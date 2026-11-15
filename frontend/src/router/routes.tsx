@@ -10,7 +10,6 @@ import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
 import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { ComparePage } from '@pages/Compare/ComparePage';
-import { NetworkClusterPage } from '@pages/NetworkCluster';
 import { FileTabPage } from '@pages/Analysis/FileTabPage';
 import { NotFoundPage } from '@pages/NotFound';
 import { MonitorPage } from '@pages/Monitor/MonitorPage';
@@ -76,15 +75,15 @@ export const router = createBrowserRouter([
             errorElement: <RouteErrorBoundary />,
           },
           {
+            // The Cluster tab is folded into the Overview ("Where the traffic goes" and the flows
+            // between organisations), now that the diagram draws every host. Old links, and the
+            // even older network-intelligence ones (#745), land on the Overview.
             path: 'network-cluster',
-            element: <NetworkClusterPage />,
-            errorElement: <RouteErrorBoundary />,
+            element: <Navigate to=".." replace />,
           },
           {
             path: 'network-intelligence',
-            // Renamed in #745. Kept as a redirect so links shared before the rename
-            // still land somewhere useful rather than on a 404.
-            element: <Navigate to="../network-cluster" replace />,
+            element: <Navigate to=".." replace />,
           },
         ],
       },

@@ -2007,6 +2007,31 @@ class PipelineIntegrationTest {
     assertThat(body.get("unanswered").get(0).get("mac").asText()).isEqualTo("44:19:b6:c0:00:09");
   }
 
+  /**
+   * The Overview's organisation grouping honours the analyst's network labels before the ASN: a
+   * labelled range shows as that organisation, which is how your own public range stops looking
+   * like your ISP's.
+   */
+  @Test
+  void organisationGrouping_prefersANetworkLabelOverTheAsn() throws Exception {
+    long ruleId =
+        rest.postForEntity("/api/v1/ip-org-rules", json("{\"cidr\":\"10.99.0.0/24\",\"label\":\"Lab\"}"), JsonNode.class)
+            .getBody().get("id").asLong();
+    try {
+      String tag = "orglabel-" + UUID.randomUUID().toString().substring(0, 8);
+      String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+      assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+      JsonNode graph = rest.getForEntity("/api/v1/clusters/" + fileId + "/graph?groupBy=asn", JsonNode.class).getBody();
+      JsonNode lab = null;
+      for (JsonNode c : graph.get("clusters")) if ("Lab".equals(c.get("label").asText())) lab = c;
+      assertThat(lab).as("a cluster named after the label").isNotNull();
+      assertThat(lab.get("id").asText()).isEqualTo("org:Lab");
+      assertThat(lab.get("hostCount").asInt()).isEqualTo(2);
+    } finally {
+      rest.delete("/api/v1/ip-org-rules/" + ruleId);
+    }
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

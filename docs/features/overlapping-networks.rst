@@ -88,7 +88,7 @@ Limits
   traffic such as DHCP.
 - A Windows sign-in records no MAC, so on a shared address it isn't placed on
   either network's machine.
-- Elsewhere (Story, reports, the network cluster view, the monitor views) the
+- Elsewhere (Story, reports, the Overview's traffic groups, the monitor views) the
   address is still one host, as for addresses that changed hands.
 - Only a monitored network's own subnet entries can be per network; the shared
   default (System → address defaults) is per CIDR.

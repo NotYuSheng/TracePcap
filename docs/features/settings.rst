@@ -84,11 +84,11 @@ without a redeploy, by whoever has the permission for them (see
      - From the next hourly cleanup run.
    * - ``DNS_NXDOMAIN_SUSPICIOUS_RATIO``, ``DNS_NXDOMAIN_MIN_QUERIES``
      - Analysis policy (analysts)
-     - At once in the network cluster view; host DNS logs use it from the next
-       analysis.
+     - At once in a DNS server's DNS tab (its host details); host DNS logs use
+       it from the next analysis.
    * - ``HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO``, ``HTTP_MIN_REQUESTS``
      - Analysis policy (analysts)
-     - At once in the network cluster view.
+     - At once in a web server's HTTP tab (its host details).
 
 Click the setting, then **Change…**. The value from the deployment's ``.env`` stays the
 default: a setting changed in the app is marked *changed in the app*, and **Reset to the

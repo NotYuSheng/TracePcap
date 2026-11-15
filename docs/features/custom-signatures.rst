@@ -93,8 +93,8 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
 - Switching a network rule off hides its matches at once.
 - On a capture's **Analysis** page, **Custom detection rules** (in the capture bar above every section)
   adds a network's rules to every tab that shows matches: the Overview, the
-  conversations (list, filters and details), the network visualization, the
-  Network Cluster's rule filter, and the PDF report's rule tags and rule
+  conversations (list, filters and details), the network visualization, and
+  the PDF report's rule tags and rule
   summary, and Story (generated with the network picked, see
   :doc:`story-mode`).
 - A snapshot's **security count** on the network page counts the network's own

@@ -11,10 +11,18 @@ the numbers are worked out.
 The Traffic (left)
 ------------------
 
-- **Totals**: hosts, conversations, packets and how long the capture runs.
+- **Totals**: hosts, conversations, packets and how long the capture runs
+  (minutes and seconds for a short capture; days, months or years for a long
+  one).
 - **Activity over time**: packets per time slice across the capture, from the
   packet timestamps tshark reads. Hover a bar for its count.
-- **Traffic mix**: two stacked bars, each with its table.
+- **Where the traffic goes**: the hosts grouped by organisation or country, as
+  tiles sized by traffic, or on a world map. Click a group for its hosts and who
+  it talks to (see :doc:`traffic-groups`).
+- **Flows between organisations**: the largest flows between two
+  organisations, each band as thick as its traffic.
+- **Traffic mix**: two stacked bars, each with its table; the tables show their
+  top ten rows, with **Show all** for the rest.
 
   - **Protocols** is the highest-layer protocol tshark recognises in each
     packet, as a share of packets.

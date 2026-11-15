@@ -228,3 +228,57 @@
 .ov-hosts ul { list-style: none; margin: 0; padding: 0; }
 .ov-hosts li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--tp-border, #eceef3); font-size: 0.82rem; }
 .ov-hosts li span { overflow-wrap: anywhere; }
+
+/* Where the traffic goes: organisations / countries as tiles sized by traffic, or the map. */
+.ov-treemap { display: block; }
+.ov-tile rect { stroke: var(--tp-surface, #fff); stroke-width: 2; }
+.ov-tile-pick { cursor: pointer; }
+.ov-tile-pick:hover rect,
+.ov-tile-pick:focus-visible rect { stroke: #5925dc; stroke-width: 2.5; }
+.ov-tile-pick:focus { outline: none; }
+.ov-tile-name { font-weight: 600; fill: #1f2937; pointer-events: none; }
+.ov-tile-meta { fill: #4b5563; pointer-events: none; }
+.ov-tile-internal rect, .ov-legend i.ov-tile-internal { fill: #ede9fe; background: #ede9fe; }
+.ov-tile-outside rect, .ov-legend i.ov-tile-outside { fill: #dbeafe; background: #dbeafe; }
+.ov-tile-unknown rect, .ov-legend i.ov-tile-unknown { fill: #eef0f3; background: #eef0f3; }
+[data-theme='dark'] .ov-tile-internal rect, [data-theme='dark'] .ov-legend i.ov-tile-internal { fill: #33275e; background: #33275e; }
+[data-theme='dark'] .ov-tile-outside rect, [data-theme='dark'] .ov-legend i.ov-tile-outside { fill: #1e3a5f; background: #1e3a5f; }
+[data-theme='dark'] .ov-tile-unknown rect, [data-theme='dark'] .ov-legend i.ov-tile-unknown { fill: #2b3040; background: #2b3040; }
+[data-theme='dark'] .ov-tile-name { fill: #e5e7eb; }
+[data-theme='dark'] .ov-tile-meta { fill: #aab1c0; }
+[data-theme='dark'] .ov-tile-pick:hover rect,
+[data-theme='dark'] .ov-tile-pick:focus-visible rect { stroke: #b9a6ff; }
+.ov-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
+.ov-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 2px; border: 1px solid rgba(0, 0, 0, 0.08); }
+.ov-where-map { position: relative; height: 420px; border: 1px solid var(--tp-card-border); border-radius: 10px; overflow: hidden; }
+.ov-where-loading { display: flex; align-items: center; gap: 8px; color: var(--tp-text-muted, #6c757d); font-size: 0.875rem; min-height: 120px; }
+
+/* Flows between organisations. */
+.ov-flows { display: block; }
+.ov-flow-band { fill-opacity: 0.5; }
+.ov-flow-band:hover { fill-opacity: 0.8; }
+.ov-flow-node { fill: #5925dc; }
+.ov-flows-name { font-size: 11px; fill: #1f2937; }
+.ov-flows-col { font-size: 10.5px; font-weight: 600; fill: #4b5563; letter-spacing: 0.04em; }
+[data-theme='dark'] .ov-flow-node { fill: #9b87f5; }
+[data-theme='dark'] .ov-flows-name { fill: #e5e7eb; }
+[data-theme='dark'] .ov-flows-col { fill: #aab1c0; }
+
+/* A group's drawer. */
+.ov-group-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+.ov-group-stats b { display: block; font-size: 1.1rem; }
+.ov-group-stats span { font-size: 0.8rem; color: var(--tp-text-muted, #6c757d); }
+.ov-group-h { font-size: 0.9rem; font-weight: 700; margin: 14px 0 8px; }
+.ov-group-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.ov-group-table th { font-weight: 600; color: var(--tp-text-muted, #6c757d); padding: 6px 4px; border-bottom: 1px solid var(--tp-border, #dee2e6); }
+.ov-group-table td { padding: 6px 4px; border-bottom: 1px solid var(--tp-border-subtle, #f0f1f4); vertical-align: middle; }
+.ov-group-table tbody tr:last-child td { border-bottom-width: 0; }
+.ov-group-table .ov-bar { display: inline-block; width: 70px; margin-right: 8px; vertical-align: middle; }
+.ov-group-table .ov-group-ip { font-size: 0.75rem; line-height: 1.35; overflow-wrap: anywhere; text-align: left; }
+.ov-group-table td:nth-child(2) { white-space: nowrap; }
+.ov-group-num { white-space: nowrap; }
+.ov-group-peers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.8125rem; }
+.ov-group-peers li { display: grid; grid-template-columns: minmax(0, 1fr) 80px 72px; gap: 8px; align-items: center; }
+.ov-group-peers .ov-group-num { text-align: right; }
+.ov-group-peer { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-chip { display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 0 5px; border-radius: 4px; background: var(--tp-bg-subtle, #eef0f4); margin-left: 6px; vertical-align: 1px; }
