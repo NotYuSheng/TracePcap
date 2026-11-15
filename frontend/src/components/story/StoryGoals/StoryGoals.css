@@ -12,7 +12,7 @@
 
 .story-goal {
   background: var(--tp-surface, #fff);
-  border: 1px solid var(--tp-border, #d5d9e1);
+  border: 1px solid var(--tp-card-border);
   border-radius: 14px;
   padding: 14px 16px;
   min-width: 0;

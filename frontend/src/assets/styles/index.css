@@ -30,6 +30,8 @@
   --tp-surface: #fff;
   --tp-surface-hover: #f8f9fa;
   --tp-border: #d5d9e1;
+  /* A card's outline: the same as an SGDS Card's, so custom cards match them. */
+  --tp-card-border: #98a2b3;
   --tp-text: #212529;
   --tp-text-muted: #525a68;
   --tp-header-bg: #fff;
@@ -44,6 +46,7 @@
   --tp-surface: #1e2130;
   --tp-surface-hover: #252840;
   --tp-border: #2e3349;
+  --tp-card-border: #2e3349;
   --tp-text: #e2e8f0;
   --tp-text-muted: #a3acbd;
   --tp-header-bg: #13151f;
