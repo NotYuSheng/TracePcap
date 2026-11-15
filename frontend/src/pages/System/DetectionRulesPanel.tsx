@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -372,67 +373,69 @@ function ImportRulesModal({
   };
 
   return (
-    <Modal show={show} onHide={() => !busy && onHide()}>
-      <Modal.Header closeButton>
-        <Modal.Title>Import rules</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="small text-muted">
-          A file exported from TracePcap, or an old{' '}
-          <span className="font-monospace">signatures.yml</span>. Rules are matched to existing ones
-          by name. If any rule in the file is invalid, nothing is imported.
-        </p>
-        {error && (
-          <Alert variant="danger" className="py-2 small">
-            {error}
-            {problems.length > 0 && (
-              <ul className="mb-0 mt-1" data-testid="import-problems">
-                {problems.map(([k, v]) => (
-                  <li key={k}>
-                    <span className="font-monospace">{k}</span>: {v}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Alert>
-        )}
-        <Form.Group className="mb-3">
-          <Form.Label htmlFor="rules-file">Rules file</Form.Label>
-          <Form.Control
-            id="rules-file"
-            type="file"
-            accept=".yml,.yaml,text/yaml,application/yaml"
-            onChange={e => setFile((e.target as HTMLInputElement).files?.[0] ?? null)}
-            disabled={busy}
-          />
-        </Form.Group>
-        <Form.Check
-          type="radio"
-          id="import-merge"
-          name="import-mode"
-          label="Add and update rules; keep the others"
-          checked={mode === 'MERGE'}
-          onChange={() => setMode('MERGE')}
+    <SideDrawer
+      show={show}
+      onHide={() => !busy && onHide()}
+      title="Import rules"
+      titleId="import-rules-title"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onHide} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={run} disabled={busy || !file}>
+            {busy ? <Spinner animation="border" size="sm" /> : 'Import'}
+          </Button>
+        </>
+      }
+    >
+      <p className="small text-muted">
+        A file exported from TracePcap, or an old{' '}
+        <span className="font-monospace">signatures.yml</span>. Rules are matched to existing ones
+        by name. If any rule in the file is invalid, nothing is imported.
+      </p>
+      {error && (
+        <Alert variant="danger" className="py-2 small">
+          {error}
+          {problems.length > 0 && (
+            <ul className="mb-0 mt-1" data-testid="import-problems">
+              {problems.map(([k, v]) => (
+                <li key={k}>
+                  <span className="font-monospace">{k}</span>: {v}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Alert>
+      )}
+      <Form.Group className="mb-3">
+        <Form.Label htmlFor="rules-file">Rules file</Form.Label>
+        <Form.Control
+          id="rules-file"
+          type="file"
+          accept=".yml,.yaml,text/yaml,application/yaml"
+          onChange={e => setFile((e.target as HTMLInputElement).files?.[0] ?? null)}
           disabled={busy}
         />
-        <Form.Check
-          type="radio"
-          id="import-replace"
-          name="import-mode"
-          label="Replace: also delete rules that aren't in the file"
-          checked={mode === 'REPLACE'}
-          onChange={() => setMode('REPLACE')}
-          disabled={busy}
-        />
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide} disabled={busy}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={run} disabled={busy || !file}>
-          {busy ? <Spinner animation="border" size="sm" /> : 'Import'}
-        </Button>
-      </Modal.Footer>
-    </Modal>
+      </Form.Group>
+      <Form.Check
+        type="radio"
+        id="import-merge"
+        name="import-mode"
+        label="Add and update rules; keep the others"
+        checked={mode === 'MERGE'}
+        onChange={() => setMode('MERGE')}
+        disabled={busy}
+      />
+      <Form.Check
+        type="radio"
+        id="import-replace"
+        name="import-mode"
+        label="Replace: also delete rules that aren't in the file"
+        checked={mode === 'REPLACE'}
+        onChange={() => setMode('REPLACE')}
+        disabled={busy}
+      />
+    </SideDrawer>
   );
 }
