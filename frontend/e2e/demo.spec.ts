@@ -788,7 +788,7 @@ test('README demo walkthrough', async ({ page }) => {
   // than a flicker, and re-framed because the volume mode adds a legend row that
   // grows the card and pushes the header back off the top.
   // Anchored on the option values it must contain, not on its rendered text: the
-  // "Color edges by" Form.Label has no htmlFor, so getByLabel cannot reach it,
+  // "Edges" Form.Label has no htmlFor, so getByLabel cannot reach it,
   // and filtering a <select> by hasText matches against its options — which
   // silently matched nothing here and skipped the whole cycle.
   const edgeColorSelect = page

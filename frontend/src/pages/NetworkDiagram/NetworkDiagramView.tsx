@@ -791,16 +791,18 @@ export const NetworkDiagramView = ({
                     its legend. Transport = base protocol (TCP/UDP/ICMP); Application = deepest
                     identified protocol (HTTPS, DNS, QUIC…). */}
                 <div className="d-flex align-items-center gap-2">
-                  <Form.Label className="mb-0 text-muted small">Color edges by</Form.Label>
+                  <Form.Label className="mb-0 text-muted small">Edges</Form.Label>
                   <Form.Select
                     size="sm"
-                    style={{ width: 130 }}
+                    aria-label="Edges"
+                    style={{ width: 150 }}
                     value={edgeColorMode}
                     onChange={e => setEdgeColorMode(e.target.value as EdgeColorMode)}
                   >
-                    <option value="transport">Transport</option>
-                    <option value="application">Application</option>
-                    <option value="volume">Volume</option>
+                    <option value="transport">By transport</option>
+                    <option value="application">By application</option>
+                    <option value="volume">By volume</option>
+                    <option value="hidden">Hidden</option>
                   </Form.Select>
                 </div>
                 {edgeColorMode === 'volume' && (
