@@ -23,7 +23,7 @@
 }
 .network-stat {
   padding: 16px;
-  border: 1px solid var(--tp-border, #d8dce5);
+  border: 1px solid var(--tp-card-border);
   border-radius: 12px;
   background: var(--tp-surface, #fff);
   text-align: left;
