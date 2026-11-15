@@ -20,7 +20,7 @@ import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
-import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { HostDetailModal } from '@components/common/EntityDetailModal';
 import { isPrivateIp } from '@/utils/ipClassification';
 import type { DeviceType } from '@/types';
 import './ConversationDetail.css';
@@ -649,11 +649,9 @@ export const ConversationDetail = ({
       </div>
 
       {hostModalIp && fileId && (
-        <EntityDetailModal
-          entityType="IP"
-          entityKey={hostModalIp}
-          displayName={hostModalIp}
+        <HostDetailModal
           fileId={fileId}
+          ip={hostModalIp}
           onClose={() => { setHostModalIp(null); refreshIdentities(); }}
         />
       )}

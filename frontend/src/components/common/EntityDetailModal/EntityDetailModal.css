@@ -227,3 +227,33 @@
   font-size: 11px;
   color: var(--tp-text-muted, #4b5563);
 }
+
+/* Role heading: the name on the left, actions on the right; in a narrow card (the node
+   dialog's identity card) the actions drop to their own row instead of squeezing. */
+.role-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+.role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.role-action-btn.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+.role-action-btn .bi {
+  font-size: 0.8rem;
+  line-height: 1;
+}

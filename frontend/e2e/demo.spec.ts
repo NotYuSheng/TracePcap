@@ -473,8 +473,13 @@ test('README demo walkthrough', async ({ page }) => {
   // "Evidence weighed" is the heart of the panel: the independent measured
   // signals (hardware fingerprint, ports/services, behaviour) that the
   // adjudicator combined into one verdict. Scroll it into view inside the modal
-  // body — the modal scrolls, the page behind it does not.
+  // body — the modal scrolls, the page behind it does not. The host modal is the
+  // identity-card view, where the evidence lives on its own tab.
+  const evidenceTab = hostModal.getByRole('tab', { name: /Identity evidence/i });
+  await expect(evidenceTab, 'host modal has no Identity evidence tab').toBeVisible({ timeout: 15_000 });
+  await showClick(page, evidenceTab);
   const evidence = hostModal.getByText(/Evidence weighed/i).first();
+  await expect(evidence).toBeVisible({ timeout: 15_000 });
   if (await evidence.isVisible().catch(() => false)) {
     await evidence.evaluate(el => el.scrollIntoView({ block: 'center' }));
     await beat(page, FEATURE);
