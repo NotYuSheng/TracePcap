@@ -33,7 +33,7 @@ This makes it well-suited for:
 
 <div align="center">
 
-![TracePcap Demo](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
+![TracePcap network diagram: a capture's devices grouped by network, the traffic played back over time, edges coloured by application, and a device's identity card](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
 
 </div>
 
@@ -133,6 +133,19 @@ docker compose up -d
 **4. Open** [http://localhost:80](http://localhost:80) in your browser.
 
 > **Note:** First startup may take a minute while PostgreSQL and MinIO initialise. AI features require a running LLM server pointed to by `LLM_API_BASE_URL`; all other features work without it. TracePcap is built to run fully offline — `LLM_API_BASE_URL` must point to a self- or LAN-hosted server, never a public/internet API.
+
+## Walkthrough
+
+The full tour: upload, conversations, story mode, the network map, filters, and a
+monitored network changing over eight weeks.
+
+<div align="center">
+
+![TracePcap walkthrough](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
+
+</div>
+
+> This walkthrough was recorded before the current design and is due to be re-recorded.
 
 ## Usage
 
