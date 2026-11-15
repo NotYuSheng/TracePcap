@@ -1,510 +1,790 @@
 package com.tracepcap.report;
 
+import static com.tracepcap.report.ReportPdf.cell;
+import static com.tracepcap.report.ReportPdf.font;
+import static com.tracepcap.report.ReportPdf.heading;
+import static com.tracepcap.report.ReportPdf.para;
+import static com.tracepcap.report.ReportPdf.right;
+import static com.tracepcap.report.ReportPdf.table;
+
+import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
-import com.lowagie.text.Element;
 import com.lowagie.text.Font;
 import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
-import com.lowagie.text.Rectangle;
-import com.lowagie.text.pdf.ColumnText;
-import com.lowagie.text.pdf.PdfContentByte;
-import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.tracepcap.analysis.dto.occupancy.DeviceMoveDto;
+import com.tracepcap.analysis.dto.occupancy.HostOccupancyResponse;
+import com.tracepcap.analysis.dto.segments.NetworkSegmentsResponse;
 import com.tracepcap.analysis.spi.AnalysisSummaryLookup;
 import com.tracepcap.analysis.spi.AnalysisSummaryLookup.CaptureSummary;
+import com.tracepcap.analysis.spi.CaptureNetworkLookup;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.Breakdown;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.analysis.spi.ConversationLookup.Facet;
 import com.tracepcap.analysis.spi.ConversationLookup.NamedTotals;
-import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
+import com.tracepcap.cluster.dto.ClusterEdgeDto;
+import com.tracepcap.cluster.dto.ClusterGraphResponse;
+import com.tracepcap.cluster.dto.ClusterNodeDto;
+import com.tracepcap.cluster.service.NetworkClusterService;
+import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.extraction.entity.ExtractedFileEntity;
 import com.tracepcap.extraction.repository.ExtractedFileRepository;
-import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
+import com.tracepcap.report.ReportRequest.Section;
 import com.tracepcap.story.dto.Finding;
-import com.tracepcap.story.dto.InvestigationStep;
 import com.tracepcap.story.dto.StoryResponse;
 import com.tracepcap.story.service.StoryService;
-import java.awt.Color;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * A capture's PDF report (#1152): a briefing for someone who will never open TracePcap — what
+ * needs a look, the hosts by network with their names, the network map — and, when asked for, the
+ * evidence after it: traffic, conversations, extracted files and an appendix of every flagged
+ * conversation.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReportService {
 
-  // ── limits ────────────────────────────────────────────────────────────────
-  private static final int TOP_CONVERSATIONS_LIMIT = 30;
-  private static final int SECURITY_FINDINGS_LIMIT = 100;
-  private static final int TLS_LIMIT = 50;
+  /** Findings shown on the summary page; the rest are counted. */
+  private static final int FINDINGS_SHOWN = 8;
+  /** Rows per flag in the appendix. */
+  private static final int APPENDIX_ROWS_PER_FLAG = 300;
+  private static final int BUSIEST = 25;
+  private static final int TOP_ORGS_ON_SUMMARY = 6;
+  /** Internet addresses listed per organisation in the hosts table. */
+  private static final int INTERNET_ADDRESSES_SHOWN = 6;
 
-  // ── PDF colours ───────────────────────────────────────────────────────────
-  private static final Color C_HEADER_BG = new Color(30, 64, 175);
-  private static final Color C_SUBHEADER_BG = new Color(59, 130, 246);
-  private static final Color C_ROW_ALT = new Color(239, 246, 255);
-  private static final Color C_RISK_BG = new Color(254, 226, 226);
-  private static final Color C_DIVIDER = new Color(147, 197, 253);
-  private static final Color C_TEXT = new Color(30, 41, 59);
-  private static final Color C_LABEL = new Color(30, 41, 59);
+  private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy");
+  private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
+  private static final DateTimeFormatter HMS = DateTimeFormatter.ofPattern("HH:mm:ss");
+  private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm");
 
-  // ── date/time format ──────────────────────────────────────────────────────
-  private static final DateTimeFormatter DT_FMT =
-      DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-
-  // Global Suricata kill-switch — when false, Suricata never ran regardless of the per-file flag,
-  // so the report must reflect the effective state, not just the upload-time choice. See AnalysisService.
-  @Value("${tracepcap.suricata.enabled:true}")
-  private boolean suricataEnabled;
-
-  // ── repositories / services ───────────────────────────────────────────────
   private final FileRepository fileRepository;
   private final AnalysisSummaryLookup analysisSummaryLookup;
   private final ConversationLookup conversationLookup;
   private final HostClassificationLookup hostClassificationLookup;
   private final ExtractedFileRepository extractedFileRepository;
-  private final GeoOrgLookup geoOrgLookup;
   private final StoryService storyService;
   private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
+  private final CaptureNetworkLookup captureNetworkLookup;
+  private final NetworkClusterService clusterService;
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Public entry point
-  // ══════════════════════════════════════════════════════════════════════════
+  /** Everything one report is drawn from, gathered once. */
+  private record Facts(
+      FileEntity file,
+      CaptureSummary summary,
+      List<ConversationFacts> conversations,
+      List<ConversationFacts> flagged,
+      List<HostFacts> hosts,
+      NetworkSegmentsResponse networks,
+      List<HostOccupancyResponse.ReusedAddress> shared,
+      List<DeviceMoveDto> moves,
+      ClusterGraphResponse orgs,
+      Set<String> internet,
+      ReportNames names,
+      StoryResponse story,
+      List<ExtractedFileEntity> extracted) {}
 
   @Transactional(readOnly = true)
   public void generateReport(UUID fileId, ReportRequest request, OutputStream out) {
-    FileEntity file =
-        fileRepository
-            .findById(fileId)
-            .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    ReportRequest req = request != null ? request : new ReportRequest();
+    Facts facts = gather(fileId, req.getNetworkId());
+    Set<Section> sections = req.effectiveSections();
 
-    CaptureSummary analysis = analysisSummaryLookup.summaryFor(fileId).orElse(null);
-
-    List<HostFacts> hosts = hostClassificationLookup.hostFacts(fileId);
-
-    List<ConversationFacts> topConversations =
-        conversationLookup.topConversationsByBytes(fileId, TOP_CONVERSATIONS_LIMIT);
-    List<ConversationFacts> riskyConversations =
-        conversationLookup.atRiskConversations(fileId, SECURITY_FINDINGS_LIMIT);
-    java.util.UUID networkId = request == null ? null : request.getNetworkId();
-    List<ConversationFacts> tlsConversations =
-        conversationLookup.tlsConversations(fileId, TLS_LIMIT);
-
-    List<ExtractedFileEntity> extractedFiles =
-        extractedFileRepository.findByFileIdOrderByCreatedAtAsc(fileId);
-
-    List<NamedTotals> appStats = conversationLookup.breakdown(fileId, Breakdown.APPLICATION);
-    List<NamedTotals> l7Stats = conversationLookup.breakdown(fileId, Breakdown.L7_PROTOCOL);
-    List<NamedTotals> categoryStats = conversationLookup.breakdown(fileId, Breakdown.CATEGORY);
-
-    List<String> fileTypes = conversationLookup.distinctValues(fileId, Facet.FILE_TYPE);
-    List<String> httpUserAgents = conversationLookup.distinctValues(fileId, Facet.HTTP_USER_AGENT);
-    List<String> riskTypes = conversationLookup.distinctValues(fileId, Facet.RISK_TYPE);
-    List<String> customSigs = conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
-    if (networkId != null) {
-      // Viewed in a network (#925): its own rules' matches count, the global rules it suppresses
-      // don't, both in the rule summary and on each at-risk row.
-      java.util.Set<String> suppressed = networkRuleOverlay.suppressedNames(networkId);
-      java.util.Map<java.util.UUID, List<String>> labels = networkRuleOverlay.labels(networkId, fileId);
-      java.util.TreeSet<String> all = new java.util.TreeSet<>(customSigs);
-      all.removeAll(suppressed);
-      labels.values().forEach(all::addAll);
-      customSigs = new java.util.ArrayList<>(all);
-      riskyConversations =
-          riskyConversations.stream().map(c -> inNetwork(c, suppressed, labels.get(c.id()))).toList();
-    }
-
-    List<GeoOrgLookup.Country> geoCountries = geoOrgLookup.distinctCountriesInFile(fileId);
-
-    long totalConversations = conversationLookup.conversationCount(fileId);
-    long riskCount = conversationLookup.atRiskConversationCount(fileId);
-
-    StoryResponse story = storyService.getStoryByFileId(fileId).orElse(null);
-
-    Document document = new Document(PageSize.A4, 40, 40, 60, 40);
+    Document doc = new Document(PageSize.A4, 40, 40, 54, 44);
     try {
-      PdfWriter writer = PdfWriter.getInstance(document, out);
-      document.open();
+      PdfWriter writer = PdfWriter.getInstance(doc, out);
+      FileEntity file = facts.file();
+      String hash = file.getFileHash();
+      String footer = file.getFileName()
+          + (hash != null && hash.length() > 16 ? "  ·  SHA-256 " + hash.substring(0, 8) + "…" + hash.substring(hash.length() - 8) : "");
+      writer.setPageEvent(new ReportPdf.Furniture(
+          "TracePcap · capture report · " + LocalDateTime.now().format(STAMP), footer));
+      doc.open();
 
-      // ── Sections ──────────────────────────────────────────────────────────
-      // Section counter: increment only for sections that are actually emitted
-      // so numbering stays consecutive even when optional sections are skipped.
-      int sec = 1;
-      addCover(document, file);
-      addFileInfo(document, file, sec++);
-      addExecutiveSummary(
-          document,
-          file,
-          analysis,
-          hosts.size(),
-          totalConversations,
-          riskCount,
-          extractedFiles.size(),
-          geoCountries.size(),
-          sec++);
+      List<ReportFindings.Finding> findings = ReportFindings.build(
+          facts.flagged(), facts.conversations().size(), facts.names(), facts.shared(), facts.networks(),
+          sections.contains(Section.APPENDIX));
 
-      if (story != null) {
-        if (story.getNarrative() != null && !story.getNarrative().isEmpty()) {
-          addAiNarrative(document, story, sec++);
-        }
-        if (story.getFindings() != null && !story.getFindings().isEmpty()) {
-          addDeterministicFindings(document, story.getFindings(), sec++);
-        }
-        if (story.getInvestigationSteps() != null && !story.getInvestigationSteps().isEmpty()) {
-          addInvestigationSteps(document, story.getInvestigationSteps(), sec++);
-        }
-      } else {
-        addStoryNotGenerated(document, sec++);
+      summaryPage(doc, facts, findings, sections, req);
+      if (sections.contains(Section.HOSTS)) {
+        doc.newPage();
+        hosts(doc, facts);
       }
-
-      if (analysis != null && analysis.protocolStats() != null) {
-        addProtocolDistribution(document, analysis.protocolStats(), sec++);
+      if (sections.contains(Section.MAP) && req.getMapImage() != null && !req.getMapImage().isBlank()) {
+        // The map gets a landscape page, so its labels print as large as they can.
+        doc.setPageSize(PageSize.A4.rotate());
+        doc.newPage();
+        map(doc, req);
       }
-
-      if (!categoryStats.isEmpty()) {
-        addCategoryDistribution(document, categoryStats, sec++);
+      restOfReport(doc, facts, sections, req);
+      doc.setPageSize(PageSize.A4);
+      if (sections.contains(Section.STORY) && hasStory(facts)) {
+        doc.newPage();
+        story(doc, facts.story());
       }
-
-      if (!appStats.isEmpty()) {
-        addApplicationsDetected(document, appStats, sec++);
+      if (sections.contains(Section.TRAFFIC)) {
+        doc.newPage();
+        traffic(doc, facts);
       }
-
-      if (!l7Stats.isEmpty()) {
-        addL7Protocols(document, l7Stats, sec++);
+      if (sections.contains(Section.CONVERSATIONS)) {
+        doc.newPage();
+        conversations(doc, facts);
       }
-
-      addHostInventory(document, hosts, sec++);
-
-      if (!geoCountries.isEmpty()) {
-        addGeoSummary(document, geoCountries, sec++);
+      if (sections.contains(Section.EXTRACTED_FILES) && !facts.extracted().isEmpty()) {
+        doc.newPage();
+        extractedFiles(doc, facts.extracted());
       }
-
-      if (!riskTypes.isEmpty() || !customSigs.isEmpty()) {
-        addRiskTypeSummary(document, riskTypes, customSigs, sec++);
+      if (sections.contains(Section.APPENDIX)) {
+        doc.newPage();
+        appendix(doc, facts);
       }
-
-      if (!riskyConversations.isEmpty()) {
-        addSecurityFindings(document, riskyConversations, sec++);
-      }
-
-      if (!tlsConversations.isEmpty()) {
-        addTlsAnalysis(document, tlsConversations, sec++);
-      }
-
-      if (!httpUserAgents.isEmpty()) {
-        addHttpUserAgents(document, httpUserAgents, sec++);
-      }
-
-      if (!topConversations.isEmpty()) {
-        addTopConversations(document, topConversations, sec++);
-      }
-
-      if (!fileTypes.isEmpty()) {
-        addDetectedFileTypes(document, fileTypes, sec++);
-      }
-
-      if (!extractedFiles.isEmpty()) {
-        addExtractedFiles(document, extractedFiles, sec++);
-      }
-
-      List<String> activeFilters =
-          request.getActiveFilters() != null ? request.getActiveFilters() : List.of();
-      String nodeLimitNote = request.getNodeLimitNote();
-      addTopologyDiagram(
-          document, writer, request.getForceDirectedImage(), "Force-Directed Layout", sec++,
-          activeFilters, nodeLimitNote);
-      addTopologyDiagram(
-          document, writer, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++,
-          activeFilters, nodeLimitNote);
-
     } catch (Exception e) {
       log.error("PDF generation failed for file {}", fileId, e);
       throw new RuntimeException("Report generation failed", e);
     } finally {
-      document.close();
+      doc.close();
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Cover
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Gathering ────────────────────────────────────────────────────────────────
 
-  private void addCover(Document doc, FileEntity file) throws Exception {
-    Font appF = new Font(Font.HELVETICA, 11, Font.BOLD, new Color(100, 116, 139));
-    Font titleF = new Font(Font.HELVETICA, 24, Font.BOLD, C_HEADER_BG);
-    Font subF = new Font(Font.HELVETICA, 13, Font.NORMAL, new Color(71, 85, 105));
-    Font metaF = new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(100, 116, 139));
+  private Facts gather(UUID fileId, UUID networkId) {
+    FileEntity file = fileRepository.findById(fileId)
+        .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    CaptureSummary summary = analysisSummaryLookup.summaryFor(fileId).orElse(null);
+    List<ConversationFacts> all = conversationLookup.conversationFacts(fileId);
+    if (networkId != null) {
+      // Viewed in a network (#925): its own rules' matches count, the global rules it suppresses don't.
+      Set<String> suppressed = networkRuleOverlay.suppressedNames(networkId);
+      Map<UUID, List<String>> labels = networkRuleOverlay.labels(networkId, fileId);
+      all = all.stream().map(c -> inNetwork(c, suppressed, labels.get(c.id()))).toList();
+    }
+    List<ConversationFacts> flagged = all.stream().filter(c -> !ReportFindings.flagsOf(c).isEmpty()).toList();
+    List<HostFacts> hosts = hostClassificationLookup.hostFacts(fileId);
+    NetworkSegmentsResponse networks = safe(() -> captureNetworkLookup.networks(fileId), null);
+    List<HostOccupancyResponse.ReusedAddress> shared = safe(() -> captureNetworkLookup.sharedAddresses(fileId), List.of());
+    List<DeviceMoveDto> moves = safe(() -> captureNetworkLookup.moves(fileId), List.of());
+    ClusterGraphResponse orgs = safe(() -> clusterService.computeClusters(fileId, "asn", null, List.of(), networkId), null);
 
-    Paragraph app = centred(new Paragraph("TracePcap — Network Traffic Analysis Report", appF));
-    app.setSpacingBefore(36);
-    doc.add(app);
-
-    Paragraph title = centred(new Paragraph(file.getFileName(), titleF));
-    title.setSpacingBefore(8);
-    doc.add(title);
-
-    Paragraph gen =
-        centred(new Paragraph("Report generated: " + LocalDateTime.now().format(DT_FMT), metaF));
-    gen.setSpacingBefore(6);
-    doc.add(gen);
-
-    addDivider(doc);
+    Map<String, String> orgByIp = new HashMap<>();
+    Set<String> internet = new HashSet<>();
+    if (orgs != null && orgs.getClusters() != null) {
+      for (ClusterNodeDto n : orgs.getClusters()) {
+        if ("cluster:internal".equals(n.getId()) || n.getIpBytes() == null) continue;
+        for (String ip : realHosts(n).keySet()) {
+          orgByIp.put(ip, n.getLabel());
+          internet.add(ip);
+        }
+      }
+    }
+    ReportNames names = new ReportNames(hosts, shared, networks, orgByIp);
+    StoryResponse story = safe(() -> storyService.getStoryByFileId(fileId).orElse(null), null);
+    List<ExtractedFileEntity> extracted = extractedFileRepository.findByFileIdOrderByCreatedAtAsc(fileId);
+    return new Facts(file, summary, all, flagged, hosts, networks, shared, moves, orgs, internet, names, story, extracted);
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: File Information
-  // ══════════════════════════════════════════════════════════════════════════
+  private static <T> T safe(java.util.function.Supplier<T> s, T fallback) {
+    try {
+      T v = s.get();
+      return v != null ? v : fallback;
+    } catch (RuntimeException e) {
+      log.warn("Report: a part couldn't be read and is left out: {}", e.toString());
+      return fallback;
+    }
+  }
 
-  private void addFileInfo(Document doc, FileEntity file, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". File Information");
+  // ── Summary page ─────────────────────────────────────────────────────────────
 
-    String[][] rows = {
-      {"File Name", file.getFileName()},
-      {"File Size", formatBytes(file.getFileSize())},
-      {"SHA-256 Hash", nvl(file.getFileHash())},
-      {"Upload Time", formatDt(file.getUploadedAt())},
-      {"Status", file.getStatus() != null ? file.getStatus().name() : "—"},
-      {"nDPI Enrichment", file.isEnableNdpi() ? "Enabled" : "Disabled"},
-      {"Suricata IDS", (suricataEnabled && file.isEnableSuricata()) ? "Enabled" : "Disabled"},
-      {"File Extraction", file.isEnableFileExtraction() ? "Enabled" : "Disabled"},
+  private void summaryPage(
+      Document doc, Facts f, List<ReportFindings.Finding> findings, Set<Section> sections, ReportRequest req)
+      throws Exception {
+    FileEntity file = f.file();
+    doc.add(new Paragraph(file.getFileName(), font(17, Font.BOLD, ReportPdf.TEXT)));
+    doc.add(new Paragraph(whenLine(f, req), ReportPdf.muted()));
+
+    long local = localDevices(f);
+    int networks = f.networks() == null ? 0 : f.networks().segments().size();
+    doc.add(ReportPdf.figures(new String[][] {
+      {String.valueOf(local), "devices on your networks"},
+      {String.valueOf(networks), networks == 1 ? "network" : "networks"},
+      {String.format("%,d", f.conversations().size()), "conversations"},
+      {String.valueOf(f.internet().size()), "internet hosts"},
+    }));
+
+    if (sections.contains(Section.NEEDS_A_LOOK)) {
+      heading(doc, "Needs a look", findings.isEmpty() ? null
+          : findings.size() + (findings.size() == 1 ? " thing" : " things") + ", most serious first");
+      if (findings.isEmpty()) {
+        para(doc, "Nothing was flagged: no nDPI risks, Suricata alerts or rule matches, no address"
+            + " that changed hands, and every device that asked for an address got one."
+            + (f.file().isEnableSuricata() ? "" : " Suricata didn't run on this capture."), ReportPdf.body());
+      } else {
+        for (int i = 0; i < Math.min(FINDINGS_SHOWN, findings.size()); i++) doc.add(ReportPdf.finding(findings.get(i)));
+        if (findings.size() > FINDINGS_SHOWN) {
+          para(doc, "And " + (findings.size() - FINDINGS_SHOWN) + " more of lower concern"
+              + (sections.contains(Section.APPENDIX) ? "; the appendix lists every flagged conversation." : "."), ReportPdf.muted());
+        }
+      }
+    }
+
+    List<ClusterNodeDto> orgs = orgsBySize(f);
+    if (!orgs.isEmpty()) {
+      heading(doc, "Where the traffic goes", "by organisation, from GeoIP and your network labels");
+      long total = orgs.stream().mapToLong(ReportService::realBytes).sum();
+      PdfPTable t = table(new float[] {5, 1.4f, 1.6f, 1.2f}, "Organisation", "Hosts", "Bytes", "Share");
+      for (ClusterNodeDto n : orgs.subList(0, Math.min(TOP_ORGS_ON_SUMMARY, orgs.size()))) orgRow(t, n, total);
+      doc.add(t);
+      if (orgs.size() > TOP_ORGS_ON_SUMMARY) {
+        para(doc, "And " + (orgs.size() - TOP_ORGS_ON_SUMMARY) + " more"
+            + (sections.contains(Section.TRAFFIC) ? ", in Traffic." : "."), ReportPdf.muted());
+      }
+    }
+  }
+
+  private String whenLine(Facts f, ReportRequest req) {
+    CaptureSummary s = f.summary();
+    List<String> parts = new ArrayList<>();
+    if (s != null && s.startTime() != null) {
+      String when = s.startTime().format(DAY) + ", " + s.startTime().format(HM);
+      if (s.endTime() != null) {
+        when += " to " + (s.endTime().toLocalDate().equals(s.startTime().toLocalDate())
+            ? s.endTime().format(HM) : s.endTime().format(DAY) + ", " + s.endTime().format(HM));
+      }
+      if (s.durationMs() != null) when += " (" + duration(s.durationMs()) + ")";
+      parts.add(when);
+    }
+    if (s != null) parts.add(String.format("%,d packets", s.packetCount()));
+    if (s != null) parts.add(bytes(s.totalBytes()));
+    parts.add(req.getNetworkId() != null ? "with a monitored network's detection rules" : "with the shared detection rules");
+    return String.join(" · ", parts);
+  }
+
+  private static long localDevices(Facts f) {
+    Set<String> keys = new HashSet<>();
+    for (HostFacts h : f.hosts()) if (h.ip() != null && !f.internet().contains(h.ip())) keys.add(h.mac() != null ? h.mac() : h.ip());
+    for (var r : f.shared()) for (var o : r.occupancies()) if (o.getMac() != null) keys.add(o.getMac());
+    if (f.networks() != null) {
+      for (var s : f.networks().segments()) for (var u : s.unanswered()) keys.add(u.mac());
+      for (var u : f.networks().unanswered()) keys.add(u.mac());
+    }
+    return keys.size();
+  }
+
+  // ── Hosts by network ─────────────────────────────────────────────────────────
+
+  private record HostRow(String name, String note, boolean redNote, String address, String mac, String device, String vendor) {}
+
+  private void hosts(Document doc, Facts f) throws Exception {
+    heading(doc, "Hosts, by network", "names from DHCP, NetBIOS and DNS");
+    ReportNames names = f.names();
+
+    // Devices that moved: their first address folds into the row of the one they moved to.
+    Map<String, DeviceMoveDto> movedTo = new HashMap<>();
+    Set<String> movedFrom = new HashSet<>();
+    for (DeviceMoveDto m : f.moves()) {
+      movedTo.put(m.toIp() + "|" + m.mac(), m);
+      movedFrom.add(m.fromIp() + "|" + m.mac());
+    }
+    Map<String, List<HostOccupancyResponse.Occupancy>> shared = new HashMap<>();
+    for (var r : f.shared()) shared.put(r.ip(), r.occupancies());
+
+    Map<String, List<HostRow>> groups = new LinkedHashMap<>();
+    Map<String, String> groupTitles = new LinkedHashMap<>();
+    if (f.networks() != null) {
+      for (var s : f.networks().segments()) {
+        groups.put(s.label(), new ArrayList<>());
+        groupTitles.put(s.label(), s.label() + (s.cidr() != null ? " · " + s.cidr() : ""));
+      }
+    }
+    String other = "Other local addresses";
+
+    List<HostFacts> local = f.hosts().stream()
+        .filter(h -> h.ip() != null && !f.internet().contains(h.ip()))
+        .sorted(Comparator.comparing(h -> ipSortKey(h.ip())))
+        .toList();
+    for (HostFacts h : local) {
+      if (movedFrom.contains(h.ip() + "|" + h.mac())) continue;
+      String group = names.networkOf(h.ip());
+      if (group == null || !groups.containsKey(group)) {
+        group = other;
+        groups.computeIfAbsent(other, k -> new ArrayList<>());
+        groupTitles.putIfAbsent(other, other);
+      }
+      List<HostRow> rows = groups.get(group);
+      var holders = shared.get(h.ip());
+      if (holders != null && holders.size() > 1) {
+        for (int i = 0; i < holders.size(); i++) {
+          var o = holders.get(i);
+          String when = o.getNetwork() != null ? "on " + o.getNetwork()
+              : i == 0 ? (o.getEndsAt() != null ? "until " + o.getEndsAt().format(HMS) : null)
+              : (o.getStartsAt() != null ? "from " + o.getStartsAt().format(HMS) : null);
+          var cls = o.getClassification();
+          rows.add(new HostRow(o.getHostname() != null ? o.getHostname() : "—", i > 0 ? "same address" : null, false,
+              h.ip() + (when != null ? "  " + when : ""), o.getMac(),
+              device(cls != null ? cls.getDeviceType() : null, false),
+              vendor(cls != null ? cls.getManufacturer() : h.manufacturer())));
+        }
+        continue;
+      }
+      DeviceMoveDto move = movedTo.get(h.ip() + "|" + h.mac());
+      boolean gateway = names.isGateway(h.ip());
+      String name = h.hostname() != null && !h.hostname().isBlank() ? h.hostname() : gateway ? "Gateway" : "—";
+      String address = move != null ? lastOctets(move.fromIp(), move.toIp()) : h.ip();
+      rows.add(new HostRow(name, move != null ? "moved" : null, false, address, h.mac(), device(h.deviceType(), gateway), vendor(h.manufacturer())));
+    }
+    if (f.networks() != null) {
+      for (var s : f.networks().segments())
+        for (var u : s.unanswered())
+          groups.get(s.label()).add(new HostRow(u.hostname() != null ? u.hostname() : "—", "no address", false, "—", u.mac(), "—", "—"));
+      for (var u : f.networks().unanswered()) {
+        groups.computeIfAbsent(other, k -> new ArrayList<>());
+        groupTitles.putIfAbsent(other, other);
+        groups.get(other).add(new HostRow(u.hostname() != null ? u.hostname() : "—", "no address", false, "—", u.mac(), "—", "—"));
+      }
+    }
+    // Flag the devices a high finding names.
+    Set<String> flaggedTargets = new HashSet<>();
+    for (ConversationFacts c : f.flagged()) {
+      if (c.findings() != null && c.findings().flowRisks() != null && c.findings().flowRisks().contains("unsafe_protocol")) {
+        String from = ReportFindings.initiator(c);
+        flaggedTargets.add(from.equals(c.flow().srcIp()) ? c.flow().dstIp() : c.flow().srcIp());
+      }
+    }
+
+    PdfPTable t = table(new float[] {3.1f, 2.1f, 2.4f, 1.6f, 1.6f}, "Name", "Address", "MAC", "Device", "Vendor");
+    Font mono = ReportPdf.mono();
+    Font small = ReportPdf.small();
+    for (var e : groups.entrySet()) {
+      if (e.getValue().isEmpty()) continue;
+      ReportPdf.groupRow(t, groupTitles.get(e.getKey()) + " · " + e.getValue().size());
+      for (HostRow r : e.getValue()) {
+        Phrase name = new Phrase(r.name(), small);
+        if (r.note() != null) name.add(ReportPdf.tag(r.note(), r.redNote()));
+        String ip = r.address().split(" ")[0];
+        if (flaggedTargets.contains(ip) && "—".equals(r.address()) == false && r.note() == null) name.add(ReportPdf.tag("flagged", true));
+        t.addCell(cell(name));
+        t.addCell(cell(r.address(), mono));
+        t.addCell(cell(r.mac(), mono));
+        t.addCell(cell(r.device(), small));
+        t.addCell(cell(r.vendor(), small));
+      }
+    }
+    // Internet: by organisation, its addresses after it.
+    List<ClusterNodeDto> orgs = orgsBySize(f);
+    if (!orgs.isEmpty()) {
+      ReportPdf.groupRow(t, "Internet · " + f.internet().size() + " hosts, " + orgs.size() + " organisations");
+      for (ClusterNodeDto n : orgs) {
+        List<String> ips = new ArrayList<>(realHosts(n).keySet());
+        ips.sort(Comparator.comparing(ReportService::ipSortKey));
+        t.addCell(cell(n.getLabel(), small));
+        // A big organisation's addresses would fill pages; the Conversations part lists them all.
+        String shown = ips.size() <= INTERNET_ADDRESSES_SHOWN ? String.join(", ", ips)
+            : String.join(", ", ips.subList(0, INTERNET_ADDRESSES_SHOWN)) + " and " + (ips.size() - INTERNET_ADDRESSES_SHOWN) + " more";
+        var c = cell(shown, mono);
+        c.setColspan(4);
+        t.addCell(c);
+      }
+    }
+    doc.add(t);
+  }
+
+  // ── Map ──────────────────────────────────────────────────────────────────────
+
+  private void map(Document doc, ReportRequest req) throws Exception {
+    heading(doc, "Network map", "grouped as on the Network tab");
+    if (req.getMapCaption() != null && !req.getMapCaption().isBlank()) para(doc, req.getMapCaption(), ReportPdf.muted());
+    byte[] bytes = Base64.getDecoder().decode(req.getMapImage());
+    Image img = Image.getInstance(bytes);
+    float w = doc.right() - doc.left();
+    float h = doc.top() - doc.bottom() - 120;
+    img.scaleToFit(w, h);
+    img.setSpacingBefore(4);
+    doc.add(img);
+  }
+
+  /** After the briefing: what the rest of the report holds, and what it leaves out and why. */
+  private void restOfReport(Document doc, Facts f, Set<Section> sections, ReportRequest req) throws Exception {
+    List<String> inside = new ArrayList<>();
+    if (sections.contains(Section.STORY) && hasStory(f)) inside.add("Story: the narrative and findings from the Story tab");
+    if (sections.contains(Section.TRAFFIC)) inside.add("Traffic: where it goes, flows between organisations, protocols and apps");
+    if (sections.contains(Section.CONVERSATIONS)) inside.add("Conversations: the busiest " + BUSIEST + ", and the internet hosts");
+    if (sections.contains(Section.EXTRACTED_FILES) && !f.extracted().isEmpty()) inside.add("Extracted files: " + f.extracted().size());
+    if (sections.contains(Section.APPENDIX)) inside.add("Appendix: every flagged conversation, by flag; how each device was classified");
+
+    List<String> out = new ArrayList<>();
+    if (!hasStory(f)) out.add("Story: not written for this capture yet");
+    else if (!sections.contains(Section.STORY)) out.add("Story: left out");
+    if (!f.file().isEnableFileExtraction()) out.add("Extracted files: extraction was off");
+    else if (f.extracted().isEmpty()) out.add("Extracted files: none were found");
+    if (sections.contains(Section.MAP) && (req.getMapImage() == null || req.getMapImage().isBlank())) out.add("Network map: it couldn't be drawn");
+    for (Section s : List.of(Section.TRAFFIC, Section.CONVERSATIONS, Section.APPENDIX)) {
+      if (!sections.contains(s)) out.add(sectionName(s) + ": left out");
+    }
+    if (inside.isEmpty() && out.isEmpty()) return;
+    if (!inside.isEmpty()) {
+      heading(doc, "The rest of this report", null);
+      for (String s : inside) para(doc, "•  " + s, ReportPdf.body());
+    }
+    if (!out.isEmpty()) {
+      Paragraph p = new Paragraph();
+      p.add(new Chunk("Not in this report.  ", font(8, Font.BOLD, ReportPdf.MUTED)));
+      p.add(new Chunk(String.join(" · ", out), ReportPdf.muted()));
+      p.setSpacingBefore(8);
+      doc.add(p);
+    }
+  }
+
+  private static String sectionName(Section s) {
+    return switch (s) {
+      case NEEDS_A_LOOK -> "Needs a look";
+      case HOSTS -> "Hosts";
+      case MAP -> "Network map";
+      case STORY -> "Story";
+      case TRAFFIC -> "Traffic";
+      case CONVERSATIONS -> "Conversations";
+      case EXTRACTED_FILES -> "Extracted files";
+      case APPENDIX -> "Appendix";
     };
-    doc.add(kvTable(rows));
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Executive Summary
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Story ────────────────────────────────────────────────────────────────────
 
-  private void addExecutiveSummary(
-      Document doc,
-      FileEntity file,
-      CaptureSummary analysis,
-      int hostCount,
-      long totalConversations,
-      long riskCount,
-      int extractedCount,
-      int countryCount,
-      int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Executive Summary");
+  private static boolean hasStory(Facts f) {
+    return f.story() != null && f.story().getNarrative() != null && !f.story().getNarrative().isEmpty();
+  }
 
-    String packets =
-        analysis != null ? String.valueOf(analysis.packetCount()) : "—";
-    String totalBytes =
-        analysis != null ? formatBytes(analysis.totalBytes()) : "—";
-    String duration =
-        analysis != null && analysis.durationMs() != null
-            ? formatDuration(analysis.durationMs())
-            : "—";
-    String timeRange =
-        analysis != null && analysis.startTime() != null && analysis.endTime() != null
-            ? formatDt(analysis.startTime()) + "  →  " + formatDt(analysis.endTime())
-            : "—";
+  private void story(Document doc, StoryResponse story) throws Exception {
+    heading(doc, "Story", "written by the LLM from this capture's analysis; check it against the evidence");
+    for (var section : story.getNarrative()) {
+      if (section.getTitle() != null) ReportPdf.subheading(doc, section.getTitle());
+      if (section.getContent() != null) para(doc, section.getContent(), ReportPdf.body());
+    }
+    if (story.getFindings() != null && !story.getFindings().isEmpty()) {
+      ReportPdf.subheading(doc, "Its findings");
+      PdfPTable t = table(new float[] {1.2f, 3, 6}, "Severity", "Finding", "Summary");
+      for (Finding fi : story.getFindings()) {
+        t.addCell(cell(fi.getSeverity() != null ? cap(fi.getSeverity().name()) : "—", ReportPdf.small()));
+        t.addCell(cell(fi.getTitle(), font(8, Font.BOLD, ReportPdf.TEXT)));
+        t.addCell(cell(fi.getSummary(), ReportPdf.small()));
+      }
+      doc.add(t);
+    }
+  }
 
-    String[][] rows = {
-      {"Total Packets", packets},
-      {"Total Traffic Volume", totalBytes},
-      {"Capture Duration", duration},
-      {"Capture Time Range", timeRange},
-      {"Total Conversations", String.valueOf(totalConversations)},
-      {"At-Risk Conversations", String.valueOf(riskCount)},
-      {"Unique Hosts Detected", String.valueOf(hostCount)},
-      {"Countries Observed", String.valueOf(countryCount)},
-      {"Extracted Files", String.valueOf(extractedCount)},
+  // ── Traffic ──────────────────────────────────────────────────────────────────
+
+  private void traffic(Document doc, Facts f) throws Exception {
+    List<ClusterNodeDto> orgs = orgsBySize(f);
+    if (!orgs.isEmpty()) {
+      heading(doc, "Where the traffic goes", "by organisation");
+      long total = orgs.stream().mapToLong(ReportService::realBytes).sum();
+      PdfPTable t = table(new float[] {5, 1.4f, 1.6f, 1.2f}, "Organisation", "Hosts", "Bytes", "Share");
+      for (ClusterNodeDto n : orgs) orgRow(t, n, total);
+      doc.add(t);
+    }
+    if (f.orgs() != null && f.orgs().getEdges() != null && !f.orgs().getEdges().isEmpty()) {
+      Map<String, String> label = new HashMap<>();
+      for (ClusterNodeDto n : f.orgs().getClusters()) label.put(n.getId(), n.getLabel());
+      heading(doc, "Flows between organisations", null);
+      PdfPTable t = table(new float[] {3.5f, 3.5f, 1.4f, 1.4f, 1.6f}, "From", "To", "Mostly", "Conversations", "Bytes");
+      f.orgs().getEdges().stream().sorted(Comparator.comparingLong(ClusterEdgeDto::getTotalBytes).reversed()).limit(15)
+          .forEach(e -> {
+            t.addCell(cell(label.getOrDefault(e.getSourceId(), e.getSourceId()), ReportPdf.small()));
+            t.addCell(cell(label.getOrDefault(e.getTargetId(), e.getTargetId()), ReportPdf.small()));
+            t.addCell(cell(e.getDominantProtocol(), ReportPdf.small()));
+            t.addCell(right(String.format("%,d", e.getConversationCount()), ReportPdf.small()));
+            t.addCell(right(bytes(e.getTotalBytes()), ReportPdf.small()));
+          });
+      doc.add(t);
+    }
+    if (f.summary() != null && f.summary().protocolStats() != null && !f.summary().protocolStats().isEmpty()) {
+      heading(doc, "Protocols", "from tshark");
+      PdfPTable t = table(new float[] {4, 2, 2, 1.5f}, "Protocol", "Packets", "Bytes", "Share");
+      f.summary().protocolStats().entrySet().stream()
+          .sorted((a, b) -> Long.compare(stat(b.getValue(), "bytes"), stat(a.getValue(), "bytes")))
+          .forEach(e -> {
+            t.addCell(cell(e.getKey(), ReportPdf.small()));
+            t.addCell(right(String.format("%,d", stat(e.getValue(), "packetCount")), ReportPdf.small()));
+            t.addCell(right(bytes(stat(e.getValue(), "bytes")), ReportPdf.small()));
+            t.addCell(right(String.format("%.1f%%", statD(e.getValue(), "percentage")), ReportPdf.small()));
+          });
+      doc.add(t);
+    }
+    named(doc, "Applications", "from nDPI", conversationLookup.breakdown(f.file().getId(), Breakdown.APPLICATION));
+    named(doc, "Categories", "from nDPI", conversationLookup.breakdown(f.file().getId(), Breakdown.CATEGORY));
+  }
+
+  private void named(Document doc, String title, String note, List<NamedTotals> rows) throws Exception {
+    if (rows == null || rows.isEmpty()) return;
+    heading(doc, title, note);
+    // Some breakdowns count packets only; a column of "0 B" would read as no traffic.
+    boolean withBytes = rows.stream().anyMatch(n -> n.totalBytes() > 0);
+    PdfPTable t = withBytes
+        ? table(new float[] {4, 2, 2}, "Name", "Packets", "Bytes")
+        : table(new float[] {6, 2}, "Name", "Packets");
+    for (NamedTotals n : rows) {
+      t.addCell(cell(n.name(), ReportPdf.small()));
+      t.addCell(right(String.format("%,d", n.packetCount()), ReportPdf.small()));
+      if (withBytes) t.addCell(right(bytes(n.totalBytes()), ReportPdf.small()));
+    }
+    doc.add(t);
+  }
+
+  // ── Conversations ────────────────────────────────────────────────────────────
+
+  private void conversations(Document doc, Facts f) throws Exception {
+    heading(doc, "Busiest conversations", "the " + BUSIEST + " that moved the most bytes");
+    List<ConversationFacts> busiest = f.conversations().stream()
+        .sorted(Comparator.comparingLong((ConversationFacts c) -> c.flow().totalBytes()).reversed())
+        .limit(BUSIEST).toList();
+    doc.add(conversationTable(busiest, f.names(), false));
+
+    List<ClusterNodeDto> orgs = orgsBySize(f);
+    if (!orgs.isEmpty()) {
+      heading(doc, "Internet hosts", null);
+      PdfPTable t = table(new float[] {2.4f, 4, 1.6f, 1.6f}, "Address", "Organisation", "Conversations", "Bytes");
+      List<String[]> rows = new ArrayList<>();
+      for (ClusterNodeDto n : orgs) {
+        for (var e : realHosts(n).entrySet()) {
+          long convs = n.getIpConversations() != null ? n.getIpConversations().getOrDefault(e.getKey(), 0L) : 0;
+          rows.add(new String[] {e.getKey(), n.getLabel(), String.valueOf(convs), String.valueOf(e.getValue())});
+        }
+      }
+      rows.sort(Comparator.comparingLong((String[] r) -> Long.parseLong(r[3])).reversed());
+      for (String[] r : rows) {
+        t.addCell(cell(r[0], ReportPdf.mono()));
+        t.addCell(cell(r[1], ReportPdf.small()));
+        t.addCell(right(String.format("%,d", Long.parseLong(r[2])), ReportPdf.small()));
+        t.addCell(right(bytes(Long.parseLong(r[3])), ReportPdf.small()));
+      }
+      doc.add(t);
+    }
+  }
+
+  private PdfPTable conversationTable(List<ConversationFacts> rows, ReportNames names, boolean withFlags) {
+    PdfPTable t = withFlags
+        ? table(new float[] {1.3f, 3, 3.4f, 1.4f, 1.3f, 3}, "When", "From", "To", "App", "Bytes", "Flags")
+        : table(new float[] {1.3f, 3.2f, 3.6f, 1.6f, 1.2f, 1.4f}, "When", "From", "To", "App", "Packets", "Bytes");
+    for (ConversationFacts c : rows) {
+      var fl = c.flow();
+      String from = ReportFindings.initiator(c);
+      boolean fwd = from.equals(fl.srcIp());
+      String to = fwd ? fl.dstIp() : fl.srcIp();
+      Integer port = fwd ? fl.dstPort() : fl.srcPort();
+      t.addCell(cell(fl.startTime() != null ? fl.startTime().format(HMS) : "—", ReportPdf.mono()));
+      t.addCell(cell(names.label(from, fl.startTime()), ReportPdf.small()));
+      t.addCell(cell(names.label(to, fl.startTime()) + (port != null ? " :" + port : ""), ReportPdf.small()));
+      t.addCell(cell(ReportFindings.app(c), ReportPdf.small()));
+      if (withFlags) {
+        t.addCell(right(bytes(fl.totalBytes()), ReportPdf.small()));
+        t.addCell(cell(ReportFindings.flagText(c), font(7.2f, Font.NORMAL, ReportPdf.MUTED)));
+      } else {
+        t.addCell(right(String.format("%,d", fl.packetCount()), ReportPdf.small()));
+        t.addCell(right(bytes(fl.totalBytes()), ReportPdf.small()));
+      }
+    }
+    return t;
+  }
+
+  // ── Extracted files ──────────────────────────────────────────────────────────
+
+  private void extractedFiles(Document doc, List<ExtractedFileEntity> files) throws Exception {
+    heading(doc, "Extracted files", files.size() + " carved from the capture");
+    PdfPTable t = table(new float[] {4, 2.6f, 1.4f, 1.6f, 5}, "File", "Type", "Size", "From", "SHA-256");
+    for (ExtractedFileEntity ef : files) {
+      t.addCell(cell(ef.getFilename(), ReportPdf.small()));
+      t.addCell(cell(ef.getMimeType(), ReportPdf.small()));
+      t.addCell(right(ef.getFileSize() != null ? bytes(ef.getFileSize()) : "—", ReportPdf.small()));
+      t.addCell(cell(ef.getExtractionMethod(), ReportPdf.small()));
+      t.addCell(cell(ef.getSha256(), font(6.4f, Font.NORMAL, ReportPdf.TEXT)));
+    }
+    doc.add(t);
+  }
+
+  // ── Appendix ─────────────────────────────────────────────────────────────────
+
+  private void appendix(Document doc, Facts f) throws Exception {
+    heading(doc, "Appendix: every flagged conversation", f.flagged().size() + " of "
+        + String.format("%,d", f.conversations().size()) + ", by flag");
+    if (f.flagged().isEmpty()) para(doc, "None.", ReportPdf.body());
+    Map<String, List<ConversationFacts>> byFlag = new LinkedHashMap<>();
+    for (ConversationFacts c : f.flagged())
+      for (String k : ReportFindings.flagKeys(c)) byFlag.computeIfAbsent(k, x -> new ArrayList<>()).add(c);
+    List<Map.Entry<String, List<ConversationFacts>>> groups = new ArrayList<>(byFlag.entrySet());
+    groups.sort(Comparator.comparingInt(e -> e.getValue().size()));
+    for (var e : groups) {
+      List<ConversationFacts> rows = e.getValue().stream()
+          .sorted(Comparator.comparing((ConversationFacts c) -> c.flow().startTime(), Comparator.nullsLast(Comparator.naturalOrder())))
+          .toList();
+      ReportPdf.subheading(doc, e.getKey() + " · " + rows.size());
+      doc.add(conversationTable(rows.subList(0, Math.min(APPENDIX_ROWS_PER_FLAG, rows.size())), f.names(), true));
+      if (rows.size() > APPENDIX_ROWS_PER_FLAG) {
+        para(doc, "And " + (rows.size() - APPENDIX_ROWS_PER_FLAG) + " more; filter the Conversations tab by this flag to see them.", ReportPdf.muted());
+      }
+    }
+
+    doc.newPage();
+    heading(doc, "How each device was classified", "from its MAC vendor, TTL and traffic");
+    PdfPTable t = table(new float[] {2.6f, 2.4f, 1.6f, 1, 5}, "Device", "Address", "Type", "Conf.", "Evidence");
+    for (HostFacts h : f.hosts().stream().sorted(Comparator.comparing(h -> ipSortKey(h.ip()))).toList()) {
+      t.addCell(cell(h.hostname() != null ? h.hostname() : f.names().isGateway(h.ip()) ? "Gateway" : "—", ReportPdf.small()));
+      t.addCell(cell(h.ip(), ReportPdf.mono()));
+      t.addCell(cell(device(h.deviceType(), false), ReportPdf.small()));
+      t.addCell(right(h.confidence() + "%", ReportPdf.small()));
+      t.addCell(cell(buildHostEvidence(h), font(7.2f, Font.NORMAL, ReportPdf.MUTED)));
+    }
+    doc.add(t);
+    para(doc, "A gateway can read as a laptop or server here: classification goes by its MAC vendor"
+        + " and traffic, while the hosts table names it from the DHCP leases it handed out.", ReportPdf.muted());
+  }
+
+  // ── Small helpers ────────────────────────────────────────────────────────────
+
+  private static List<ClusterNodeDto> orgsBySize(Facts f) {
+    if (f.orgs() == null || f.orgs().getClusters() == null) return List.of();
+    return f.orgs().getClusters().stream()
+        .filter(n -> !"cluster:internal".equals(n.getId()) && !realHosts(n).isEmpty())
+        .sorted(Comparator.comparingLong(ReportService::realBytes).reversed())
+        .toList();
+  }
+
+  private static void orgRow(PdfPTable t, ClusterNodeDto n, long total) {
+    long b = realBytes(n);
+    t.addCell(cell(n.getLabel(), ReportPdf.small()));
+    t.addCell(right(String.valueOf(realHosts(n).size()), ReportPdf.small()));
+    t.addCell(right(bytes(b), ReportPdf.small()));
+    t.addCell(right(total > 0 ? String.format("%.1f%%", 100.0 * b / total) : "—", ReportPdf.small()));
+  }
+
+  /** An organisation's hosts, less the addresses that aren't one (0.0.0.0, broadcast, multicast). */
+  static Map<String, Long> realHosts(ClusterNodeDto n) {
+    if (n.getIpBytes() == null) return Map.of();
+    Map<String, Long> out = new LinkedHashMap<>();
+    n.getIpBytes().forEach((ip, b) -> { if (isHost(ip)) out.put(ip, b); });
+    return out;
+  }
+
+  private static long realBytes(ClusterNodeDto n) {
+    return realHosts(n).values().stream().mapToLong(Long::longValue).sum();
+  }
+
+  /** False for the unspecified, broadcast and multicast addresses, which no device holds. */
+  static boolean isHost(String ip) {
+    if (ip == null || ip.equals("0.0.0.0") || ip.equals("::") || ip.equals("255.255.255.255")) return false;
+    if (ip.toLowerCase().startsWith("ff")) return false;
+    int dot = ip.indexOf('.');
+    if (dot > 0) {
+      int first = parseOr(ip.substring(0, dot));
+      if (first >= 224 && first <= 239) return false;
+    }
+    return true;
+  }
+
+  /** "LAPTOP_DESKTOP" → "Laptop/desktop"; a DHCP gateway is a gateway whatever its traffic says. */
+  static String device(String type, boolean gateway) {
+    if (gateway) return "Gateway";
+    if (type == null || type.isBlank() || type.equals("UNKNOWN")) return "—";
+    return switch (type) {
+      case "LAPTOP_DESKTOP" -> "Laptop/desktop";
+      case "DNS_SERVER" -> "DNS server";
+      case "IOT" -> "IoT";
+      default -> cap(type.replace('_', ' '));
     };
-    doc.add(kvTable(rows));
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Protocol Distribution
-  // ══════════════════════════════════════════════════════════════════════════
+  /** A vendor without its legal suffix: "Dell Inc." → "Dell", "Hangzhou Hikvision … Co.,Ltd." → "Hangzhou Hikvision". */
+  static String vendor(String manufacturer) {
+    if (manufacturer == null || manufacturer.isBlank()) return "—";
+    String v = manufacturer.replaceAll("(?i)[,.]?\\s*(inc\\.?|incorporated|corporation|corporate|corp\\.?|co\\.?,?\\s*ltd\\.?|ltd\\.?|llc|gmbh|limited|electronics|digital technology|technology|technologies)\\b\\.?", "").trim();
+    v = v.replaceAll("[,.]+$", "").trim();
+    String[] words = v.split("\\s+");
+    if (words.length > 2) v = words[0] + " " + words[1];
+    return v.isBlank() ? manufacturer : v;
+  }
 
-  private void addProtocolDistribution(Document doc, Map<String, Object> protocolStats, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Protocol Distribution");
+  private static String lastOctets(String from, String to) {
+    int dot = from.lastIndexOf('.');
+    if (dot > 0 && to.startsWith(from.substring(0, dot + 1))) return from + " → ." + to.substring(dot + 1);
+    return from + " → " + to;
+  }
 
-    PdfPTable table = new PdfPTable(new float[] {3, 2, 2, 2});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(table, "Protocol", "Packets", "Bytes", "% Traffic");
+  private static String ipSortKey(String ip) {
+    if (ip == null) return "";
+    String[] o = ip.split("\\.");
+    if (o.length != 4) return "~" + ip;
+    StringBuilder sb = new StringBuilder();
+    for (String s : o) sb.append(String.format("%03d", parseOr(s)));
+    return sb.toString();
+  }
 
-    List<Map.Entry<String, Object>> sorted =
-        protocolStats.entrySet().stream()
-            .sorted(
-                (a, b) ->
-                    Long.compare(
-                        getStatLong(b.getValue(), "packetCount"),
-                        getStatLong(a.getValue(), "packetCount")))
-            .toList();
-
-    Font f = cellFont();
-    for (int i = 0; i < sorted.size(); i++) {
-      var e = sorted.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(
-          table,
-          bg,
-          f,
-          e.getKey(),
-          String.valueOf(getStatLong(e.getValue(), "packetCount")),
-          formatBytes(getStatLong(e.getValue(), "bytes")),
-          String.format("%.1f%%", getStatDouble(e.getValue(), "percentage")));
+  private static int parseOr(String s) {
+    try {
+      return Integer.parseInt(s);
+    } catch (NumberFormatException e) {
+      return 0;
     }
-    doc.add(table);
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Category Distribution
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addCategoryDistribution(Document doc, List<NamedTotals> categoryStats, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Traffic Category Distribution");
-
-    PdfPTable table = new PdfPTable(new float[] {4, 2});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(table, "Category", "Conversations");
-
-    Font f = cellFont();
-    for (int i = 0; i < categoryStats.size(); i++) {
-      NamedTotals row = categoryStats.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f, nvl(row.name()), String.valueOf(row.packetCount()));
-    }
-    doc.add(table);
+  private static String cap(String s) {
+    String l = s.toLowerCase();
+    return Character.toUpperCase(l.charAt(0)) + l.substring(1);
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Applications Detected
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addApplicationsDetected(Document doc, List<NamedTotals> appStats, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Applications Detected (" + appStats.size() + ")");
-
-    PdfPTable table = new PdfPTable(new float[] {4, 2, 2});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(table, "Application", "Packets", "Bytes");
-
-    Font f = cellFont();
-    for (int i = 0; i < appStats.size(); i++) {
-      NamedTotals row = appStats.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(
-          table,
-          bg,
-          f,
-          nvl(row.name()),
-          String.valueOf(row.packetCount()),
-          formatBytes(row.totalBytes()));
-    }
-    doc.add(table);
+  static String bytes(long b) {
+    if (b < 1024) return b + " B";
+    if (b < 1024 * 1024) return String.format("%.1f KB", b / 1024.0);
+    if (b < 1024L * 1024 * 1024) return String.format("%.1f MB", b / (1024.0 * 1024));
+    return String.format("%.2f GB", b / (1024.0 * 1024 * 1024));
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: L7 Protocols
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addL7Protocols(Document doc, List<NamedTotals> l7Stats, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". Detected L7 Protocols (" + l7Stats.size() + ")");
-
-    PdfPTable table = new PdfPTable(new float[] {4, 2, 2});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(table, "L7 Protocol", "Packets", "Bytes");
-
-    Font f = cellFont();
-    for (int i = 0; i < l7Stats.size(); i++) {
-      NamedTotals row = l7Stats.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(
-          table,
-          bg,
-          f,
-          nvl(row.name()),
-          String.valueOf(row.packetCount()),
-          formatBytes(row.totalBytes()));
-    }
-    doc.add(table);
+  static String duration(long ms) {
+    long s = ms / 1000;
+    if (s < 60) return s + " s";
+    long m = Math.round(s / 60.0);
+    if (m < 60) return m + " min";
+    long h = m / 60;
+    if (h < 48) return h + " h " + (m % 60) + " min";
+    long d = Math.round(h / 24.0);
+    return d < 730 ? d + " days" : Math.round(d / 365.0) + " years";
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Host Inventory (with supporting evidence)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addHostInventory(Document doc, List<HostFacts> hosts, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Host Inventory (" + hosts.size() + " hosts)");
-
-    PdfPTable table = new PdfPTable(new float[] {3, 3, 3, 2, 2, 1, 4});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(
-        table,
-        "IP Address",
-        "MAC Address",
-        "Manufacturer",
-        "Device Type",
-        "TTL Fingerprint",
-        "Conf.",
-        "Classification Evidence");
-
-    Font f = cellFont();
-    for (int i = 0; i < hosts.size(); i++) {
-      HostFacts h = hosts.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(
-          table,
-          bg,
-          f,
-          nvl(h.ip()),
-          nvl(h.mac()),
-          nvl(h.manufacturer()),
-          nvl(h.deviceType()),
-          ttlFingerprint(h.ttl()),
-          h.confidence() + "%",
-          buildHostEvidence(h));
-    }
-    doc.add(table);
-
-    // Legend
-    Font legendFont = new Font(Font.HELVETICA, 8, Font.ITALIC, new Color(100, 116, 139));
-    Paragraph legend =
-        new Paragraph(
-            "Evidence signals: MAC OUI vendor lookup · TTL OS fingerprint (64=Linux/Android/iOS,"
-                + " 128=Windows, 255=Network device) · nDPI application profile · Traffic pattern"
-                + " analysis (peer count, port behaviour, initiation ratio). Confidence reflects the"
-                + " margin between the winning classification score and the second-best score.",
-            legendFont);
-    legend.setSpacingBefore(2);
-    legend.setSpacingAfter(10);
-    doc.add(legend);
+  private static long stat(Object stat, String key) {
+    if (stat instanceof Map<?, ?> m && m.get(key) instanceof Number n) return n.longValue();
+    return 0L;
   }
+
+  private static double statD(Object stat, String key) {
+    if (stat instanceof Map<?, ?> m && m.get(key) instanceof Number n) return n.doubleValue();
+    return 0.0;
+  }
+
+  // ── Classification evidence (characterised in ReportHeuristicsCharacterisationTest) ──
 
   private String ttlFingerprint(Integer ttl) {
     if (ttl == null) return "—";
@@ -515,24 +795,17 @@ public class ReportService {
 
   private String buildHostEvidence(HostFacts h) {
     StringBuilder sb = new StringBuilder();
-
     if (h.manufacturer() != null) {
       sb.append("MAC vendor: ").append(h.manufacturer());
       String hint = vendorDeviceHint(h.manufacturer());
-      if (hint != null) sb.append(" (→ ").append(hint).append(")");
+      if (hint != null) sb.append(" (→ ").append(device(hint, false)).append(")");
     } else if (h.mac() != null) {
       sb.append("MAC present, vendor unknown");
     } else {
       sb.append("No MAC data");
     }
-
-    if (h.ttl() != null) {
-      sb.append("; TTL ").append(h.ttl()).append(" → ").append(ttlOs(h.ttl()));
-    }
-
-    if (h.confidence() == 100) {
-      sb.append("; YAML rule override (confidence 100%)");
-    }
+    if (h.ttl() != null) sb.append("; TTL ").append(h.ttl()).append(" → ").append(ttlOs(h.ttl()));
+    if (h.confidence() == 100) sb.append("; YAML rule override (confidence 100%)");
     return sb.toString();
   }
 
@@ -564,829 +837,7 @@ public class ReportService {
     return "Linux/Unix/iOS/Android";
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Geo Summary
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addGeoSummary(Document doc, List<GeoOrgLookup.Country> geoCountries, int sec) throws Exception {
-    addSectionHeader(
-        doc, sec + ". Geographic Distribution (" + geoCountries.size() + " countries)");
-
-    PdfPTable table = new PdfPTable(new float[] {2, 5});
-    table.setWidthPercentage(60);
-    table.setHorizontalAlignment(Element.ALIGN_LEFT);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(table, "Country Code", "Country");
-
-    Font f = cellFont();
-    for (int i = 0; i < geoCountries.size(); i++) {
-      GeoOrgLookup.Country row = geoCountries.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f, nvl(row.code()), nvl(row.name()));
-    }
-    doc.add(table);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Risk Type Summary
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addRiskTypeSummary(
-      Document doc, List<String> riskTypes, List<String> customSigs, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". Risk & Signature Summary");
-
-    if (!riskTypes.isEmpty()) {
-      addSubHeader(doc, "nDPI Flow Risk Types Detected");
-      PdfPTable t = tagTable(riskTypes);
-      doc.add(t);
-    }
-
-    if (!customSigs.isEmpty()) {
-      addSubHeader(doc, "Custom Signature Rules Triggered");
-      PdfPTable t = tagTable(customSigs);
-      doc.add(t);
-    }
-  }
-
-  private PdfPTable tagTable(List<String> items) {
-    PdfPTable table = new PdfPTable(1);
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(4);
-    table.setSpacingAfter(10);
-    Font f = cellFont();
-    for (int i = 0; i < items.size(); i++) {
-      PdfPCell cell = new PdfPCell(new Phrase("• " + items.get(i), f));
-      cell.setBackgroundColor(i % 2 == 0 ? Color.WHITE : C_ROW_ALT);
-      cell.setPadding(5);
-      cell.setBorderColor(new Color(226, 232, 240));
-      table.addCell(cell);
-    }
-    return table;
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Security Findings
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addSecurityFindings(Document doc, List<ConversationFacts> risky, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Security Findings (" + risky.size() + " at-risk conversations)");
-
-    PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 2, 2, 5});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(
-        table, "Source", "Destination", "Protocol", "Application", "Bytes", "Risk Flags");
-
-    Font f = cellFont();
-    for (ConversationFacts c : risky) {
-      String src = endpoint(c.flow().srcIp(), c.flow().srcPort());
-      String dst = endpoint(c.flow().dstIp(), c.flow().dstPort());
-      String risks = joinRisks(c.findings().flowRisks(), c.findings().customSignatures());
-      addRow(
-          table,
-          C_RISK_BG,
-          f,
-          src,
-          dst,
-          nvl(c.flow().protocol()),
-          nvl(c.findings().appName()),
-          formatBytes(c.flow().totalBytes()),
-          risks);
-    }
-    doc.add(table);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: TLS Analysis
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addTlsAnalysis(Document doc, List<ConversationFacts> tlsConvs, int sec)
-      throws Exception {
-    addSectionHeader(
-        doc, sec + ". TLS / HTTPS Analysis (" + tlsConvs.size() + " encrypted conversations)");
-
-    PdfPTable table = new PdfPTable(new float[] {3, 3, 3, 3, 3, 4, 3, 3});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(
-        table,
-        "Source",
-        "Destination",
-        "Hostname (SNI)",
-        "JA3 Client",
-        "JA3 Server",
-        "Subject (CN)",
-        "Valid From",
-        "Valid To");
-
-    Font f = new Font(Font.HELVETICA, 7, Font.NORMAL, C_TEXT);
-    for (int i = 0; i < tlsConvs.size(); i++) {
-      ConversationFacts c = tlsConvs.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(
-          table,
-          bg,
-          f,
-          endpoint(c.flow().srcIp(), c.flow().srcPort()),
-          endpoint(c.flow().dstIp(), c.flow().dstPort()),
-          nvl(c.tls().hostname()),
-          truncate(c.tls().ja3Client(), 10),
-          truncate(c.tls().ja3Server(), 10),
-          truncate(c.tls().tlsSubject(), 30),
-          formatDt(c.tls().tlsNotBefore()),
-          formatDt(c.tls().tlsNotAfter()));
-    }
-    doc.add(table);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: HTTP User Agents
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addHttpUserAgents(Document doc, List<String> agents, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". HTTP User Agents (" + agents.size() + " distinct)");
-    doc.add(tagTable(agents));
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Top Conversations
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addTopConversations(Document doc, List<ConversationFacts> convs, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Top Conversations by Traffic (top " + convs.size() + ")");
-
-    PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 3, 3, 2, 2, 2});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(
-        table,
-        "Source",
-        "Destination",
-        "Protocol",
-        "Application",
-        "Hostname",
-        "Packets",
-        "Bytes",
-        "Duration");
-
-    Font f = cellFont();
-    for (int i = 0; i < convs.size(); i++) {
-      ConversationFacts c = convs.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      long ms =
-          (c.flow().startTime() != null && c.flow().endTime() != null)
-              ? java.time.Duration.between(c.flow().startTime(), c.flow().endTime()).toMillis()
-              : 0;
-      addRow(
-          table,
-          bg,
-          f,
-          endpoint(c.flow().srcIp(), c.flow().srcPort()),
-          endpoint(c.flow().dstIp(), c.flow().dstPort()),
-          nvl(c.flow().protocol()),
-          nvl(c.findings().appName()),
-          nvl(c.tls().hostname()),
-          String.valueOf(c.flow().packetCount()),
-          formatBytes(c.flow().totalBytes()),
-          formatDuration(ms));
-    }
-    doc.add(table);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Detected File Types
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addDetectedFileTypes(Document doc, List<String> fileTypes, int sec)
-      throws Exception {
-    addSectionHeader(
-        doc, sec + ". Detected File Types in Packet Payloads (" + fileTypes.size() + ")");
-    doc.add(tagTable(fileTypes));
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Extracted Files
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addExtractedFiles(Document doc, List<ExtractedFileEntity> files, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Extracted Files (" + files.size() + ")");
-
-    PdfPTable table = new PdfPTable(new float[] {4, 3, 2, 2, 7});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    addTableHeader(table, "Filename", "MIME Type", "Size", "Method", "SHA-256");
-
-    Font f = new Font(Font.HELVETICA, 8, Font.NORMAL, C_TEXT);
-    for (int i = 0; i < files.size(); i++) {
-      ExtractedFileEntity ef = files.get(i);
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(
-          table,
-          bg,
-          f,
-          nvl(ef.getFilename()),
-          nvl(ef.getMimeType()),
-          ef.getFileSize() != null ? formatBytes(ef.getFileSize()) : "—",
-          nvl(ef.getExtractionMethod()),
-          nvl(ef.getSha256()));
-    }
-    doc.add(table);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Network Diagram Filters Applied
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addNetworkDiagramFilters(Document doc, List<String> filters, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Network Diagram — Active Filters");
-
-    Font bodyFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
-    Paragraph intro =
-        new Paragraph(
-            "The network topology diagrams in this report were generated with the following filters applied:",
-            bodyFont);
-    intro.setSpacingBefore(6);
-    intro.setSpacingAfter(8);
-    doc.add(intro);
-
-    PdfPTable table = new PdfPTable(1);
-    table.setWidthPercentage(100);
-    table.setSpacingAfter(12);
-    Font labelFont = new Font(Font.HELVETICA, 10, Font.BOLD, C_LABEL);
-    Font valueFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
-    for (int i = 0; i < filters.size(); i++) {
-      String filter = filters.get(i);
-      if (filter == null) continue;
-      int colon = filter.indexOf(':');
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      PdfPCell cell = new PdfPCell();
-      cell.setBackgroundColor(bg);
-      cell.setPadding(6);
-      cell.setBorder(Rectangle.NO_BORDER);
-      if (colon > 0) {
-        Phrase phrase = new Phrase();
-        phrase.add(new Phrase(filter.substring(0, colon + 1) + " ", labelFont));
-        phrase.add(new Phrase(filter.substring(colon + 1).trim(), valueFont));
-        cell.setPhrase(phrase);
-      } else {
-        cell.setPhrase(new Phrase(filter, valueFont));
-      }
-      table.addCell(cell);
-    }
-    doc.add(table);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Network Topology Diagrams (frontend-rendered PNG)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addTopologyDiagram(
-      Document doc, PdfWriter writer, String base64Image, String layoutName, int sectionNum,
-      List<String> activeFilters, String nodeLimitNote)
-      throws Exception {
-
-    // ── Page setup ────────────────────────────────────────────────────────────
-    // setPageSize only takes effect on the next newPage(). Calling newPage()
-    // twice guarantees the landscape size is active before we draw anything:
-    // the first call closes the previous page with its current size, the second
-    // opens a fresh page with the new landscape size.
-    float pageW = PageSize.A4.getHeight(); // 841.89 pt
-    float pageH = PageSize.A4.getWidth();  // 595.28 pt
-    doc.setPageSize(new Rectangle(pageW, pageH));
-    doc.setMargins(40, 40, 40, 40);
-    doc.newPage();
-    // Verify the page size took effect; if the writer still reports portrait
-    // dimensions, force one more page turn.
-    if (writer.getPageSize().getHeight() >= writer.getPageSize().getWidth()
-        && writer.getPageSize().getWidth() < pageW - 1f) {
-      doc.newPage();
-    }
-
-    // ── Constants ─────────────────────────────────────────────────────────────
-    final int   BADGE_COLS = 5;
-    final float MARGIN     = 40f;
-    final float TITLE_H    = 16f;  // 11pt font + leading
-    final float TITLE_GAP  = 6f;   // gap between title bottom and image top
-    final float FOOTER_GAP = 8f;   // gap between image bottom and topmost footer element
-
-    List<String> nonNullFilters =
-        (activeFilters != null)
-            ? activeFilters.stream().filter(f -> f != null)
-                .collect(java.util.stream.Collectors.toList())
-            : List.of();
-    boolean hasFilters  = !nonNullFilters.isEmpty();
-    boolean hasNodeNote = nodeLimitNote != null && !nodeLimitNote.isBlank();
-
-    float contentW = pageW - MARGIN * 2;
-
-    Font disclaimerFont = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(120, 120, 120));
-    Font noteFont       = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(80, 80, 80));
-
-    // ── Build badge chips table so getTotalHeight() is exact ─────────────────
-    // (disclaimer + note are built below as a single combined table)
-
-    // Badge chips (optional)
-    PdfPTable badges = null;
-    float badgesH = 0f;
-    if (hasFilters) {
-      Font labelFont = new Font(Font.HELVETICA, 7f, Font.BOLD,   new Color(30, 64, 175));
-      Font valueFont = new Font(Font.HELVETICA, 7f, Font.NORMAL, new Color(30, 41,  59));
-      Color chipBg   = new Color(219, 234, 254);
-      int cols = Math.min(nonNullFilters.size(), BADGE_COLS);
-      badges = new PdfPTable(cols);
-      badges.setTotalWidth(contentW);
-      for (String filter : nonNullFilters) {
-        int colon = filter.indexOf(':');
-        Phrase phrase = new Phrase();
-        if (colon > 0) {
-          phrase.add(new Phrase(filter.substring(0, colon + 1) + " ", labelFont));
-          phrase.add(new Phrase(filter.substring(colon + 1).trim(), valueFont));
-        } else {
-          phrase.add(new Phrase(filter, valueFont));
-        }
-        PdfPCell chip = new PdfPCell(phrase);
-        chip.setBackgroundColor(chipBg);
-        chip.setPaddingTop(2); chip.setPaddingBottom(2);
-        chip.setPaddingLeft(5); chip.setPaddingRight(5);
-        chip.setBorderColor(new Color(147, 197, 253));
-        chip.setBorderWidth(0.5f);
-        badges.addCell(chip);
-      }
-      int remainder = nonNullFilters.size() % cols;
-      if (remainder != 0) {
-        for (int p = remainder; p < cols; p++) {
-          PdfPCell empty = new PdfPCell(new Phrase(""));
-          empty.setBorder(Rectangle.NO_BORDER);
-          badges.addCell(empty);
-        }
-      }
-      badgesH = badges.getTotalHeight();
-    }
-
-    // ── Merge disclaimer + note into one table for exact combined height ───────
-    // Building them separately risks coordinate drift; one table guarantees
-    // the text block height is measured as a single unit.
-    PdfPTable textFooter = new PdfPTable(1);
-    textFooter.setTotalWidth(contentW);
-    if (hasNodeNote) {
-      PdfPCell noteCell2 = new PdfPCell(new Phrase(nodeLimitNote, noteFont));
-      noteCell2.setBorder(Rectangle.NO_BORDER);
-      noteCell2.setHorizontalAlignment(Element.ALIGN_CENTER);
-      noteCell2.setPaddingTop(0); noteCell2.setPaddingBottom(2);
-      textFooter.addCell(noteCell2);
-    }
-    PdfPCell discCell2 = new PdfPCell(new Phrase(
-        "Note: This diagram is automatically generated and may not render all connections accurately "
-            + "for large or complex network captures. For a complete view, consider taking a manual "
-            + "screenshot from the Network Diagram page.",
-        disclaimerFont));
-    discCell2.setBorder(Rectangle.NO_BORDER);
-    discCell2.setHorizontalAlignment(Element.ALIGN_CENTER);
-    discCell2.setPaddingTop(0); discCell2.setPaddingBottom(0);
-    textFooter.addCell(discCell2);
-    float textFooterH = textFooter.getTotalHeight();
-
-    // ── Exact footer height ───────────────────────────────────────────────────
-    float footerH = FOOTER_GAP + textFooterH + badgesH;
-
-    // ── Derive image slot ─────────────────────────────────────────────────────
-    float titleTop = pageH - MARGIN;
-    float imageTop = titleTop - TITLE_H - TITLE_GAP;
-    float imageBot = MARGIN + footerH;
-    float usableH  = imageTop - imageBot;
-
-    log.info("Topology diagram '{}': pageH={} footerH={} (textFooter={} badges={}) imageBot={} usableH={}",
-        layoutName, pageH, footerH, textFooterH, badgesH, imageBot, usableH);
-
-    // ── Draw title ────────────────────────────────────────────────────────────
-    PdfContentByte cb = writer.getDirectContent();
-    Font titleFont = new Font(Font.HELVETICA, 11, Font.BOLD, C_HEADER_BG);
-    ColumnText ctTitle = new ColumnText(cb);
-    ctTitle.setSimpleColumn(MARGIN, titleTop - TITLE_H, MARGIN + contentW, titleTop);
-    ctTitle.setAlignment(Element.ALIGN_LEFT);
-    ctTitle.addText(new Phrase(sectionNum + ". Network Topology \u2014 " + layoutName, titleFont));
-    ctTitle.go();
-
-    if (base64Image == null || base64Image.isBlank()) {
-      ColumnText ctErr = new ColumnText(cb);
-      ctErr.setSimpleColumn(MARGIN, imageBot, MARGIN + contentW, imageTop);
-      ctErr.addText(new Phrase("Diagram image not provided.", cellFont()));
-      ctErr.go();
-      doc.add(new Paragraph(" "));
-      return;
-    }
-
-    // ── Draw image ────────────────────────────────────────────────────────────
-    byte[] imageBytes;
-    try {
-      String data = base64Image.contains(",") ? base64Image.split(",")[1] : base64Image;
-      imageBytes = Base64.getDecoder().decode(data);
-    } catch (IllegalArgumentException e) {
-      log.warn("Invalid base64 image data for layout: {}", layoutName);
-      ColumnText ctErr = new ColumnText(cb);
-      ctErr.setSimpleColumn(MARGIN, imageBot, MARGIN + contentW, imageTop);
-      ctErr.addText(new Phrase("Invalid diagram image data.", cellFont()));
-      ctErr.go();
-      doc.add(new Paragraph(" "));
-      return;
-    }
-    Image img = Image.getInstance(imageBytes);
-    img.scaleToFit(contentW, usableH);
-    float imgX = MARGIN + (contentW - img.getScaledWidth()) / 2f;
-    float imgY = imageTop - img.getScaledHeight();
-    img.setAbsolutePosition(imgX, imgY);
-    cb.addImage(img);
-
-    // ── Draw footer bottom-up — two elements, exact heights, no estimates ─────
-    float y = MARGIN;
-
-    // 1. Badge chips (bottom-most)
-    if (badges != null) {
-      badges.writeSelectedRows(0, -1, MARGIN, y + badgesH, cb);
-      y += badgesH;
-    }
-
-    // 2. Text block (node note + disclaimer) directly above badges
-    y += FOOTER_GAP;
-    textFooter.writeSelectedRows(0, -1, MARGIN, y + textFooterH, cb);
-
-    // Advance iText's flow cursor so the next section opens a new page.
-    doc.add(new Paragraph(" "));
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Story not generated
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addStoryNotGenerated(Document doc, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". AI-Generated Narrative");
-    Font f = new Font(Font.HELVETICA, 10, Font.ITALIC, C_TEXT);
-    Paragraph p =
-        new Paragraph(
-            "No story has been generated for this capture. Visit the Story tab to generate one before exporting the report.",
-            f);
-    p.setSpacingBefore(8);
-    p.setSpacingAfter(8);
-    doc.add(p);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: AI Narrative
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private static final Color C_SEVERITY_CRITICAL = new Color(220, 38, 38);
-  private static final Color C_SEVERITY_HIGH = new Color(234, 88, 12);
-  private static final Color C_SEVERITY_MEDIUM = new Color(202, 138, 4);
-  private static final Color C_SEVERITY_LOW = new Color(100, 116, 139);
-
-  private void addAiNarrative(Document doc, StoryResponse story, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". AI-Generated Narrative");
-
-    Font bodyFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
-    Font titleFont = new Font(Font.HELVETICA, 10, Font.BOLD, C_TEXT);
-
-    for (var section : story.getNarrative()) {
-      if (section.getTitle() != null) {
-        Paragraph title = new Paragraph(section.getTitle(), titleFont);
-        title.setSpacingBefore(10);
-        title.setSpacingAfter(4);
-        doc.add(title);
-      }
-      if (section.getContent() != null) {
-        Paragraph content = new Paragraph(section.getContent(), bodyFont);
-        content.setSpacingAfter(8);
-        doc.add(content);
-      }
-    }
-
-    if (story.getTimeline() != null && !story.getTimeline().isEmpty()) {
-      addSubHeader(doc, "Key Events Timeline");
-      PdfPTable table = new PdfPTable(new float[] {2, 4, 2});
-      table.setWidthPercentage(100);
-      table.setSpacingBefore(6);
-      table.setSpacingAfter(12);
-      addTableHeader(table, "Title", "Description", "Type");
-      Font f = cellFont();
-      for (int i = 0; i < story.getTimeline().size(); i++) {
-        var event = story.getTimeline().get(i);
-        Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-        addRow(
-            table,
-            bg,
-            f,
-            nvl(event.getTitle()),
-            nvl(event.getDescription()),
-            event.getType() != null ? event.getType().name() : "—");
-      }
-      doc.add(table);
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: Deterministic Findings
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addDeterministicFindings(Document doc, List<Finding> findings, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". Deterministic Findings (" + findings.size() + ")");
-
-    Font bodyFont = new Font(Font.HELVETICA, 9, Font.NORMAL, C_TEXT);
-
-    String[] severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW"};
-    for (String sev : severities) {
-      List<Finding> group =
-          findings.stream()
-              .filter(f -> f.getSeverity() != null && sev.equals(f.getSeverity().name()))
-              .collect(java.util.stream.Collectors.toList());
-      if (group.isEmpty()) continue;
-
-      Color sevColor =
-          switch (sev) {
-            case "CRITICAL" -> C_SEVERITY_CRITICAL;
-            case "HIGH" -> C_SEVERITY_HIGH;
-            case "MEDIUM" -> C_SEVERITY_MEDIUM;
-            default -> C_SEVERITY_LOW;
-          };
-
-      Font sevFont = new Font(Font.HELVETICA, 10, Font.BOLD, Color.WHITE);
-      PdfPTable banner = new PdfPTable(1);
-      banner.setWidthPercentage(100);
-      banner.setSpacingBefore(8);
-      banner.setSpacingAfter(2);
-      PdfPCell bannerCell = new PdfPCell(new Phrase(sev + " (" + group.size() + ")", sevFont));
-      bannerCell.setBackgroundColor(sevColor);
-      bannerCell.setPadding(5);
-      bannerCell.setBorder(Rectangle.NO_BORDER);
-      banner.addCell(bannerCell);
-      doc.add(banner);
-
-      PdfPTable table = new PdfPTable(new float[] {3, 3, 6, 4});
-      table.setWidthPercentage(100);
-      table.setSpacingBefore(2);
-      table.setSpacingAfter(8);
-      addTableHeader(table, "Type", "Title", "Summary", "Affected IPs");
-      Font f = cellFont();
-      for (int i = 0; i < group.size(); i++) {
-        Finding finding = group.get(i);
-        Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-        String type = finding.getType() != null ? finding.getType().name().replace("_", " ") : "—";
-        String ips =
-            finding.getAffectedIps() != null ? String.join(", ", finding.getAffectedIps()) : "—";
-        addRow(
-            table,
-            bg,
-            f,
-            type,
-            nvl(finding.getTitle()),
-            nvl(finding.getSummary()),
-            ips.isEmpty() ? "—" : ips);
-      }
-      doc.add(table);
-
-      // Metrics for each finding as a small note
-      for (Finding finding : group) {
-        if (finding.getMetrics() != null && !finding.getMetrics().isEmpty()) {
-          StringBuilder metrics = new StringBuilder("  Metrics — ");
-          finding
-              .getMetrics()
-              .forEach((k, v) -> metrics.append(k).append(": ").append(v).append("  "));
-          Paragraph mp = new Paragraph(metrics.toString(), bodyFont);
-          mp.setSpacingAfter(4);
-          doc.add(mp);
-        }
-      }
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section: LLM Investigation Steps
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addInvestigationSteps(Document doc, List<InvestigationStep> steps, int sec)
-      throws Exception {
-    addSectionHeader(doc, sec + ". LLM Investigation (" + steps.size() + " queries)");
-
-    Font bodyFont = new Font(Font.HELVETICA, 9, Font.NORMAL, C_TEXT);
-    Font boldFont = new Font(Font.HELVETICA, 9, Font.BOLD, C_TEXT);
-
-    for (InvestigationStep step : steps) {
-      var query = step.getQuery();
-      addSubHeader(doc, query.getId() + ": " + nvl(query.getLabel()));
-
-      if (step.getHypothesis() != null) {
-        Paragraph hyp = new Paragraph();
-        hyp.add(
-            new Phrase("Hypothesis [" + step.getHypothesis().getConfidence() + "]: ", boldFont));
-        hyp.add(new Phrase(step.getHypothesis().getHypothesis(), bodyFont));
-        hyp.setSpacingAfter(6);
-        doc.add(hyp);
-      }
-
-      long total = step.getConversationCount();
-      int shown = step.getConversations() != null ? step.getConversations().size() : 0;
-      Paragraph countLine =
-          new Paragraph(
-              "Matching conversations: "
-                  + total
-                  + (shown < total ? " (showing top " + shown + ")" : ""),
-              bodyFont);
-      countLine.setSpacingAfter(4);
-      doc.add(countLine);
-
-      if (step.getConversations() != null && !step.getConversations().isEmpty()) {
-        PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 2, 2, 2, 4});
-        table.setWidthPercentage(100);
-        table.setSpacingBefore(4);
-        table.setSpacingAfter(10);
-        addTableHeader(table, "Source", "Destination", "Port", "Protocol", "App", "Bytes", "Risks");
-        Font f = cellFont();
-        for (int i = 0; i < step.getConversations().size(); i++) {
-          var ev = step.getConversations().get(i);
-          Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-          String risks = ev.getFlowRisks() != null ? String.join(", ", ev.getFlowRisks()) : "—";
-          addRow(
-              table,
-              bg,
-              f,
-              nvl(ev.getSrcIp()),
-              nvl(ev.getDstIp()),
-              ev.getDstPort() != null ? String.valueOf(ev.getDstPort()) : "—",
-              nvl(ev.getProtocol()),
-              nvl(ev.getAppName()),
-              ev.getTotalBytes() != null ? formatBytes(ev.getTotalBytes()) : "—",
-              risks.isEmpty() ? "—" : risks);
-        }
-        doc.add(table);
-      } else {
-        Paragraph none = new Paragraph("No matching conversations found.", bodyFont);
-        none.setSpacingAfter(8);
-        doc.add(none);
-      }
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // PDF building helpers
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void addSectionHeader(Document doc, String title) throws Exception {
-    Font font = new Font(Font.HELVETICA, 12, Font.BOLD, Color.WHITE);
-    PdfPTable banner = new PdfPTable(1);
-    banner.setWidthPercentage(100);
-    banner.setSpacingBefore(18);
-    banner.setSpacingAfter(2);
-    PdfPCell cell = new PdfPCell(new Phrase(title, font));
-    cell.setBackgroundColor(C_HEADER_BG);
-    cell.setPadding(8);
-    cell.setBorder(Rectangle.NO_BORDER);
-    banner.addCell(cell);
-    doc.add(banner);
-  }
-
-  private void addSubHeader(Document doc, String title) throws Exception {
-    Font font = new Font(Font.HELVETICA, 10, Font.BOLD, Color.WHITE);
-    PdfPTable banner = new PdfPTable(1);
-    banner.setWidthPercentage(100);
-    banner.setSpacingBefore(8);
-    banner.setSpacingAfter(2);
-    PdfPCell cell = new PdfPCell(new Phrase(title, font));
-    cell.setBackgroundColor(C_SUBHEADER_BG);
-    cell.setPadding(6);
-    cell.setBorder(Rectangle.NO_BORDER);
-    banner.addCell(cell);
-    doc.add(banner);
-  }
-
-  private void addDivider(Document doc) throws Exception {
-    PdfPTable line = new PdfPTable(1);
-    line.setWidthPercentage(100);
-    line.setSpacingBefore(16);
-    line.setSpacingAfter(16);
-    PdfPCell cell = new PdfPCell(new Phrase(" "));
-    cell.setBackgroundColor(C_DIVIDER);
-    cell.setBorder(Rectangle.NO_BORDER);
-    cell.setFixedHeight(2f);
-    line.addCell(cell);
-    doc.add(line);
-  }
-
-  private void addTableHeader(PdfPTable table, String... headers) {
-    Font font = new Font(Font.HELVETICA, 9, Font.BOLD, Color.WHITE);
-    for (String h : headers) {
-      PdfPCell cell = new PdfPCell(new Phrase(h, font));
-      cell.setBackgroundColor(C_SUBHEADER_BG);
-      cell.setPadding(6);
-      cell.setHorizontalAlignment(Element.ALIGN_LEFT);
-      cell.setBorderColor(C_DIVIDER);
-      table.addCell(cell);
-    }
-  }
-
-  private void addRow(PdfPTable table, Color bg, Font font, String... values) {
-    for (String v : values) {
-      PdfPCell cell = new PdfPCell(new Phrase(nvl(v), font));
-      cell.setBackgroundColor(bg);
-      cell.setPadding(5);
-      cell.setBorderColor(new Color(226, 232, 240));
-      table.addCell(cell);
-    }
-  }
-
-  /** Two-column key → value table used for metadata sections. */
-  private PdfPTable kvTable(String[][] rows) {
-    PdfPTable table = new PdfPTable(new float[] {2, 5});
-    table.setWidthPercentage(100);
-    table.setSpacingBefore(6);
-    table.setSpacingAfter(12);
-    Font labelFont = new Font(Font.HELVETICA, 10, Font.BOLD, C_LABEL);
-    Font valueFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
-    for (int i = 0; i < rows.length; i++) {
-      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      PdfPCell lc = new PdfPCell(new Phrase(rows[i][0], labelFont));
-      lc.setBackgroundColor(bg);
-      lc.setPadding(6);
-      lc.setBorder(Rectangle.NO_BORDER);
-      table.addCell(lc);
-      PdfPCell vc = new PdfPCell(new Phrase(rows[i][1], valueFont));
-      vc.setBackgroundColor(bg);
-      vc.setPadding(6);
-      vc.setBorder(Rectangle.NO_BORDER);
-      table.addCell(vc);
-    }
-    return table;
-  }
-
-  private static Paragraph centred(Paragraph p) {
-    p.setAlignment(Element.ALIGN_CENTER);
-    return p;
-  }
-
-  private static Font cellFont() {
-    return new Font(Font.HELVETICA, 9, Font.NORMAL, new Color(30, 41, 59));
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Formatters
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private static String formatBytes(Long bytes) {
-    if (bytes == null) return "—";
-    if (bytes < 1_024) return bytes + " B";
-    if (bytes < 1_048_576) return String.format("%.1f KB", bytes / 1_024.0);
-    if (bytes < 1_073_741_824) return String.format("%.1f MB", bytes / 1_048_576.0);
-    return String.format("%.2f GB", bytes / 1_073_741_824.0);
-  }
-
-  private static String formatBytes(long bytes) {
-    return formatBytes((Long) bytes);
-  }
-
-  private static String formatDuration(long ms) {
-    if (ms <= 0) return "—";
-    long s = ms / 1_000;
-    long h = s / 3_600;
-    long m = (s % 3_600) / 60;
-    long sec = s % 60;
-    if (h > 0) return String.format("%dh %02dm %02ds", h, m, sec);
-    if (m > 0) return String.format("%dm %02ds", m, sec);
-    return String.format("%ds", sec);
-  }
-
-  private static String formatDt(LocalDateTime dt) {
-    return dt != null ? dt.format(DT_FMT) : "—";
-  }
-
-  private static String nvl(String s) {
-    return (s != null && !s.isBlank()) ? s : "—";
-  }
-
-  private static String endpoint(String ip, Integer port) {
-    if (ip == null) return "—";
-    return port != null ? ip + ":" + port : ip;
-  }
-
-  private static String truncate(String s, int maxLen) {
-    if (s == null || s.isBlank()) return "—";
-    return s.length() > maxLen ? s.substring(0, maxLen) + "…" : s;
-  }
-
-  private static String abbreviate(String s, int maxLen) {
-    if (s == null) return "";
-    return s.length() > maxLen ? s.substring(0, maxLen - 1) + "…" : s;
-  }
-
-  /** Both lists come from the port and are never null (see ConversationLookup.Findings). */
-  /** A conversation's rule matches as seen in a network: minus suppressed, plus the network's own. */
-  static ConversationFacts inNetwork(ConversationFacts c, java.util.Set<String> suppressed, List<String> networkNames) {
+  static ConversationFacts inNetwork(ConversationFacts c, Set<String> suppressed, List<String> networkNames) {
     var f = c.findings();
     java.util.LinkedHashSet<String> sigs = new java.util.LinkedHashSet<>();
     if (f.customSignatures() != null) {
@@ -1398,33 +849,5 @@ public class ReportService {
             f.appName(), f.tsharkProtocol(), f.category(), f.flowRisks(), f.suricataAlerts(),
             List.copyOf(sigs), f.httpUserAgents());
     return new ConversationFacts(c.id(), c.fileId(), c.flow(), c.tls(), findings);
-  }
-
-  private static String joinRisks(List<String> flowRisks, List<String> customSigs) {
-    StringBuilder sb = new StringBuilder();
-    for (String r : flowRisks) sb.append(r).append(" ");
-    for (String s : customSigs) sb.append("[SIG] ").append(s).append(" ");
-    String result = sb.toString().trim();
-    return result.isBlank() ? "—" : result;
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // protocolStats helpers
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private static long getStatLong(Object stat, String key) {
-    if (stat instanceof Map<?, ?> m) {
-      Object v = m.get(key);
-      if (v instanceof Number n) return n.longValue();
-    }
-    return 0L;
-  }
-
-  private static double getStatDouble(Object stat, String key) {
-    if (stat instanceof Map<?, ?> m) {
-      Object v = m.get(key);
-      if (v instanceof Number n) return n.doubleValue();
-    }
-    return 0.0;
   }
 }

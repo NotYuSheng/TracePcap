@@ -1,0 +1,69 @@
+/* Download report drawer (#1152). */
+.report-drawer-group {
+  border: 0;
+  margin: 0 0 18px;
+  padding: 0;
+}
+.report-drawer-group legend {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tp-text-muted, #525a68);
+  margin-bottom: 8px;
+}
+.report-drawer-choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--tp-border, #d5d9e1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.report-drawer-choice input {
+  margin-top: 3px;
+  accent-color: var(--sgds-primary, #5925dc);
+}
+.report-drawer-choice.is-on {
+  border-color: var(--sgds-primary, #5925dc);
+  background: color-mix(in srgb, var(--sgds-primary, #5925dc) 6%, transparent);
+}
+.report-drawer-choice.is-off {
+  cursor: default;
+  opacity: 0.6;
+}
+.report-drawer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--tp-border, #eceef3);
+  font-size: 0.875rem;
+}
+.report-drawer-row .form-check {
+  margin: 0;
+}
+.report-drawer-row.is-off {
+  opacity: 0.6;
+}
+.report-drawer-hint {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #525a68);
+  text-align: right;
+}
+.report-drawer-choice .report-drawer-hint {
+  text-align: left;
+}
+.report-drawer-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.report-drawer-footer > :first-child {
+  flex: 1;
+}

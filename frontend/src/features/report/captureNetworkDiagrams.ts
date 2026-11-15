@@ -116,7 +116,7 @@ async function captureLayout(
               const dataUrl = await toPng(container, {
                 width: CAPTURE_W,
                 height: CAPTURE_H,
-                pixelRatio: 6,
+                pixelRatio: 2,
                 // Skip re-fetching web fonts (Bootstrap Icons) — those fetches
                 // fail when Vite-bundled with hashed asset URLs.  Edge lines,
                 // labels and colours are all captured; only icon glyphs are

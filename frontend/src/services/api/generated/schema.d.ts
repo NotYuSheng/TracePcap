@@ -4285,12 +4285,11 @@ export interface components {
             timestamp?: string;
         };
         ReportRequest: {
-            activeFilters?: string[];
-            forceDirectedImage?: string;
-            hierarchicalImage?: string;
+            mapCaption?: string;
+            mapImage?: string;
             /** Format: uuid */
             networkId?: string;
-            nodeLimitNote?: string;
+            sections?: ("NEEDS_A_LOOK" | "HOSTS" | "MAP" | "STORY" | "TRAFFIC" | "CONVERSATIONS" | "EXTRACTED_FILES" | "APPENDIX")[];
         };
         ReusedAddress: {
             ip?: string;

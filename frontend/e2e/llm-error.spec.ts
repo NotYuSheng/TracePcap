@@ -83,10 +83,14 @@ test('Report download shows an actionable alert when the diagram exceeds the JSO
   // Download report lives in the Capture tab.
   await page.goto(`/analysis/${fileId}/file`);
   await page.getByRole('button', { name: /Download Report/i }).click();
+  // The drawer: leave the map out (it isn't what's under test), then build.
+  const drawer = page.getByRole('dialog', { name: 'Download report' });
+  await drawer.getByRole('checkbox', { name: 'Network map' }).uncheck();
+  await drawer.getByRole('button', { name: /Download PDF/ }).click();
 
-  const alert = page.locator('.alert-danger');
+  const alert = drawer.locator('.alert-danger');
   await expect(alert).toBeVisible();
-  await expect(alert).toContainText('Report Too Large for This Deployment');
+  await expect(alert).toContainText(/too large for this deployment/i);
   await expect(alert).toContainText('63 MB');
   await expect(alert).toContainText('APP_MEMORY_MB');
   await expect(alert).toContainText('2048');

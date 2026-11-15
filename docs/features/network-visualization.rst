@@ -441,7 +441,7 @@ Layout Controls
 Export
 ------
 
-The topology can be captured as part of the PDF report via the **Export PDF**
-button (see :doc:`../operations/backup-restore`). The **download** button in the
+The grouped map goes into the PDF report, as left or for the whole capture (see
+:doc:`report-export`). The **download** button in the
 graph card's header saves the network map as a draw.io diagram to finish by hand
 (see :doc:`network-map`).

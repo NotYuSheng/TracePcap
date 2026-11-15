@@ -562,8 +562,8 @@ limit is hit, a warning is shown on the Extracted Files tab. See
 Report Generation
 -----------------
 
-The PDF report request carries a base64-encoded PNG of the topology diagram
-(force-directed and hierarchical layouts) as a single JSON string field. Jackson
+The PDF report request carries the network map, drawn by the browser, as a base64-encoded JPEG
+in a single JSON string field (usually around 1 MB). Jackson
 caps any single JSON string token at 20 MB by default, purely as a memory-safety
 guard against unbounded allocation from one request — a dense topology's
 captured diagram can exceed that, which fails the request with
