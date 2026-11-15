@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '@govtechsg/sgds-react';
-import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEventBadge';
+import { ChangeList } from '@/components/monitor/ChangeList';
+import { changeSummary } from '@/features/monitor/utils/describeChange';
 import { SnapshotMap } from '@/components/monitor/SnapshotMap';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import type { NetworkAnnotation, NetworkExternalEvent } from '@/features/insights/types/insights.types';
@@ -9,6 +10,9 @@ import { formatBytes, formatSpan } from '@/utils/formatters';
 import './NetworkTimeline.css';
 
 type Filter = 'all' | 'changes' | 'captures' | 'notes';
+
+/** A capture with this many changes or fewer lists them; more start as a one-line summary. */
+const INLINE_CHANGES = 3;
 
 interface NetworkTimelineProps {
   networkId: string;
@@ -54,6 +58,8 @@ export function NetworkTimeline({
   const ordered = useMemo(() => [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder), [snapshots]);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [openChanges, setOpenChanges] = useState<Set<string>>(new Set());
+  const navigate = useNavigate();
   const picked = ordered.find(s => s.id === pickedId) ?? ordered[ordered.length - 1] ?? null;
   const pickedIndex = picked ? ordered.indexOf(picked) : -1;
   const previous = pickedIndex > 0 ? ordered[pickedIndex - 1] : null;
@@ -166,9 +172,27 @@ export function NetworkTimeline({
                   </button>
                   {changes.length > 0 && (
                     <div className="nt-changes">
-                      {changes.map(c => (
-                        <ChangeEventBadge key={c.id} event={c} snapshots={snapshots} onPatch={onPatchChange} />
-                      ))}
+                      {changes.length <= INLINE_CHANGES || openChanges.has(s.id) ? (
+                        <ChangeList
+                          events={changes}
+                          snapshots={snapshots}
+                          onPatch={onPatchChange}
+                          compact
+                          pageSize={6}
+                        />
+                      ) : (
+                        <>
+                          <p className="nt-change-summary">{changeSummary(changes)}</p>
+                          <Button
+                            size="sm"
+                            variant="link"
+                            className="nt-link"
+                            onClick={() => setOpenChanges(prev => new Set(prev).add(s.id))}
+                          >
+                            Show the {changes.length.toLocaleString()} changes
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                   {notes.map(n => (
@@ -178,10 +202,12 @@ export function NetworkTimeline({
                     </p>
                   ))}
                   <div className="nt-capture-links">
-                    <Button size="sm" variant="link" className="p-0" onClick={() => onOpenDetails(s)}>
+                    <Button size="sm" variant="link" className="nt-link" onClick={() => onOpenDetails(s)}>
                       Details
                     </Button>
-                    <Link to={`/analysis/${s.fileId}`}>Open the capture</Link>
+                    <Button size="sm" variant="link" className="nt-link" onClick={() => navigate(`/analysis/${s.fileId}`)}>
+                      Open the capture
+                    </Button>
                   </div>
                 </li>
               );

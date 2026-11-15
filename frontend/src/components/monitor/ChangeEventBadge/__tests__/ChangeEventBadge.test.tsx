@@ -189,21 +189,21 @@ describe('ChangeEventBadge', () => {
     const onPatch = vi.fn(() => new Promise<void>(res => { resolvePatch = () => res() }))
     renderBadge(event(), onPatch)
 
-    await userEvent.click(screen.getByTitle('Mark as reviewed'))
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as reviewed' }))
 
     expect(onPatch).toHaveBeenCalledWith('e1', { reviewed: true })
     // Mid-flight: the row greys out immediately so a triage queue stays responsive.
-    expect(screen.getByTitle('Mark as unreviewed')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mark as unreviewed' })).toBeInTheDocument()
 
     resolvePatch()
-    await waitFor(() => expect(screen.getByTitle('Mark as unreviewed')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark as unreviewed' })).toBeInTheDocument())
   })
 
   it('reverts the review state when the save fails', async () => {
     const onPatch = vi.fn().mockRejectedValue(new Error('offline'))
     renderBadge(event(), onPatch)
 
-    await userEvent.click(screen.getByTitle('Mark as reviewed'))
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as reviewed' }))
     await waitFor(() => expect(onPatch).toHaveBeenCalled())
 
     // Assert the state that actually reverts, not merely that a button exists — an earlier
@@ -213,7 +213,7 @@ describe('ChangeEventBadge', () => {
     //
     // Optimistic UI without a revert leaves the row greyed out as reviewed while the backend
     // still has it outstanding: the operator's triage queue and the truth diverge silently.
-    await waitFor(() => expect(screen.getByTitle('Mark as reviewed')).toBeInTheDocument())
-    expect(screen.queryByTitle('Mark as unreviewed')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark as reviewed' })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Mark as unreviewed' })).not.toBeInTheDocument()
   })
 })

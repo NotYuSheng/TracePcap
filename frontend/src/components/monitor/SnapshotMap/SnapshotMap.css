@@ -41,3 +41,31 @@
 .snapshot-map-graph .network-graph-wrapper {
   height: 100%;
 }
+
+/* Devices gone since the capture before: chips in a box that scrolls past a few rows. */
+.snapshot-map-gone {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 132px;
+  overflow-y: auto;
+  border: 1px solid var(--tp-border, #eceef3);
+  border-radius: 8px;
+}
+
+.snapshot-map-gone li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px dashed #98a2b3;
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+
+.snapshot-map-gone-mac {
+  color: var(--tp-text-muted, #525a68);
+}

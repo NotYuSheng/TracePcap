@@ -4,76 +4,18 @@ import { Button, Form } from '@govtechsg/sgds-react';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
 import { severityHex, severityIcon } from '@/utils/severityColors';
+import { describeEvent } from '@/features/monitor/utils/describeChange';
 
 interface ChangeEventBadgeProps {
   event: ChangeEvent;
   snapshots: NetworkSnapshot[];
   onPatch: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
+  /** For a narrow column: no capture line or timestamp, and the text wraps. */
+  compact?: boolean;
 }
 
 
-/** Human label for a security-drift signalKind payload value. */
-function securityKindLabel(kind: unknown): string {
-  switch (kind) {
-    case 'ids':       return 'IDS alert';
-    case 'signature': return 'Custom signature';
-    case 'risk':      return 'Flow risk';
-    case 'fileType':  return 'File type';
-    default:          return 'Security signal';
-  }
-}
-
-function describeEvent(event: ChangeEvent): string {
-  const nv = event.newValue ?? {};
-  const ov = event.oldValue ?? {};
-
-  switch (event.changeType) {
-    case 'MAC_ADDED': {
-      const parts = [nv['manufacturer'], nv['deviceType']].filter(Boolean);
-      const parens = parts.length ? ` (${parts.join(', ')})` : '';
-      return `New device: ${event.entityKey}${parens}${nv['ip'] ? ` at ${nv['ip']}` : ''}`;
-    }
-    case 'IP_MAC_DRIFT':
-      if (ov['mac'] && nv['mac'] && ov['mac'] !== nv['mac']) {
-        // IP→MAC change: same IP, different MAC (possible ARP spoofing)
-        return `Potential ARP spoof: ${event.entityKey} — MAC changed from ${ov['mac']} to ${nv['mac']}`;
-      }
-      // MAC→IP change: same MAC, different IP (DHCP reassignment)
-      return `IP reassignment: ${event.entityKey} — IP changed from ${ov['ip'] ?? '?'} to ${nv['ip'] ?? '?'}`;
-    case 'ASN_CHANGE':
-      return `New ISP/ASN seen: ${nv['asn']}${nv['org'] ? ` — ${nv['org']}` : ''}${nv['country'] ? ` (${nv['country']})` : ''}`;
-    case 'GATEWAY_CHANGE': {
-      const fmtGw = (ip: unknown, org: unknown) => `${ip ?? '?'}${org ? ` (${org})` : ''}`;
-      return `Gateway changed: ${fmtGw(ov['ip'], ov['org'])} → ${fmtGw(nv['ip'], nv['org'])}`;
-    }
-    case 'APP_ADDED':
-      return `New application: ${event.entityKey}`;
-    case 'PROTOCOL_ADDED':
-      return `New protocol: ${event.entityKey}`;
-    case 'VPN_DRIFT':
-      if (nv['riskType']) return `VPN detected: ${nv['riskType']}`;
-      return `VPN signal gone: ${ov['riskType'] ?? event.entityKey}`;
-    case 'SECURITY_ALERT_ADDED':
-      return `${securityKindLabel(nv['signalKind'])} appeared: ${event.entityKey}`;
-    case 'SECURITY_ALERT_REMOVED':
-      return `${securityKindLabel(ov['signalKind'])} cleared: ${event.entityKey}`;
-    case 'BASELINE_MISSING': {
-      const what = nv['entryType'] === 'GATEWAY' ? 'gateway' : 'device';
-      return `Baselined ${what} not seen: ${event.entityKey}${nv['expected'] ? ` (expected at ${nv['expected']})` : ''}`;
-    }
-    case 'BASELINE_MISMATCH':
-      return `Baseline mismatch: ${event.entityKey} — declared ${nv['expected'] ?? '?'}, observed ${nv['observed'] ?? '?'}`;
-    case 'LABEL_STALE': {
-      const changes = Array.isArray(nv['changes']) ? (nv['changes'] as string[]).join(', ') : '';
-      const label = nv['roleLabel'] ? ` (${nv['roleLabel']})` : '';
-      return `Label may be stale: ${event.entityKey}${label}${changes ? ` — ${changes}` : ''}`;
-    }
-    default:
-      return event.entityKey;
-  }
-}
-
-export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadgeProps) => {
+export const ChangeEventBadge = ({ event, snapshots, onPatch, compact = false }: ChangeEventBadgeProps) => {
   const toSnap = snapshots.find(s => s.id === event.toSnapshotId);
   const detectedMs = parseDateTime(event.detectedAt as unknown as string | number[]);
   const formattedTime = new Date(detectedMs).toLocaleString('en-GB');
@@ -117,8 +59,9 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
   };
 
   return (
+    <div className="py-2 border-bottom">
     <div
-      className={`d-flex align-items-start gap-3 py-2 border-bottom${localReviewed ? ' opacity-50' : ''}`}
+      className={`d-flex align-items-start gap-3${localReviewed ? ' opacity-50' : ''}`}
       style={{ transition: 'opacity 0.2s' }}
     >
       <i
@@ -126,8 +69,8 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
         style={{ color: severityHex(event.severity) }}
       />
       <div className="flex-grow-1 min-w-0">
-        <div className="text-break">{describeEvent(event)}</div>
-        {toSnap && (
+        <div className="text-break" style={{ overflowWrap: 'anywhere' }}>{describeEvent(event)}</div>
+        {toSnap && !compact && (
           <small className="text-muted d-block">
             Snapshot {toSnap.snapshotOrder + 1}: {toSnap.fileName}
           </small>
@@ -137,8 +80,34 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
             <i className="bi bi-chat-left-text me-1"></i>{localNotes}
           </small>
         )}
+      </div>
+
+      <div className="d-flex align-items-center gap-2 flex-shrink-0">
+        {!compact && <small className="text-muted text-nowrap">{formattedTime}</small>}
+        <Button
+          size="sm"
+          variant="link"
+          className="p-0 text-muted"
+          aria-label={showNotes ? 'Hide notes' : (localNotes ? 'Edit notes' : 'Add notes')}
+          onClick={() => { setShowNotes(v => !v); setDraftNotes(localNotes); }}
+        >
+          <i className={`bi bi-chat-left-text${localNotes ? '-fill' : ''}`}></i>
+        </Button>
+        <Button
+          size="sm"
+          variant="link"
+          className={`p-0 ${localReviewed ? 'text-success' : 'text-muted'}`}
+          aria-label={localReviewed ? 'Mark as unreviewed' : 'Mark as reviewed'}
+          onClick={handleReviewToggle}
+          disabled={saving}
+        >
+          <i className={`bi bi-check-circle${localReviewed ? '-fill' : ''}`}></i>
+        </Button>
+      </div>
+    </div>
+    {/* The notes editor gets the row's full width, not the text column beside the buttons. */}
         {showNotes && (
-          <div className="mt-2">
+          <div className="mt-2 ms-4">
             <Form.Control
               as="textarea"
               size="sm"
@@ -169,30 +138,6 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
             </div>
           </div>
         )}
-      </div>
-
-      <div className="d-flex align-items-center gap-2 flex-shrink-0">
-        <small className="text-muted text-nowrap">{formattedTime}</small>
-        <Button
-          size="sm"
-          variant="link"
-          className="p-0 text-muted"
-          title={showNotes ? 'Hide notes' : (localNotes ? 'Edit notes' : 'Add notes')}
-          onClick={() => { setShowNotes(v => !v); setDraftNotes(localNotes); }}
-        >
-          <i className={`bi bi-chat-left-text${localNotes ? '-fill' : ''}`}></i>
-        </Button>
-        <Button
-          size="sm"
-          variant="link"
-          className={`p-0 ${localReviewed ? 'text-success' : 'text-muted'}`}
-          title={localReviewed ? 'Mark as unreviewed' : 'Mark as reviewed'}
-          onClick={handleReviewToggle}
-          disabled={saving}
-        >
-          <i className={`bi bi-check-circle${localReviewed ? '-fill' : ''}`}></i>
-        </Button>
-      </div>
     </div>
   );
 };

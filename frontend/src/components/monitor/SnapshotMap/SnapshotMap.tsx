@@ -78,6 +78,7 @@ export function SnapshotMap({
   const navigate = useNavigate();
   const [layoutType, setLayoutType] = useState<GraphLayoutType>('grouped');
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  const [showGone, setShowGone] = useState(false);
   // In this network, so its own detection rules' matches show too (#925 phase 3).
   const { nodes, edges, loading } = useNetworkData(snapshot.fileId, undefined, undefined, networkId);
 
@@ -122,13 +123,28 @@ export function SnapshotMap({
           {gone.length > 0 && (
             <span>
               <span className="snapshot-map-dot snapshot-map-dot-gone" aria-hidden="true" />
-              Gone since the capture before:{' '}
-              <span className="font-monospace">
-                {gone.map(g => (g.mac ? `${g.ip} (${g.mac})` : g.ip)).join(', ')}
-              </span>
+              {gone.length.toLocaleString()} {gone.length === 1 ? 'device' : 'devices'} gone since the capture before{' '}
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 align-baseline"
+                aria-expanded={showGone}
+                onClick={() => setShowGone(v => !v)}
+              >
+                {showGone ? 'Hide' : 'Show'}
+              </button>
             </span>
           )}
         </div>
+      )}
+      {showGone && gone.length > 0 && (
+        <ul className="snapshot-map-gone" aria-label="Devices gone since the capture before">
+          {gone.map(g => (
+            <li key={g.mac ?? g.ip}>
+              <span className="font-monospace">{g.ip}</span>
+              {g.mac && <span className="snapshot-map-gone-mac font-monospace">{g.mac}</span>}
+            </li>
+          ))}
+        </ul>
       )}
       {selected && (
         <EntityDetailModal
