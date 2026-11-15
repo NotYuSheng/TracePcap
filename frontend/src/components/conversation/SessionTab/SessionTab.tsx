@@ -2,6 +2,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Badge, Button, ButtonGroup, Card } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
+import './SessionTab.css';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type {
   SessionData,
@@ -25,7 +26,7 @@ const SERVER_COLOR = '#1a5276'; // blue — sent by server
 
 function InterleavedStream({ chunks }: { chunks: SessionChunk[] }) {
   if (chunks.length === 0) {
-    return <p className="text-muted text-center py-3">No payload data in this stream.</p>;
+    return <p className="session-empty">No payload in this stream.</p>;
   }
 
   return (
@@ -340,7 +341,7 @@ function StunMessageBlock({ msg, index }: { msg: StunMessage; index: number }) {
 
 function StunMessagesView({ messages }: { messages: StunMessage[] }) {
   if (messages.length === 0) {
-    return <p className="text-muted text-center py-3">No STUN messages decoded.</p>;
+    return <p className="session-empty">No STUN messages decoded.</p>;
   }
   return (
     <div>
@@ -463,26 +464,22 @@ export function SessionTab({ conversationId }: SessionTabProps) {
   const isTls = session.detectedProtocol === 'TLS';
 
   return (
-    <div>
+    <div className="session-tab">
       {/* Toolbar */}
-      <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
+      <div className="session-toolbar">
         <div className="d-flex align-items-center gap-2">
           {session.detectedProtocol && (
-            <Badge bg="info" text="dark">{session.detectedProtocol}</Badge>
+            <span className="session-tag">{session.detectedProtocol}</span>
           )}
           {hasMedia && (
-            <Badge bg="primary">
-              {session.mediaInfo!.containerFormat}
-            </Badge>
+            <span className="session-tag">{session.mediaInfo!.containerFormat}</span>
           )}
-          <small className="text-muted">
-            ↑ {formatBytes(session.totalClientBytes)} client &nbsp;·&nbsp; ↓{' '}
-            {formatBytes(session.totalServerBytes)} server
-          </small>
+          <span className="session-bytes">
+            ↑ {formatBytes(session.totalClientBytes)} from the client · ↓{' '}
+            {formatBytes(session.totalServerBytes)} from the server
+          </span>
           {session.truncated && (
-            <Badge bg="warning" text="dark" title="Session truncated at 1 MB">
-              Truncated
-            </Badge>
+            <span className="session-tag session-tag-warn">Truncated at 1 MB</span>
           )}
         </div>
 
@@ -513,28 +510,23 @@ export function SessionTab({ conversationId }: SessionTabProps) {
           </ButtonGroup>
         )}
 
-        <Button
-          size="sm"
-          variant="outline-secondary"
-          className="ms-auto"
-          onClick={handleReconstruct}
-          title="Re-run reconstruction"
-        >
-          ↺ Refresh
-        </Button>
+        <button type="button" className="btn btn-link btn-sm p-0 ms-auto session-refresh" onClick={handleReconstruct}>
+          <i className="bi bi-arrow-clockwise me-1" aria-hidden="true" />
+          Rebuild the session
+        </button>
       </div>
 
       {isTls && (
-        <Alert variant="secondary" className="py-2 mb-3" style={{ fontSize: '0.85rem' }}>
-          This session uses TLS encryption — payload content cannot be decoded without the private
-          key.
-        </Alert>
+        <p className="session-note">
+          <i className="bi bi-lock me-1" aria-hidden="true" />
+          Encrypted with TLS: the payload can't be read without the private key.
+        </p>
       )}
 
       {session.truncated && (
-        <Alert variant="warning" className="py-2 mb-3" style={{ fontSize: '0.85rem' }}>
-          Session exceeded 1 MB — only the first 1 MB of data is shown.
-        </Alert>
+        <p className="session-note session-note-warn">
+          The session is over 1 MB: only the first 1 MB is shown.
+        </p>
       )}
 
       {/* Media metadata panel */}
