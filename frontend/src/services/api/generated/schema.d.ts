@@ -419,6 +419,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{fileId}/facet-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count conversations per filter value (protocol, app, risk, country, ...) */
+        get: operations["getFacetCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{fileId}/file-types": {
         parameters: {
             query?: never;
@@ -2991,6 +3008,38 @@ export interface components {
             /** Format: int64 */
             totalBytes?: number;
         };
+        ConversationFacetCountsResponse: {
+            apps?: {
+                [key: string]: number;
+            };
+            categories?: {
+                [key: string]: number;
+            };
+            countries?: {
+                [key: string]: number;
+            };
+            customSignatures?: {
+                [key: string]: number;
+            };
+            deviceTypes?: {
+                [key: string]: number;
+            };
+            fileTypes?: {
+                [key: string]: number;
+            };
+            l7Protocols?: {
+                [key: string]: number;
+            };
+            protocols?: {
+                [key: string]: number;
+            };
+            riskTypes?: {
+                [key: string]: number;
+            };
+            suricataAlerts?: {
+                [key: string]: number;
+            };
+        };
         ConversationResponse: {
             appName?: string;
             category?: string;
@@ -5256,6 +5305,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getFacetCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConversationFacetCountsResponse"];
+                };
             };
         };
     };
