@@ -4,7 +4,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Badge, Button, Card, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
-import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
+import { DEFAULT_DIAGRAM_NODES, NODE_LIMIT_PRESETS } from '@/features/network/hooks/useNetworkData';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import type { GraphNode } from '@/features/network/types';
 import { useCompareData } from '@/features/network/hooks/useCompareData';
@@ -67,7 +67,7 @@ export const ComparePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileIds.join(',')]);
 
-  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
+  const [nodeLimit, setNodeLimit] = useState(DEFAULT_DIAGRAM_NODES);
   const [customInput, setCustomInput] = useState('');
 
   const { mergedNodes, mergedEdges, totalNodes, hiddenNodes, perFileStats, labels, loading, error } =
@@ -468,9 +468,9 @@ export const ComparePage = () => {
         </Card.Body>
       </Card>
 
-      {totalNodes > MAX_DIAGRAM_NODES &&
+      {totalNodes > NODE_LIMIT_PRESETS[0] &&
         (() => {
-          const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
+          const presets = NODE_LIMIT_PRESETS.filter(p => p < totalNodes);
           const applyCustom = () => {
             const n = parseInt(customInput, 10);
             if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));

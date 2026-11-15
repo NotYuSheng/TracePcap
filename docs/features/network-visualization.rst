@@ -62,6 +62,18 @@ node positions are preserved.
 The control is available in both the analysis-mode diagram and the monitor-mode
 snapshot diagram, which share the same underlying graph component.
 
+How Many Hosts
+--------------
+
+The diagram draws every host in the capture, up to 1,000. A larger capture
+starts with the 1,000 most significant, ranked by traffic, risk signals and
+how connected they are; the line above the diagram says how many are shown,
+and its menu switches to the top 100, 500 or 1,000, or **All**. The renderer
+draws a few thousand hosts smoothly, so **All** is one click away; past that
+size a map is read by filtering, which narrows it to what you're looking for.
+
+With 100 hosts or fewer the menu isn't shown: every host is drawn.
+
 Traffic Card
 ------------
 
