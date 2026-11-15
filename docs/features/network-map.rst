@@ -126,11 +126,24 @@ The diagram opens laid out the way TracePcap drew it. It always uses the
 network map's grouping, whichever layout is showing, and only the devices the
 current filters leave on the graph.
 
+Filters
+-------
+
+The funnel button on the graph opens the filter drawer on the right. It is the
+same drawer as the Conversations tab's **More filters**: one section per filter
+(IP or hostname, port, security risks, node identity, edge protocols,
+applications, categories, risk types, rules, file types, countries), and each
+chip shows how many it covers: devices for a node identity, connections for
+everything else. Filters apply as you pick them. **Show N connections** at the
+foot closes the drawer; **Clear all** resets every filter. The Network Cluster
+tab and the monitor's snapshot dialog use the same drawer.
+
 Your Own Groups, Names and Notes
 --------------------------------
 
-**Groups** (in the graph card's header, with the network map showing) lists every
-group of the map as a tree. There you can:
+**Groups** (in the graph card's header, with the network map showing) opens a
+drawer on the right that lists every group of the map as a tree, with the map
+still visible beside it. There you can:
 
 - **Add a group of your own**: give it a name (``Payments (PCI scope)``) and pick
   the group it goes **inside** (a network, a subnet, *Your networks*…: any box that

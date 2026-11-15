@@ -15,7 +15,8 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Form, Popover } from '@govtechsg/sgds-react';
+import { FilterPillCount } from '@components/common/SideDrawer';
+import { Badge, Button, Form, Popover } from '@govtechsg/sgds-react';
 import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import './NetworkControls.css';
 
@@ -39,6 +40,19 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
       </Button>
     </EscapableOverlayTrigger>
   );
+}
+
+/** Per-value counts for the network filter chips. Keys match the chip values. */
+export interface NetworkFilterCounts {
+  identities: Record<string, number>;
+  legend: Record<string, number>;
+  apps: Record<string, number>;
+  l7Protocols: Record<string, number>;
+  categories: Record<string, number>;
+  riskTypes: Record<string, number>;
+  customSigs: Record<string, number>;
+  fileTypes: Record<string, number>;
+  countries: Record<string, number>;
 }
 
 interface NetworkControlsProps {
@@ -97,6 +111,10 @@ interface NetworkControlsProps {
   presentGhostFlags?: Set<string>;
   /** Whether the panel starts collapsed. Defaults to false (expanded). */
   defaultCollapsed?: boolean;
+  /** Rendered inside a filter drawer: no toggle, card or Clear button of its own. */
+  embedded?: boolean;
+  /** Counts shown on the chips: connections per value, devices per identity. */
+  counts?: NetworkFilterCounts;
 }
 
 function edgeLegendLabel(key: string): string {
@@ -167,7 +185,10 @@ export function NetworkControls({
   onGhostFilterClear,
   presentGhostFlags = new Set(),
   defaultCollapsed = false,
+  embedded = false,
+  counts,
 }: NetworkControlsProps) {
+  const countOf = (facet: keyof NetworkFilterCounts, key: string) => counts?.[facet]?.[key];
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   const [showColorInfo, setShowColorInfo] = useState(false);
   const colorInfoRef = useRef<HTMLDivElement>(null);
@@ -228,6 +249,7 @@ export function NetworkControls({
       <div className="nc-filter-panel">
         {/* Toggle button */}
         <div className="d-flex align-items-center gap-2">
+          {!embedded && (
           <Button
             size="sm"
             variant="outline-secondary"
@@ -240,6 +262,7 @@ export function NetworkControls({
             )}
             <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
           </Button>
+          )}
           <Button
             size="sm"
             variant="link"
@@ -252,9 +275,9 @@ export function NetworkControls({
         </div>
 
         {/* Collapsible panel */}
-        {isOpen && (
-          <div className="card mt-2">
-            <Card.Body className="p-3">
+        {(embedded || isOpen) && (
+          <div className={embedded ? 'nc-embedded mt-2' : 'card mt-2'}>
+            <div className={embedded ? undefined : 'card-body p-3'}>
               <div className="row g-3">
                 {/* IP / Hostname */}
                 <div className="col-md-3">
@@ -427,6 +450,7 @@ export function NetworkControls({
                         >
                           <span className="nc-dot" style={{ background: color }} />
                           {deviceTypeLabel(key)}
+                          <FilterPillCount n={countOf('identities', key)} />
                         </button>
                       );
                     })}
@@ -470,6 +494,7 @@ export function NetworkControls({
                           >
                             <span className="nc-dot" style={{ background: color }} />
                             {edgeLegendLabel(key)}
+                            <FilterPillCount n={countOf('legend', key)} />
                           </button>
                         );
                       })}
@@ -513,6 +538,7 @@ export function NetworkControls({
                             onClick={() => onL7ProtocolClick(proto)}
                           >
                             {proto}
+                            <FilterPillCount n={countOf('l7Protocols', proto)} />
                           </button>
                         );
                       })}
@@ -571,6 +597,7 @@ export function NetworkControls({
                             onClick={() => onAppFilterClick(app)}
                           >
                             {app}
+                            <FilterPillCount n={countOf('apps', app)} />
                           </button>
                         );
                       })}
@@ -619,6 +646,7 @@ export function NetworkControls({
                             onClick={() => onCategoryClick(cat)}
                           >
                             {cat}
+                            <FilterPillCount n={countOf('categories', cat)} />
                           </button>
                         );
                       })}
@@ -667,6 +695,7 @@ export function NetworkControls({
                             onClick={() => onRiskTypeClick(risk)}
                           >
                             {risk.replace(/_/g, ' ')}
+                            <FilterPillCount n={countOf('riskTypes', risk)} />
                           </button>
                         );
                       })}
@@ -710,6 +739,7 @@ export function NetworkControls({
                             onClick={() => onCustomSigClick(sig)}
                           >
                             {sig.replace(/_/g, ' ')}
+                            <FilterPillCount n={countOf('customSigs', sig)} />
                           </button>
                         );
                       })}
@@ -753,6 +783,7 @@ export function NetworkControls({
                             onClick={() => onFileTypeClick(ft)}
                           >
                             {ft}
+                            <FilterPillCount n={countOf('fileTypes', ft)} />
                           </button>
                         );
                       })}
@@ -834,6 +865,7 @@ export function NetworkControls({
                             onClick={() => onCountryClick(code)}
                           >
                             {countryFlag(code)} {code}
+                            <FilterPillCount n={countOf('countries', code)} />
                           </button>
                         );
                       })}
@@ -842,7 +874,7 @@ export function NetworkControls({
                 )}
               </div>
 
-              {activeFilterCount > 0 && (
+              {!embedded && activeFilterCount > 0 && (
                 <div className="mt-3 pt-2 border-top">
                   <Button
                     size="sm"
@@ -854,7 +886,7 @@ export function NetworkControls({
                   </Button>
                 </div>
               )}
-            </Card.Body>
+            </div>
           </div>
         )}
       </div>

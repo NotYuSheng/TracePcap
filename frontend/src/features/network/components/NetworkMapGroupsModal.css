@@ -85,3 +85,7 @@
   display: flex;
   gap: 8px;
 }
+/* A side drawer, a little wider than the filter drawers: rows carry names, notes and actions. */
+.modal-dialog.side-drawer.nm-groups-drawer {
+  width: 520px;
+}

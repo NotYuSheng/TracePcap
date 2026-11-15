@@ -41,6 +41,8 @@ import { VolumeLegend } from '@components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
 import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { NetworkControls } from '@components/network/NetworkControls';
+import type { NetworkFilterCounts } from '@components/network/NetworkControls/NetworkControls';
+import { SideDrawer, FilterDrawerFooter } from '@components/common/SideDrawer';
 import { TrafficCard } from '@components/network/TrafficCard';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
@@ -293,6 +295,33 @@ export const NetworkDiagramPage = () => {
     edges.forEach(e => e.data.detectedFileTypes?.forEach(f => vals.add(f)));
     return [...vals].sort();
   }, [edges]);
+
+  // Chip counts for the filter drawer: connections per value, devices per identity.
+  const filterCounts = useMemo<NetworkFilterCounts>(() => {
+    const bump = (m: Record<string, number>, k: string | undefined | null) => {
+      if (k) m[k] = (m[k] ?? 0) + 1;
+    };
+    const c: NetworkFilterCounts = {
+      identities: {}, legend: {}, apps: {}, l7Protocols: {}, categories: {},
+      riskTypes: {}, customSigs: {}, fileTypes: {}, countries: {},
+    };
+    nodes.forEach(n => bump(c.identities, nodeIdentityKey(n.data)));
+    edges.forEach(e => {
+      const proto = e.data.protocol.toUpperCase();
+      const app = (e.data.appName ?? '').toUpperCase();
+      presentEdgeLegendKeys.forEach(key => {
+        if (edgeMatchesLegendKey(proto, app, key)) bump(c.legend, key);
+      });
+      bump(c.apps, e.data.appName);
+      bump(c.l7Protocols, e.data.l7Protocol);
+      bump(c.categories, e.data.category);
+      new Set(e.data.flowRisks ?? []).forEach(r => bump(c.riskTypes, r));
+      new Set(e.data.customSignatures ?? []).forEach(r => bump(c.customSigs, r));
+      new Set(e.data.detectedFileTypes ?? []).forEach(r => bump(c.fileTypes, r));
+      new Set([e.data.srcCountry, e.data.dstCountry].filter(Boolean)).forEach(r => bump(c.countries, r));
+    });
+    return c;
+  }, [nodes, edges, presentEdgeLegendKeys]);
 
   const presentGhostFlags = useMemo(() => {
     const flags = new Set<string>();
@@ -884,17 +913,26 @@ export const NetworkDiagramPage = () => {
         container={graphCardRef.current ?? undefined}
       />
 
-      <Modal
+      <SideDrawer
         show={showFilterModal}
         onHide={() => setShowFilterModal(false)}
-        size="lg"
+        title="Filters"
+        titleId="nm-filter-drawer-title"
+        badge={activeFilterCount}
+        className="filter-drawer"
         container={graphCardRef.current ?? undefined}
+        footer={
+          <FilterDrawerFooter
+            onClearAll={clearAllFilters}
+            canClear={activeFilterCount > 0}
+            onDone={() => setShowFilterModal(false)}
+            doneLabel={`Show ${filteredEdges.length.toLocaleString()} connection${filteredEdges.length === 1 ? '' : 's'}`}
+          />
+        }
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Filters</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
           <NetworkControls
+            embedded
+            counts={filterCounts}
             activeLegendProtocols={activeLegendProtocols}
             onLegendProtocolClick={toggleLegendProtocol}
             onLegendProtocolClear={() => setActiveLegendProtocols([])}
@@ -944,13 +982,7 @@ export const NetworkDiagramPage = () => {
             activeFilterCount={activeFilterCount}
             onClearAllFilters={clearAllFilters}
           />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowFilterModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      </SideDrawer>
 
       <Modal show={showSignificanceModal} onHide={() => setShowSignificanceModal(false)} centered>
         <Modal.Header closeButton>

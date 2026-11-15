@@ -20,6 +20,7 @@ import { SummaryStatsBar } from '@components/cluster/SummaryStatsBar/SummaryStat
 import { ClusterGraph } from '@components/cluster/ClusterGraph/ClusterGraph';
 import { TopHostsTable } from '@components/cluster/TopHostsTable/TopHostsTable';
 import { NetworkControls } from '@components/network/NetworkControls';
+import { SideDrawer, FilterDrawerFooter } from '@components/common/SideDrawer';
 import { toggleSet } from '@/features/network/constants';
 import { nodeIdentityKey } from '@/utils/deviceType';
 
@@ -355,16 +356,24 @@ export const NetworkClusterPage = () => {
       </Card>
 
       {/* Filter modal */}
-      <Modal
+      <SideDrawer
         show={showFilterModal}
         onHide={() => setShowFilterModal(false)}
-        size="lg"
+        title="Filters"
+        titleId="cluster-filter-drawer-title"
+        badge={activeFilterCount}
+        className="filter-drawer"
+        footer={
+          <FilterDrawerFooter
+            onClearAll={clearAllFilters}
+            canClear={activeFilterCount > 0}
+            onDone={() => setShowFilterModal(false)}
+            doneLabel="Done"
+          />
+        }
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Filters</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
           <NetworkControls
+            embedded
             activeLegendProtocols={activeLegendProtocols}
             onLegendProtocolClick={toggleLegendProtocol}
             onLegendProtocolClear={() => setActiveLegendProtocols([])}
@@ -415,8 +424,7 @@ export const NetworkClusterPage = () => {
             onNetLabelClear={() => setActiveNetLabels([])}
             presentNetLabels={presentNetLabels}
           />
-        </Modal.Body>
-      </Modal>
+      </SideDrawer>
 
     </div>
   );

@@ -1,6 +1,7 @@
 package com.tracepcap.conversation.controller;
 
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
+import com.tracepcap.analysis.dto.ConversationFacetCountsResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.dto.EntityStatsResponse;
@@ -183,6 +184,13 @@ public class ConversationsController {
           @RequestParam(required = false)
           String l7Protocol) {
     return ResponseEntity.ok(conversationQueryService.getEntityStats(fileId, app, l7Protocol));
+  }
+
+  /** Conversations per filter value, for the counts beside each filter chip. */
+  @GetMapping("/{fileId}/facet-counts")
+  @Operation(summary = "Count conversations per filter value (protocol, app, risk, country, ...)")
+  public ResponseEntity<ConversationFacetCountsResponse> getFacetCounts(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(conversationQueryService.getFacetCounts(fileId));
   }
 
   /** Returns the distinct detected file types found in packets for this file. */
