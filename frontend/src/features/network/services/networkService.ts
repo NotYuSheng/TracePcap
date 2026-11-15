@@ -341,19 +341,29 @@ export function selectSignificantNodes(
 }
 
 /**
+ * How many hosts the diagram draws by default: all of them up to this many. The WebGL renderer
+ * draws a few thousand smoothly; past this the cost is the labels, group boxes and traffic dots
+ * drawn on top, and a map that size is read by filtering, so larger captures start at the most
+ * significant 1,000 with "All" one click away.
+ */
+export const DEFAULT_DIAGRAM_NODES = 1000;
+/** The host-count choices offered when a capture has more hosts than the smallest. */
+export const NODE_LIMIT_PRESETS = [100, 500, 1000];
+
+/**
  * Transform conversations into graph nodes and edges
  * @param conversations - Array of conversations to visualize
  * @param analysisSummary - Optional analysis summary used to seed unique hosts and override packet totals
  * @param maxConversations - Maximum number of conversations to render (default: 500)
  * @param hostClassifications - Optional per-IP device classifications from the backend
- * @param maxNodes - Maximum number of nodes to render (default: 50, 0 = no limit)
+ * @param maxNodes - Maximum number of nodes to render (default: DEFAULT_DIAGRAM_NODES, 0 = no limit)
  */
 export function buildNetworkGraph(
   conversations: Conversation[],
   analysisSummary?: AnalysisSummary,
   maxConversations: number = 500,
   hostClassifications?: HostClassification[],
-  maxNodes: number = 50,
+  maxNodes: number = DEFAULT_DIAGRAM_NODES,
   hostIdentities?: HostIdentity[],
   nodeRoles?: NodeRole[],
   /** Addresses more than one device held: drawn as one node per device (#918 slice 2). */

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Conversation } from '@/types'
-import { buildNetworkGraph, UNANSWERED_COLLAPSE, UNANSWERED_ID } from '../networkService'
+import { buildNetworkGraph, DEFAULT_DIAGRAM_NODES, UNANSWERED_COLLAPSE, UNANSWERED_ID } from '../networkService'
 
 function conversation(src: string, dst: string, overrides: Partial<Conversation> = {}): Conversation {
   return {
@@ -269,5 +269,14 @@ describe('buildNetworkGraph: clients asking for an address from 0.0.0.0', () => 
     expect(g.nodes.map(x => x.id)).toEqual(expect.arrayContaining([UNANSWERED_ID]))
     expect(g.nodes.filter(x => x.data.isL2)).toHaveLength(1)
     expect(g.nodes.find(x => x.id === UNANSWERED_ID)!.label).toBe(`${n} devices asking for an address`)
+  })
+})
+
+describe('buildNetworkGraph: how many hosts by default', () => {
+  it('draws every host up to DEFAULT_DIAGRAM_NODES, not the old 50', () => {
+    const convs = Array.from({ length: 60 }, (_, i) => conversation(`10.0.0.${i + 1}`, '8.8.8.8', { id: `c${i}` }))
+    const g = buildNetworkGraph(convs, undefined, 500, undefined, DEFAULT_DIAGRAM_NODES)
+    expect(g.nodes).toHaveLength(61)
+    expect(g.hiddenNodes ?? 0).toBe(0)
   })
 })

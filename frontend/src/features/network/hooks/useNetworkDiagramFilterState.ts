@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
+import { DEFAULT_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import type { NetworkDiagramFilterState } from '@/pages/Analysis/AnalysisPage';
 
 /**
@@ -7,7 +7,7 @@ import type { NetworkDiagramFilterState } from '@/pages/Analysis/AnalysisPage';
  * it survives tab switches; a Monitor capture holds its own.
  */
 export function useNetworkDiagramFilterState(): NetworkDiagramFilterState {
-  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
+  const [nodeLimit, setNodeLimit] = useState(DEFAULT_DIAGRAM_NODES);
   const [ipFilter, setIpFilter] = useState('');
   const [portFilter, setPortFilter] = useState('');
   const [hasRisksOnly, setHasRisksOnly] = useState(false);

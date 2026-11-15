@@ -27,7 +27,7 @@ import type { GraphNode } from '@/features/network/types';
 import {
   useNetworkData,
   CONVERSATION_LIMIT_ENABLED,
-  MAX_DIAGRAM_NODES,
+  NODE_LIMIT_PRESETS,
 } from '@/features/network/hooks/useNetworkData';
 import { buildActiveFilterLabels, toggleSet } from '@/features/network/constants';
 import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
@@ -112,7 +112,6 @@ export const NetworkDiagramView = ({
   } = networkDiagramFilters;
 
   // Draft value for the custom node count input — only applied on Enter/blur
-  const [customInput, setCustomInput] = useState('');
   const [showSignificanceModal, setShowSignificanceModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
@@ -704,14 +703,10 @@ export const NetworkDiagramView = ({
       {/* Page title */}
       {showTitle && (
       <div className="mb-3">
-        <h4 className="mb-1">
+        <h4 className="mb-0">
           <i className="bi bi-diagram-3 me-2"></i>
           Network Topology Diagram
         </h4>
-        <p className="text-muted small mb-0">
-          Visualise individual hosts and the connections between them. Best for captures with fewer than 50 hosts —
-          for larger captures, use the <strong>Network Cluster</strong> tab for a cluster-level overview.
-        </p>
       </div>
       )}
 
@@ -724,14 +719,7 @@ export const NetworkDiagramView = ({
             {stats.totalConversations?.toLocaleString()} conversations by packet count. Set{' '}
             <code>VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false</code> to render all.
           </Alert>
-        ) : compact ? null : (
-          <Alert variant="info" className="mb-3">
-            <i className="bi bi-info-circle me-2"></i>
-            <strong>Performance limit enabled</strong> — all{' '}
-            {stats.totalConversations?.toLocaleString()} conversations are within the 500-connection
-            limit and fully rendered.
-          </Alert>
-        ))}
+        ) : null)}
 
       {/* Traffic: the totals, with the busiest pairs and the node-to-node matrix as tabs. */}
       <TrafficCard
@@ -747,12 +735,13 @@ export const NetworkDiagramView = ({
         compact={compact}
       />
 
-      {compact && stats.totalNodes > MAX_DIAGRAM_NODES && (
+      {/* How many hosts: every one up to DEFAULT_DIAGRAM_NODES; the choice shows once there are more than the smallest preset. */}
+      {stats.totalNodes > NODE_LIMIT_PRESETS[0] && (
         <div className="nd-limit-slim">
           <span>
             {hiddenNodes > 0 ? (
               <>
-                <b>{nodeLimit}</b> of {stats.totalNodes.toLocaleString()} hosts, the most significant
+                <b>{nodeLimit.toLocaleString()}</b> of {stats.totalNodes.toLocaleString()} hosts, the most significant
               </>
             ) : (
               <>
@@ -768,15 +757,13 @@ export const NetworkDiagramView = ({
               setNodeLimit(e.target.value === 'all' ? stats.totalNodes : parseInt(e.target.value, 10))
             }
           >
-            {[25, 50, 100, 200]
-              .filter(p => p < stats.totalNodes)
-              .map(p => (
-                <option key={p} value={p}>
-                  Top {p}
-                </option>
-              ))}
-            {![25, 50, 100, 200].includes(nodeLimit) && nodeLimit < stats.totalNodes && (
-              <option value={nodeLimit}>Top {nodeLimit}</option>
+            {NODE_LIMIT_PRESETS.filter(p => p < stats.totalNodes).map(p => (
+              <option key={p} value={p}>
+                Top {p.toLocaleString()}
+              </option>
+            ))}
+            {!NODE_LIMIT_PRESETS.includes(nodeLimit) && nodeLimit < stats.totalNodes && (
+              <option value={nodeLimit}>Top {nodeLimit.toLocaleString()}</option>
             )}
             <option value="all">All {stats.totalNodes.toLocaleString()}</option>
           </Form.Select>
@@ -791,84 +778,6 @@ export const NetworkDiagramView = ({
           </Button>
         </div>
       )}
-
-      {!compact && stats.totalNodes > MAX_DIAGRAM_NODES &&
-        (() => {
-          const totalNodes = stats.totalNodes;
-          const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
-          const applyCustom = () => {
-            const n = parseInt(customInput, 10);
-            if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));
-            setCustomInput('');
-          };
-          return (
-            <Alert variant="info" className="mb-3">
-              <div className="d-flex align-items-start gap-2 flex-wrap">
-                <Button
-                  variant="link"
-                  className="p-0 border-0 mt-1 flex-shrink-0"
-                  style={{ lineHeight: 1 }}
-                  title="How is significance determined?"
-                  onClick={() => setShowSignificanceModal(true)}
-                >
-                  <i className="bi bi-info-circle"></i>
-                </Button>
-                <div className="flex-grow-1">
-                  <div>
-                    {hiddenNodes > 0 ? (
-                      <>
-                        Showing the <strong>{nodeLimit} most significant nodes</strong> (
-                        {hiddenNodes} hidden). Ranked by traffic volume, risk signals, and
-                        connectivity.
-                      </>
-                    ) : (
-                      <>
-                        Showing <strong>all {totalNodes} nodes</strong>. Ranked by traffic volume,
-                        risk signals, and connectivity.
-                      </>
-                    )}
-                  </div>
-                  <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                    <span className="text-muted small fw-semibold me-1">Show:</span>
-                    {presets.map(p => (
-                      <Button
-                        key={p}
-                        size="sm"
-                        variant={nodeLimit === p ? 'info' : 'outline-secondary'}
-                        style={{ minWidth: 52 }}
-                        onClick={() => setNodeLimit(p)}
-                      >
-                        Top {p}
-                      </Button>
-                    ))}
-                    <Button
-                      size="sm"
-                      variant={nodeLimit >= totalNodes ? 'info' : 'outline-secondary'}
-                      style={{ minWidth: 52 }}
-                      onClick={() => setNodeLimit(totalNodes)}
-                    >
-                      All {totalNodes}
-                    </Button>
-                    <span className="text-muted small ms-2 me-1">or</span>
-                    <div className="input-group input-group-sm" style={{ width: 120 }}>
-                      <Form.Control
-                        type="number"
-                        size="sm"
-                        placeholder="Custom…"
-                        min={1}
-                        max={totalNodes}
-                        value={customInput}
-                        onChange={e => setCustomInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && applyCustom()}
-                        onBlur={applyCustom}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Alert>
-          );
-        })()}
 
       {/* Row 2: Graph full width */}
       <div className="row">
