@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Button, Card, Container, Dropdown, Form } from '@govtechsg/sgds-react';
+import { Button, Card, Container, Form, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { Alert } from '@components/common/Alert';
-import { SnapshotTimeline } from '@/components/monitor/SnapshotTimeline/SnapshotTimeline';
+import { SnapshotDetailModal } from '@/components/monitor/SnapshotDetailModal/SnapshotDetailModal';
+import { SnapshotMap } from '@/components/monitor/SnapshotMap';
+import { SideDrawer } from '@components/common/SideDrawer';
+import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { DeviceDriftPanel } from '@/components/monitor/DeviceDriftPanel/DeviceDriftPanel';
 import { ProtocolDriftPanel } from '@/components/monitor/ProtocolDriftPanel/ProtocolDriftPanel';
 import { IpDriftPanel } from '@/components/monitor/IpDriftPanel/IpDriftPanel';
@@ -27,7 +30,7 @@ import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEv
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import './NetworkDetailPage.css';
-import { ChangeEventsSection } from './components/ChangeEventsSection';
+import { NetworkTimeline } from './components/NetworkTimeline';
 import { HelpPopover } from './components/HelpPopover';
 
 export const NetworkDetailPage = () => {
@@ -57,10 +60,18 @@ export const NetworkDetailPage = () => {
     () => new URLSearchParams(window.location.search).get('add') === '1'
   );
   const [showManage, setShowManage] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  // Set up moved into the Settings drawer; its old links open it.
+  const [showSettings, setShowSettings] = useState(() =>
+    ['setup', 'expected', 'subnets'].includes(new URLSearchParams(window.location.search).get('section') ?? '')
+  );
   const [showAddresses, setShowAddresses] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showInactivity, setShowInactivity] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [showEvents, setShowEvents] = useState(false);
+  const [detailSnapshot, setDetailSnapshot] = useState<NetworkSnapshot | null>(null);
+  const [inventoryTab, setInventoryTab] = useState<'devices' | 'addresses' | 'apps'>('devices');
 
   const [params, setParams] = useSearchParams();
   const sectionParam = params.get('section');
@@ -125,53 +136,40 @@ export const NetworkDetailPage = () => {
   const railItems: RailItem[] = [
     { key: 'overview', label: 'Overview', short: 'Overview', icon: 'bi-grid-1x2' },
     {
-      key: 'changes',
-      label: 'Changes',
-      short: 'Changes',
-      icon: 'bi-activity',
+      key: 'timeline',
+      label: 'Timeline: captures, changes, notes and events',
+      short: 'Timeline',
+      icon: 'bi-clock-history',
       badge: toReview || undefined,
     },
-    { key: 'captures', label: 'Captures', short: 'Captures', icon: 'bi-clock-history' },
     {
       key: 'inventory',
       label: 'Devices, addresses and apps',
       short: 'Inventory',
       icon: 'bi-pc-display',
     },
-    { key: 'insights', label: 'Insights', short: 'Insights', icon: 'bi-stars' },
-    {
-      key: 'setup',
-      label: 'Expected state and subnets',
-      short: 'Set up',
-      icon: 'bi-shield-check',
-      group: 'Set up',
-    },
-    { key: 'notes', label: 'Notes and outside events', short: 'Notes', icon: 'bi-pencil-square' },
   ];
-  // Older links name the sections that were folded together; send them to the tab that holds them.
+  // Older links name sections that were folded together; send them to the tab that holds them.
   const FOLDED: Record<string, string> = {
+    changes: 'timeline',
+    captures: 'timeline',
+    notes: 'timeline',
+    events: 'timeline',
+    insights: 'overview',
     devices: 'inventory',
     addresses: 'inventory',
     apps: 'inventory',
-    expected: 'setup',
-    subnets: 'setup',
-    events: 'notes',
+    setup: 'overview',
+    expected: 'overview',
+    subnets: 'overview',
   };
   const wanted = sectionParam ? (FOLDED[sectionParam] ?? sectionParam) : null;
   const section = railItems.some(i => i.key === wanted) ? wanted! : 'overview';
   const pick = (key: string) =>
     setParams(key === 'overview' ? {} : { section: key }, { replace: true });
-
-  const timeline = (
-    <SnapshotTimeline
-      networkId={network.id}
-      snapshots={snapshots}
-      changeEvents={changeEvents}
-      onManage={() => setShowManage(true)}
-      onPatchChange={data.handlePatchChange}
-      onSnapshotUpdated={data.handleSnapshotUpdated}
-    />
-  );
+  const ordered = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
+  const latest = ordered[ordered.length - 1] ?? null;
+  const beforeLatest = ordered.length > 1 ? ordered[ordered.length - 2] : null;
 
   return (
     <div className="network-page">
@@ -203,7 +201,7 @@ export const NetworkDetailPage = () => {
                 <button
                   type="button"
                   className="network-review-pill"
-                  onClick={() => pick('changes')}
+                  onClick={() => pick('timeline')}
                 >
                   {toReview} to review
                 </button>
@@ -220,39 +218,14 @@ export const NetworkDetailPage = () => {
               >
                 <i className="bi bi-arrow-clockwise" aria-hidden="true"></i>
               </Button>
-              <Dropdown align="end">
-                <Dropdown.Toggle variant="outline-secondary" size="sm" id="network-settings-menu">
-                  <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  <Dropdown.Item onClick={() => setShowSettings(true)}>
-                    Inactivity rule
-                  </Dropdown.Item>
-                  <Dropdown.Item onClick={() => setShowRules(true)}>Detection rules</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setShowAddresses(true)}>
-                    Address labels
-                  </Dropdown.Item>
-                  <Dropdown.Item onClick={() => setShowDevices(true)}>Device labels</Dropdown.Item>
-                  <Dropdown.Divider />
-                  <Dropdown.ItemText>
-                    <Form.Label htmlFor="network-refresh" className="small text-muted mb-1">
-                      Refresh
-                    </Form.Label>
-                    <Form.Select
-                      id="network-refresh"
-                      size="sm"
-                      value={pollInterval}
-                      onChange={e => setPollInterval(Number(e.target.value))}
-                    >
-                      <option value={10}>Every 10s</option>
-                      <option value={30}>Every 30s</option>
-                      <option value={60}>Every 1m</option>
-                      <option value={300}>Every 5m</option>
-                      <option value={0}>Manual only</option>
-                    </Form.Select>
-                  </Dropdown.ItemText>
-                </Dropdown.Menu>
-              </Dropdown>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => setShowSettings(true)}
+              >
+                <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -289,7 +262,7 @@ export const NetworkDetailPage = () => {
                   <button
                     type="button"
                     className={`network-stat network-stat-button${toReview > 0 ? ' network-stat-warn' : ''}`}
-                    onClick={() => pick('changes')}
+                    onClick={() => pick('timeline')}
                   >
                     <div className="network-stat-label">To review</div>
                     <div className="network-stat-value">{toReview}</div>
@@ -313,7 +286,7 @@ export const NetworkDetailPage = () => {
                       <button
                         type="button"
                         className="btn btn-link btn-sm p-0 ms-auto"
-                        onClick={() => pick('changes')}
+                        onClick={() => pick('timeline')}
                       >
                         All changes
                       </button>
@@ -341,12 +314,79 @@ export const NetworkDetailPage = () => {
                   </Card.Body>
                 </Card>
 
-                <Card id="sec-timeline">
-                  <Card.Body>
-                    <h2 className="h6 mb-3">Captures</h2>
-                    {timeline}
-                  </Card.Body>
-                </Card>
+                {latest && (
+                  <div className="network-overview-grid">
+                    <Card>
+                      <Card.Body>
+                        <div className="d-flex align-items-baseline gap-2 flex-wrap mb-2">
+                          <h2 className="h6 mb-0">Network map · latest capture</h2>
+                          <span className="small text-muted">{latest.fileName} · {day(latest)}</span>
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 ms-auto"
+                            onClick={() => pick('timeline')}
+                          >
+                            Open in Timeline
+                          </button>
+                        </div>
+                        <SnapshotMap
+                          networkId={network.id}
+                          snapshot={latest}
+                          previous={beforeLatest}
+                          changeEvents={changeEvents}
+                          height={380}
+                        />
+                      </Card.Body>
+                    </Card>
+                    <Card>
+                      <Card.Body>
+                        <div className="d-flex align-items-center mb-2">
+                          <h2 className="h6 mb-0">Insights</h2>
+                        <HelpPopover
+                          id="network-insights-info"
+                          title="Network Insights"
+                          buttonTitle="About network insights"
+                        >
+                          <p className="mb-2">
+                            Clicking <strong>Generate</strong> sends your network's snapshots, change
+                            events, device roles, external events, and analyst annotations to the
+                            configured LLM. It returns a structured narrative explaining observed
+                            behaviour in operational context.
+                          </p>
+                          <p className="fw-semibold mb-1">Output sections</p>
+                          <ul className="mb-2 ps-3">
+                            <li className="mb-1">
+                              <strong>Summary</strong> — one-paragraph overview of the period
+                            </li>
+                            <li className="mb-1">
+                              <strong>Narrative</strong> — detailed section-by-section analysis
+                            </li>
+                            <li className="mb-1">
+                              <strong>Anomalies</strong> — flagged deviations with severity
+                            </li>
+                            <li className="mb-1">
+                              <strong>Correlations</strong> — links between external events and network
+                              changes
+                            </li>
+                            <li>
+                              <strong>Recommendations</strong> — suggested follow-up actions
+                            </li>
+                          </ul>
+                          <p className="mb-0 text-muted fst-italic">
+                            Assign device roles and add external events first to get richer, more
+                            contextual insights.
+                          </p>
+                        </HelpPopover>
+                        </div>
+                        <NetworkInsightsPanel
+                          insight={insight}
+                          llmAvailable={true}
+                          onGenerate={data.handleGenerateInsights}
+                        />
+                      </Card.Body>
+                    </Card>
+                  </div>
+                )}
 
                 {snapshots.length >= 2 && (
                   <Card>
@@ -361,110 +401,76 @@ export const NetworkDetailPage = () => {
               </div>
             )}
 
-            {section === 'changes' && (
-              <ChangeEventsSection
-                changeEvents={changeEvents}
+            {section === 'timeline' && (
+              <NetworkTimeline
+                networkId={network.id}
                 snapshots={snapshots}
+                changeEvents={changeEvents}
+                externalEvents={externalEvents}
+                annotations={annotations}
                 onPatchChange={data.handlePatchChange}
+                onOpenDetails={setDetailSnapshot}
+                onAddNote={() => setShowNotes(true)}
+                onAddEvent={() => setShowEvents(true)}
+                onManage={() => setShowManage(true)}
               />
             )}
 
-            {section === 'captures' && (
-              <Card id="sec-timeline">
-                <Card.Body>
-                  <h2 className="h5 mb-3">Captures</h2>
-                  {timeline}
-                </Card.Body>
-              </Card>
-            )}
-
             {section === 'inventory' && (
-              <Card>
-                <Card.Body>
-                  <h2 className="h5 mb-3">Devices</h2>
-                  <DeviceDriftPanel snapshots={snapshots} settings={network.settings} />
-                </Card.Body>
-              </Card>
-            )}
-
-            {section === 'inventory' && (
-              <Card>
-                <Card.Body>
-                  <h2 className="h5 mb-3">Addresses</h2>
-                  <IpDriftPanel
-                    networkId={networkId}
-                    snapshots={snapshots}
-                    subnets={subnets}
-                    settings={network.settings}
-                  />
-                </Card.Body>
-              </Card>
-            )}
-
-            {section === 'inventory' && (
-              <Card>
-                <Card.Body>
-                  <h2 className="h5 mb-3">Apps and protocols</h2>
-                  <ProtocolDriftPanel snapshots={snapshots} settings={network.settings} />
-                </Card.Body>
-              </Card>
-            )}
-
-            {section === 'insights' && (
-              <Card>
-                <Card.Body>
-                  <div className="d-flex align-items-center mb-3">
-                    <h2 className="h5 mb-0">Insights</h2>
-                    <HelpPopover
-                      id="network-insights-info"
-                      title="Network Insights"
-                      buttonTitle="About network insights"
+              <Card className="network-inventory">
+                <div className="network-inventory-tabs" role="tablist" aria-label="Inventory">
+                  {(
+                    [
+                      ['devices', 'Devices', deviceCounts?.all],
+                      ['addresses', 'Addresses', undefined],
+                      ['apps', 'Apps and protocols', undefined],
+                    ] as const
+                  ).map(([key, label, count]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={inventoryTab === key}
+                      className={`network-inventory-tab${inventoryTab === key ? ' active' : ''}`}
+                      onClick={() => setInventoryTab(key)}
                     >
-                      <p className="mb-2">
-                        Clicking <strong>Generate</strong> sends your network's snapshots, change
-                        events, device roles, external events, and analyst annotations to the
-                        configured LLM. It returns a structured narrative explaining observed
-                        behaviour in operational context.
-                      </p>
-                      <p className="fw-semibold mb-1">Output sections</p>
-                      <ul className="mb-2 ps-3">
-                        <li className="mb-1">
-                          <strong>Summary</strong> — one-paragraph overview of the period
-                        </li>
-                        <li className="mb-1">
-                          <strong>Narrative</strong> — detailed section-by-section analysis
-                        </li>
-                        <li className="mb-1">
-                          <strong>Anomalies</strong> — flagged deviations with severity
-                        </li>
-                        <li className="mb-1">
-                          <strong>Correlations</strong> — links between external events and network
-                          changes
-                        </li>
-                        <li>
-                          <strong>Recommendations</strong> — suggested follow-up actions
-                        </li>
-                      </ul>
-                      <p className="mb-0 text-muted fst-italic">
-                        Assign device roles and add external events first to get richer, more
-                        contextual insights.
-                      </p>
-                    </HelpPopover>
-                  </div>
-                  <NetworkInsightsPanel
-                    insight={insight}
-                    llmAvailable={true}
-                    onGenerate={data.handleGenerateInsights}
-                  />
+                      {label}
+                      {count !== undefined && <span className="network-inventory-count">{count}</span>}
+                    </button>
+                  ))}
+                </div>
+                <Card.Body role="tabpanel">
+                  {inventoryTab === 'devices' && (
+                    <DeviceDriftPanel snapshots={snapshots} settings={network.settings} />
+                  )}
+                  {inventoryTab === 'addresses' && (
+                    <IpDriftPanel
+                      networkId={networkId}
+                      snapshots={snapshots}
+                      subnets={subnets}
+                      settings={network.settings}
+                    />
+                  )}
+                  {inventoryTab === 'apps' && (
+                    <ProtocolDriftPanel snapshots={snapshots} settings={network.settings} />
+                  )}
                 </Card.Body>
               </Card>
             )}
+          </main>
+        </div>
+      </div>
 
-            {section === 'setup' && (
-              <Card>
-                <Card.Body>
-                  <div className="d-flex align-items-center mb-3">
-                    <h2 className="h5 mb-0">Expected state</h2>
+      <SideDrawer
+        show={showSettings}
+        onHide={() => setShowSettings(false)}
+        title="Network settings"
+        titleId="network-settings-title"
+        className="network-settings-drawer"
+      >
+        <section className="network-settings-section">
+          <div className="d-flex align-items-center mb-2">
+            <h3 className="h6 mb-0">Expected state</h3>
                     <HelpPopover
                       id="baseline-definitions-info"
                       title="Baseline Definitions"
@@ -499,22 +505,17 @@ export const NetworkDetailPage = () => {
                         </li>
                       </ul>
                     </HelpPopover>
-                  </div>
-                  <BaselineDefinitionPanel
-                    networkId={network.id}
-                    definitions={definitions}
-                    onAdd={data.handleAddDefinition}
-                    onDelete={data.handleDeleteDefinition}
-                  />
-                </Card.Body>
-              </Card>
-            )}
-
-            {section === 'setup' && (
-              <Card>
-                <Card.Body>
-                  <div className="d-flex align-items-center mb-3">
-                    <h2 className="h5 mb-0">Subnets</h2>
+          </div>
+          <BaselineDefinitionPanel
+            networkId={network.id}
+            definitions={definitions}
+            onAdd={data.handleAddDefinition}
+            onDelete={data.handleDeleteDefinition}
+          />
+        </section>
+        <section className="network-settings-section">
+          <div className="d-flex align-items-center mb-2">
+            <h3 className="h6 mb-0">Subnets</h3>
                     <HelpPopover
                       id="subnet-definitions-info"
                       title="How Subnet Detection Works"
@@ -565,56 +566,95 @@ export const NetworkDetailPage = () => {
                         </li>
                       </ul>
                     </HelpPopover>
-                  </div>
-                  <SubnetsPanel
-                    networkId={networkId!}
-                    subnets={subnets}
-                    snapshots={snapshots}
-                    onSaved={data.handleSubnetSaved}
-                    onDeleted={data.handleSubnetDeleted}
-                    onChanged={() => reload(false)}
-                  />
-                </Card.Body>
-              </Card>
-            )}
+          </div>
+          <SubnetsPanel
+            networkId={networkId!}
+            subnets={subnets}
+            snapshots={snapshots}
+            onSaved={data.handleSubnetSaved}
+            onDeleted={data.handleSubnetDeleted}
+            onChanged={() => reload(false)}
+          />
+        </section>
+        <section className="network-settings-section">
+          <h3 className="h6 mb-2">More</h3>
+          <div className="network-settings-links">
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowInactivity(true)}>
+              When a device counts as gone
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowRules(true)}>
+              Detection rules
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowAddresses(true)}>
+              Address labels
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowDevices(true)}>
+              Device labels
+            </Button>
+          </div>
+          <Form.Label htmlFor="network-refresh" className="small text-muted mt-3 mb-1">
+            Refresh this page
+          </Form.Label>
+          <Form.Select
+            id="network-refresh"
+            size="sm"
+            value={pollInterval}
+            onChange={e => setPollInterval(Number(e.target.value))}
+            style={{ maxWidth: 200 }}
+          >
+            <option value={10}>Every 10s</option>
+            <option value={30}>Every 30s</option>
+            <option value={60}>Every 1m</option>
+            <option value={300}>Every 5m</option>
+            <option value={0}>Manual only</option>
+          </Form.Select>
+        </section>
+      </SideDrawer>
 
-            {section === 'notes' && (
-              <Card>
-                <Card.Body>
-                  <h2 className="h5 mb-1">Outside events</h2>
-                  <p className="small text-muted">
-                    Real-world events (maintenance windows, incidents, policy changes) to line up
-                    with what changed. Insights take them into account.
-                  </p>
-                  <ExternalEventsPanel
-                    events={externalEvents}
-                    onAdd={data.handleAddExternalEvent}
-                    onUpdate={data.handleUpdateExternalEvent}
-                    onDelete={data.handleDeleteExternalEvent}
-                  />
-                </Card.Body>
-              </Card>
-            )}
+      <Modal show={showNotes} onHide={() => setShowNotes(false)} size="lg" scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>Notes</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="small text-muted">Free-text notes on this network. Insights read them as context.</p>
+          <NetworkAnnotationsPanel
+            annotations={annotations}
+            onAdd={data.handleAddAnnotation}
+            onUpdate={data.handleUpdateAnnotation}
+            onDelete={data.handleDeleteAnnotation}
+          />
+        </Modal.Body>
+      </Modal>
 
-            {section === 'notes' && (
-              <Card>
-                <Card.Body>
-                  <h2 className="h5 mb-1">Notes</h2>
-                  <p className="small text-muted">
-                    Free-text notes on this network. Insights read them as context.
-                  </p>
-                  <NetworkAnnotationsPanel
-                    annotations={annotations}
-                    onAdd={data.handleAddAnnotation}
-                    onUpdate={data.handleUpdateAnnotation}
-                    onDelete={data.handleDeleteAnnotation}
-                  />
-                </Card.Body>
-              </Card>
-            )}
-          </main>
-        </div>
-      </div>
+      <Modal show={showEvents} onHide={() => setShowEvents(false)} size="lg" scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>Outside events</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="small text-muted">
+            Real-world events (maintenance windows, incidents, policy changes) to line up with what
+            changed. Insights take them into account.
+          </p>
+          <ExternalEventsPanel
+            events={externalEvents}
+            onAdd={data.handleAddExternalEvent}
+            onUpdate={data.handleUpdateExternalEvent}
+            onDelete={data.handleDeleteExternalEvent}
+          />
+        </Modal.Body>
+      </Modal>
+
+      {detailSnapshot && (
+        <SnapshotDetailModal
+          snapshot={detailSnapshot}
+          networkId={network.id}
+          changeEvents={changeEvents}
+          snapshots={snapshots}
+          onPatchChange={data.handlePatchChange}
+          onSnapshotUpdated={data.handleSnapshotUpdated}
+          onHide={() => setDetailSnapshot(null)}
+        />
+      )}
 
       <ManagePcapsModal
         show={showManage}
@@ -661,8 +701,8 @@ export const NetworkDetailPage = () => {
         />
       )}
       <NetworkSettingsModal
-        show={showSettings}
-        onHide={() => setShowSettings(false)}
+        show={showInactivity}
+        onHide={() => setShowInactivity(false)}
         initial={network.settings}
         onSave={async settings => {
           await monitorService.updateNetworkSettings(network.id, settings);
