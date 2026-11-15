@@ -122,20 +122,20 @@ export function StartPanel({
           <span>with {stagesText(options)}</span>
         </div>
       )}
-      <div className="home-drop">
+      {/* The drop box is the button: click it to choose files, or drop them anywhere on the panel. */}
+      <button type="button" className="home-drop" onClick={open}>
         <span className="home-drop-icon" aria-hidden="true">
           <i className="bi bi-upload" />
         </span>
-        <div>
-          <div className="fw-semibold">Drop captures here</div>
-          <div className="home-drop-hint">
+        <span className="home-drop-text">
+          <span className="home-drop-title">
+            {uploads.length > 0 ? 'Add more captures' : 'Drop captures here, or click to choose'}
+          </span>
+          <span className="home-drop-hint">
             {acceptedTypes.join(', ')} · {mb} MB
             {maxPackets > 0 ? ` and ${maxPackets.toLocaleString()} packets` : ''} each
-          </div>
-        </div>
-      </div>
-      <button type="button" className="btn btn-outline-primary home-choose" onClick={open}>
-        {uploads.length > 0 ? 'Add more' : 'Choose files'}
+          </span>
+        </span>
       </button>
 
       <UploadQueue

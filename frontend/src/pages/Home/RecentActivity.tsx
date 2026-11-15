@@ -65,7 +65,9 @@ export function buildActivity(
   files: ActivityFile[],
   audit: AuditLogEntry[],
   retentionHours: number | null,
-  now: number
+  now: number,
+  /** Captures that are snapshots of a monitored network: never deleted, so never warned about. */
+  keptIds: Set<string> = new Set()
 ): ActivityEvent[] {
   const events: ActivityEvent[] = [];
   for (const f of files) {
@@ -81,7 +83,7 @@ export function buildActivity(
         link: { label: f.fileName, to },
         meta: f.packetCount != null ? `${f.packetCount.toLocaleString()} packets` : undefined,
       });
-      if (retentionHours && f.source !== 'MONITOR') {
+      if (retentionHours && f.source !== 'MONITOR' && !keptIds.has(f.fileId)) {
         const left = at + retentionHours * 3600_000 - now;
         if (left > 0 && left <= EXPIRY_WARN_MS) {
           events.push({
@@ -180,8 +182,12 @@ export function RecentActivity({ retentionHours }: { retentionHours: number | nu
       .getAuditLog(1, AUDIT_FETCHED)
       .then(r => r.data)
       .catch(() => [] as AuditLogEntry[]);
-    Promise.all([files, audit]).then(([f, a]) => {
-      if (alive) setEvents(buildActivity(f, a, retentionHours, now));
+    const kept = apiClient
+      .get<{ fileId: string }[]>(API_ENDPOINTS.NETWORK_MEMBERSHIPS)
+      .then(r => new Set(r.data.map(m => m.fileId)))
+      .catch(() => new Set<string>());
+    Promise.all([files, audit, kept]).then(([f, a, k]) => {
+      if (alive) setEvents(buildActivity(f, a, retentionHours, now, k));
     });
     return () => {
       alive = false;

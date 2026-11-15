@@ -132,22 +132,28 @@ export const NetworkDetailPage = () => {
       badge: toReview || undefined,
     },
     { key: 'captures', label: 'Captures', short: 'Captures', icon: 'bi-clock-history' },
-    { key: 'devices', label: 'Devices', short: 'Devices', icon: 'bi-pc-display' },
-    { key: 'addresses', label: 'Addresses', short: 'Addresses', icon: 'bi-globe' },
-    { key: 'apps', label: 'Apps and protocols', short: 'Apps', icon: 'bi-diagram-3' },
+    { key: 'inventory', label: 'Devices, addresses and apps', short: 'Inventory', icon: 'bi-pc-display' },
     { key: 'insights', label: 'Insights', short: 'Insights', icon: 'bi-stars' },
     {
-      key: 'expected',
-      label: 'Expected state',
-      short: 'Expected',
+      key: 'setup',
+      label: 'Expected state and subnets',
+      short: 'Set up',
       icon: 'bi-shield-check',
       group: 'Set up',
     },
-    { key: 'subnets', label: 'Subnets', short: 'Subnets', icon: 'bi-diagram-2' },
-    { key: 'events', label: 'Outside events', short: 'Events', icon: 'bi-calendar-event' },
-    { key: 'notes', label: 'Notes', short: 'Notes', icon: 'bi-pencil-square' },
+    { key: 'notes', label: 'Notes and outside events', short: 'Notes', icon: 'bi-pencil-square' },
   ];
-  const section = railItems.some(i => i.key === sectionParam) ? sectionParam! : 'overview';
+  // Older links name the sections that were folded together; send them to the tab that holds them.
+  const FOLDED: Record<string, string> = {
+    devices: 'inventory',
+    addresses: 'inventory',
+    apps: 'inventory',
+    expected: 'setup',
+    subnets: 'setup',
+    events: 'notes',
+  };
+  const wanted = sectionParam ? (FOLDED[sectionParam] ?? sectionParam) : null;
+  const section = railItems.some(i => i.key === wanted) ? wanted! : 'overview';
   const pick = (key: string) =>
     setParams(key === 'overview' ? {} : { section: key }, { replace: true });
 
@@ -367,7 +373,7 @@ export const NetworkDetailPage = () => {
               </Card>
             )}
 
-            {section === 'devices' && (
+            {section === 'inventory' && (
               <Card>
                 <Card.Body>
                   <h2 className="h5 mb-3">Devices</h2>
@@ -376,7 +382,7 @@ export const NetworkDetailPage = () => {
               </Card>
             )}
 
-            {section === 'addresses' && (
+            {section === 'inventory' && (
               <Card>
                 <Card.Body>
                   <h2 className="h5 mb-3">Addresses</h2>
@@ -390,7 +396,7 @@ export const NetworkDetailPage = () => {
               </Card>
             )}
 
-            {section === 'apps' && (
+            {section === 'inventory' && (
               <Card>
                 <Card.Body>
                   <h2 className="h5 mb-3">Apps and protocols</h2>
@@ -449,7 +455,7 @@ export const NetworkDetailPage = () => {
               </Card>
             )}
 
-            {section === 'expected' && (
+            {section === 'setup' && (
               <Card>
                 <Card.Body>
                   <div className="d-flex align-items-center mb-3">
@@ -499,7 +505,7 @@ export const NetworkDetailPage = () => {
               </Card>
             )}
 
-            {section === 'subnets' && (
+            {section === 'setup' && (
               <Card>
                 <Card.Body>
                   <div className="d-flex align-items-center mb-3">
@@ -567,7 +573,7 @@ export const NetworkDetailPage = () => {
               </Card>
             )}
 
-            {section === 'events' && (
+            {section === 'notes' && (
               <Card>
                 <Card.Body>
                   <h2 className="h5 mb-1">Outside events</h2>

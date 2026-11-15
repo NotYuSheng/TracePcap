@@ -1,6 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Container, Dropdown, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { monitorService } from '@/features/monitor/services/monitorService';
@@ -22,6 +22,7 @@ const FILTERS: { key: NetworkFilter; label: string }[] = [
 ];
 
 export const MonitorPage = () => {
+  const navigate = useNavigate();
   const [networks, setNetworks] = useState<Network[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,7 +185,15 @@ export const MonitorPage = () => {
                     const caps = n.captures ?? [];
                     const last = caps[caps.length - 1];
                     return (
-                      <tr key={n.id}>
+                      <tr
+                        key={n.id}
+                        className="monitor-row"
+                        onClick={e => {
+                          // The whole row opens the network; its own buttons and links still act alone.
+                          if ((e.target as HTMLElement).closest('a, button, .dropdown-menu')) return;
+                          navigate(`/monitor/${n.id}`);
+                        }}
+                      >
                         <td>
                           <Link to={`/monitor/${n.id}`} className="monitor-name">
                             {n.name}
@@ -224,6 +233,11 @@ export const MonitorPage = () => {
                           >
                             {st.action}
                           </Link>
+                          {(st.key === 'review' || st.key === 'critical' || st.key === 'clear') && (
+                            <Link to={`/monitor/${n.id}?add=1`} className="btn btn-sm btn-outline-secondary ms-2">
+                              Add a capture
+                            </Link>
+                          )}
                           <Dropdown align="end" className="d-inline-block ms-2">
                             <Dropdown.Toggle
                               variant="outline-secondary"
@@ -234,7 +248,7 @@ export const MonitorPage = () => {
                             >
                               <i className="bi bi-three-dots" aria-hidden="true"></i>
                             </Dropdown.Toggle>
-                            <Dropdown.Menu>
+                            <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
                               <Dropdown.Item onClick={() => setEditNetwork(n)}>Rename</Dropdown.Item>
                               <Dropdown.Item className="text-danger" onClick={() => setConfirmDeleteId(n.id)}>
                                 Delete

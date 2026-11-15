@@ -122,3 +122,12 @@ describe('time words', () => {
     expect(retentionText(72)).toBe('3 days');
   });
 });
+
+describe('kept captures', () => {
+  it('does not warn about deleting a capture kept with a network', () => {
+    const NOW2 = Date.UTC(2026, 10, 14, 12)
+    const f = { fileId: 'k', fileName: 'k.pcap', uploadedAt: new Date(NOW2 - 10 * 3600_000).toISOString(), status: 'COMPLETED', source: 'ANALYSIS', packetCount: 1 }
+    expect(buildActivity([f], [], 12, NOW2, new Set(['k'])).some(e => e.tone === 'warn')).toBe(false)
+    expect(buildActivity([f], [], 12, NOW2).some(e => e.tone === 'warn')).toBe(true)
+  })
+})

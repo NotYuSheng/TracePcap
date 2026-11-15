@@ -62,7 +62,8 @@ Getting Started
 The Networks Page
 -----------------
 
-**Monitor** lists every network in one table:
+**Monitor** lists every network in one table. Click anywhere on a row to open
+the network:
 
 - **Status**, one per network:
   - **No captures yet**;
@@ -75,6 +76,7 @@ The Networks Page
 - **Last capture**: when it was captured, and its file.
 - **Devices**: how many devices the network has seen.
 - **One next action** per row: **Review**, **Add a capture** or **Open**.
+  **Add a capture** is always there, beside **Review** too.
   **Rename** and **Delete** are in the row's **⋯** menu.
 
 Chips filter the table to **Needs review** or **No captures**, and the search
@@ -92,10 +94,10 @@ A network's page has the same layout as a capture's analysis (see
 - **Settings** holds the inactivity rule, the network's detection rules,
   address and device labels, and how often the page refreshes.
 - **The rail down the left** has the results first: **Overview**, **Changes**
-  (with the count to review), **Captures**, **Devices**, **Addresses**,
-  **Apps** and **Insights**. Below a *Set up* divider are the things you
-  maintain: **Expected** (baseline definitions), **Subnets**, **Events**
-  (outside events) and **Notes**.
+  (with the count to review), **Captures**, **Inventory** (devices, addresses
+  and apps together) and **Insights**. Below a *Set up* divider are the things
+  you maintain: **Set up** (expected state, i.e. baseline definitions, and
+  subnets) and **Notes** (your notes and outside events).
 - **Overview** puts it together: capture, device and to-review counts, what
   changed in the latest capture (mark items reviewed there), the capture
   timeline and the traffic chart.
