@@ -1,19 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation, HostClassification } from '@/types';
 import type { SortField } from '@/features/conversation/types';
-import {
-  loadVisibleColumns,
-  defaultVisibleColumns,
-  COLUMNS_APPLIED_EVENT,
-  saveVisibleColumns,
-} from '@/features/conversation/constants';
-import type { ColumnKey } from '@/features/conversation/constants';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { clusterApi } from '@/features/cluster/services/clusterApi';
-import { ConversationList } from '@components/conversation/ConversationList';
 import { ConversationListCompact } from '@components/conversation/ConversationListCompact';
 import './ConversationPage.css';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
@@ -43,22 +35,6 @@ export const ConversationPage = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-  // List and detail side by side (default), or the full table with a dialog. Remembered.
-  const [view, setView] = useState<'split' | 'table'>(() => {
-    try {
-      return localStorage.getItem('tracepcap.conversations.view') === 'table' ? 'table' : 'split';
-    } catch {
-      return 'split';
-    }
-  });
-  const chooseView = (v: 'split' | 'table') => {
-    setView(v);
-    try {
-      localStorage.setItem('tracepcap.conversations.view', v);
-    } catch {
-      // Not remembered: the view still changes.
-    }
-  };
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,31 +48,8 @@ export const ConversationPage = () => {
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [signatureScopes, setSignatureScopes] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
-  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
-  // Personal preferences loaded from the server can replace the columns while this page is open.
-  useEffect(() => {
-    const reload = () => setVisibleColumns(loadVisibleColumns());
-    window.addEventListener(COLUMNS_APPLIED_EVENT, reload);
-    return () => window.removeEventListener(COLUMNS_APPLIED_EVENT, reload);
-  }, []);
   const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
   const [highlightPacket, setHighlightPacket] = useState<number | null>(null);
-
-  const toggleColumn = useCallback((key: ColumnKey) => {
-    setVisibleColumns(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      saveVisibleColumns(next);
-      return next;
-    });
-  }, []);
-
-  // Restore the default visible-column set, clearing any stored override.
-  const resetColumns = useCallback(() => {
-    saveVisibleColumns(null);
-    setVisibleColumns(defaultVisibleColumns());
-  }, []);
 
   // Fetch available file types and risk types once per file
   useEffect(() => {
@@ -247,24 +200,20 @@ export const ConversationPage = () => {
   // List and detail: something is always shown. Pick the first conversation when nothing (or a
   // conversation no longer on this page) is selected, and keep the selected row in view.
   useEffect(() => {
-    if (view !== 'split' || conversations.length === 0) return;
+    if (conversations.length === 0) return;
     if (!selectedConversation || !conversations.some(c => c.id === selectedConversation.id)) {
       if (selectedIndex === -1 && selectedConversation) return; // a deep link, kept as is
       openConversation(conversations[0], 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, conversations]);
+  }, [conversations]);
   useEffect(() => {
-    if (view !== 'split' || !selectedConversation) return;
+    if (!selectedConversation) return;
     document
       .querySelector(`[data-conversation-id="${selectedConversation.id}"]`)
       ?.scrollIntoView({ block: 'nearest' });
-  }, [view, selectedConversation]);
+  }, [selectedConversation]);
 
-  const closeModal = useCallback(() => {
-    setSelectedConversation(null);
-    setHighlightPacket(null);
-  }, []);
 
   const exportConversationCsv = useCallback((conversation: Conversation) => {
     const hexToAscii = (hex: string) => {
@@ -356,35 +305,17 @@ export const ConversationPage = () => {
       if (!selectedConversation) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-      const back = e.key === 'ArrowLeft' || (view === 'split' && e.key === 'ArrowUp');
-      const fwd = e.key === 'ArrowRight' || (view === 'split' && e.key === 'ArrowDown');
+      const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+      const fwd = e.key === 'ArrowRight' || e.key === 'ArrowDown';
       if (back || fwd) e.preventDefault();
       if (back) handlePrev();
       if (fwd) handleNext();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [selectedConversation, handlePrev, handleNext, view]);
+  }, [selectedConversation, handlePrev, handleNext]);
 
-  useEffect(() => {
-    document.body.style.overflow = view === 'table' && selectedConversation ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [selectedConversation, view]);
 
-  // Sort: cycle empty → asc → desc → empty
-  const handleSort = (field: SortField) => {
-    if (!field) {
-      setFilters({ sortBy: '', sortDir: 'asc' });
-    } else if (filters.sortBy !== field) {
-      setFilters({ sortBy: field, sortDir: 'asc' });
-    } else if (filters.sortDir === 'asc') {
-      setFilters({ sortBy: field, sortDir: 'desc' });
-    } else {
-      setFilters({ sortBy: '', sortDir: 'asc' });
-    }
-  };
 
   // Filter options from the already-loaded analysis summary
   const protocolOptions = (data.protocolDistribution ?? []).map(p => ({
@@ -426,26 +357,6 @@ export const ConversationPage = () => {
               </span>
             </h4>
             <div className="d-flex gap-2 align-items-center">
-              <div className="btn-group btn-group-sm" role="group" aria-label="View">
-                <button
-                  type="button"
-                  className={`btn ${view === 'split' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                  aria-pressed={view === 'split'}
-                  onClick={() => chooseView('split')}
-                >
-                  <i className="bi bi-layout-split me-1" aria-hidden="true" />
-                  List and detail
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${view === 'table' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                  aria-pressed={view === 'table'}
-                  onClick={() => chooseView('table')}
-                >
-                  <i className="bi bi-table me-1" aria-hidden="true" />
-                  Table
-                </button>
-              </div>
               <a
                 href={exportUrl}
                 download={exportFilename}
@@ -486,16 +397,35 @@ export const ConversationPage = () => {
             countryOptions={countryOptions}
             presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
-            visibleColumns={visibleColumns}
-            onToggleColumn={toggleColumn}
-            onResetColumns={resetColumns}
           />
         </div>
       </div>
 
-      {view === 'split' ? (
         <div className="conv-split">
           <section className="conv-list-card" aria-label="Conversation list">
+            <div className="conv-list-head">
+              <Form.Label htmlFor="conv-sort" className="mb-0 small text-muted">
+                Sort
+              </Form.Label>
+              <Form.Select
+                id="conv-sort"
+                size="sm"
+                className="conv-sort"
+                value={`${filters.sortBy}:${filters.sortDir}`}
+                onChange={e => {
+                  const [sortBy, sortDir] = e.target.value.split(':') as [SortField, 'asc' | 'desc'];
+                  setFilters({ sortBy, sortDir, page: 1 });
+                }}
+              >
+                <option value=":asc">In capture order</option>
+                <option value="startTime:desc">Newest first</option>
+                <option value="bytes:desc">Most bytes</option>
+                <option value="packets:desc">Most packets</option>
+                <option value="duration:desc">Longest</option>
+                <option value="srcIp:asc">Source address</option>
+                <option value="dstIp:asc">Destination address</option>
+              </Form.Select>
+            </div>
             <div className="conv-list-scroll" style={{ opacity: loading ? 0.4 : 1 }}>
               {loading && conversations.length === 0 && (
                 <LoadingSpinner size="medium" message="Loading conversations..." />
@@ -588,146 +518,6 @@ export const ConversationPage = () => {
             )}
           </section>
         </div>
-      ) : (
-      <div className="row">
-        <div className="col-12">
-          <Card style={{ overflow: 'hidden' }}>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <h6 className="mb-0">Conversations</h6>
-              <small className="text-muted">Click a row to view details</small>
-            </Card.Header>
-            <Card.Body className="p-0" style={{ position: 'relative' }}>
-              {loading && conversations.length === 0 && (
-                <LoadingSpinner size="medium" message="Loading conversations..." />
-              )}
-              {conversations.length > 0 && (
-                <div
-                  style={{
-                    opacity: loading ? 0.4 : 1,
-                    pointerEvents: loading ? 'none' : 'auto',
-                    transition: 'opacity 0.15s',
-                  }}
-                >
-                  <ConversationList
-                    conversations={conversations}
-                    onSelectConversation={c => {
-                      const idx = conversations.findIndex(x => x.id === c.id);
-                      openConversation(c, idx);
-                    }}
-                    sortBy={filters.sortBy}
-                    sortDir={filters.sortDir}
-                    onSort={handleSort}
-                    onRiskFilterClick={() => setFilters({ hasRisks: true })}
-                    visibleColumns={visibleColumns}
-                    signatureSeverities={signatureSeverities}
-                    signatureScopes={signatureScopes}
-                    hostClassMap={hostClassMap}
-                  />
-                </div>
-              )}
-            </Card.Body>
-            {totalPages > 1 && (
-              <Card.Footer>
-                <Pagination
-                  currentPage={filters.page}
-                  totalPages={totalPages}
-                  onPageChange={page => setFilters({ page })}
-                  pageSize={filters.pageSize}
-                  totalItems={totalItems}
-                  showPageSizeSelector
-                  onPageSizeChange={pageSize => setFilters({ pageSize, page: 1 })}
-                />
-              </Card.Footer>
-            )}
-          </Card>
-        </div>
-      </div>
-
-      )}
-
-      {view === 'table' && (
-      <Modal show={!!selectedConversation} onHide={closeModal} size="xl" centered scrollable>
-        <Modal.Header closeButton>
-          <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-            <Button
-              size="sm"
-              variant="outline-secondary"
-              onClick={handlePrev}
-              disabled={selectedIndex <= 0}
-              title="Previous conversation"
-            >
-              ‹ Prev
-            </Button>
-            <Modal.Title className="text-truncate mb-0 font-monospace small" as="h5">
-              {modalTitle}
-            </Modal.Title>
-            <Button
-              size="sm"
-              variant="outline-secondary"
-              onClick={handleNext}
-              disabled={selectedIndex >= conversations.length - 1}
-              title="Next conversation"
-            >
-              Next ›
-            </Button>
-            <span className="text-muted small text-nowrap">
-              {selectedIndex + 1} / {conversations.length}
-            </span>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-info"
-            className="ms-2"
-            onClick={() => selectedConversation && setTracerConversationId(selectedConversation.id)}
-            title="Step through packets with AI explanations"
-          >
-            <i className="bi bi-play-circle me-1"></i>Trace
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-secondary"
-            className="ms-2"
-            onClick={() => selectedConversation && exportConversationCsv(selectedConversation)}
-            title="Export this conversation as CSV"
-          >
-            <i className="bi bi-download me-1"></i>CSV
-          </Button>
-          {selectedConversation && (
-            <a
-              href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
-              download={makeExportFilename(
-                exportBase,
-                'pcap',
-                `${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}`
-              )}
-              className="btn btn-sm btn-outline-secondary ms-2"
-              title="Export this conversation as PCAP"
-            >
-              <i className="bi bi-download me-1"></i>PCAP
-            </a>
-          )}
-        </Modal.Header>
-        <Modal.Body>
-          {detailLoading ? (
-            <LoadingSpinner size="medium" message="Loading conversation..." />
-          ) : (
-            selectedConversation && (
-              <ConversationDetail
-                conversation={selectedConversation}
-                signatureSeverities={signatureSeverities}
-                signatureScopes={signatureScopes}
-                hostClassMap={hostClassMap}
-                fileId={fileId}
-                highlightPacketNumber={highlightPacket}
-              />
-            )
-          )}
-        </Modal.Body>
-      </Modal>
-
-      )}
 
       {/* Conversation Tracer modal */}
       {tracerConversationId && (

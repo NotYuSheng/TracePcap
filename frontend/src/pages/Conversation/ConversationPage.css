@@ -75,3 +75,15 @@
 .conv-pane .cd-bare > .card-body {
   padding: 0;
 }
+
+.conv-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+.conv-list-head .conv-sort {
+  width: auto;
+  flex: 1;
+}

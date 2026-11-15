@@ -3,7 +3,6 @@ import { Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useStore, type ThemeMode } from '@/store';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
-import { COLUMNS_APPLIED_EVENT, COLUMNS_SAVED_EVENT, saveVisibleColumns, storedVisibleColumns } from '@/features/conversation/constants';
 import { preferencesService } from '@/features/preferences/preferencesService';
 
 const THEMES: { value: ThemeMode; label: string }[] = [
@@ -22,17 +21,9 @@ export function PersonalSettingsTab() {
   const nodeLabelCount = useStore(s => s.nodeLabelConfig.fields.filter(f => f.enabled).length);
   const [shared, setShared] = useState<boolean | null>(null);
   const [showLabels, setShowLabels] = useState(false);
-  const [customColumns, setCustomColumns] = useState(() => storedVisibleColumns() !== null);
 
   useEffect(() => {
     preferencesService.get().then(p => setShared(!!p.shared)).catch(() => setShared(null));
-    const refresh = () => setCustomColumns(storedVisibleColumns() !== null);
-    window.addEventListener(COLUMNS_SAVED_EVENT, refresh);
-    window.addEventListener(COLUMNS_APPLIED_EVENT, refresh);
-    return () => {
-      window.removeEventListener(COLUMNS_SAVED_EVENT, refresh);
-      window.removeEventListener(COLUMNS_APPLIED_EVENT, refresh);
-    };
   }, []);
 
   return (
@@ -68,27 +59,6 @@ export function PersonalSettingsTab() {
           <Button type="button" size="sm" variant="outline-secondary" onClick={() => setShowLabels(true)}>
             Edit labels
           </Button>
-        </div>
-      </div>
-
-      <div className="mb-3">
-        <div className="fw-semibold small">Conversation table columns</div>
-        <div className="d-flex align-items-center gap-2">
-          <span className="small text-muted">
-            {customColumns
-              ? 'Your own selection. Change it from the Columns menu above the conversation table.'
-              : 'The default columns. Change them from the Columns menu above the conversation table.'}
-          </span>
-          {customColumns && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline-secondary"
-              onClick={() => saveVisibleColumns(null)}
-            >
-              Reset to default
-            </Button>
-          )}
         </div>
       </div>
 
