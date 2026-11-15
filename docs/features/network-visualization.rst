@@ -40,17 +40,24 @@ they produce multiple edges — one per conversation row.
 Edge thickness is fixed: **1.5 px** for edges in a single capture, or **2.5 px**
 for edges that appear in both captures when using the Compare view. Edge width
 does not vary with traffic volume — volume is carried by color instead, when the
-**Color edges by** control is set to Volume (see below).
+**Edges** control is set to By volume (see below).
 
 Edge Color Modes
 ~~~~~~~~~~~~~~~~
 
-The **Color edges by** control above the diagram switches what edge color means:
+The **Edges** control above the diagram switches what edge color means, or
+turns the edges off:
 
-- **Protocol** (default) — each edge takes its protocol's color.
-- **Volume** — each edge is shaded by its ``totalBytes`` on the
+- **By transport** (default) — each edge takes its base protocol's color
+  (TCP, UDP, ICMP…).
+- **By application** — each edge takes the color of the deepest protocol or
+  application identified on it (HTTPS, DNS, QUIC…).
+- **By volume** — each edge is shaded by its ``totalBytes`` on the
   :ref:`shared volume color scale <shared-volume-scale>`, the same scale the
   node-to-node heatmap uses. A gradient legend appears beside the control.
+- **Hidden** — no edges, so a dense map shows just its devices and groups.
+  Hovering a device still draws its own connections; the traffic dots go with
+  the edges.
 
 These are alternatives rather than layers. Color is a single channel, and
 encoding two meanings in it at once would make neither readable — so only one is

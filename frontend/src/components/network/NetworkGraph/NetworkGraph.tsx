@@ -36,7 +36,8 @@ export interface NodeHighlight {
   description?: string;
 }
 
-export type EdgeColorMode = 'transport' | 'application' | 'volume';
+/** How edges are coloured; 'hidden' draws none, except a hovered device's own. */
+export type EdgeColorMode = 'transport' | 'application' | 'volume' | 'hidden';
 
 interface NetworkGraphProps {
   nodes: GraphNode[];
@@ -671,6 +672,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     return () => cancelAnimationFrame(raf);
   }, [animateTraffic, hasLinks, hasWindow, hasFlights]);
 
+  const edgeColorModeRef = useRef(edgeColorMode);
   const activeInWindowRef = useRef(activeInWindow);
   useEffect(() => {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -752,7 +754,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   // base protocols (TCP/UDP/ICMP…); Application lists the nDPI applications
   // (WhatsApp, YouTube…) the same way the strokes are coloured, via getAppColor.
   const protocolLegend = useMemo(() => {
-    if (edgeColorMode === 'volume') return { entries: [], hasUnmapped: false };
+    if (edgeColorMode === 'volume' || edgeColorMode === 'hidden') return { entries: [], hasUnmapped: false };
     if (edgeColorMode === 'application') return buildAppLegend(edges.map(e => e.data.appName));
     return buildProtocolLegend(edges.map(e => e.data.protocol));
   }, [edges, edgeColorMode]);
@@ -896,6 +898,9 @@ export const NetworkGraph = memo(function NetworkGraph({
           if (src !== hovNode && tgt !== hovNode) {
             res['hidden'] = true;
           }
+        } else if (edgeColorModeRef.current === 'hidden') {
+          // Edges off: none drawn, until a device is hovered (its own show, above).
+          res['hidden'] = true;
         }
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.5);
@@ -1282,6 +1287,7 @@ export const NetworkGraph = memo(function NetworkGraph({
             : getProtocolColor((attrs.protocol as string) ?? '')
       );
     });
+    edgeColorModeRef.current = edgeColorMode;
     sigmaRef.current?.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edgeColorMode]);
