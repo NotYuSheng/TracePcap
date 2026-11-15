@@ -23,11 +23,6 @@
   font-size: 1.5rem;
   font-weight: 700;
 }
-.home-start-lede {
-  margin: 6px 0 0;
-  font-size: 0.9rem;
-  color: var(--tp-text-muted, #4b5563);
-}
 /* The whole start panel is the drop target (Upload A). */
 .home-drop-target {
   position: relative;

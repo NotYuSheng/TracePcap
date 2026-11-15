@@ -125,14 +125,9 @@ export const HomePage = () => {
         className="home-card home-start"
         labelledBy="home-start-title"
         heading={
-          <div>
-            <h1 id="home-start-title" className="home-start-title">
-              Analyse a capture
-            </h1>
-            <p className="home-start-lede">
-              See who talked to whom, what each device is, and what looks wrong.
-            </p>
-          </div>
+          <h1 id="home-start-title" className="home-start-title">
+            Analyse a capture
+          </h1>
         }
       />
       <div className="home-side">
