@@ -142,7 +142,7 @@ What This Doesn't Change Yet
 ----------------------------
 
 - **Notes** are still per address (or per MAC, on a device's MAC).
-- Story, reports, the network cluster view and the monitor views use the
+- Story, reports, the Overview's traffic groups and the monitor views use the
   address's classification.
 - Re-applying detection rules re-scores the address, not each device.
 - The same device on different addresses, across captures, isn't recognised as

@@ -134,7 +134,9 @@ public class NetworkClusterService {
     if ("deviceType".equals(groupBy)) {
       hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.put(h.ip(), h));
     }
-    List<IpOrgRuleEntity> orgRules = "customOrg".equals(groupBy)
+    // The analyst's network labels: their own grouping, and the organisation an address belongs
+    // to before its ASN (labelling your own public range shows it as yours, not as the ISP's).
+    List<IpOrgRuleEntity> orgRules = "customOrg".equals(groupBy) || "asn".equals(groupBy)
         ? ipOrgRuleService.loadRules(networkId)
         : List.of();
 
@@ -717,6 +719,8 @@ public class NetworkClusterService {
       LocalityRules locality) {
     return switch (groupBy) {
       case "asn" -> {
+        String label = ipOrgRuleService.matchIp(ip, orgRules);
+        if (label != null) yield "org:" + label;
         IpPlace geo = geoByIp.get(ip);
         if (geo != null && geo.asn() != null && !geo.asn().isBlank()) {
           yield "asn:" + geo.asn();
@@ -760,6 +764,7 @@ public class NetworkClusterService {
       List<IpOrgRuleEntity> orgRules) {
     return switch (groupBy) {
       case "asn" -> {
+        if (key.startsWith("org:")) yield key.substring("org:".length());
         if (key.equals("cluster:internal")) yield "Internal Network";
         if (key.equals("cluster:unknown")) yield "Unknown (No ASN)";
         IpPlace geo = geoByIp.get(ip);

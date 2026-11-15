@@ -920,24 +920,18 @@ test('README demo walkthrough', async ({ page }) => {
   await frameCardTop(heatmapCard);
   await beat(page, FEATURE);
 
-  // ── 9. Network intelligence ────────────────────────────────────────────
-  await openTab(page, /Network Intelligence/i);
-
-  // Frame the default ASN cluster diagram before touching the controls — it is
-  // the view the tab actually opens on, and switching to Country immediately
-  // means it never appears in the recording.
-  const clusterBody = page.locator('.intel-cluster-card-body').first();
-  await expect(clusterBody, 'cluster graph not rendered').toBeVisible({ timeout: 30_000 });
-  // Frame the card, not the body: "Network Cluster View" lives in the sibling
-  // Card.Header, so centring the body alone leaves the diagram unlabelled.
-  await frameCardTop(clusterBody.locator('xpath=..'));
+  // ── 9. Where the traffic goes ──────────────────────────────────────────
+  // The Cluster tab is folded into the Overview: organisations as tiles sized by traffic, then
+  // the world map. Frame the tiles first: they are what the card opens on.
+  await openTab(page, /Overview/i);
+  const whereCard = page.locator('section', { has: page.getByRole('heading', { name: 'Where the traffic goes' }) }).first();
+  await expect(whereCard, 'traffic card not rendered').toBeVisible({ timeout: 30_000 });
+  await frameCardTop(whereCard);
   await beat(page, FEATURE);
 
-  // Then regroup by country, which swaps the cluster graph for the world map.
-  const groupBy = page.locator('select').filter({ hasText: /ASN \/ Organization/ }).first();
-  await expect(groupBy, 'group-by control not found').toBeVisible({ timeout: 20_000 });
-  await showClick(page, groupBy);
-  await groupBy.selectOption('country');
+  // Then the map.
+  const mapButton = whereCard.getByRole('button', { name: 'Map' });
+  await showClick(page, mapButton);
   await beat(page, FEATURE);
 
   // Italy is a single-host cluster in this capture — small enough that drilling

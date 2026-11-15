@@ -14,7 +14,10 @@ import { getProtocolColor } from '@/features/network/constants';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import { formatBytes } from '@/utils/formatters';
+import { formatBytes, formatDuration } from '@/utils/formatters';
+import { clusterApi, type ClusterGraphResponse } from '@/features/cluster/services/clusterApi';
+import { TrafficWhereCard } from '@components/analysis/Overview/TrafficWhereCard';
+import { FlowsCard } from '@components/analysis/Overview/FlowsCard';
 import {
   getAppColor,
   getCategoryColor,
@@ -29,6 +32,9 @@ import { getExtractedFiles } from '@features/extractedFiles/services/extractedFi
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import type { Answer } from '@/types';
+
+/** "Where the hosts are" lists this many groups per heading before "Show all". */
+const HOSTS_SHOWN = 6;
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -93,6 +99,21 @@ export const AnalysisOverview = () => {
   const [activityLoaded, setActivityLoaded] = useState(false);
   const { tops: hostTops } = useHostGroups(fileId, data);
   const [flagged, setFlagged] = useState({ total: 0, risks: 0, suricata: 0, custom: 0 });
+  // Hosts by organisation, shared by "Where the traffic goes" and the flows between them.
+  const [byOrg, setByOrg] = useState<ClusterGraphResponse | null>(null);
+  // "Where the hosts are" groups opened past their first few.
+  const [hostsOpen, setHostsOpen] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let alive = true;
+    clusterApi
+      .getClusters(fileId, 'asn', {}, networkContext ?? undefined)
+      .then(r => alive && setByOrg(r))
+      .catch(() => alive && setByOrg({ groupType: 'asn', clusters: [], edges: [], hiddenClusters: 0 }));
+    return () => {
+      alive = false;
+    };
+  }, [fileId, networkContext]);
 
   // Packets over time for the activity chart, and how the flagged conversations were flagged.
   useEffect(() => {
@@ -176,12 +197,8 @@ export const AnalysisOverview = () => {
 
   const detectedApps = data.detectedApplications ?? [];
 
-  const durationText = (() => {
-    const ms = data.timeRange ? data.timeRange[1] - data.timeRange[0] : 0;
-    const m = Math.floor(ms / 60000);
-    const sec = Math.round((ms % 60000) / 1000);
-    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
-  })();
+  // "26m 12s" for a short capture; days, months or years past two days, not "8846328m 29s".
+  const durationText = formatDuration(data.timeRange ? data.timeRange[1] - data.timeRange[0] : 0);
   const protoRows: MixRow[] = (data.protocolDistribution ?? []).map(p => ({
     name: p.protocol,
     packets: p.count,
@@ -285,6 +302,9 @@ export const AnalysisOverview = () => {
             </section>
           }
 
+          <TrafficWhereCard fileId={fileId} networkId={networkContext ?? undefined} byOrg={byOrg} />
+          <FlowsCard byOrg={byOrg} />
+
           {(protoRows.length > 0 || catRows.length > 0) && (
             <section className="ov-card" aria-labelledby="ov-mix">
               <div className="ov-head">
@@ -305,9 +325,11 @@ export const AnalysisOverview = () => {
                 </SourceTag>
               </div>
               {protoRows.length > 0 && (
-                <MixBar title="Protocols" column="Protocol" rows={protoRows} />
+                <MixBar title="Protocols" column="Protocol" rows={protoRows} limit={10} />
               )}
-              {catRows.length > 0 && <MixBar title="Categories" column="Category" rows={catRows} />}
+              {catRows.length > 0 && (
+                <MixBar title="Categories" column="Category" rows={catRows} limit={10} />
+              )}
             </section>
           )}
 
@@ -587,14 +609,42 @@ export const AnalysisOverview = () => {
                   <h3>
                     {top.label} <span className="text-muted fw-normal">· {groupSize(top)}</span>
                   </h3>
-                  <ul>
-                    {(top.children.length ? top.children : [top]).map(g => (
-                      <li key={g.id}>
-                        <span>{g.label}</span>
-                        <b>{groupSize(g)}</b>
-                      </li>
-                    ))}
-                  </ul>
+                  {(() => {
+                    // The biggest groups first; past HOSTS_SHOWN, the rest are one click away.
+                    const rows = (top.children.length ? [...top.children] : [top]).sort(
+                      (a, b) => groupSize(b) - groupSize(a)
+                    );
+                    const open = hostsOpen.has(top.id);
+                    const shown = open ? rows : rows.slice(0, HOSTS_SHOWN);
+                    return (
+                      <>
+                        <ul>
+                          {shown.map(g => (
+                            <li key={g.id}>
+                              <span>{g.label}</span>
+                              <b>{groupSize(g)}</b>
+                            </li>
+                          ))}
+                        </ul>
+                        {rows.length > HOSTS_SHOWN && (
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0"
+                            onClick={() =>
+                              setHostsOpen(prev => {
+                                const next = new Set(prev);
+                                if (open) next.delete(top.id);
+                                else next.add(top.id);
+                                return next;
+                              })
+                            }
+                          >
+                            {open ? 'Show fewer' : `Show all ${rows.length}`}
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </section>

@@ -126,12 +126,6 @@ const RAIL_ITEMS: RailItem[] = [
     icon: 'bi-diagram-3',
   },
   {
-    key: 'network-cluster',
-    label: 'Network Cluster',
-    short: 'Cluster',
-    icon: 'bi-globe-europe-africa',
-  },
-  {
     key: 'extracted-files',
     label: 'Extracted Files',
     short: 'Files',
@@ -384,7 +378,6 @@ export const AnalysisPage = () => {
     else if (path.includes('/filter-generator')) setActiveTab('filter-generator');
     else if (path.includes('/network-diagram')) setActiveTab('network-diagram');
     else if (path.includes('/extracted-files')) setActiveTab('extracted-files');
-    else if (path.includes('/network-cluster')) setActiveTab('network-cluster');
     else if (path.endsWith('/file')) setActiveTab('file');
     else setActiveTab('overview');
   }, [location.pathname]);

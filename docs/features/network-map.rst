@@ -148,8 +148,8 @@ same drawer as the Conversations tab's **More filters**: one section per filter
 applications, categories, risk types, rules, file types, countries), and each
 chip shows how many it covers: devices for a node identity, connections for
 everything else. Filters apply as you pick them. **Show N connections** at the
-foot closes the drawer; **Clear all** resets every filter. The Network Cluster
-tab and the monitor's snapshot dialog use the same drawer.
+foot closes the drawer; **Clear all** resets every filter. The Conversations
+filters and the Monitor capture map use the same drawer.
 
 Your Own Groups, Names and Notes
 --------------------------------
