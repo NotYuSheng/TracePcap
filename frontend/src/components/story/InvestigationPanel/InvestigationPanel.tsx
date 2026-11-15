@@ -1,5 +1,6 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState } from 'react';
-import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Popover } from '@govtechsg/sgds-react';
 import type { InvestigationStep } from '@/types';
 import { formatBytes } from '@/utils/formatters';
 
@@ -29,7 +30,7 @@ function InfoPopover() {
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -39,7 +40,7 @@ function InfoPopover() {
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 

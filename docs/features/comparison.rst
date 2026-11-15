@@ -8,16 +8,14 @@ across captures side by side.
 Starting a Comparison
 ---------------------
 
-1. From the **All Uploads** file list, check the checkboxes on two or more
-   fully-processed PCAP files.
-2. Click the **Multi-Analysis (N)** button that appears in the header.
-3. A modal appears with two options:
+1. In **Your captures** on the home page, tick two or more analysed captures.
+2. Use the bar that appears at the foot of the list:
 
-   - **View Together** — navigates to ``/compare?files=id1,id2,...`` and
-     renders the merged topology immediately. The original files are unchanged.
-   - **Merge & Analyze** — permanently merges the selected PCAPs into a new
-     single file (named automatically or as you specify), runs the full
-     analysis pipeline on the merged file, and navigates to its analysis page.
+   - **Compare** goes to ``/compare?files=id1,id2,...`` and draws the captures
+     together straight away. The original captures are unchanged.
+   - **Merge into one** asks for a name (one is suggested). It merges the
+     selected captures into a new capture, analyses it in full, and opens its
+     analysis.
 
 The Comparison View
 -------------------

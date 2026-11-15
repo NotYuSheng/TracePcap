@@ -15,8 +15,12 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["/*"],
-      "webOrigins": ["+"],
+      "redirectUris": [
+        "/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "+"
@@ -40,5 +44,17 @@
         }
       ]
     }
-  ]
+  ],
+  "roles": {
+    "client": {
+      "tracepcap-frontend": [
+        {
+          "name": "admin",
+          "description": "TracePcap admin: may change settings marked admin-only (#915). Grant via Users > Role mapping > Filter by clients.",
+          "composite": false,
+          "clientRole": true
+        }
+      ]
+    }
+  }
 }

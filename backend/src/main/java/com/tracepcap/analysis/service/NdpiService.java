@@ -74,6 +74,13 @@ public class NdpiService implements Extractor {
     return enrich(target.capture(), target.conversations());
   }
 
+  /** ndpiReader needs only the file, so it runs before the pipeline's transaction (#409). */
+  @Override
+  public Prepared prepare(ExtractionTarget target) {
+    NdpiRun run = runNdpi(target.capture());
+    return conversations -> applyFlows(run, conversations);
+  }
+
   private static final String NDPI_BINARY = "ndpiReader";
 
   /**
@@ -156,8 +163,13 @@ public class NdpiService implements Extractor {
   public Outcome enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty())
       return new Outcome(ExtractionManifest.Status.COMPLETED, "no conversations to enrich");
+    return applyFlows(runNdpi(pcapFile), conversations);
+  }
 
-    NdpiRun run = runNdpi(pcapFile);
+  /** Maps one ndpiReader run onto conversations. Shared by {@link #enrich} and {@link #prepare}. */
+  private Outcome applyFlows(NdpiRun run, List<PcapParserService.ConversationInfo> conversations) {
+    if (conversations.isEmpty())
+      return new Outcome(ExtractionManifest.Status.COMPLETED, "no conversations to enrich");
     Map<String, FlowData> flowMap = run.flows();
     if (flowMap.isEmpty()) return run.outcome();
 

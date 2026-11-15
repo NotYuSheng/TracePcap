@@ -1,7 +1,7 @@
 Custom Signature Rules
 ======================
 
-TracePcap supports user-defined YAML detection rules that are matched against
+TracePcap supports user-defined detection rules that are matched against
 every conversation after nDPI analysis. Matched rule names appear as
 color-coded badges in the Conversations tab and Overview, alongside nDPI's
 built-in detections.
@@ -9,24 +9,162 @@ built-in detections.
 How It Works
 ------------
 
-Rules are stored inside a Docker named volume (``config_data``) at
-``/app/config/signatures.yml`` inside the backend container. The file is
-reloaded on every analysis run — **no restart is required** after editing.
+Rules are stored in the **database**, as global rules that apply to every
+capture. They're edited on the **Settings** page, under **Detection rules**.
 
-Click **Custom Detection Rules** in the navbar to open a modal with two tabs:
+- **Add rule** opens a form: name, severity, description, the match fields,
+  and payload patterns. Fields are checked as you type, and anything the
+  server rejects (a CIDR that isn't one, a regex that doesn't compile) is
+  shown next to its field.
+- Each rule has an **on/off switch**, so a rule can be paused without losing
+  it, and shows who last changed it, when, and its version.
+- **Test against a capture**, at the bottom of the form, says what the rule as
+  it stands would match in a capture you pick, with a few examples, before you
+  save it. Nothing is saved. A rule that looks inside packets can't be tested
+  on a capture whose packets retention deleted.
+- New captures are checked against the enabled rules when they're
+  analysed. Captures analysed earlier are **not** re-checked automatically
+  when a rule is added or changed; see `Keeping matches up to date`_.
+- **Who can edit** is a permission (*Edit global detection rules*, analysts by
+  default; see :ref:`settings-permissions`). Everyone can view the rules.
+- Every create, edit and delete is recorded in the **audit log**, with the
+  rule before and after.
 
-- **Detection Rules** — the built-in YAML editor for ``signatures.yml``.
-  Changes are saved immediately and take effect on the next analysis run.
-- **Network Labels** — define CIDR-to-label mappings used in the Network
-  Visualization grouping mode (see `Network Labels`_ below).
+**Export** downloads every rule as a YAML file, in the format below.
+**Import** reads such a file, or an old ``signatures.yml``: rules are matched
+to existing ones by name, and *Replace* also deletes rules the file doesn't
+contain. If any rule in the file is invalid, nothing is imported, and every
+problem is listed. Export and import are for backups and for moving rules
+between installs; the database is what TracePcap uses.
+
+**Upgrading from ``signatures.yml``.** Earlier versions kept the rules in a
+file in the ``config_data`` volume. On the first start after upgrading,
+TracePcap imports that file once. A rule the editor would reject (for
+example a regex that doesn't compile) is imported **disabled**, with the
+reason in its description, so nothing is lost and nothing starts matching
+differently. The audit log records the import. If you had pointed
+``SIGNATURES_PATH`` at a different file, import it with **Import** instead.
+
+Rules for one capture
+---------------------
+
+Sometimes a rule only makes sense for one capture: "in this capture,
+``10.0.0.53`` is the sanctioned DNS server", or a pattern you're testing
+before you trust it everywhere. A capture's **Overview** has **Rules for this
+capture**:
+
+- **Add rule** opens the same form as global rules. The rule flags
+  conversations in this capture only, **straight away**, with no re-apply,
+  and wherever the capture is viewed, including inside a network where it's a
+  snapshot.
+- Each rule can be switched off, edited, deleted, or **promoted**.
+- **Promote** makes a global copy, so the rule flags every capture. You
+  choose whether to keep the capture's rule as well. The copy is checked
+  against this capture at once; other captures show as out of date until the
+  rules are re-applied.
+- A capture rule's name can't be the same as a global rule's, since both label
+  the same capture. A promoted copy is the exception: it's meant to label the
+  same thing.
+- Who can edit capture rules is its own permission (*Edit capture detection
+  rules*, analysts by default). Promoting needs the global-rules permission
+  too. Every change is in the audit log.
+
+**Each match says where it comes from.** Rule badges in the conversations
+table, the conversation details, the filter and the Overview end in their
+scope: *global* or *capture*.
+
+Rules for a network
+-------------------
+
+A monitored network can have its own rules, for things that are only true of
+that site: "at HQ, ``10.0.0.53`` is the sanctioned DNS server", or "this
+site's cameras live on ``10.20.0.0/16``". Open the network's page and click
+**Detection rules**.
+
+- A network rule's matches show when the network's captures are viewed **in
+  that network**: its snapshots, their **Security** tab, and the
+  conversations those link to. The same capture viewed on its own, or in
+  another network, doesn't show them.
+- Each capture that **joins** the network is checked against its rules
+  straight away. A capture that **leaves** loses the network's matches.
+- Adding or changing a network rule doesn't re-check the captures already in
+  the network: they show as out of date, as for a global rule, until the rules
+  are re-applied.
+- Switching a network rule off hides its matches at once.
+- On a capture's **Analysis** page, **Custom detection rules** (in the capture bar above every section)
+  adds a network's rules to every tab that shows matches: the Overview, the
+  conversations (list, filters and details), the network visualization, the
+  Network Cluster's rule filter, and the PDF report's rule tags and rule
+  summary, and Story (generated with the network picked, see
+  :doc:`story-mode`).
+- A snapshot's **security count** on the network page counts the network's own
+  rules, and leaves out the global rules the network has switched off.
+  The networks the capture is in are listed first, with a hint when it's in
+  one; links from a network's Security tab open the capture already in that
+  network. You can also pick a network the capture isn't in, to see what its
+  rules would flag: they're checked against the capture when you do. Matches
+  are labelled with the network's name.
+- A network rule's name can't be the same as a global rule's.
+- **Switching a global rule off for one network.** Under *Global rules in
+  this network*, switch a global rule off to hide its matches when the
+  network's captures are viewed in this network, for example a rule that's
+  noisy at one site. It keeps applying everywhere else, and switching it back
+  on shows its matches again. This needs the network-rules permission and is
+  in the audit log.
+- Who can edit network rules is its own permission (*Edit network detection
+  rules*, analysts by default). Every change is in the audit log. Deleting the
+  network deletes its rules.
+
+Keeping matches up to date
+--------------------------
+
+TracePcap records, for each capture, which version of each rule it was
+checked against. When you add a rule or change what one matches, captures
+checked before stay as they were, and are shown as **out of date**:
+
+- The **Detection rules** tab says how many captures haven't been checked
+  against the current rules, with **Re-apply** to check them all.
+- A capture's **Overview** names the rules it's out of date for, with
+  **Re-apply to this capture**.
+
+Re-apply runs in the background, with its progress shown, one capture at a
+time. It's safe to run again, and a capture is never left half-updated. It
+needs the same permission as editing rules, and is recorded in the audit
+log. If the backend restarts mid-run, the job is marked *interrupted*; start
+it again to finish.
+
+Some changes apply **at once**, everywhere, with no re-apply: switching a
+rule off hides its matches, switching it back on shows them again, renaming
+it relabels them, and deleting it removes them.
+
+**Captures whose packets were deleted.** Rules that look inside packets
+(``payload_contains``, ``payload_regex``) need the capture's raw packets. If
+retention has deleted them (``PACKET_RETENTION_HOURS``), Re-apply can't
+re-check those rules, so their old matches are dropped and the capture says
+**couldn't re-check** rather than showing results from an older rule.
+
+**After upgrading,** captures analysed by an earlier version show as out of
+date: which rule versions produced their matches isn't known. Their existing
+matches stay visible; Re-apply brings them up to date.
+
+Network labels (CIDR-to-organisation mappings, used by the Network Labels grouping
+mode) are set under **Settings › Address defaults › Organisations** (see
+`Network Labels`_ below).
 
 .. _Network Labels:
 
 .. tip::
 
-   ``signatures.sample.yml`` in the repository root is a reference template
-   covering every match field with annotated examples. Paste it into the
-   browser editor to get started, then modify to suit your environment.
+   ``signatures.sample.yml`` in the repository root covers every match field
+   with annotated examples. Import it from **Detection rules** to get
+   started, then adjust the rules to your environment.
+
+.. note::
+
+   A rule can carry a **classification hint** (*Device type* and *Weight* at
+   the bottom of the form): a weighted vote in device classification, named
+   in the host's evidence, not an override. See
+   :doc:`../configuration/signature-rules`.
 
 Rule Format
 -----------
@@ -144,19 +282,43 @@ in the conversation is sufficient.
 ``payload_contains`` and ``payload_regex`` can coexist in the same rule; both
 must match (AND).
 
-Device Type Override
---------------------
+Classification Hint
+-------------------
 
-A rule can pin the device type of all IPs involved in a matching conversation:
+A rule can vote for the device type of the hosts it matches. The vote is
+weighed with the other classification signals and shown in the host's
+evidence; it doesn't override them:
 
 .. code-block:: yaml
 
-   - name: cctv_camera
-     description: Known CCTV camera
+   - name: rtsp_camera
+     description: RTSP video stream server
      severity: low
      device_type: "CCTV Camera"
+     device_type_weight: 40
      match:
-       ip: "192.168.1.50"
+       dstPort: 554
+
+Here the host on port 554 gets the vote, not the client watching it. To pin a
+single known host, label the host instead.
+
+**When it counts.** The vote is counted when a capture is analysed, and only
+global and capture rules vote (a network rule's hint doesn't). When you add,
+edit, switch off or delete a rule with a hint, captures already analysed are
+re-scored when their rules are next checked: by **Re-apply**, or straight away
+for a switched-off or deleted rule. Re-scoring takes back the rule's old vote and
+counts its new one, then works out the winner again:
+
+- An **automatic** device type changes only if the winner changes. Each change
+  is listed in Re-apply's result ("10.0.0.9: IoT → CCTV Camera, rule
+  rtsp_camera"), shown on the host ("changed by Re-apply on …: it was IoT"), and
+  recorded in the audit log.
+- An **analyst's label** is never changed. If the new winner isn't what the
+  label says, the label is marked **stale**, with the reason; re-affirm it to
+  clear the flag. Re-applying again with nothing changed doesn't flag it again.
+
+Hosts analysed before this existed have no stored votes to re-score: re-analyse
+them from the :doc:`File tab <reanalysis>` once.
 
 Standard values: ``ROUTER``, ``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``,
 ``IOT``, ``UNKNOWN``. Custom strings (e.g. ``"PLC"``, ``"CCTV Camera"``) are
@@ -253,7 +415,7 @@ For a deep-dive rule authoring guide, see :doc:`../configuration/signature-rules
 Network Labels
 --------------
 
-The **Network Labels** tab (in the same **Custom Detection Rules** modal) maps
+Network labels are the **organisations** of :doc:`network-address-config`: they map
 individual IP addresses or CIDR ranges to human-readable organisation labels.
 These labels are used as a grouping strategy in the **Network Visualization**
 — enabling you to cluster nodes by network segment rather than by ASN or
@@ -262,11 +424,12 @@ country.
 How to Add a Label
 ~~~~~~~~~~~~~~~~~~
 
-1. Open **Custom Detection Rules** in the navbar.
-2. Switch to the **Network Labels** tab.
-3. Enter a label name (e.g. ``Corporate LAN``, ``DMZ``, ``Guest Wi-Fi``) and
+1. Open **Settings** (the gear at the right of the header), then **Address defaults** › **Organisations**
+   (for every network). For one network only, use its page's **Addresses** button
+   instead.
+2. Enter a label name (e.g. ``Corporate LAN``, ``DMZ``, ``Guest Wi-Fi``) and
    a CIDR range (e.g. ``10.0.1.0/24``) or individual IP (e.g. ``10.0.1.5``).
-4. Click **Add**.
+3. Add it.
 
 Labels are stored in the database and persist across sessions. Multiple CIDR
 entries can share the same label to group non-contiguous ranges under one name.

@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import java.util.Set;
 import com.tracepcap.analysis.dto.AnalysisProgressResponse;
 import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
 import com.tracepcap.analysis.dto.ConversationResponse;
@@ -7,6 +8,7 @@ import com.tracepcap.analysis.dto.ProtocolStatsResponse;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.tracepcap.analysis.entity.HostTtlWindowEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.analysis.entity.IpMacObservationEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
@@ -32,6 +34,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.File;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -104,7 +107,8 @@ public class AnalysisService {
     // against a real large capture, the same follow-up the streaming design itself called for.
     List<StageStep> plan = new ArrayList<>();
     plan.add(new StageStep("Downloading capture", 3));
-    plan.add(new StageStep("Parsing packets", coldEngine ? 3 : 24));
+    // The analysers' tool runs (Suricata, nDPI, tshark) come before parsing since #409. They need
+    // only the file, and running them first keeps them outside the DB transaction.
     // The one stage whose cost is not about this capture at all: on a cold engine it is the
     // ruleset build, which dwarfs everything else and is paid once per process.
     // Labelled for what it is on a cold engine. The bar cannot move inside a stage, so this one
@@ -114,6 +118,7 @@ public class AnalysisService {
         coldEngine
             ? new StageStep("Building threat-detection ruleset (first run)", 90)
             : new StageStep("Detecting applications & threats", 21));
+    plan.add(new StageStep("Parsing packets", coldEngine ? 3 : 24));
     plan.add(new StageStep("Classifying hosts & geo-locating", coldEngine ? 2 : 30));
     plan.add(new StageStep("Saving analysis summary", 1));
     plan.add(new StageStep("Finalizing conversations", 1));
@@ -172,6 +177,19 @@ public class AnalysisService {
   private final HostnameClaimWriter hostnameClaimWriter;
   private final SuricataEngine suricataEngine;
   private final WindowsIdentityResolverService windowsIdentityResolverService;
+  private final FailoverAddressResolverService failoverAddressResolverService;
+  private final DhcpLeaseResolverService dhcpLeaseResolverService;
+  private final HostOccupancyService hostOccupancyService;
+  private final OccupancyClassificationService occupancyClassificationService;
+  private final com.tracepcap.analysis.repository.HostTtlWindowRepository hostTtlWindowRepository;
+  private final WindowsLogonWriter windowsLogonWriter;
+  private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
+  private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /** The pipeline's one write transaction (see analyzeFile). Package-private for the boundary test. */
+  org.springframework.transaction.support.TransactionTemplate pipelineTx() {
+    return new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+  }
 
   /**
    * Runs the capture through the pipeline (#512 slice 7).
@@ -184,8 +202,14 @@ public class AnalysisService {
    * <p>What stays here is what genuinely belongs to the whole job: the guard against re-analysis,
    * the temp file's lifetime, and the failure path — which has to mark the record FAILED in its own
    * committed transaction, since the one being rolled back cannot record why it failed.
+   *
+   * <p><b>Not {@code @Transactional}, on purpose (#409).</b> Downloading the capture and the
+   * analysers' tool runs ({@link ExtractorRunner#prepareAll}) need only the file, and they are about
+   * 90% of the wall-clock time. They run first, with no transaction open. Everything that writes,
+   * from the streaming parse through completion, then runs in one {@link #pipelineTx} transaction.
+   * So a failure still rolls back every partial row, exactly as before, but a connection is held
+   * for seconds instead of the whole job. {@code AnalysisTransactionBoundaryTest} pins both halves.
    */
-  @Transactional
   public void analyzeFile(UUID fileId) {
     log.info("Starting analysis for file: {}", fileId);
 
@@ -214,14 +238,33 @@ public class AnalysisService {
       File tempFile = File.createTempFile("pcap-", ".pcap");
       run.pcap = tempFile;
       try {
+        // No transaction open: file-only work.
         downloadCapture(run);
-        parseCapture(run);
-        runExtractors(run);
-        enrichAndClassify(run);
-        persistAnalysisResult(run);
-        persistConversationsAndPackets(run);
-        extractEmbeddedFiles(run);
-        completeFile(run);
+        prepareExtractors(run);
+
+        // One transaction for every write. The batch flush in the streaming parse
+        // (EntityManager.flush) throws without one. AFTER_COMMIT listeners (analysis trigger,
+        // identity adjudication) fire when it commits.
+        pipelineTx()
+            .executeWithoutResult(
+                status -> {
+                  // Re-read inside the transaction so completeFile updates a managed entity. The
+                  // copy loaded above is detached by now.
+                  run.file =
+                      fileRepository
+                          .findById(fileId)
+                          .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+                  parseCapture(run);
+                  runExtractors(run);
+                  enrichAndClassify(run);
+                  persistAnalysisResult(run);
+                  persistConversationsAndPackets(run);
+                  // Each device that held a reused address, classified from its own traffic (#918
+                  // slice 2). After stage 6, because it reads the finished conversation rows.
+                  occupancyClassificationService.classifyFile(run.fileId);
+                  extractEmbeddedFiles(run);
+                  completeFile(run);
+                });
 
         log.info(
             "[{}] Analysis complete: total {}ms",
@@ -265,12 +308,22 @@ public class AnalysisService {
    */
   private static final class Run {
     final UUID fileId;
-    final FileEntity file;
+    /** Detached copy before the pipeline transaction; re-read inside it. */
+    FileEntity file;
     final List<StageStep> plan;
     final AnalysisResultEntity analysis;
 
     /** Stage 1 writes; stages 2, 3, 4 and 7 read. Deleted by the caller's finally. */
     File pcap;
+
+    /** The analysers' tool output, from before the transaction; applied in stage 3. */
+    ExtractorRunner.PreparedExtractions prepared = ExtractorRunner.PreparedExtractions.NONE;
+
+    /** Hostname claims and Windows logins: file-only tshark passes, run before the transaction. */
+    List<HostnameResolverService.Claim> hostnameClaims = List.of();
+    List<WindowsIdentityResolverService.Logon> logons = List.of();
+    Map<String, FailoverAddressResolverService.VirtualAddress> failoverAddresses = Map.of();
+    List<DhcpLeaseResolverService.Lease> dhcpLeases = List.of();
 
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
@@ -298,7 +351,7 @@ public class AnalysisService {
   // ── Stage 2: parse ──────────────────────────────────────────────────────────
 
   private void parseCapture(Run run) {
-    reportStage(run.fileId, run.plan, 1);
+    reportStage(run.fileId, run.plan, 2);
     long t = System.currentTimeMillis();
 
     // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
@@ -425,10 +478,33 @@ public class AnalysisService {
    * row is automatic (#512).
    */
   private void runExtractors(Run run) {
-    reportStage(run.fileId, run.plan, 2);
+    // No reportStage: the visible "Detecting applications & threats" step was prepareExtractors.
+    // This is the apply half, which takes milliseconds.
     long t = System.currentTimeMillis();
-    extractorRunner.runAll(run.file, run.pcap, run.parseResult.getConversations());
-    log.info("[{}] [3/7] Extract: {}ms", run.fileId, System.currentTimeMillis() - t);
+    extractorRunner.runAll(run.file, run.pcap, run.parseResult.getConversations(), run.prepared);
+    log.info("[{}] [3/7] Extract (apply): {}ms", run.fileId, System.currentTimeMillis() - t);
+  }
+
+  /** Runs the analysers' tools on the file, before the pipeline transaction opens (#409). */
+  private void prepareExtractors(Run run) {
+    reportStage(run.fileId, run.plan, 1);
+    long t = System.currentTimeMillis();
+    run.prepared = extractorRunner.prepareAll(run.file, run.pcap);
+    // The hostname and Windows-login passes read only the file too (#812 item 3), so they run here,
+    // with no DB connection held, rather than inside stage 4's transaction. Sequential on purpose:
+    // each tshark pass peaks around 170 MB, and running them alongside Suricata would raise the
+    // container's peak native memory, which the memory budget assumes is one tool at a time.
+    // Both resolvers never throw.
+    run.hostnameClaims = hostnameResolverService.resolve(run.pcap);
+    run.logons = windowsIdentityResolverService.resolveLogons(run.pcap);
+    // Router failover virtual addresses (VRRP/HSRP, #918): a small filtered pass. Never throws.
+    run.failoverAddresses = failoverAddressResolverService.resolve(run.pcap);
+    // DHCP leases (#918 item 3): which client MAC held which address when. Never throws.
+    run.dhcpLeases = dhcpLeaseResolverService.resolve(run.pcap);
+    log.info(
+        "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
+        run.fileId,
+        System.currentTimeMillis() - t);
   }
 
   // ── Stage 4: signatures, classification, geo-IP ─────────────────────────────
@@ -438,13 +514,13 @@ public class AnalysisService {
     long t = System.currentTimeMillis();
     UUID fileId = run.fileId;
 
-    Map<String, String> deviceOverrides =
-        signatureApplier.applySignatures(run.parseResult.getConversations());
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> ruleHints =
+        signatureApplier.applySignatures(fileId, run.parseResult.getConversations());
 
     // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
     // (#512 slice 4); the adjudicator picks display winners with the same semantics the
     // resolver used to apply at write time, so downstream behaviour is unchanged.
-    List<HostnameResolverService.Claim> hostnameClaims = hostnameResolverService.resolve(run.pcap);
+    List<HostnameResolverService.Claim> hostnameClaims = run.hostnameClaims;
     try {
       hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
     } catch (Exception e) {
@@ -462,7 +538,15 @@ public class AnalysisService {
     // primary principal is recorded as the host's signed-in-user attribute (no separate table).
     Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp =
         new LinkedHashMap<>();
-    for (WindowsIdentityResolverService.Claim claim : windowsIdentityResolverService.resolve(run.pcap)) {
+    // Every login with its time (#812), kept for the host timeline; the claims below are the same
+    // deduplicated classification view as before.
+    List<WindowsIdentityResolverService.Logon> logons = run.logons;
+    try {
+      windowsLogonWriter.replaceForFile(fileId, logons);
+    } catch (Exception e) {
+      log.warn("Failed to persist {} Windows login(s) for file {}: {}", logons.size(), fileId, e.getMessage());
+    }
+    for (WindowsIdentityResolverService.Claim claim : WindowsIdentityResolverService.toClaims(logons)) {
       windowsIdentityClaimsByIp.computeIfAbsent(claim.ip(), k -> new ArrayList<>()).add(claim);
     }
 
@@ -475,26 +559,58 @@ public class AnalysisService {
     // (e.g. a DNS responder → DNS_SERVER). Adding a role needs no change here.
     ServiceLogOutcome serviceLogs = runServiceLogExtractors(run.file, run.pcap);
 
+    Map<String, HostClassifier.Board> boards = new HashMap<>();
     List<HostClassificationEntity> hostClassifications =
         hostClassifier.classify(
-            run.file,
-            run.parseResult.getConversations(),
-            run.parseResult.getHostTtls(),
-            run.parseResult.getHostMacs(),
-            deviceOverrides,
-            hostnames,
-            serviceLogs.rolesByIp(),
-            windowsIdentityClaimsByIp);
+            new HostClassifier.ClassificationRequest(
+                run.file,
+                run.parseResult.getConversations(),
+                run.parseResult.getHostTtls(),
+                run.parseResult.getHostMacs(),
+                ruleHints,
+                hostnames,
+                serviceLogs.rolesByIp(),
+                windowsIdentityClaimsByIp,
+                boards));
+    // Each host's whole score board and rule votes, so a rule change can be re-scored (#925).
+    for (HostClassificationEntity h : hostClassifications) {
+      HostClassifier.Board board = boards.get(h.getIp());
+      if (board != null) RuleVoteRescoreService.applyBoard(h, board);
+    }
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
     applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
-    hostClassificationRepository.saveAll(hostClassifications);
-
     try {
-      persistIpMacObservations(run.file, run.parseResult.getHostMacObservations());
+      persistIpMacObservations(
+          run.file, run.parseResult.getHostMacObservations(), run.parseResult.getArpClaimWindows());
     } catch (Exception e) {
       // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
       log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
     }
+    try {
+      persistTtlWindows(fileId, run.parseResult.getHostTtlWindows());
+    } catch (Exception e) {
+      log.warn("Failed to persist TTL windows for file {}: {}", fileId, e.getMessage());
+    }
+    // Which device held each address when (#918 item 3), from the ARP claims above and the DHCP
+    // leases, plus any split/merge decisions (a re-analysis version inherits them).
+    Map<String, Integer> occupancyCounts = Map.of();
+    Map<String, List<String>> severalNetworks = Map.of();
+    try {
+      hostOccupancyService.saveLeases(fileId, run.dhcpLeases);
+      occupancyCounts = hostOccupancyService.recompute(fileId, run.failoverAddresses.keySet());
+      severalNetworks = hostOccupancyService.severalNetworks(fileId);
+    } catch (Exception e) {
+      log.warn("Failed to compute host occupancies for file {}: {}", fileId, e.getMessage());
+    }
+    HostIdentityChecks.apply(
+        hostClassifications,
+        run.parseResult.getHostTtlObservations(),
+        hostnameClaims,
+        run.failoverAddresses,
+        run.parseResult.getHostMacObservations(),
+        occupancyCounts.keySet(),
+        severalNetworks);
+    hostClassificationRepository.saveAll(hostClassifications);
 
     try {
       Set<String> allIps =
@@ -569,6 +685,8 @@ public class AnalysisService {
       ConversationEntity conversation =
           entityManager.getReference(ConversationEntity.class, convInfo.getEntityId());
       conversation.setInitiatorIp(convInfo.getInitiatorIp());
+      conversation.setSrcMac(convInfo.getSrcMac());
+      conversation.setDstMac(convInfo.getDstMac());
       conversation.setInitiatorPort(convInfo.getInitiatorPort());
       conversation.setAppName(convInfo.getAppName());
       conversation.setTsharkProtocol(convInfo.getTsharkProtocol());
@@ -919,6 +1037,14 @@ public class AnalysisService {
   @Transactional(readOnly = true)
   public List<ConversationResponse> getSecurityAlerts(UUID fileId) {
     List<ConversationEntity> conversations = conversationRepository.findByFileIdWithRisks(fileId);
+    // Who was logged in on each endpoint at the alert's start (#812 follow-up).
+    var accounts =
+        windowsLogonLookup.accountsAtTime(
+            fileId,
+            conversations.stream()
+                .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+                .filter(ip -> ip != null && !ip.isBlank())
+                .collect(Collectors.toSet()));
 
     return conversations.stream()
         .map(
@@ -954,6 +1080,7 @@ public class AnalysisService {
                   .durationMs(duration.toMillis())
                   .build();
             })
+        .map(r -> r.withAccountsFrom(accounts))
         .collect(Collectors.toList());
   }
 
@@ -1019,20 +1146,42 @@ public class AnalysisService {
    * overlap signal, but we store all pairings so the detector can present the full evidence.
    */
   private void persistIpMacObservations(
-      FileEntity file, Map<String, LinkedHashSet<String>> macsByIp) {
+      FileEntity file,
+      Map<String, LinkedHashSet<String>> macsByIp,
+      Map<String, Map<String, LocalDateTime[]>> windows) {
     if (macsByIp == null || macsByIp.isEmpty()) return;
     List<IpMacObservationEntity> rows = new ArrayList<>();
     macsByIp.forEach(
         (ip, macs) ->
             macs.forEach(
-                mac ->
-                    rows.add(
-                        IpMacObservationEntity.builder()
-                            .fileId(file.getId())
-                            .ip(ip)
-                            .mac(mac)
-                            .build())));
+                mac -> {
+                  LocalDateTime[] w = windows == null ? null : windows.getOrDefault(ip, Map.of()).get(mac);
+                  rows.add(
+                      IpMacObservationEntity.builder()
+                          .fileId(file.getId())
+                          .ip(ip)
+                          .mac(mac)
+                          .firstSeen(w == null ? null : w[0])
+                          .lastSeen(w == null ? null : w[1])
+                          .build());
+                }));
     if (!rows.isEmpty()) ipMacObservationRepository.saveAll(rows);
+  }
+
+  private void persistTtlWindows(UUID fileId, Map<String, Map<String, PcapParserService.TtlWindow>> windows) {
+    if (windows == null || windows.isEmpty()) return;
+    List<HostTtlWindowEntity> rows = new ArrayList<>();
+    windows.forEach((ip, byTtl) -> byTtl.forEach((k, w) -> rows.add(
+        HostTtlWindowEntity.builder()
+            .fileId(fileId)
+            .ip(ip)
+            .ttl(w.ttl())
+            .mac(w.mac())
+            .firstSeen(w.first())
+            .lastSeen(w.last())
+            .packets(w.packets())
+            .build())));
+    hostTtlWindowRepository.saveAll(rows);
   }
 
   private void applyServiceLogSuspicions(
@@ -1064,6 +1213,20 @@ public class AnalysisService {
    * winning source appear (a shared machine), the first observed is recorded; the full set stays
    * visible in the classification evidence.
    */
+  /**
+   * Device types where an LDAP lookup is not taken as a sign-in (#812 decision 1): servers and
+   * routers look users up all day (directory sync, mail, file ACLs). String literals because
+   * DeviceTypes lives in hostclassification, which analysis must not depend on.
+   */
+  private static final Set<String> NO_LDAP_SIGN_IN =
+      Set.of("SERVER", "ROUTER", "DNS_SERVER", "WEB_SERVER", "API_SERVER");
+
+  /**
+   * Sets the host's sign-in label (#812). A name is only set when exactly one account is in
+   * question; with more, loggedInUserCount says how many and the UI shows the timeline instead of
+   * picking one. Kerberos logins decide when present. Otherwise LDAP lookups in the default Users
+   * folder do, except on server/router hosts.
+   */
   private void applyWindowsSignIn(
       List<HostClassificationEntity> hostClassifications,
       Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
@@ -1071,29 +1234,25 @@ public class AnalysisService {
     for (HostClassificationEntity host : hostClassifications) {
       List<WindowsIdentityResolverService.Claim> claims =
           windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of());
-      WindowsIdentityResolverService.Claim primary = primaryWindowsClaim(claims);
-      if (primary != null) {
-        host.setLoggedInUser(primary.username());
-        host.setLoggedInUserSource(primary.source());
+      List<String> kerberos = claims.stream()
+          .filter(c -> WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source()))
+          .map(WindowsIdentityResolverService.Claim::username).distinct().toList();
+      List<String> ldap = NO_LDAP_SIGN_IN.contains(host.getDeviceType())
+          ? List.<String>of()
+          : claims.stream()
+              .filter(c -> WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source()))
+              .map(WindowsIdentityResolverService.Claim::username).distinct().toList();
+      List<String> accounts = !kerberos.isEmpty() ? kerberos : ldap;
+      host.setLoggedInUserCount(accounts.size());
+      if (accounts.size() == 1) {
+        host.setLoggedInUser(accounts.get(0));
+        host.setLoggedInUserSource(!kerberos.isEmpty()
+            ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
+            : WindowsIdentityResolverService.SOURCE_LDAP_DN);
+        if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
       }
-      // The LDAP-DN claim carries the person's display name (the CN), which the Kerberos principal
-      // does not — record it alongside, whichever claim won the primary slot.
-      claims.stream()
-          .filter(c -> WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source()))
-          .map(WindowsIdentityResolverService.Claim::username)
-          .filter(name -> name != null && !name.isBlank())
-          .findFirst()
-          .ifPresent(host::setLoggedInUserRealName);
     }
   }
 
-  private WindowsIdentityResolverService.Claim primaryWindowsClaim(
-      List<WindowsIdentityResolverService.Claim> claims) {
-    WindowsIdentityResolverService.Claim ldap = null;
-    for (WindowsIdentityResolverService.Claim c : claims) {
-      if (WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source())) return c;
-      if (ldap == null && WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source())) ldap = c;
-    }
-    return ldap;
-  }
+
 }

@@ -1,5 +1,8 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.subnets.entity.SubnetNetworkBaselineEntity;
+import java.util.Optional;
+
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
@@ -38,8 +41,10 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
   private static final int TOP_PROTOCOLS = 8;
 
   private final SubnetDefinitionRepository subnetRepo;
+  private final com.tracepcap.subnets.repository.SubnetNetworkBaselineRepository baselineRepo;
   private final NetworkSnapshotRepository snapshotRepo;
   private final JdbcTemplate jdbc;
+  private final com.tracepcap.analysis.spi.NetworkSegmentLookup segmentLookup;
 
   /** One snapshot's view of a subnet: composition + the snapshot's identity. */
   public record CompositionHistoryEntry(
@@ -56,13 +61,18 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
    * where the subnet had members. Feeds the subnet Snapshot History table (analogous to the IP one).
    */
   public List<CompositionHistoryEntry> history(String cidr, UUID networkId) {
+    return history(cidr, null, networkId);
+  }
+
+  /** As above, for one of several networks sharing the range (#462); null segment = the whole range. */
+  public List<CompositionHistoryEntry> history(String cidr, String segmentKey, UUID networkId) {
     if (networkId == null) return List.of();
     List<CompositionHistoryEntry> out = new ArrayList<>();
     // Fetch-join the file so getFileName() works outside a session (this method isn't @Transactional).
     for (NetworkSnapshotEntity snap :
         snapshotRepo.findByNetworkIdWithFileOrderBySnapshotOrderAsc(networkId)) {
       if (snap.getFile() == null) continue;
-      Map<String, Object> comp = computeComposition(cidr, snap.getFile().getId());
+      Map<String, Object> comp = computeComposition(cidr, segmentKey, snap.getFile().getId());
       if (!Boolean.TRUE.equals(comp.get("observed"))) continue;
       out.add(
           new CompositionHistoryEntry(
@@ -89,6 +99,21 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
    * member count. {@code observed} is true when any member host appears in the file.
    */
   public Map<String, Object> computeComposition(String cidr, UUID fileId) {
+    return computeComposition(cidr, null, fileId);
+  }
+
+  /**
+   * A subnet's composition for one of several networks sharing the range (#462): its members are
+   * the addresses that network leased (and its router), each member's device type is its own
+   * machine's on that network, and its protocols come from conversations whose MAC on the member's
+   * side is that network's. A null segment, or one not in the file, is the range as a whole.
+   */
+  public Map<String, Object> computeComposition(String cidr, String segmentKey, UUID fileId) {
+    if (segmentKey != null && fileId != null) {
+      var seg =
+          segmentLookup.segments(fileId).stream().filter(x -> x.key().equals(segmentKey)).findFirst().orElse(null);
+      if (seg != null) return segmentComposition(cidr, seg, fileId);
+    }
     Map<String, Object> comp = new HashMap<>();
     comp.put("observed", false);
     comp.put("deviceTypes", List.of());
@@ -114,43 +139,154 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
   }
 
   /**
-   * Capture the current composition of a subnet as its staleness baseline, using the most recent
-   * snapshot of the network (or a specific file). Called when an analyst confirms the label.
+   * Capture the current composition of a subnet as its staleness baseline in a network, from that
+   * network's latest snapshot. Called when an analyst confirms the label. Baselines are per network
+   * (#915 phase 4): with no network there's nothing to compare against, so nothing is recorded.
    */
   @Transactional
   public void captureBaseline(SubnetDefinitionEntity subnet, UUID networkId) {
     UUID fileId = latestFileId(networkId);
-    Map<String, Object> comp = fileId != null ? computeComposition(subnet.getCidr(), fileId) : null;
-    subnet.setLabeledAt(LocalDateTime.now());
-    subnet.setBaselineFileId(fileId);
-    subnet.setBaselineComposition(
-        comp != null && Boolean.TRUE.equals(comp.get("observed")) ? comp : null);
-    subnet.setStaleSince(null);
-    subnet.setStaleFields(null);
+    if (fileId == null || subnet.getId() == null) {
+      // No snapshot to baseline against (no networkId, or an empty network). The label is saved,
+      // but the subnet can never be flagged stale. The UI always passes networkId, so this is an
+      // API caller that omitted it. Logged so "why is this subnet never stale?" has an answer (#465).
+      log.info(
+          "Subnet {} ({}) labelled without a staleness baseline: no snapshot for network {}",
+          subnet.getId(), subnet.getCidr(), networkId);
+      return;
+    }
+    Map<String, Object> comp = computeComposition(subnet.getCidr(), subnet.getSegmentKey(), fileId);
+    SubnetNetworkBaselineEntity b =
+        baselineRepo
+            .findBySubnetIdAndNetworkId(subnet.getId(), networkId)
+            .orElseGet(() -> SubnetNetworkBaselineEntity.builder().subnetId(subnet.getId()).networkId(networkId).build());
+    b.setLabeledAt(LocalDateTime.now());
+    b.setBaselineFileId(fileId);
+    b.setBaselineComposition(Boolean.TRUE.equals(comp.get("observed")) ? comp : null);
+    b.setStaleSince(null);
+    b.setStaleFields(null);
+    baselineRepo.save(b);
+  }
+
+  /** A subnet's baseline in a network, if it has one. */
+  public Optional<SubnetNetworkBaselineEntity> baseline(Long subnetId, UUID networkId) {
+    if (subnetId == null || networkId == null) return Optional.empty();
+    return baselineRepo.findBySubnetIdAndNetworkId(subnetId, networkId);
   }
 
   /**
    * Re-validate every labelled subnet against the latest snapshot of a network: recompute each
-   * subnet's composition and, if it has drifted from the baseline, flag it stale. Called by
-   * monitor change detection through the {@code SnapshotRevalidationHook} port after a snapshot is
-   * added/reordered (#512 slice 3). No-op for subnets without a baseline.
+   * subnet's composition and, if it has drifted from its baseline in this network, flag it stale.
+   * Called by monitor change detection through the {@code SnapshotRevalidationHook} port after a
+   * snapshot is added/reordered (#512 slice 3). No-op for subnets without a baseline here.
    */
   @Override
   @Transactional
   public void revalidate(UUID networkId) {
     UUID fileId = latestFileId(networkId);
     if (fileId == null) return;
-    for (SubnetDefinitionEntity subnet : subnetRepo.findAll()) {
-      if (subnet.getBaselineComposition() == null || subnet.getLabeledAt() == null) continue;
-      Map<String, Object> current = computeComposition(subnet.getCidr(), fileId);
+    Map<Long, SubnetDefinitionEntity> byId = new HashMap<>();
+    subnetRepo.findAllById(
+            baselineRepo.findByNetworkId(networkId).stream().map(SubnetNetworkBaselineEntity::getSubnetId).toList())
+        .forEach(sd -> byId.put(sd.getId(), sd));
+    for (SubnetNetworkBaselineEntity b : baselineRepo.findByNetworkId(networkId)) {
+      SubnetDefinitionEntity subnet = byId.get(b.getSubnetId());
+      if (subnet == null || b.getBaselineComposition() == null || b.getLabeledAt() == null) continue;
+      Map<String, Object> current = computeComposition(subnet.getCidr(), subnet.getSegmentKey(), fileId);
       if (!Boolean.TRUE.equals(current.get("observed"))) continue; // subnet absent in this snapshot
-      List<String> changes = diff(subnet.getBaselineComposition(), current);
+      List<String> changes = diff(b.getBaselineComposition(), current);
       if (!changes.isEmpty()) {
-        if (subnet.getStaleSince() == null) subnet.setStaleSince(LocalDateTime.now());
-        subnet.setStaleFields(changes);
-        subnetRepo.save(subnet);
+        if (b.getStaleSince() == null) b.setStaleSince(LocalDateTime.now());
+        b.setStaleFields(changes);
+        baselineRepo.save(b);
       }
     }
+  }
+
+  private Map<String, Object> segmentComposition(
+      String cidr, com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment seg, UUID fileId) {
+    Map<String, Object> comp = new HashMap<>();
+    comp.put("observed", false);
+    comp.put("deviceTypes", List.of());
+    comp.put("protocols", List.of());
+    comp.put("memberCount", 0);
+    long[] range;
+    try {
+      range = CidrRange.of(cidr);
+    } catch (Exception e) {
+      return comp;
+    }
+    List<String> members =
+        seg.addresses().stream()
+            .filter(ip -> {
+              try {
+                long v = CidrRange.ipToLong(ip);
+                return v >= range[0] && v <= range[1];
+              } catch (RuntimeException e) {
+                return false; // not IPv4
+              }
+            })
+            .toList();
+    if (members.isEmpty()) return comp;
+    comp.put("observed", true);
+    comp.put("memberCount", members.size());
+    String[] ips = members.toArray(String[]::new);
+    String[] macs = seg.macs().toArray(String[]::new);
+    try {
+      // A member's own machine on this network where the address is shared (an occupancy with this
+      // segment), else its host's type.
+      comp.put(
+          "deviceTypes",
+          jdbc.query(
+              con -> {
+                var ps =
+                    con.prepareStatement(
+                        """
+                        SELECT t FROM (
+                          SELECT COALESCE(o.device_type, h.device_type) AS t
+                          FROM host_classifications h
+                          LEFT JOIN ip_occupancies o
+                            ON o.file_id = h.file_id AND o.ip = h.ip AND o.segment_key = ?
+                          WHERE h.file_id = ? AND h.ip = ANY(?)
+                        ) x WHERE t IS NOT NULL GROUP BY t ORDER BY COUNT(*) DESC LIMIT ?
+                        """);
+                ps.setString(1, seg.key());
+                ps.setObject(2, fileId);
+                ps.setArray(3, con.createArrayOf("varchar", ips));
+                ps.setInt(4, TOP_DEVICE_TYPES);
+                return ps;
+              },
+              (rs, i) -> rs.getString(1)));
+      comp.put(
+          "protocols",
+          jdbc
+              .query(
+                  con -> {
+                    var ps =
+                        con.prepareStatement(
+                            """
+                            SELECT tshark_protocol FROM conversations
+                            WHERE file_id = ? AND tshark_protocol IS NOT NULL
+                              AND ((src_ip = ANY(?) AND src_mac = ANY(?)) OR (dst_ip = ANY(?) AND dst_mac = ANY(?)))
+                            GROUP BY tshark_protocol ORDER BY COUNT(*) DESC LIMIT ?
+                            """);
+                    ps.setObject(1, fileId);
+                    ps.setArray(2, con.createArrayOf("varchar", ips));
+                    ps.setArray(3, con.createArrayOf("varchar", macs));
+                    ps.setArray(4, con.createArrayOf("varchar", ips));
+                    ps.setArray(5, con.createArrayOf("varchar", macs));
+                    ps.setInt(6, TOP_PROTOCOLS);
+                    return ps;
+                  },
+                  (rs, i) -> rs.getString(1))
+              .stream()
+              .filter(p -> p != null && !p.isBlank())
+              .map(String::toUpperCase)
+              .collect(Collectors.toList()));
+    } catch (Exception e) {
+      log.warn("segment composition failed: {}", e.getMessage());
+    }
+    return comp;
   }
 
   // ── composition queries ─────────────────────────────────────────────────────

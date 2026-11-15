@@ -6,7 +6,10 @@ TracePcap holds three things that cannot be regenerated:
 - **PostgreSQL** — analysis results, conversations, monitor snapshots, and every
   human-entered label or override.
 - **MinIO** — the raw PCAP objects.
-- **config volume** — ``signatures.yml``, your custom detection rules.
+- **config volume** — only the old ``signatures.yml``, if you upgraded from a
+  version that kept detection rules there. Rules now live in PostgreSQL.
+  Restoring an old ``signatures.yml`` doesn't re-import it; use **Import** on
+  the Settings page's **Detection rules** tab.
 
 ``scripts/backup.sh`` captures all three into one timestamped archive, and
 ``scripts/restore.sh`` puts them back.
@@ -195,6 +198,18 @@ deliberately not configured — a trade for a single-server deployment whose
 primary data is re-importable. See `issue #379
 <https://github.com/NotYuSheng/TracePcap/issues/379>`_.
 
+Deleted Files in Backups
+------------------------
+
+Deleting a file doesn't touch existing backups. Its capture and extracted
+content stay in any backup taken while it existed, until
+``BACKUP_RETENTION_DAYS`` rotates that backup out. If captures are sensitive,
+set that value to match your retention policy.
+
+Keep the backend stopped during a manual restore, and restore PostgreSQL before
+MinIO. A running backend sweeps away extracted content that has no matching file
+row. ``scripts/restore.sh`` already restores in this order.
+
 What Is Not Covered
 -------------------
 
@@ -222,8 +237,9 @@ The individual commands, if you need to do something the scripts do not cover:
    docker exec tracepcap-minio mc mirror minio/tracepcap-files ./backup-pcaps/
    docker exec tracepcap-minio mc mirror ./backup-pcaps/ minio/tracepcap-files
 
-   # Signature rules
-   docker cp tracepcap-backend:/app/config/signatures.yml ./signatures.yml.bak
+   # Detection rules are in PostgreSQL (above). For a portable copy, use
+   # System > Detection rules > Export, or:
+   curl -o detection-rules.yml http://localhost/api/v1/detection-rules/export
 
 Export Options
 --------------

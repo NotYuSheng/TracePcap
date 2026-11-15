@@ -43,7 +43,7 @@ unregistered or vendor-private prefixes return no vendor name.
 Where Vendor Names Appear
 --------------------------
 
-- **Network Visualization** — shown in the Node Detail Panel when you click
+- **Network Visualization** — shown in the node details dialog when you click
   a host node.
 - **Conversations** — a ``Vendor`` column (hidden by default; enable via
   Column Picker).

@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  */
 class CustomPrivateRangeServiceTest {
 
-  private final CustomPrivateRangeService service = new CustomPrivateRangeService(null);
+  private final CustomPrivateRangeService service = new CustomPrivateRangeService(null, null, null);
 
   private static CustomPrivateRangeEntity range(String cidr, IpClassification classification) {
     return CustomPrivateRangeEntity.builder().cidr(cidr).classification(classification).build();

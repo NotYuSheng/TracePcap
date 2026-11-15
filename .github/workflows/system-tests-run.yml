@@ -1,0 +1,104 @@
+name: System Tests (run)
+
+# The full-stack system test, called once per architecture by system-tests.yml and
+# system-tests-arm64.yml. Separate callers rather than a matrix because GitHub can't apply path
+# filters to one matrix entry, and arm64 only needs to run on a PR when the build changes.
+
+on:
+  workflow_call:
+    inputs:
+      arch:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  system:
+    name: Analysis pipeline (full stack, ${{ inputs.arch }})
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 45
+
+    # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
+    # to 80. Pin it to 8888 to match the readiness check and the test base URL.
+    #
+    # DOCKERHUB_USERNAME/TOKEN are mirrored from secrets here because `if:` cannot reference the
+    # secrets context directly — GitHub rejects the whole workflow file at parse time if it does
+    # ("Unrecognized named-value: 'secrets'"). env: is one of the few places secrets IS allowed,
+    # and env context (unlike secrets context) is readable from if:.
+    env:
+      NGINX_PORT: '8888'
+      RUN_SYSTEM_TESTS: 'true'
+      E2E_BASE_URL: 'http://127.0.0.1:8888'
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticated pulls aren't subject to Docker Hub's anonymous-pull rate limit, which has
+      # intermittently denied pulls of the (unchanged, legitimate) minio image this stack needs.
+      # Guarded so a fork PR without these secrets degrades to the previous behaviour rather than
+      # failing outright.
+      - name: Log in to Docker Hub
+        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and start the stack
+        uses: ./.github/actions/build-stack
+
+      - name: Wait for app to be ready
+        # Use 127.0.0.1, not localhost: Docker publishes the port on IPv4 only,
+        # but localhost can resolve to IPv6 (::1) first and fail to connect.
+        run: |
+          for i in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8888/api/v1/files)" = "200" ]; then
+              echo "App is up"; exit 0
+            fi
+            sleep 5
+          done
+          echo "App did not become ready in time"
+          docker compose logs --tail=100
+          exit 1
+
+      - name: Run system tests against the running stack
+        working-directory: backend
+        run: mvn -B -Dtest=AnalysisCompletionSystemTest -DfailIfNoTests=false test
+
+      # NdpiService degrades gracefully, so the test above passes even with nDPI missing or broken.
+      - name: Check nDPI classifies traffic
+        run: |
+          docker compose cp backend/src/test/resources/fixtures/ftp.pcap backend:/tmp/ftp.pcap
+          docker compose exec -T backend ndpiReader -i /tmp/ftp.pcap -v 2 > /tmp/ndpi.out
+          grep 'FTP' /tmp/ndpi.out
+
+      # The system test disables Suricata for speed. Same flags as SuricataService, which also
+      # proves the arm64 package loads the bundled ruleset and writes eve.json. arm64 only: it adds
+      # about 90 seconds, and amd64 has been running this package in production all along.
+      - name: Check Suricata runs the ruleset
+        if: inputs.arch == 'arm64'
+        run: |
+          docker compose exec -T backend sh -ec '
+            mkdir -p /tmp/suricata-check
+            suricata -r /tmp/ftp.pcap -l /tmp/suricata-check --runmode single --set unix-command.enabled=no
+            test -s /tmp/suricata-check/eve.json
+          '
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

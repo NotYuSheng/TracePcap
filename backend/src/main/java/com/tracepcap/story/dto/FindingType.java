@@ -10,5 +10,7 @@ public enum FindingType {
   UNKNOWN_APP,
   PORT_PROTOCOL_MISMATCH,
   /** An extractor didn't run or failed, so a whole fact category is missing — a tooling gap, not a traffic finding. */
-  COVERAGE_GAP
+  COVERAGE_GAP,
+  /** Conversations matched by a detection rule (#925). */
+  DETECTION_RULE
 }

@@ -63,7 +63,25 @@ public interface ConversationLookup {
       long packetCount,
       long totalBytes,
       LocalDateTime startTime,
-      LocalDateTime endTime) {}
+      LocalDateTime endTime,
+      String srcMac,
+      String dstMac) {
+
+    /** Without each side's MAC (#462): they default to unknown. */
+    public FlowIdentity(
+        String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp,
+        Integer initiatorPort, String protocol, long packetCount, long totalBytes,
+        LocalDateTime startTime, LocalDateTime endTime) {
+      this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
+          totalBytes, startTime, endTime, null, null);
+    }
+
+    /** The MAC on {@code ip}'s side of the flow, when recorded (#462). */
+    public String macOf(String ip) {
+      if (ip == null) return null;
+      return ip.equals(srcIp) ? srcMac : ip.equals(dstIp) ? dstMac : null;
+    }
+  }
 
   /**
    * What a party claimed on the wire — testimony, not measurement. Every field is nullable: absent
@@ -184,6 +202,26 @@ public interface ConversationLookup {
    */
   List<String> distinctValues(UUID fileId, Facet facet);
 
+  /**
+   * How many of a file's conversations carry each value of every filter facet — the counts beside
+   * the filter chips. Whole-file counts, not narrowed by any active filter. Keys are the values the
+   * filters take, except L7 protocols, which are upper-cased (their stored spelling varies).
+   */
+  record FacetCounts(
+      Map<String, Long> protocols,
+      Map<String, Long> l7Protocols,
+      Map<String, Long> apps,
+      Map<String, Long> categories,
+      Map<String, Long> fileTypes,
+      Map<String, Long> riskTypes,
+      Map<String, Long> customSignatures,
+      Map<String, Long> suricataAlerts,
+      Map<String, Long> countries,
+      Map<String, Long> deviceTypes) {}
+
+  /** Per-value conversation counts for every filter facet, aggregated in the database. */
+  FacetCounts facetCounts(UUID fileId);
+
   /** One peer and the bytes exchanged with it. */
   record PeerBytes(String ip, long bytes) {}
 
@@ -298,6 +336,13 @@ public interface ConversationLookup {
    * than present with zero, so callers must supply their own default.
    */
   Map<UUID, Long> securitySignalCounts(Collection<UUID> fileIds);
+
+  /**
+   * The distinct stored custom-rule names (global and capture rules) per file, batched. Lets a
+   * network's view adjust {@link #securitySignalCounts} for the global rules it suppresses (#925).
+   * Files with none are absent.
+   */
+  Map<UUID, java.util.Set<String>> customSignatureNames(Collection<UUID> fileIds);
 
   record HostFanOut(String srcIp, long distinctDestinations, long totalFlows) {}
 

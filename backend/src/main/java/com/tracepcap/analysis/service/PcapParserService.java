@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Set;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,10 +50,17 @@ public class PcapParserService {
     result.setConversations(new ArrayList<>());
     // First-seen TTL and MAC per source IP (used for device classification)
     Map<String, Integer> hostTtls = new HashMap<>();
-    Map<String, String> hostMacs = new HashMap<>();
+    // Every TTL seen per source IP (#918 item 1c): differing TTL families on one IP suggest two machines.
+    Map<String, java.util.TreeSet<Integer>> hostTtlObservations = new HashMap<>();
+    // Every Ethernet source MAC seen per source IP, in order. Turned into one MAC per IP after the
+    // parse (attributeMacs), once we know which MACs are routers fronting many IPs (#918).
+    Map<String, LinkedHashSet<String>> ethMacsByIp = new HashMap<>();
     // All distinct source MACs seen per IP. Usually one; more than one within a single capture is
     // the tell for two devices sharing an IP (overlapping networks / ARP conflict) — #461.
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
+    // When each ARP claim (ip, mac) was first and last seen (#918 item 3): [first, last].
+    Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
+    Map<String, Map<String, TtlWindow>> hostTtlWindows = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
     // Discarded with the parse; see pooled().
@@ -260,8 +268,21 @@ public class PcapParserService {
 
           // Record first-seen TTL and MAC for source IP
           if (srcIp != null) {
-            if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
-            if (srcMac != null) hostMacs.putIfAbsent(srcIp, srcMac);
+            if (ttl != null) {
+              hostTtls.putIfAbsent(srcIp, ttl);
+              java.util.TreeSet<Integer> seen = hostTtlObservations.computeIfAbsent(srcIp, k -> new java.util.TreeSet<>());
+              if (seen.size() < 16) seen.add(ttl); // a handful is enough to see a conflict
+              // When each TTL was sent (#918 slice 2), so a device holding the address part of the
+              // time gets its own TTL. Capped like the observations above.
+              // Per TTL and sending MAC (#462), so two machines on one address on two networks
+              // each get their own.
+              Map<String, TtlWindow> byTtl = hostTtlWindows.computeIfAbsent(srcIp, k -> new HashMap<>());
+              String twKey = ttl + "|" + (srcMac == null ? "" : srcMac);
+              TtlWindow tw = byTtl.get(twKey);
+              if (tw == null && byTtl.size() < 16) byTtl.put(twKey, tw = new TtlWindow(timestamp, ttl, srcMac));
+              if (tw != null) tw.see(timestamp);
+            }
+            if (srcMac != null) ethMacsByIp.computeIfAbsent(srcIp, k -> new LinkedHashSet<>()).add(srcMac);
           }
 
           // Overlap detection (#461): record the IP↔MAC ownership claim from ARP
@@ -273,6 +294,12 @@ public class PcapParserService {
             hostMacObservations
                 .computeIfAbsent(arpSrcIp, k -> new LinkedHashSet<>())
                 .add(arpSrcMac);
+            LocalDateTime[] w =
+                arpClaimWindows
+                    .computeIfAbsent(arpSrcIp, k -> new java.util.LinkedHashMap<>())
+                    .computeIfAbsent(arpSrcMac, k -> new LocalDateTime[] {timestamp, timestamp});
+            if (timestamp.isBefore(w[0])) w[0] = timestamp;
+            if (timestamp.isAfter(w[1])) w[1] = timestamp;
           }
 
           // Track conversations for IP traffic
@@ -330,6 +357,12 @@ public class PcapParserService {
                     });
             conv.setPacketCount(conv.getPacketCount() + 1);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
+            // Each side's MAC (#462): the first eth.src seen from it. A local host's own MAC, or for
+            // traffic from outside the site's router MAC, which says which network it was on.
+            if (srcMac != null) {
+              if (fSrcIp.equals(conv.getSrcIp()) && conv.getSrcMac() == null) conv.setSrcMac(srcMac);
+              else if (fSrcIp.equals(conv.getDstIp()) && conv.getDstMac() == null) conv.setDstMac(srcMac);
+            }
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
 
             // Who opened this connection (#496). SYN without ACK is the opening packet; SYN+ACK is
@@ -417,8 +450,11 @@ public class PcapParserService {
     result.setPacketCount(packetNumber);
     result.setConversations(new ArrayList<>(conversationMap.values()));
     result.setHostTtls(hostTtls);
-    result.setHostMacs(hostMacs);
+    result.setHostTtlObservations(hostTtlObservations);
+    result.setHostMacs(attributeMacs(ethMacsByIp, hostMacObservations));
     result.setHostMacObservations(hostMacObservations);
+    result.setArpClaimWindows(arpClaimWindows);
+    result.setHostTtlWindows(hostTtlWindows);
 
     log.info(
         "PCAP analysis completed: {} packets, {} bytes, {} conversations",
@@ -454,6 +490,60 @@ public class PcapParserService {
    * proportional to itself again rather than growing the pool without limit.
    */
   private static final int MAX_POOL_SIZE = 50_000;
+
+  /**
+   * An Ethernet source MAC that is the source for at least this many IPs, none of which it claims
+   * by ARP, is a router: the IPs behind it are off-subnet hosts whose frames it forwards (#918).
+   */
+  static final int ROUTER_MAC_MIN_IPS = 3;
+
+  /**
+   * One MAC per source IP, for classification and the host's MAC field (#918).
+   *
+   * <p>Until #918 this was simply the first {@code eth.src} seen for the IP. For an off-subnet host
+   * that's the gateway's MAC, because routed frames carry the router's address. On a real 635-host
+   * capture, 149 internet hosts were all recorded with one router's MAC (and its manufacturer,
+   * which also fed the device classifier). Now:
+   *
+   * <ol>
+   *   <li>A MAC that claimed the IP by ARP wins. ARP is the "this address is mine" statement, the
+   *       same source #461/#467 use.
+   *   <li>Otherwise the first {@code eth.src}, unless that MAC is a router: the source for
+   *       {@link #ROUTER_MAC_MIN_IPS} or more IPs it never claimed by ARP.
+   *   <li>Otherwise no MAC. An off-subnet host's real MAC isn't in the capture, and leaving it
+   *       empty is honest, where the router's MAC was wrong.
+   * </ol>
+   */
+  static Map<String, String> attributeMacs(
+      Map<String, LinkedHashSet<String>> ethMacsByIp, Map<String, LinkedHashSet<String>> arpMacsByIp) {
+    Map<String, Integer> unclaimedIpsByMac = new HashMap<>();
+    ethMacsByIp.forEach(
+        (ip, macs) -> {
+          Set<String> claimed = arpMacsByIp.getOrDefault(ip, new LinkedHashSet<>());
+          for (String mac : macs) {
+            if (!claimed.contains(mac)) unclaimedIpsByMac.merge(mac, 1, Integer::sum);
+          }
+        });
+    Map<String, String> result = new HashMap<>();
+    Set<String> ips = new java.util.HashSet<>(ethMacsByIp.keySet());
+    ips.addAll(arpMacsByIp.keySet());
+    for (String ip : ips) {
+      LinkedHashSet<String> arp = arpMacsByIp.get(ip);
+      if (arp != null && !arp.isEmpty()) {
+        result.put(ip, arp.iterator().next());
+        continue;
+      }
+      LinkedHashSet<String> eth = ethMacsByIp.get(ip);
+      if (eth == null) continue;
+      for (String mac : eth) {
+        if (unclaimedIpsByMac.getOrDefault(mac, 0) < ROUTER_MAC_MIN_IPS) {
+          result.put(ip, mac);
+          break;
+        }
+      }
+    }
+    return result;
+  }
 
   private static String pooled(Map<String, String> pool, String value) {
     if (value == null) return null;
@@ -542,11 +632,62 @@ public class PcapParserService {
     /** First-seen TTL value per source IP address. */
     private Map<String, Integer> hostTtls = new HashMap<>();
 
+    /** Every TTL seen per source IP (up to 16), lowest first (#918 item 1c). */
+    private Map<String, java.util.TreeSet<Integer>> hostTtlObservations = new HashMap<>();
+
     /** First-seen Ethernet source MAC address per source IP address. */
     private Map<String, String> hostMacs = new HashMap<>();
 
     /** All distinct source MACs seen per source IP (>1 ⇒ possible overlapping networks, #461). */
     private Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
+
+    /** Per IP, per ARP-claimed MAC: when the claim was first and last seen (#918 item 3). */
+    private Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
+
+    /** Per source IP, per TTL: when it was first and last sent, and how often (#918 slice 2). */
+    private Map<String, Map<String, TtlWindow>> hostTtlWindows = new HashMap<>();
+  }
+
+  /** When one TTL was first and last seen from an address, and in how many packets. */
+  public static final class TtlWindow {
+    private LocalDateTime first;
+    private LocalDateTime last;
+    private long packets;
+    private final int ttl;
+    private final String mac;
+
+    public TtlWindow(LocalDateTime at, int ttl, String mac) {
+      this.first = at;
+      this.last = at;
+      this.ttl = ttl;
+      this.mac = mac;
+    }
+
+    public int ttl() {
+      return ttl;
+    }
+
+    public String mac() {
+      return mac;
+    }
+
+    void see(LocalDateTime at) {
+      if (at.isBefore(first)) first = at;
+      if (at.isAfter(last)) last = at;
+      packets++;
+    }
+
+    public LocalDateTime first() {
+      return first;
+    }
+
+    public LocalDateTime last() {
+      return last;
+    }
+
+    public long packets() {
+      return packets;
+    }
   }
 
   @lombok.Data
@@ -581,6 +722,9 @@ public class PcapParserService {
     private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;
+    /** Each side's MAC (#462): the first eth.src seen from srcIp, and from dstIp. */
+    private String srcMac;
+    private String dstMac;
     private String ja3Client;
     private String ja3Server;
     private String tlsIssuer;

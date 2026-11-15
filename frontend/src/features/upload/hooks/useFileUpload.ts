@@ -5,6 +5,8 @@ export interface UploadEntry {
   id: string; // local key
   fileId?: string; // backend ID, set on success
   fileName: string;
+  /** Bytes, for "9.2 of 14.45 MB". */
+  size?: number;
   progress: number;
   isUploading: boolean;
   error?: string;
@@ -30,6 +32,7 @@ export const useFileUpload = () => {
       const entries: UploadEntry[] = files.map((f, i) => ({
         id: `${Date.now()}-${i}`,
         fileName: f.name,
+        size: f.size,
         progress: 0,
         isUploading: true,
       }));
@@ -70,9 +73,11 @@ export const useFileUpload = () => {
   );
 
   const clearUploads = useCallback(() => setUploads([]), []);
+  /** Drop the rows that are done with: uploaded (analysis carries on) or failed. */
+  const clearFinished = useCallback(() => setUploads(prev => prev.filter(u => u.isUploading)), []);
 
   // True if any file is currently being uploaded
   const isUploading = uploads.some(u => u.isUploading);
 
-  return { uploadFiles, uploads, clearUploads, isUploading };
+  return { uploadFiles, uploads, clearUploads, clearFinished, isUploading };
 };

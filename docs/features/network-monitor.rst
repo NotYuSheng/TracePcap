@@ -50,13 +50,72 @@ Getting Started
 ---------------
 
 1. Navigate to **Monitor** in the top navigation bar.
-2. Click **Create Network** and give it a name and optional description.
-3. Open the network card to enter the detail view.
+2. Click **New network** and give it a name and optional description.
+3. Click the network's name in the table to enter the detail view, or use
+   **Add the first capture** on its row.
 4. Click **Manage PCAPs** to open the PCAP management modal, then **Add PCAP**
    and select a file that has already been analysed (status: *Completed*).
    Repeat for each capture. The same modal lets you **remove** a snapshot from
    the network later.
 5. Change events appear automatically once two or more snapshots exist.
+
+The Networks Page
+-----------------
+
+**Monitor** lists every network in one table. Click anywhere on a row to open
+the network:
+
+- **Status**, one per network:
+  - **No captures yet**;
+  - **Baseline set** (one capture, nothing to compare yet);
+  - **N changes to review** or **N critical to review**;
+  - **Up to date**.
+- **Captures**: one dot per capture, oldest first. The colour is the most
+  severe change it brought: blue for the baseline, green for none, amber for
+  changes, red for a critical change.
+- **Last capture**: when it was captured, and its file.
+- **Devices**: how many devices the network has seen.
+- **One next action** per row: **Review**, **Add a capture** or **Open**.
+  **Add a capture** is always there, beside **Review** too.
+  **Rename** and **Delete** are in the row's **⋯** menu.
+
+Chips filter the table to **Needs review** or **No captures**, and the search
+box matches network names.
+
+A Network's Page
+----------------
+
+A network's page has the same layout as a capture's analysis (see
+:doc:`analysis-navigation`):
+
+- **The bar on top** shows the network's name and its captures' date range.
+  It also has how many changes are waiting (click it to open them), a refresh
+  button, **Settings** and **Add a capture**.
+- **Settings** opens a drawer with what you maintain: **Expected state**
+  (baseline definitions), **Subnets**, and buttons for when a device counts as
+  gone (the inactivity rule), the network's detection rules, and address and
+  device labels, plus how often the page refreshes.
+- **The rail down the left** has three tabs: **Overview**, **Timeline** (with
+  the count to review) and **Inventory**.
+- **Overview** puts it together: capture, device and to-review counts, what
+  changed in the latest capture (mark items reviewed there), the **network map
+  of the latest capture** with its changes marked, **Insights**, and the traffic
+  chart.
+- **Timeline** is everything that happened to the network on one time axis,
+  newest first: each capture with the changes it brought (review them in
+  place) and any notes attached to it, plus outside events and notes where they
+  fall. Chips narrow it to changes, captures, or notes and events; **Note** and
+  **Outside event** add one, and **Manage captures** removes them. Beside the
+  list is **the picked capture** (see `Capture Details`_): its network map and
+  everything else about it, in tabs. Pick a capture in the list, or step with
+  the arrows or ← →.
+- **Inventory** is one card with three tabs: **Devices**, **Addresses**, and
+  **Apps and protocols**.
+
+The section is in the address (``?section=timeline``), so a link can open a
+network straight on its timeline. Older links still work: ``changes``,
+``captures`` and ``notes`` open the Timeline, ``insights`` the Overview, and
+``setup``, ``expected`` and ``subnets`` open Settings.
 
 .. note::
    Only files with status **COMPLETED** can be added as snapshots. Upload and
@@ -76,8 +135,8 @@ Tracks which hardware devices (identified by MAC address) appear or disappear.
 - **MAC_ADDED** (WARNING) — a MAC address present in the new snapshot was not
   seen in the previous one. Payload includes IP, manufacturer, and device type.
 - Devices that disappear are shown as **absent entities** in the Devices drift
-  panel (greyed-out, strikethrough) rather than as change events, since a host
-  going offline is expected behaviour.
+  panel (quiet or no longer seen, per the network's inactivity rule) rather than as
+  change events, since a host going offline is expected behaviour.
 
 Signal 2 — IP ↔ MAC Binding Drift
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -246,8 +305,8 @@ Severity Levels
      - Informational. Examples: new ASN or cloud provider seen, new protocol or
        application appeared.
 
-The network card on the Monitor list page shows **Unreviewed Critical** and
-**Unreviewed Warnings** counts so resolved events do not inflate the numbers.
+The status on the Monitor networks page counts only **unreviewed** critical
+and warning events, so resolved events do not inflate the numbers.
 
 Change Event Feed
 -----------------
@@ -278,50 +337,67 @@ Marking as Reviewed
 ~~~~~~~~~~~~~~~~~~~
 
 Click the checkbox on any event to mark it as reviewed. Add a note to record
-the reason (e.g. "Known DHCP lease renewal — expected"). The network card
-unreviewed counts update immediately.
+the reason (e.g. "Known DHCP lease renewal — expected"). The network's
+status on the networks page updates on its next refresh.
 
-Capture Timeline
-----------------
+Capture Details
+---------------
 
-The Capture Timeline table lists all snapshots in order. A mode toggle in the
-header switches between two views:
+The capture picked in the Timeline fills the right of the page, compared with
+the capture before it. ‹ › (or ← →) step through the captures, and **Open the
+capture** opens it in analysis mode (conversations, story, files). It has six
+tabs:
 
-- **By PCAP** (default) — one row per snapshot.
-- **By Time** — snapshots are bucketed into a selectable interval
-  (``1m`` / ``5m`` / ``30m`` / ``1h`` / ``1d`` / ``1mo``), aggregating captures,
-  packets, and change counts per bucket. The ``1mo`` interval buckets by
-  calendar month. Each bucket row expands to list the individual PCAPs within
-  the interval, and each PCAP still opens its snapshot detail modal. The By Time
-  view is computed entirely client-side from existing snapshot data — no
-  re-analysis is triggered.
-
-The Changes indicator is rendered as the same badge pill in all three places
-(By PCAP rows, the By Time bucket aggregate, and the nested per-PCAP rows);
-clickable badges show a pointer cursor.
-
-Clicking any snapshot row opens the **Snapshot Detail** modal, which contains
-five tabs:
-
-- **Network Diagram** — topology graph for that snapshot with change highlights
-  overlaid. Navigate between snapshots with the prev/next arrows or dropdown;
-  use ← → arrow keys as a shortcut.
-- **Changes** — all change events that were produced when this snapshot was
-  compared to its predecessor.
-- **Context & Notes** — free-text fields for capturing what was happening during
+- **Map** — the same network diagram as the analysis page's Network tab: traffic
+  counts with busiest pairs and the matrix, the node limit, filters, colour edges
+  by, groups, draw.io download, node labels, fullscreen and the play bar. The
+  changes this capture brought are highlighted (see `Network Diagram Overlay`_).
+  Under it, the devices **gone since the capture before** are listed; **Show them
+  on the map, faded** draws them where they were, and hovering one in the list
+  rings it on the map. The map's filters stay as you step between captures; its
+  edits (groups, names, moved devices) belong to that capture, the same as in
+  analysis mode.
+- **Changes** — the change events produced when this capture was compared with
+  the one before: severity, kind and reviewed filters, search, and pages.
+- **Security** — the capture's security signals: IDS alerts, flow risks, custom
+  rule matches and detected file types.
+- **Subnets** — per-capture subnet overrides (see `Per-Snapshot Subnet Overrides`_).
+- **Context & notes** — free-text fields for capturing what was happening during
   this capture (sent to the AI when generating insights).
-- **Subnets** — per-snapshot subnet overrides (see `Per-Snapshot Subnet Overrides`_).
-- **Insights** — AI-generated analysis scoped to this single snapshot (see
+- **Insights** — AI-generated analysis scoped to this single capture (see
   `Network Insights`_ below).
 
-The Changes column on the timeline row shows a badge with the count and highest
-severity. Click the badge directly to jump straight to the Changes tab.
 
 Drift Panels
 ------------
 
 Three drift panels on the network detail page give a cross-snapshot summary.
 All three panels have a **search box** at the top to filter by name.
+
+Active, quiet, and no longer seen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every device, IP, protocol, and application in the panels is in one of three states:
+
+- **Active** — present in the latest capture.
+- **Quiet** (dashed badge) — missing from the latest capture, but still within the
+  network's inactivity rule. It may simply not have communicated during that capture.
+- **No longer seen** (greyed out, struck through) — past the inactivity rule.
+
+The rule is set per network: open the network and click **Settings**. Choose how to
+count:
+
+- **Captures** — no longer seen once missing from the last *N* captures. Suits
+  irregular capture schedules.
+- **Days** — no longer seen once not seen for more than *N* days before the latest
+  capture. Suits regular schedules. It counts from the latest capture's start, not
+  from today, so reviewing an older set of captures still works.
+
+The default is **captures, 1**: no longer seen as soon as something is missing from the
+latest capture. That is how the panels behaved before the setting existed, so a
+network looks the same until you change it. For example, with weekly captures and a
+rule of *3 captures*, a printer nobody used this week shows as quiet, while a laptop
+missing for three weeks shows as no longer seen.
 
 Devices Panel
 ~~~~~~~~~~~~~
@@ -337,14 +413,15 @@ History Modal**, which shows:
   applications per snapshot (paginated; use ← → arrow keys to page)
 - **Notes** tab — free-text notes persisted globally for this device
 
-Absent devices (not seen in the latest snapshot) appear greyed-out with
-strikethrough.
+Devices missing from the latest snapshot appear **quiet** (dashed) or **no longer
+seen** (greyed out, struck through), depending on the network's inactivity rule (see
+`Active, quiet, and no longer seen`_).
 
 Protocols & Applications Panel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Shows all protocols and nDPI application names seen across all snapshots.
-Absent entries are greyed-out with strikethrough. Click any badge to open the
+Entries missing from the latest snapshot are quiet or no longer seen, as above. Click any badge to open the
 **Entity Detail** modal showing stats for that protocol or application in the
 latest snapshot, and its capture history across all uploaded files.
 
@@ -367,7 +444,7 @@ Click any IP badge to open the **Entity Detail** modal, which shows:
   snapshot
 - **Notes** tab
 
-Absent addresses follow the same greyed-out / strikethrough pattern.
+Addresses missing from the latest snapshot follow the same quiet / no longer seen rule.
 
 Private IP Overrides
 ~~~~~~~~~~~~~~~~~~~~
@@ -487,7 +564,7 @@ without overrides fall back to the global config unchanged.
 To set overrides for a snapshot:
 
 1. Open the snapshot via the Capture Timeline.
-2. Go to the **Subnets** tab.
+2. Open **Settings**; the **Subnets** section is in the drawer.
 3. If no overrides exist, click **Customize for this snapshot** — the current
    global definitions are pre-populated as *Inherited* rows.
 4. Add, edit, or remove rows. Inherited rows carry a grey *Inherited* badge;
@@ -681,8 +758,8 @@ A completed insight contains:
 Per-snapshot insights
 ~~~~~~~~~~~~~~~~~~~~~
 
-Each snapshot also has its own **Insights** tab (inside the Snapshot Detail
-modal). This generates an insight scoped to that single snapshot — what changed
+Each capture also has its own **Insights** tab (in the Timeline, beside the
+captures list). This generates an insight scoped to that single snapshot — what changed
 versus its predecessor, whether the changes are explained by external events in
 the capture window, and what is recommended. The same audience and focus options
 are available.
@@ -690,26 +767,26 @@ are available.
 Network Diagram Overlay
 -----------------------
 
-The **Network Diagram** tab inside the Snapshot Detail modal renders the
-topology graph for the selected snapshot. Change events are overlaid as coloured
+The **Map** tab of the capture picked in the Timeline renders the topology graph
+for that capture. Change events are overlaid as coloured
 highlights:
 
 - Red nodes — CRITICAL events
 - Yellow/orange nodes — WARNING events
 - Green nodes — INFO events
 
-Use the snapshot selector or ← → arrow keys to step through the timeline. Nodes
+Pick a capture in the Timeline's list, or use ‹ › or the ← → arrow keys, to step
+through the captures. Nodes
 involved in change events are labelled with the event type (e.g. "Potential ARP
 spoof", "New device"). Click a highlighted node to open its details.
 
 Polling / Auto-Refresh
 ----------------------
 
-Both the Monitor list page and the network detail page support auto-refresh:
-
-- A **last updated** timestamp shows when data was last fetched.
-- A **refresh** button triggers an immediate reload.
-- An **interval dropdown** lets you choose the polling frequency:
+The Monitor networks page refreshes itself every 30 seconds and shows when it
+last did. A network's page shows when it last fetched data and has a
+**refresh** button in its top bar. Its polling frequency is under
+**Settings › Refresh**:
 
   - 10 seconds
   - 30 seconds

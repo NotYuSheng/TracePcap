@@ -1,9 +1,9 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
+import { Button, Container, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
-import { SignaturesModal } from '@components/signatures/SignaturesModal';
+import { usePreferencesSync } from '@/features/preferences/usePreferencesSync';
 import { AuthMenu } from '@/auth/AuthMenu';
 import { getAccessToken } from '@/auth/tokenStore';
 import { env } from '@/config/env';
@@ -83,13 +83,30 @@ function useResolvedDark(themeMode: ThemeMode): boolean {
 }
 
 export const MainLayout = () => {
-  const [showSignatures, setShowSignatures] = useState(false);
+  // Personal preferences live on the server (#915): per account with login on, shared when off.
+  usePreferencesSync();
   const backendReady = useBackendReady();
   const themeMode = useStore(s => s.themeMode);
   const cycleTheme = useStore(s => s.cycleTheme);
   const isDark = useResolvedDark(themeMode);
   const location = useLocation();
   const isMonitorActive = location.pathname.startsWith('/monitor');
+  const isSystemActive = location.pathname.startsWith('/settings') || location.pathname.startsWith('/system');
+  // Pages with a section rail (a capture's analysis, a monitored network) run edge to edge: the
+  // rail sits flush against the window's left side, under the header.
+  const isFlush = /^\/(analysis|monitor)\/[^/]+/.test(location.pathname);
+
+  // The header's height, so a sticky rail can sit right under it whatever the header wraps to.
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const set = () => document.documentElement.style.setProperty('--tp-header-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Keeps the shared Escape coordinator alive for the whole session (#535).
   useEscapeLayerRoot();
@@ -111,21 +128,16 @@ export const MainLayout = () => {
       </div>
     );
 
-  const isAnalyseActive = !isMonitorActive;
+  const isAnalyseActive = !isMonitorActive && !isSystemActive;
 
   return (
     <div className="main-layout">
-      <header className="main-header">
-        <Navbar expand="lg" hasBorderBottom style={{ paddingTop: '1rem', paddingBottom: '1rem' }}>
-          <Container>
-            <Navbar.Brand as={Link} to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div className="d-flex align-items-center gap-3">
-                <Activity size={28} className="text-primary" />
-                <div>
-                  <h4 className="mb-0">TracePcap</h4>
-                  <small className="text-muted">Network Analysis</small>
-                </div>
-              </div>
+      <header className="main-header" ref={headerRef}>
+        <Navbar expand="lg" hasBorderBottom className="main-navbar">
+          <Container fluid className="main-navbar-inner">
+            <Navbar.Brand as={Link} to="/" className="main-brand">
+              <Activity size={22} className="text-primary" aria-hidden="true" />
+              <span>TracePcap</span>
             </Navbar.Brand>
 
             <Navbar.Toggle />
@@ -150,33 +162,27 @@ export const MainLayout = () => {
                 >
                   <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={() => setShowSignatures(true)}
+                {/* Settings: a page (your own, and the install's), opened from the gear on the right. */}
+                <Link
+                  to="/settings"
+                  className={`btn btn-sm ${isSystemActive ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                  aria-label="Settings"
+                  title="Settings"
+                  aria-current={isSystemActive ? 'page' : undefined}
                 >
-                  <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
-                </Button>
+                  <i className="bi bi-gear" aria-hidden="true"></i>
+                </Link>
                 {env.AUTH_ENABLED && <AuthMenu />}
               </div>
             </Navbar.Collapse>
           </Container>
         </Navbar>
       </header>
-      <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
-      <main className="main-content">{mainContent}</main>
-      <footer className="main-footer mt-auto py-4">
-        <Container>
-          <Row>
-            <Col className="text-center text-muted">
-              <small>TracePcap &copy; 2026 - Network Traffic Analysis and Visualization Tool</small>
-              <br />
-              <small className="text-muted opacity-75">
-                {__APP_VERSION__}
-              </small>
-            </Col>
-          </Row>
+      <main className={`main-content${isFlush ? ' main-content-flush' : ''}`}>{mainContent}</main>
+      <footer className="main-footer mt-auto">
+        <Container fluid className="main-navbar-inner d-flex justify-content-between flex-wrap gap-2 text-muted">
+          <span>TracePcap · network traffic analysis</span>
+          <span className="opacity-75">{__APP_VERSION__}</span>
         </Container>
       </footer>
     </div>

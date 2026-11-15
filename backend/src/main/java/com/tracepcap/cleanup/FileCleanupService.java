@@ -1,14 +1,20 @@
 package com.tracepcap.cleanup;
 
 import com.tracepcap.analysis.spi.PacketPartitions;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import com.tracepcap.config.CleanupProperties;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.entity.FileEntity.FileSource;
 import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.file.service.FileService;
 import java.time.LocalDateTime;
+import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +36,9 @@ public class FileCleanupService {
   private final FileService fileService;
   private final CleanupProperties cleanupProperties;
   private final PacketPartitions packetPartitions;
+  private final NetworkSnapshotRepository snapshotRepository;
+  // Retention hours are editable in the app (#915 phase 5), so read them per run, never at startup.
+  private final RuntimePolicy runtimePolicy;
 
   /**
    * Scheduled task to clean up expired files Runs according to the cron expression configured in
@@ -47,21 +56,33 @@ public class FileCleanupService {
     try {
       List<FileEntity> expiredFiles = new ArrayList<>();
 
-      // Analysis files — always apply retention
-      LocalDateTime analysisExpiry =
-          LocalDateTime.now().minusHours(cleanupProperties.getRetentionHours());
-      log.info("Checking analysis files uploaded before: {}", analysisExpiry);
-      expiredFiles.addAll(
-          fileRepository.findBySourceAndUploadedAtBefore(FileSource.ANALYSIS, analysisExpiry));
+      // A capture that is a snapshot of a monitored network is kept with the network, whatever it
+      // was uploaded as: deleting it would cut a hole in the network's history. It follows the
+      // monitor retention instead.
+      Set<UUID> inNetworks = filesInNetworks();
 
-      // Monitor files — only apply if monitorRetentionHours > 0
-      if (cleanupProperties.getMonitorRetentionHours() > 0) {
-        LocalDateTime monitorExpiry =
-            LocalDateTime.now().minusHours(cleanupProperties.getMonitorRetentionHours());
+      // Analysis files: the analysis retention, unless kept with a network.
+      LocalDateTime analysisExpiry =
+          LocalDateTime.now().minusHours(runtimePolicy.getInt(EditablePolicy.FILE_RETENTION_HOURS));
+      log.info("Checking analysis files uploaded before: {}", analysisExpiry);
+      fileRepository.findBySourceAndUploadedAtBefore(FileSource.ANALYSIS, analysisExpiry).stream()
+          .filter(f -> !inNetworks.contains(f.getId()))
+          .forEach(expiredFiles::add);
+
+      // Monitor files, and analysis files kept with a network: only when monitorRetentionHours > 0.
+      int monitorRetentionHours = runtimePolicy.getInt(EditablePolicy.MONITOR_FILE_RETENTION_HOURS);
+      if (monitorRetentionHours > 0) {
+        LocalDateTime monitorExpiry = LocalDateTime.now().minusHours(monitorRetentionHours);
         log.info("Checking monitor files uploaded before: {}", monitorExpiry);
         expiredFiles.addAll(
             fileRepository.findBySourceAndUploadedAtBefore(FileSource.MONITOR, monitorExpiry));
+        fileRepository.findBySourceAndUploadedAtBefore(FileSource.ANALYSIS, monitorExpiry).stream()
+            .filter(f -> inNetworks.contains(f.getId()))
+            .forEach(expiredFiles::add);
       }
+
+      // Kept at upload ("expires" unticked): never swept, whatever the retention says.
+      expiredFiles.removeIf(FileEntity::isKeepForever);
 
       if (expiredFiles.isEmpty()) {
         log.info("No expired files found");
@@ -102,6 +123,15 @@ public class FileCleanupService {
     }
   }
 
+  /** Every capture that is a snapshot of at least one monitored network. */
+  private Set<UUID> filesInNetworks() {
+    Set<UUID> out = new HashSet<>();
+    for (Object[] row : snapshotRepository.findAllMemberships()) {
+      out.add((UUID) row[1]);
+    }
+    return out;
+  }
+
   /**
    * Prunes raw packets from files that have outlived {@code packetRetentionHours} but not their own
    * retention window (#394).
@@ -112,12 +142,12 @@ public class FileCleanupService {
    */
   @Scheduled(cron = "${tracepcap.cleanup.cron}")
   public void prunePacketsOfAgedFiles() {
-    if (!cleanupProperties.isEnabled() || cleanupProperties.getPacketRetentionHours() <= 0) {
+    int packetRetentionHours = runtimePolicy.getInt(EditablePolicy.PACKET_RETENTION_HOURS);
+    if (!cleanupProperties.isEnabled() || packetRetentionHours <= 0) {
       return;
     }
 
-    LocalDateTime packetExpiry =
-        LocalDateTime.now().minusHours(cleanupProperties.getPacketRetentionHours());
+    LocalDateTime packetExpiry = LocalDateTime.now().minusHours(packetRetentionHours);
     log.info("Pruning packets for files uploaded before: {}", packetExpiry);
 
     try {

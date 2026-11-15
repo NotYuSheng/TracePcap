@@ -31,7 +31,7 @@ test('Story tab shows an error alert when story generation returns 502', async (
   });
 
   await page.goto(`/analysis/${fileId}/story`);
-  await page.getByRole('button', { name: /Generate Story/i }).click();
+  await page.getByRole('button', { name: /Write the story/i }).click();
 
   const alert = page.locator('.error-message-container .alert');
   await expect(alert).toBeVisible();
@@ -80,7 +80,8 @@ test('Report download shows an actionable alert when the diagram exceeds the JSO
     })
   );
 
-  await page.goto(`/analysis/${fileId}`);
+  // Download report lives in the Capture tab.
+  await page.goto(`/analysis/${fileId}/file`);
   await page.getByRole('button', { name: /Download Report/i }).click();
 
   const alert = page.locator('.alert-danger');

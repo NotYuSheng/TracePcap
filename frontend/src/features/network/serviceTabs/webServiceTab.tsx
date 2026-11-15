@@ -56,21 +56,19 @@ export const webServiceTab: ServiceTabConfig<WebServerDetail, HttpEndpoint> = {
       : null,
   getInfoFields: infoFields,
 
-  // Light-red highlight for endpoints that mostly returned client errors (4xx).
-  rowStyle: row =>
-    row.clientErrorCount > row.successCount + row.serverErrorCount
-      ? { backgroundColor: '#f8d7da', color: '#842029' }
-      : undefined,
+  // A red edge for endpoints that mostly returned client errors (4xx).
+  rowTone: row =>
+    row.clientErrorCount > row.successCount + row.serverErrorCount ? 'danger' : undefined,
 
   columns: [
-    { header: 'Method', cell: row => <span className="fw-semibold">{row.method ?? '—'}</span> },
-    { header: 'Path', cell: row => <span style={{ fontFamily: 'monospace' }}>{row.path}</span> },
+    { header: 'Method', slot: 'lead', cell: row => <span className="fw-semibold">{row.method ?? '—'}</span> },
+    { header: 'Path', slot: 'title', cell: row => <span className="font-monospace">{row.path}</span> },
     {
       header: 'Status',
       cell: row => <span className={statusClass(row.topStatus)}>{row.topStatus ?? '—'}</span>,
     },
     { header: 'Content-Type', cell: row => row.contentType ?? <span className="text-muted">—</span> },
-    { header: 'Count', cell: row => row.requestCount },
+    { header: 'Count', slot: 'aside', cell: row => `×${row.requestCount.toLocaleString()}` },
     {
       header: 'Packets',
       cell: (row, ctx) => {

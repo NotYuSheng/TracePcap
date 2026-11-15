@@ -1,6 +1,9 @@
 export interface SubnetDefinition {
   id: number | null;
   cidr: string;
+  /** Which of several networks sharing this range it is (#462); absent for the range as a whole. */
+  segmentKey?: string | null;
+  segmentLabel?: string | null;
   label: string | null;
   description: string | null;
   source: 'AUTO' | 'MANUAL';
@@ -12,6 +15,10 @@ export interface SubnetDefinition {
   labeledAt?: string | null;
   staleSince?: string | null;
   staleFields?: string[] | null;
+  /** In a network's list (#915 phase 4): the network's own entry, or the shared default's. */
+  scope?: 'default' | 'network' | null;
+  /** A network entry for a CIDR the default also has. */
+  overridesDefault?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

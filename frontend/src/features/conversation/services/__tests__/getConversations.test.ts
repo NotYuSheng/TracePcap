@@ -158,4 +158,14 @@ describe('conversationService.getConversations', () => {
     await expect(conversationService.getConversations(FILE, filters())).rejects.toThrow()
     expect(handled).toBe(true)
   })
+
+  it('sends an exact src → dst pair as srcIp/dstIp, separate from the contains-match ip (#471)', async () => {
+    const seen = captureFetch()
+
+    await conversationService.getConversations(FILE, filters({ srcIp: '10.0.0.1', dstIp: '8.8.8.8' }))
+
+    expect(seen.query?.get('srcIp')).toBe('10.0.0.1')
+    expect(seen.query?.get('dstIp')).toBe('8.8.8.8')
+    expect(seen.query?.has('ip')).toBe(false)
+  })
 })

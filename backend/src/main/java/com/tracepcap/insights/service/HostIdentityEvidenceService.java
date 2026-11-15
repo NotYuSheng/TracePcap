@@ -45,7 +45,14 @@ public class HostIdentityEvidenceService {
    * before the adjudicator existed still resolves a verdict.
    */
   public Optional<HostIdentityEvidenceDto> evidenceFor(UUID fileId, String ip) {
-    Optional<HostFacts> factsOpt = hostClassificationLookup.hostFactsByIp(fileId, ip);
+    // A device on an address more than one device held (#918 slice 3): its own facts, and only the
+    // conversations that started while it held the address. {@code ip} may be its key (ip@start).
+    var span = hostClassificationLookup.deviceSpan(fileId, ip);
+    String address = com.tracepcap.analysis.spi.DeviceKeys.ipOf(ip);
+    Optional<HostFacts> factsOpt =
+        span.isPresent()
+            ? hostClassificationLookup.deviceFacts(fileId, ip)
+            : hostClassificationLookup.hostFactsByIp(fileId, ip);
     if (factsOpt.isEmpty()) {
       return Optional.empty();
     }
@@ -80,17 +87,18 @@ public class HostIdentityEvidenceService {
     int conversationCount = 0;
     Set<String> peers = new LinkedHashSet<>();
     Set<String> apps = new LinkedHashSet<>();
-    for (ConversationFacts c : conversationLookup.conversationFactsForIp(fileId, ip)) {
+    for (ConversationFacts c : conversationLookup.conversationFactsForIp(fileId, address)) {
+      if (span.isPresent() && !span.get().contains(c.flow().startTime(), c.flow().macOf(address))) continue;
       conversationCount++;
       String src = c.flow().srcIp();
       String dst = c.flow().dstIp();
-      String peer = ip.equals(src) ? dst : src;
-      if (peer != null && !peer.isBlank() && !ip.equals(peer)) {
+      String peer = address.equals(src) ? dst : src;
+      if (peer != null && !peer.isBlank() && !address.equals(peer)) {
         peers.add(peer);
       }
       String initiator = c.flow().initiatorIp();
       if (initiator != null) {
-        if (ip.equals(initiator)) {
+        if (address.equals(initiator)) {
           initiated++;
         } else {
           answered++;
@@ -107,6 +115,10 @@ public class HostIdentityEvidenceService {
             .ip(ip)
             .manufacturer(facts.manufacturer())
             .ttl(facts.ttl())
+            .ttls(facts.ttls())
+            .addressKind(facts.addressKind())
+            .identityWarning(facts.identityWarning())
+            .reclassified(reclassified(facts.reclassified()))
             .serviceRoles(new ArrayList<>(facts.serviceRoles()))
             .ndpiApps(new ArrayList<>(apps))
             .initiatedConversations(initiated)
@@ -117,7 +129,7 @@ public class HostIdentityEvidenceService {
     // Geolocation for external hosts (INFERRED, provenance-carrying). Absent from the map for
     // private/internal IPs, which are never geolocated — the builder stays null and the panel omits
     // the block. This reads the persisted geo cache; it does not trigger a fresh lookup on view.
-    IpPlace place = geoOrgLookup.placesFor(List.of(ip)).get(ip);
+    IpPlace place = geoOrgLookup.placesFor(List.of(address)).get(address);
     if (place != null) {
       b.country(place.country())
           .countryCode(place.countryCode())
@@ -143,5 +155,16 @@ public class HostIdentityEvidenceService {
     }
 
     return Optional.of(b.build());
+  }
+
+  private static java.util.Map<String, Object> reclassified(
+      com.tracepcap.analysis.spi.HostClassificationLookup.Reclassified r) {
+    if (r == null) return null;
+    java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+    m.put("at", r.at().toString());
+    m.put("from", r.fromType());
+    m.put("by", r.by());
+    m.put("rules", r.rules());
+    return m;
   }
 }

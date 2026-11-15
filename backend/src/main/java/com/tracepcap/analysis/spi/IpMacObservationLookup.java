@@ -20,4 +20,13 @@ public interface IpMacObservationLookup {
    * Never contains null elements.
    */
   List<IpMacs> ipMacObservations(UUID fileId);
+
+  /** As {@link #ipMacObservations}, for one IP only: the MACs that claimed it (#469). */
+  List<IpMacs> ipMacObservationsForIp(UUID fileId, String ip);
+
+  /**
+   * As {@link #ipMacObservations}, for only the IPs this MAC claimed, each with all its MACs (#469).
+   * The MAC is matched case-insensitively.
+   */
+  List<IpMacs> ipMacObservationsForMac(UUID fileId, String mac);
 }

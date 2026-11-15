@@ -21,7 +21,37 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
   /** Snapshots referencing a given file — a file may be added to more than one network. */
   List<NetworkSnapshotEntity> findByFileId(UUID fileId);
 
+  /** Every (network id, capture id) membership, for an install-wide pass (#925 phase 3). */
+  @Query("SELECT s.network.id, s.file.id FROM NetworkSnapshotEntity s")
+  List<Object[]> findAllMemberships();
+
+  /** Every (capture id, network id, network name) membership, for the captures list. */
+  @Query("SELECT s.file.id, s.network.id, s.network.name FROM NetworkSnapshotEntity s")
+  List<Object[]> findAllMembershipsWithNames();
+
+  /** Each network's captures in order, with file name and time, for the networks table. */
+  @Query(
+      "SELECT s.network.id, s.id, f.fileName, f.startTime, f.uploadedAt FROM NetworkSnapshotEntity s"
+          + " JOIN s.file f WHERE s.network.id IN :ids ORDER BY s.network.id, s.snapshotOrder")
+  List<Object[]> findCaptureMarksRaw(@Param("ids") java.util.Collection<UUID> ids);
+
   long countByNetworkId(UUID networkId);
+
+  /** Snapshot count per network, for the networks list in one query (#469). */
+  @Query(
+      "SELECT s.network.id, COUNT(s) FROM NetworkSnapshotEntity s WHERE s.network.id IN :ids"
+          + " GROUP BY s.network.id")
+  List<Object[]> countRawByNetworkIds(@Param("ids") java.util.Collection<UUID> ids);
+
+  /**
+   * Networks whose snapshot_order is no longer 0..n-1 (#635). That happens when a snapshot's file is
+   * deleted outside {@code SnapshotService.removeSnapshot}, for example by retention or a delete from
+   * the files list. The FK cascade drops the snapshot but nothing renumbers the rest.
+   */
+  @Query(
+      "SELECT s.network.id FROM NetworkSnapshotEntity s GROUP BY s.network.id"
+          + " HAVING MIN(s.snapshotOrder) <> 0 OR MAX(s.snapshotOrder) <> COUNT(s) - 1")
+  List<UUID> findNetworkIdsWithSnapshotOrderGaps();
 
   void deleteByNetworkId(UUID networkId);
 

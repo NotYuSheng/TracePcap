@@ -6,6 +6,7 @@ import { useEntityNote } from './hooks/useEntityNote';
 import { useEntityHistory } from './hooks/useEntityHistory';
 import { useIpSnapshotHistory } from './hooks/useIpSnapshotHistory';
 import { RoleSection } from './sections/RoleSection';
+import { Alert } from '@components/common/Alert';
 import { HostIdentitySection } from '@components/common/HostIdentitySection';
 import { EntityStatsSection } from './sections/EntityStatsSection';
 import { SnapshotHistoryTable } from './sections/SnapshotHistoryTable';
@@ -13,6 +14,8 @@ import { CaptureHistoryTable } from './sections/CaptureHistoryTable';
 import { NotesTab } from './sections/NotesTab';
 import { GraphNodeDetailsSection } from './sections/GraphNodeDetailsSection';
 import { GraphHistoryTab } from './sections/GraphHistoryTab';
+import { GraphNodeIdentityCard } from './sections/GraphNodeIdentityCard';
+import { HostDetailModal } from './HostDetailModal';
 import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
 import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { EntityDetailModalProps, Tab } from './types';
@@ -52,7 +55,19 @@ export function EntityDetailModal({
   // A peer/history navigation: route via the caller, then close (the graph is behind this modal).
   const navigateAndClose = (path: string) => { onClose(); onNavigate?.(path); };
 
-  const role = useEntityRole(entityType, entityKey, fileId, showRole);
+  // The device on a reused address being looked at (#918 slice 3): a graph node for one device
+  // starts on it, and picking another in the identity panel moves the role section with it.
+  const nodeDevice = graphNode?.data.occupancy;
+  const [device, setDevice] = useState<{ idx?: number; key: string }>({
+    idx: nodeDevice?.idx,
+    key: nodeDevice?.key ?? entityKey,
+  });
+  useEffect(() => {
+    setDevice({ idx: nodeDevice?.idx, key: nodeDevice?.key ?? entityKey });
+  }, [entityKey, nodeDevice?.idx, nodeDevice?.key]);
+  const roleKey = entityType === 'IP' ? device.key : entityKey;
+
+  const role = useEntityRole(entityType, roleKey, fileId, showRole);
   const { stats, statsLoading, statsError } = useEntityStats(entityType, entityKey, fileId);
   const note = useEntityNote(entityType, entityKey);
   const { history, historyLoading, historyError } = useEntityHistory(entityType, entityKey);
@@ -61,7 +76,7 @@ export function EntityDetailModal({
   // If the active service tab is no longer offered (modal reused for a node without that role),
   // fall back to Details so the body never goes blank.
   useEffect(() => {
-    const isBaseTab = activeTab === 'details' || activeTab === 'notes' || activeTab === 'history';
+    const isBaseTab = activeTab === 'details' || activeTab === 'notes' || activeTab === 'history' || activeTab === 'identity';
     if (!isBaseTab && !activeServiceTab) setActiveTab('details');
   }, [activeTab, activeServiceTab]);
 
@@ -98,6 +113,170 @@ export function EntityDetailModal({
   const showSnapshotHistory =
     (entityType === 'IP' || entityType === 'DEVICE') && !!snapshots && snapshots.length > 0;
 
+  // The same device on another address in this capture (it moved).
+  const moves = (graphNode?.data.moves?.length ?? 0) > 0 && (
+            <Alert variant="info" className="d-flex align-items-start gap-2 p-2 mb-3 small" data-testid="node-moves">
+              <i className="bi bi-arrow-left-right mt-1 flex-shrink-0" aria-hidden="true" />
+              <div>
+                {(graphNode?.data.moves ?? []).map(m => (
+                  <div key={`${m.direction}${m.ip}${m.at}`}>
+                    {m.direction === 'to' ? (
+                      <>
+                        This device moved to <span className="font-monospace">{m.ip}</span> at {new Date(m.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </>
+                    ) : (
+                      <>
+                        This device was on <span className="font-monospace">{m.ip}</span> before {new Date(m.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </>
+                    )}
+                    {m.hostname && <> (as {m.hostname})</>}
+                    <span className="text-muted"> · same MAC, {m.evidence}</span>
+                  </div>
+                ))}
+              </div>
+            </Alert>
+          );
+
+  // A peer opened from this host: the same identity-card view when the capture is known.
+  const nested =
+    nestedIp &&
+    (fileId ? (
+      <HostDetailModal fileId={fileId} ip={nestedIp} onNavigate={onNavigate} onClose={() => setNestedIp(null)} />
+    ) : (
+      <EntityDetailModal
+        entityType="IP"
+        entityKey={nestedIp}
+        displayName={nestedIp}
+        fileId={fileId}
+        onClose={() => setNestedIp(null)}
+      />
+    ));
+
+  // ── Graph node: an identity card on the left, tabbed detail on the right ────────────────────────
+  if (isGraph) {
+    const node = graphNode!;
+    const canIdentify = entityType === 'IP' && !!fileId;
+    const tabs: { id: Tab; label: string; icon: string }[] = [
+      { id: 'details', label: 'Traffic', icon: 'bi-bar-chart' },
+      ...(canIdentify ? [{ id: 'identity' as Tab, label: 'Identity evidence', icon: 'bi-fingerprint' }] : []),
+      { id: 'history', label: 'History', icon: 'bi-clock-history' },
+      { id: 'notes', label: 'Notes', icon: 'bi-sticky' },
+      ...serviceTabs.map(svc => ({ id: `svc:${svc.role}` as Tab, label: svc.label, icon: svc.icon })),
+    ];
+    return (
+      <>
+        <Modal show onHide={onClose} size="xl" dialogClassName="node-dialog" aria-labelledby="entity-detail-title">
+          <Modal.Body className="p-0 node-dialog-body">
+            <GraphNodeIdentityCard
+              node={node}
+              fileId={fileId}
+              identityKey={device.key}
+              titleId="entity-detail-title"
+              onClose={onClose}
+              badges={(badge || statusBadge) && <>{badge}{statusBadge}</>}
+              role={showRole && <RoleSection fileId={fileId} role={role} />}
+              onShowEvidence={() => setActiveTab('identity')}
+              onShowConversations={() => {
+                if (onViewConversations) {
+                  onClose();
+                  onViewConversations();
+                } else {
+                  navigateAndClose(`/analysis/${fileId}/conversations?ip=${encodeURIComponent(node.data.ip)}`);
+                }
+              }}
+            />
+            <section className="node-detail">
+              <div className="node-detail-tabs">
+                <div role="tablist" aria-label="Host details" className="node-detail-tablist">
+                  {tabs.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === t.id}
+                      className={`node-detail-tab${activeTab === t.id ? ' active' : ''}`}
+                      onClick={() => setActiveTab(t.id)}
+                    >
+                      <i className={`bi ${t.icon} me-1`} aria-hidden="true" />
+                      {t.label}
+                      {t.id === 'notes' && note.savedNote && (
+                        <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>1</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="btn-close d-none d-lg-block" aria-label="Close (Esc)" onClick={onClose} />
+              </div>
+              <div className="node-detail-body" role="tabpanel">
+                {activeTab === 'details' && (
+                  <>
+                    {changeHighlight && (
+                      <div
+                        className="d-flex align-items-center gap-2 rounded p-2 mb-3 small"
+                        style={{ background: changeHighlight.color + '22', border: `1px solid ${changeHighlight.color}55` }}
+                      >
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: changeHighlight.color, flexShrink: 0, display: 'inline-block' }} />
+                        <span style={{ color: changeHighlight.color, fontWeight: 600 }}>{changeHighlight.label}</span>
+                        {changeHighlight.description && <span className="text-muted">— {changeHighlight.description}</span>}
+                      </div>
+                    )}
+                    {moves}
+                    {node.data.isL2 ? (
+                      <p className="text-muted small">
+                        A layer-2 device: it was seen by its MAC address only, so there is no IP traffic to count.
+                      </p>
+                    ) : (
+                      graphEdges && (
+                        <GraphNodeDetailsSection
+                          node={node}
+                          edges={graphEdges}
+                          fileId={fileId}
+                          onOpenPeer={setNestedIp}
+                          onNavigate={navigateAndClose}
+                        />
+                      )
+                    )}
+                  </>
+                )}
+                {activeTab === 'identity' && canIdentify && (
+                  <HostIdentitySection
+                    fileId={fileId}
+                    ip={entityKey}
+                    occupancyIdx={nodeDevice?.idx}
+                    deviceKey={nodeDevice?.key}
+                    fromGraphNode={!!nodeDevice}
+                    onSelectDevice={(idx, key) => setDevice({ idx, key })}
+                  />
+                )}
+                {activeTab === 'history' && (
+                  <GraphHistoryTab entityType={entityType} entityKey={entityKey} fileId={fileId} onNavigate={navigateAndClose} />
+                )}
+                {activeServiceTab && (
+                  <ServiceLogTab fileId={fileId} ip={node.data.ip} config={activeServiceTab} />
+                )}
+                {activeTab === 'notes' && (
+                  <NotesTab
+                    entityLabel={entityLabel}
+                    displayName={displayName}
+                    noteText={note.noteText}
+                    setNoteText={note.setNoteText}
+                    savedNote={note.savedNote}
+                    noteSaving={note.noteSaving}
+                    noteDeleting={note.noteDeleting}
+                    noteChanged={note.noteChanged}
+                    onSave={note.save}
+                    onDelete={note.remove}
+                  />
+                )}
+              </div>
+            </section>
+          </Modal.Body>
+        </Modal>
+        {nested}
+      </>
+    );
+  }
+
   return (
     <>
     <Modal show onHide={onClose} size="lg" scrollable>
@@ -112,7 +291,7 @@ export function EntityDetailModal({
           {/* Tabs — graph context adds a History tab (cross-capture role trail) and service-role tabs. */}
           <div className="modal-header py-0 border-bottom-0">
             <ul className="nav nav-pills gap-1" style={{ paddingTop: '4px', paddingBottom: '4px' }}>
-              {((isGraph ? ['details', 'history', 'notes'] : ['details', 'notes']) as Tab[]).map(tab => (
+              {(['details', 'notes'] as Tab[]).map(tab => (
                 <li key={tab} className="nav-item">
                   <button
                     className={`nav-link py-1 px-3${activeTab === tab ? ' active' : ''}`}
@@ -120,7 +299,6 @@ export function EntityDetailModal({
                     onClick={() => setActiveTab(tab)}
                   >
                     {tab === 'details' && <i className="bi bi-bar-chart me-1" />}
-                    {tab === 'history' && <i className="bi bi-clock-history me-1" />}
                     {tab === 'notes' && (
                       <>
                         <i className="bi bi-sticky me-1" />
@@ -133,21 +311,6 @@ export function EntityDetailModal({
                   </button>
                 </li>
               ))}
-              {serviceTabs.map(svc => {
-                const id = `svc:${svc.role}`;
-                return (
-                  <li key={id} className="nav-item">
-                    <button
-                      className={`nav-link py-1 px-3${activeTab === id ? ' active' : ''}`}
-                      style={{ fontSize: '0.875rem' }}
-                      onClick={() => setActiveTab(id)}
-                    >
-                      <i className={`bi ${svc.icon} me-1`} />
-                      {svc.label}
-                    </button>
-                  </li>
-                );
-              })}
             </ul>
           </div>
 
@@ -173,17 +336,13 @@ export function EntityDetailModal({
                 {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
                 {entityType === 'IP' && fileId && (
-                  <HostIdentitySection fileId={fileId} ip={entityKey} />
-                )}
-
-                {/* Graph host detail: traffic counters, protocol chips, per-peer Connections table. */}
-                {isGraph && !graphNode!.data.isL2 && graphEdges && (
-                  <GraphNodeDetailsSection
-                    node={graphNode!}
-                    edges={graphEdges}
+                  <HostIdentitySection
                     fileId={fileId}
-                    onOpenPeer={setNestedIp}
-                    onNavigate={navigateAndClose}
+                    ip={entityKey}
+                    occupancyIdx={nodeDevice?.idx}
+                    deviceKey={nodeDevice?.key}
+                    fromGraphNode={!!nodeDevice}
+                    onSelectDevice={(idx, key) => setDevice({ idx, key })}
                   />
                 )}
 
@@ -197,7 +356,7 @@ export function EntityDetailModal({
                 )}
 
                 {/* Fallback for entity types without file stats and no role section */}
-                {!showRole && !hasFileStats && !isGraph && (
+                {!showRole && !hasFileStats && (
                   <p className="text-muted small fst-italic">
                     No per-file stats available in this context.
                   </p>
@@ -215,9 +374,8 @@ export function EntityDetailModal({
                   </div>
                 )}
 
-                {/* Cross-capture history: the graph surface has its own tab for it (role trail), so
-                    only the non-graph entity panel renders it inline here. */}
-                {!isGraph && (showSnapshotHistory ? (
+                {/* Cross-capture history, inline (the graph dialog gives it a tab of its own). */}
+                {showSnapshotHistory ? (
                   <SnapshotHistoryTable
                     entityType={entityType}
                     entityKey={entityKey}
@@ -232,23 +390,8 @@ export function EntityDetailModal({
                     historyError={historyError}
                     onClose={onClose}
                   />
-                ))}
+                )}
               </div>
-            )}
-
-            {/* ── HISTORY TAB (graph context only) ─────────────────── */}
-            {activeTab === 'history' && isGraph && (
-              <GraphHistoryTab
-                entityType={entityType}
-                entityKey={entityKey}
-                fileId={fileId}
-                onNavigate={navigateAndClose}
-              />
-            )}
-
-            {/* ── SERVICE-ROLE TAB (DNS, …) ────────────────────────── */}
-            {activeServiceTab && graphNode && (
-              <ServiceLogTab fileId={fileId} ip={graphNode.data.ip} config={activeServiceTab} />
             )}
 
             {/* ── NOTES TAB ────────────────────────────────────────── */}
@@ -269,15 +412,7 @@ export function EntityDetailModal({
           </Modal.Body>
     </Modal>
 
-    {nestedIp && (
-      <EntityDetailModal
-        entityType="IP"
-        entityKey={nestedIp}
-        displayName={nestedIp}
-        fileId={fileId}
-        onClose={() => setNestedIp(null)}
-      />
-    )}
+    {nested}
     </>
   );
 }

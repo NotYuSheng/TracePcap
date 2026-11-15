@@ -16,7 +16,18 @@ public class HostClassificationResponse {
   String loggedInUser;
   /** How {@code loggedInUser} was discovered: {@code kerberos_as_req} or {@code ldap_dn}; null if unset. */
   String loggedInUserSource;
+  /**
+   * How many distinct accounts were seen signing in (#812). {@code loggedInUser} is only set when
+   * this is 1. With more, show "N accounts" and the host's login timeline instead.
+   */
+  int loggedInUserCount;
   Integer ttl;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  java.util.List<Integer> ttls;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918); else null. */
+  String addressKind;
+  /** Why this may be more than one machine (#918); null when nothing conflicts. */
+  String identityWarning;
   String deviceType;
   int confidence;
   /** Service roles this host was detected serving (e.g. ["dns"]); drives the node modal tabs. */

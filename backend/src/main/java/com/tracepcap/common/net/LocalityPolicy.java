@@ -31,4 +31,10 @@ public interface LocalityPolicy {
    * knows which answer came from an override.
    */
   LocalityRules currentRules(LocalityRules.CidrSet additionalPrivate);
+
+  /**
+   * The rules in effect for a network (#915 phase 4): its own private/public overrides layered on
+   * the shared default, plus {@code additionalPrivate} (may be null). A null network is the default.
+   */
+  LocalityRules currentRules(java.util.UUID networkId, LocalityRules.CidrSet additionalPrivate);
 }

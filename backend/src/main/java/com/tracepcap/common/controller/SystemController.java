@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -19,11 +21,31 @@ public class SystemController {
   @Value("${MAX_UPLOAD_SIZE_BYTES:536870912}")
   private long maxUploadSizeBytes;
 
+  // Same property FileServiceImpl enforces (app.max-packets), so the advertised and enforced packet
+  // limits are one number. 0 (or negative) means "no packet limit" — reported as such to the UI.
+  @Value("${app.max-packets:2000000}")
+  private long maxUploadPackets;
+
   @Value("${ANALYSIS_TIMEOUT_SECONDS:300}")
   private int analysisTimeoutSeconds;
 
   @Value("${llm.api.timeout-seconds:300}")
   private int llmTimeoutSeconds;
+
+  // Whether an LLM is set up at all, so the upload panel can offer to write the story.
+  @Value("${llm.api.base-url:}")
+  private String llmBaseUrl;
+
+  // How long an analysis capture is kept, so the home page can say when one will be deleted. Read
+  // per request: retention is editable in the app (#915 phase 5).
+  private final RuntimePolicy runtimePolicy;
+
+  @Value("${tracepcap.cleanup.enabled:true}")
+  private boolean cleanupEnabled;
+
+  public SystemController(RuntimePolicy runtimePolicy) {
+    this.runtimePolicy = runtimePolicy;
+  }
 
   /** Returns the server's current local datetime (ISO-8601, no timezone offset). */
   @GetMapping("/time")
@@ -38,7 +60,7 @@ public class SystemController {
    * values. Consumed by the upload page and the analysis polling hook.
    */
   @GetMapping("/limits")
-  @Operation(summary = "Get runtime limits (upload size, analysis and LLM timeouts)")
+  @Operation(summary = "Get runtime limits (upload size, analysis and LLM timeouts, capture retention)")
   public ResponseEntity<Map<String, Object>> getLimits() {
     return ResponseEntity.ok(
         Map.of(
@@ -46,9 +68,19 @@ public class SystemController {
             maxUploadSizeBytes,
             "maxUploadMb",
             maxUploadSizeBytes / 1024 / 1024,
+            // 0 (or negative) means no packet limit is enforced; the UI treats it as unlimited.
+            "maxUploadPackets",
+            Math.max(maxUploadPackets, 0),
             "analysisTimeoutMs",
             (long) analysisTimeoutSeconds * 1000,
             "llmTimeoutMs",
-            (long) llmTimeoutSeconds * 1000));
+            (long) llmTimeoutSeconds * 1000,
+            "llmConfigured",
+            llmBaseUrl != null && !llmBaseUrl.isBlank(),
+            // 0 means captures are never deleted.
+            "fileRetentionHours",
+            cleanupEnabled
+                ? Math.max(runtimePolicy.getInt(EditablePolicy.FILE_RETENTION_HOURS), 0)
+                : 0));
   }
 }

@@ -1,0 +1,92 @@
+Devices Across Snapshots
+========================
+
+A monitored network's **Devices** list shows each device once, wherever it was
+on the network across the network's snapshots: a laptop that moved from one
+address to another is one row, and two devices that shared an address (see
+:doc:`address-reuse`) are two.
+
+Open it from a monitored network's page with **Devices**.
+
+What Each Row Shows
+-------------------
+
+- **Device:** its hostname in the latest snapshot it was seen in (or its
+  address), and its device type.
+- **MAC:** the address it's recognised by, its vendor, and a badge when the MAC
+  is a virtual machine's, a container's, or private (below).
+- **Addresses it used:** each address with the snapshots it used it in, for
+  example ``10.0.0.50 snapshots 1–3`` then ``10.0.0.73 snapshot 4``.
+- **Seen in:** one square per snapshot, filled where the device was seen.
+- **Label:** your confirmed role label on it, from the latest snapshot that has
+  one. Labels follow a device's MAC into later snapshots
+  (:doc:`address-reuse`).
+- **Irregularities:** anything that means the MAC may not stand for one machine.
+
+Search matches name, MAC, address, vendor and label. **Irregular** and
+**Private MAC** narrow the list. Click a device to see its address in each
+snapshot, and open the latest snapshot it was seen in.
+
+Only devices with a MAC of their own are listed. A host outside the local
+network has none (its frames carry the router's MAC), and a router failover
+pair's shared address isn't a device.
+
+Irregularities
+--------------
+
+**Duplicate MAC?** (high)
+   One MAC answering as two machines at once: TTLs from two operating-system
+   families, or two DHCP hostnames, in the same snapshot. Cloned virtual
+   machines and duplicated MACs do this.
+
+**Virtual machine MAC** (medium)
+   A hypervisor's prefix: VMware, VirtualBox, Hyper-V, QEMU/KVM, Xen or
+   Parallels. Virtual machines cloned from one image often keep the same MAC,
+   so it identifies a machine less reliably.
+
+**Container MAC** (medium)
+   Docker's ``02:42:…`` prefix: a container, not a physical device.
+
+**Private MAC** (information)
+   The MAC's locally-administered bit is set, so the device made it up rather
+   than using its manufacturer's. Phones do this by default (iOS 14 and later,
+   Android 10 and later), usually one per network, and newer versions can
+   change it periodically. A private MAC names no vendor, and the same phone
+   can appear under more than one.
+
+Phones With a Changing Private MAC
+----------------------------------
+
+When a phone changes its private MAC, it shows up as two devices. TracePcap
+**suggests** two private MACs as one device when:
+
+- one stopped before the other began, and they were never active at the same
+  time; and
+- they share what a device keeps when its MAC changes:
+
+  - its **DHCP fingerprint** (strong): the options it asks DHCP for, in order
+    (option 55), which name its operating system and often its model;
+  - its **signed-in Windows user** (strong);
+  - its **hostname** (medium): names can be shared, so not enough alone;
+  - its **TLS client fingerprints** (medium), when nDPI recorded them;
+
+- and nothing is against it: different DHCP fingerprints, hostnames or users
+  mean two devices, and no suggestion is made.
+
+A suggestion shows at the top of the Devices list, with each piece of evidence
+and its strength. Nothing is linked until you choose:
+
+- **Same device** links the MACs. They show as one row, with every address and
+  snapshot under either MAC, and its label applies under both.
+- **Not the same** records that they're different, so the pair isn't suggested
+  again.
+
+Either asks for a reason, is recorded in the audit log, and can be undone from
+the device's details (**Your decisions** → **Undo**). Two MACs active in the
+same snapshot at the same time can't be linked. Who can link is the **Split,
+merge or link devices** permission (see :ref:`settings-permissions`).
+
+``sample-files/private_mac_week1.pcap`` and ``private_mac_week2.pcap`` show it:
+add both to one network, in order, and Bob's phone (two private MACs) is
+suggested as one device while Carol's phone isn't.
+A walkthrough with screenshots: :doc:`../demos/devices-on-a-dhcp-network`.

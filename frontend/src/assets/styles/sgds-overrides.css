@@ -584,3 +584,45 @@
   background-color: var(--tp-surface) !important;
   border-color: var(--tp-border) var(--tp-border) var(--tp-surface) !important;
 }
+
+/* ── Subtle / emphasis colour utilities ─────────────────────────────────────── */
+
+/*
+ * Bootstrap 5.3's bg-*-subtle, text-*-emphasis, border-*-subtle and bg-body-secondary
+ * aren't in SGDS's stylesheet, so markup using them rendered white text on no background
+ * (invisible badges, empty "not seen" squares). Defined here for both themes.
+ */
+:root {
+  --tp-primary-subtle: #ece6fc;
+  --tp-primary-emphasis: #3b1891;
+  --tp-secondary-subtle: #e6efff;
+  --tp-secondary-emphasis: #123f99;
+  --tp-info-subtle: #e1f0fa;
+  --tp-info-emphasis: #0a4a7a;
+  --tp-warning-subtle: #fff3e0;
+  --tp-warning-emphasis: #7a4504;
+  --tp-body-secondary: #e9ecef;
+}
+
+[data-theme='dark'] {
+  --tp-primary-subtle: #2b1d55;
+  --tp-primary-emphasis: #cbbcfa;
+  --tp-secondary-subtle: #172a52;
+  --tp-secondary-emphasis: #a9c4ff;
+  --tp-info-subtle: #0f2c42;
+  --tp-info-emphasis: #9fd0f2;
+  --tp-warning-subtle: #3d2a0c;
+  --tp-warning-emphasis: #f8c98a;
+  --tp-body-secondary: #2e3349;
+}
+
+.bg-primary-subtle { background-color: var(--tp-primary-subtle) !important; }
+.bg-secondary-subtle { background-color: var(--tp-secondary-subtle) !important; }
+.bg-info-subtle { background-color: var(--tp-info-subtle) !important; }
+.bg-warning-subtle { background-color: var(--tp-warning-subtle) !important; }
+.bg-body-secondary { background-color: var(--tp-body-secondary) !important; }
+.text-primary-emphasis { color: var(--tp-primary-emphasis) !important; }
+.text-secondary-emphasis { color: var(--tp-secondary-emphasis) !important; }
+.text-info-emphasis { color: var(--tp-info-emphasis) !important; }
+.text-warning-emphasis { color: var(--tp-warning-emphasis) !important; }
+.border-warning-subtle { border-color: var(--tp-warning-subtle) !important; }

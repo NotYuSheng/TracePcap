@@ -83,6 +83,7 @@ public class ReportService {
   private final ExtractedFileRepository extractedFileRepository;
   private final GeoOrgLookup geoOrgLookup;
   private final StoryService storyService;
+  private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
 
   // ══════════════════════════════════════════════════════════════════════════
   // Public entry point
@@ -103,6 +104,7 @@ public class ReportService {
         conversationLookup.topConversationsByBytes(fileId, TOP_CONVERSATIONS_LIMIT);
     List<ConversationFacts> riskyConversations =
         conversationLookup.atRiskConversations(fileId, SECURITY_FINDINGS_LIMIT);
+    java.util.UUID networkId = request == null ? null : request.getNetworkId();
     List<ConversationFacts> tlsConversations =
         conversationLookup.tlsConversations(fileId, TLS_LIMIT);
 
@@ -117,6 +119,18 @@ public class ReportService {
     List<String> httpUserAgents = conversationLookup.distinctValues(fileId, Facet.HTTP_USER_AGENT);
     List<String> riskTypes = conversationLookup.distinctValues(fileId, Facet.RISK_TYPE);
     List<String> customSigs = conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
+    if (networkId != null) {
+      // Viewed in a network (#925): its own rules' matches count, the global rules it suppresses
+      // don't, both in the rule summary and on each at-risk row.
+      java.util.Set<String> suppressed = networkRuleOverlay.suppressedNames(networkId);
+      java.util.Map<java.util.UUID, List<String>> labels = networkRuleOverlay.labels(networkId, fileId);
+      java.util.TreeSet<String> all = new java.util.TreeSet<>(customSigs);
+      all.removeAll(suppressed);
+      labels.values().forEach(all::addAll);
+      customSigs = new java.util.ArrayList<>(all);
+      riskyConversations =
+          riskyConversations.stream().map(c -> inNetwork(c, suppressed, labels.get(c.id()))).toList();
+    }
 
     List<GeoOrgLookup.Country> geoCountries = geoOrgLookup.distinctCountriesInFile(fileId);
 
@@ -1371,6 +1385,21 @@ public class ReportService {
   }
 
   /** Both lists come from the port and are never null (see ConversationLookup.Findings). */
+  /** A conversation's rule matches as seen in a network: minus suppressed, plus the network's own. */
+  static ConversationFacts inNetwork(ConversationFacts c, java.util.Set<String> suppressed, List<String> networkNames) {
+    var f = c.findings();
+    java.util.LinkedHashSet<String> sigs = new java.util.LinkedHashSet<>();
+    if (f.customSignatures() != null) {
+      for (String n : f.customSignatures()) if (!suppressed.contains(n)) sigs.add(n);
+    }
+    if (networkNames != null) sigs.addAll(networkNames);
+    var findings =
+        new ConversationLookup.Findings(
+            f.appName(), f.tsharkProtocol(), f.category(), f.flowRisks(), f.suricataAlerts(),
+            List.copyOf(sigs), f.httpUserAgents());
+    return new ConversationFacts(c.id(), c.fileId(), c.flow(), c.tls(), findings);
+  }
+
   private static String joinRisks(List<String> flowRisks, List<String> customSigs) {
     StringBuilder sb = new StringBuilder();
     for (String r : flowRisks) sb.append(r).append(" ");

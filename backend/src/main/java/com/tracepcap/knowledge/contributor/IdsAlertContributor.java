@@ -1,6 +1,5 @@
 package com.tracepcap.knowledge.contributor;
 
-import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
@@ -9,10 +8,10 @@ import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.Severity;
+import com.tracepcap.knowledge.spi.KnowledgeContext;
 import com.tracepcap.knowledge.spi.KnowledgeContributor;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +58,6 @@ public class IdsAlertContributor implements KnowledgeContributor {
           "URI", "URL", "UA", "CNC", "C2", "GET", "POST", "JA3", "OS", "IP", "ABUSE", "WIN32",
           "WIN64", "X86", "X64", "PDF", "JS", "VBS", "PS1", "APT", "CVE", "USER");
 
-  private final ConversationLookup conversationLookup;
 
   @Override
   public String name() {
@@ -67,8 +65,8 @@ public class IdsAlertContributor implements KnowledgeContributor {
   }
 
   @Override
-  public void contribute(UUID fileId, CaseKnowledgeBuilder board) {
-    for (ConversationFacts conv : conversationLookup.conversationFacts(fileId)) {
+  public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    for (ConversationFacts conv : context.conversationFacts()) {
       List<String> alerts = conv.findings().suricataAlerts();
       if (alerts == null || alerts.isEmpty()) continue;
 

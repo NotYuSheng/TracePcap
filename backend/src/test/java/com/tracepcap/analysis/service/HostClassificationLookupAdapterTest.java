@@ -24,8 +24,11 @@ class HostClassificationLookupAdapterTest {
   private static final UUID FILE = UUID.randomUUID();
 
   private final HostClassificationRepository repository = mock(HostClassificationRepository.class);
+  private final com.tracepcap.analysis.repository.IpOccupancyRepository occupancies =
+      mock(com.tracepcap.analysis.repository.IpOccupancyRepository.class);
   private final HostClassificationLookupAdapter adapter =
-      new HostClassificationLookupAdapter(repository);
+      new HostClassificationLookupAdapter(
+          repository, occupancies, mock(com.tracepcap.analysis.repository.DhcpLeaseRepository.class));
 
   private static HostClassificationEntity host(String ip, String serviceRoles) {
     return HostClassificationEntity.builder()

@@ -1,5 +1,7 @@
 package com.tracepcap.monitor.spi;
 
+import java.util.Set;
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -12,4 +14,10 @@ public interface InsightPresence {
   boolean networkHasInsights(UUID networkId);
 
   boolean snapshotHasInsights(UUID snapshotId);
+
+  /** Of {@code networkIds}, the ones with insights, in one query. For listings (#469). */
+  Set<UUID> networksWithInsights(Collection<UUID> networkIds);
+
+  /** Of {@code snapshotIds}, the ones with insights, in one query. For listings (#469). */
+  Set<UUID> snapshotsWithInsights(Collection<UUID> snapshotIds);
 }

@@ -14,6 +14,7 @@ Only build a custom component if SGDS has no equivalent.
 - **Forms that create/edit a thing** (add evidence, override a label, add a snapshot) belong in an **SGDS `Modal`**, not an inline expanding panel — keep the surface uncluttered and the action focused.
 - Keep the copy inside these modals task-oriented: say what the thing is and how to act on it (e.g. "click a badge to inspect it and add evidence").
 - **Escape must close exactly one popup — the topmost one.** SGDS `Modal`s get this for free, so always wire `onHide` (leave it unwired only to deliberately block dismissal, e.g. mid-upload). Any popup that is *not* an SGDS `Modal` — an overlay panel, a portalled popover, a CSS-fullscreen mode — must call `useEscapeLayer(onClose, { ref })` from `@utils/useEscapeLayer` instead of installing its own `keydown` listener; the shared stack is what keeps one press from closing two layers.
+- **Click-toggled info/help popovers** use `EscapableOverlayTrigger` from `@components/common/EscapableOverlayTrigger` — same props as SGDS `OverlayTrigger`, but it owns `show` and joins the Escape stack. Never `OverlayTrigger … rootClose`: inside a `Modal`, one Escape closes both. Give the `Popover` an `id` (it locates the layer by it).
 
 ## Branching
 
@@ -22,7 +23,7 @@ Only build a custom component if SGDS has no equivalent.
   `--base dev` explicitly.**
 - Branch from `dev`, and open PRs **against `dev`**. Never open a PR against `main` except the
   periodic `dev` -> `main` release PR, and never commit to `main` directly.
-- `dev` runs the same gates as `main` and is expected to be green.
+- PRs into `dev` run the full test gates and must be green to merge. The long jobs (system, backend, frontend, arm64) don't re-run on pushes to `dev`, only on the release PR and on `main`.
 - See CONTRIBUTING.md for what runs where and how to cut a release.
 
 
@@ -33,7 +34,7 @@ Only build a custom component if SGDS has no equivalent.
 - **DB**: PostgreSQL with Flyway migrations
 - **Storage**: MinIO
 - **Build**: Docker Compose — run `docker compose build` to build, `docker compose up -d` to start
-- **After every change**: run `docker compose up -d --build` to rebuild and restart all services
+- **After every change**: run `scripts/rebuild.sh` to rebuild and restart all services. It builds one image at a time; `docker compose up -d --build` builds them in parallel and, next to a running stack and a `mvn verify`, has frozen this 15 GB machine. Never run it alongside `mvn verify` or the frontend test suite.
 
 ## API Conventions
 

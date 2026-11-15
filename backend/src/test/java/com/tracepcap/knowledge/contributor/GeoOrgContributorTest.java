@@ -1,5 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.knowledge.spi.KnowledgeContext;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -47,7 +49,7 @@ class GeoOrgContributorTest {
         .thenReturn(Map.of("141.98.10.79", new IpAttribution("141.98.10.79", "AS209605", "UAB Host Baltic", "LT")));
 
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new GeoOrgContributor(conversationLookup, geoOrgLookup).contribute(FILE, board);
+    new GeoOrgContributor(geoOrgLookup).contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
     CaseKnowledge k = board.build();
 
     assertThat(k.entity(EntityRef.external("141.98.10.79"))).isPresent().get()
@@ -69,7 +71,7 @@ class GeoOrgContributorTest {
         .thenReturn(Map.of("8.8.8.8", new IpAttribution("8.8.8.8", "AS15169", "Google LLC", "US")));
 
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new GeoOrgContributor(conversationLookup, geoOrgLookup).contribute(FILE, board);
+    new GeoOrgContributor(geoOrgLookup).contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
 
     assertThat(board.build().entity(EntityRef.external("8.8.8.8"))).isPresent().get()
         .satisfies(e -> assertThat(e.attributes()).containsEntry("org", "Google LLC"));

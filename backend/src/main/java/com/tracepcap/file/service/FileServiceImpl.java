@@ -2,6 +2,7 @@ package com.tracepcap.file.service;
 
 import com.tracepcap.common.exception.DuplicateFileException;
 import com.tracepcap.common.exception.InvalidFileException;
+import com.tracepcap.common.exception.PacketCountExceededException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
@@ -31,13 +32,15 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 /** Implementation of FileService */
@@ -51,6 +54,7 @@ public class FileServiceImpl implements FileService {
   private final ApplicationEventPublisher eventPublisher;
 
   private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList(".pcap", ".pcapng", ".cap");
+
   /**
    * The largest capture we will accept, from {@code app.max-file-size} (#779).
    *
@@ -61,28 +65,244 @@ public class FileServiceImpl implements FileService {
    */
   private final long maxFileSize;
 
+  /**
+   * The most packets we will accept in a single capture, from {@code app.max-packets} (env {@code
+   * MAX_UPLOAD_PACKETS}). A provisioning contract rather than a hard technical ceiling: packet
+   * count is the dominant driver of database row counts, and therefore of the parallel-query shared
+   * memory Postgres needs in {@code /dev/shm}. Raising it means also raising the Postgres {@code
+   * shm_size}/{@code work_mem} budget in the compose files — see {@code .env.example}. A
+   * non-positive value disables the check. Enforced against the {@code capinfos} count, which is an
+   * upper bound on rows actually inserted, so the gate never lets through more than it advertises.
+   */
+  private final long maxPackets;
+
+  /**
+   * Size-gated fail-closed threshold for the packet gate, from {@code
+   * app.max-packets-verify-fraction} (default 0.5), as a fraction of {@link #maxFileSize}.
+   *
+   * <p>When {@code capinfos} can't produce a count (timeout, non-zero exit, parse failure) the gate
+   * has nothing to compare against. Failing open unconditionally would be weakest exactly where it
+   * matters most: a very large capture is both the one the gate should stop and the one most likely
+   * to make capinfos slow or trip its timeout. So the gate fails <em>open</em> for a small file
+   * (which cannot hold a dangerous packet count) and fails <em>closed</em> for a file at or above
+   * this fraction of the size cap, where an unverifiable count is genuinely suspicious. A file over
+   * {@code maxFileSize} is already rejected by {@code validateFile}, so this only bites in the band
+   * below that cap. Set to {@code >= 1.0} to restore pure fail-open behaviour.
+   */
+  private final double maxPacketsVerifyFraction;
+
+  /**
+   * The only transaction an upload or merge opens: around the metadata insert and the {@link
+   * FileUploadedEvent} publish (#826).
+   *
+   * <p>{@code uploadFile} and {@code mergeFiles} used to be {@code @Transactional}, and {@code
+   * JpaTransactionManager} takes a pooled connection the moment the transaction begins. That held a
+   * connection through the hashing, the {@code capinfos} count (up to 15s), the MinIO upload and,
+   * for a merge, the source downloads and a {@code mergecap} run of up to five minutes. A handful
+   * of concurrent large uploads could drain the pool and stall every other request. None of that
+   * work needs the database. The duplicate-hash lookup runs on its own, and the insert and publish
+   * need a transaction only because {@code FileUploadEventListener} is an {@code AFTER_COMMIT}
+   * listener. Without a commit, analysis would never start.
+   *
+   * <p>A TransactionTemplate rather than a self-injected proxy, as in {@code AdjudicatorRunner}:
+   * the boundary is visible at the call site.
+   */
+  private final TransactionTemplate persistTx;
+
   public FileServiceImpl(
       FileRepository fileRepository,
       StorageService storageService,
       FileMapper fileMapper,
       ApplicationEventPublisher eventPublisher,
-      @Value("${app.max-file-size:536870912}") long maxFileSize) {
+      PlatformTransactionManager txManager,
+      @Value("${app.max-file-size:536870912}") long maxFileSize,
+      @Value("${app.max-packets:2000000}") long maxPackets,
+      @Value("${app.max-packets-verify-fraction:0.5}") double maxPacketsVerifyFraction) {
     this.fileRepository = fileRepository;
     this.storageService = storageService;
     this.fileMapper = fileMapper;
     this.eventPublisher = eventPublisher;
+    this.persistTx = new TransactionTemplate(txManager);
     this.maxFileSize = maxFileSize;
+    this.maxPackets = maxPackets;
+    this.maxPacketsVerifyFraction = maxPacketsVerifyFraction;
   }
 
+  /**
+   * Inserts the file row and publishes {@link FileUploadedEvent} inside one short transaction, so
+   * the {@code AFTER_COMMIT} listener starts analysis only once the row is visible. This is the
+   * only place an upload or merge holds a DB connection (see {@link #persistTx}).
+   */
+  /**
+   * {@link #persistAndPublish}, turning a lost duplicate race into the usual 409.
+   *
+   * <p>The hash check before the upload is only a fast path. Two identical uploads can both pass it
+   * before either inserts (8 simultaneous ones all did), so the unique index
+   * {@code uq_files_file_hash} (V44) is what actually enforces one capture per hash. The loser's
+   * insert fails here. Its MinIO object is now orphaned, so remove it, then answer exactly as the
+   * fast path would have, with the winner's id.
+   */
+  private FileEntity persistOrReportDuplicate(FileEntity fileEntity, String storedPath) {
+    try {
+      return persistAndPublish(fileEntity);
+    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+      Optional<FileEntity> winner =
+          fileEntity.getFileHash() == null
+              ? Optional.empty()
+              : fileRepository.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(fileEntity.getFileHash());
+      if (winner.isEmpty()) throw e; // some other constraint; not a duplicate
+      try {
+        storageService.deleteFile(storedPath);
+      } catch (Exception cleanup) {
+        log.warn("Could not remove orphaned upload {} after duplicate race: {}", storedPath, cleanup.getMessage());
+      }
+      log.info("Duplicate upload lost the race to {}; rejected", winner.get().getId());
+      throw new DuplicateFileException(winner.get().getId());
+    }
+  }
+
+  /**
+   * Re-analyses a capture with other options, as a new version (#915 phase 3). The version gets its
+   * own copy of the capture in storage, so deleting either never breaks the other, and its own
+   * analysis; the original is left as it was. A version of a version derives from the original.
+   * The duplicate-upload check doesn't apply (versions share the original's hash).
+   */
+  @Override
+  public FileUploadResponse reanalyse(
+      UUID fileId, boolean enableNdpi, boolean enableSuricata, boolean enableFileExtraction) {
+    FileEntity source =
+        fileRepository.findById(fileId).orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    if (source.getStatus() == FileEntity.FileStatus.PROCESSING || source.getStatus() == FileEntity.FileStatus.UPLOADING) {
+      throw new IllegalArgumentException("Wait for the current analysis to finish before re-analysing.");
+    }
+    if (source.getPacketsPrunedAt() != null) {
+      throw new IllegalArgumentException(
+          "Retention already deleted this capture's packets, so it can't be re-analysed.");
+    }
+    UUID rootId = source.getDerivedFrom() != null && source.isVersion() ? source.getDerivedFrom() : source.getId();
+    UUID versionId = UUID.randomUUID();
+    String objectName = versionId + getFileExtension(source.getFileName());
+    storageService.copyFile(source.getMinioPath(), objectName);
+    FileEntity version =
+        FileEntity.builder()
+            .id(versionId)
+            .fileName(source.getFileName())
+            .fileSize(source.getFileSize())
+            .packetCount(source.getPacketCount())
+            .minioPath(objectName)
+            .uploadedAt(LocalDateTime.now())
+            .status(FileEntity.FileStatus.PROCESSING)
+            .fileHash(source.getFileHash())
+            .source(source.getSource())
+            .enableNdpi(enableNdpi)
+            .enableSuricata(enableSuricata)
+            .enableFileExtraction(enableFileExtraction)
+            .derivedFrom(rootId)
+            .isVersion(true)
+            .build();
+    try {
+      FileEntity saved =
+          persistTx.execute(
+              status -> {
+                FileEntity s = fileRepository.save(version);
+                // Before the analysis trigger: listeners copy what belongs to the capture.
+                eventPublisher.publishEvent(new com.tracepcap.file.event.FileVersionCreatedEvent(this, versionId, source.getId()));
+                eventPublisher.publishEvent(new FileUploadedEvent(this, versionId));
+                return s;
+              });
+      log.info("Re-analysing {} as version {}", fileId, versionId);
+      return fileMapper.toUploadResponse(saved);
+    } catch (RuntimeException e) {
+      storageService.deleteFile(objectName); // don't leave the copy behind
+      throw e;
+    }
+  }
 
   @Override
-  @Transactional
+  public java.util.List<FileMetadataDto> versions(UUID fileId) {
+    FileEntity f =
+        fileRepository.findById(fileId).orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    UUID rootId = f.isVersion() && f.getDerivedFrom() != null ? f.getDerivedFrom() : f.getId();
+    java.util.List<FileMetadataDto> out = new java.util.ArrayList<>();
+    fileRepository.findById(rootId).ifPresent(r -> out.add(fileMapper.toMetadataDto(r)));
+    fileRepository.findByDerivedFromOrderByUploadedAtAsc(rootId).forEach(v -> out.add(fileMapper.toMetadataDto(v)));
+    if (out.stream().noneMatch(d -> d.getFileId().equals(fileId.toString()))) {
+      out.add(fileMapper.toMetadataDto(f)); // a version whose original was deleted
+    }
+    return out;
+  }
+
+  private FileEntity persistAndPublish(FileEntity fileEntity) {
+    return persistTx.execute(
+        status -> {
+          FileEntity saved = fileRepository.save(fileEntity);
+          eventPublisher.publishEvent(new FileUploadedEvent(this, saved.getId()));
+          return saved;
+        });
+  }
+
+  /**
+   * Enforces the packet provisioning limit for one capture, before any storage/analysis work.
+   *
+   * <p>Three cases: (1) a known count over {@link #maxPackets} → reject with the count and limit;
+   * (2) an unknown count ({@code null}) on a file at/above {@link #maxPacketsVerifyFraction} of the
+   * size cap → reject as unverifiable (see that field's javadoc for the rationale); (3) otherwise
+   * allow. Disabled entirely when {@code maxPackets <= 0}.
+   *
+   * @param packetCount the capinfos count, or {@code null} if it could not be determined
+   * @param fileSizeBytes the capture's size, used only for the size-gated fail-closed decision
+   * @param label capture name for the rejection log line
+   * @param retryable whether an unverifiable-count rejection should tell the operator to retry —
+   *     {@code true} for a direct upload (a transient capinfos failure may clear), {@code false}
+   *     for a merge (the merged file is deterministic, so capinfos fails identically on retry)
+   */
+  // Package-private for direct unit testing of the gate branches (see FileServiceImplTest, #827).
+  void enforcePacketLimit(Long packetCount, long fileSizeBytes, String label, boolean retryable) {
+    if (maxPackets <= 0) {
+      return;
+    }
+    if (packetCount != null) {
+      if (packetCount > maxPackets) {
+        log.warn(
+            "Upload rejected: {} has {} packets, over the provisioned limit of {}",
+            label,
+            packetCount,
+            maxPackets);
+        throw new PacketCountExceededException(packetCount, maxPackets);
+      }
+      return;
+    }
+    // Unknown count: fail closed only for large files, where an unverifiable size is suspicious.
+    // A fraction >= 1.0 means "never fail closed" (pure fail-open); handle it explicitly rather
+    // than
+    // via the threshold, since validateFile admits a file exactly at maxFileSize (its check is
+    // strictly greater-than) and that would otherwise still trip a threshold of maxFileSize.
+    if (maxPacketsVerifyFraction >= 1.0) {
+      return;
+    }
+    long verifyThreshold = (long) (maxFileSize * maxPacketsVerifyFraction);
+    if (fileSizeBytes >= verifyThreshold) {
+      log.warn(
+          "Upload rejected: could not verify packet count for {} ({} bytes >= {} threshold); "
+              + "too large to accept unverified against the {}-packet limit",
+          label,
+          fileSizeBytes,
+          verifyThreshold,
+          maxPackets);
+      throw new PacketCountExceededException(maxPackets, retryable);
+    }
+  }
+
+  // Deliberately NOT @Transactional — see persistTx (#826).
+  @Override
   public FileUploadResponse uploadFile(
       MultipartFile file,
       boolean enableNdpi,
       boolean enableSuricata,
       boolean enableFileExtraction,
-      FileSource source) {
+      FileSource source,
+      boolean generateStory,
+      boolean keepForever) {
     log.info("Starting file upload: {}", file.getOriginalFilename());
 
     // Validate file
@@ -96,10 +316,22 @@ public class FileServiceImpl implements FileService {
 
     // Reject if a file with the same hash already exists
     Optional<FileEntity> existing =
-        fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+        fileRepository.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(fileHash);
     if (existing.isPresent()) {
       throw new DuplicateFileException(existing.get().getId());
     }
+
+    // Count packets up front (best-effort) so the loading view can show a packet-based time
+    // estimate immediately, before analysis has run. Overwritten with the exact count on
+    // completion.
+    // Done before the MinIO upload so an over-limit capture is rejected without first storing it.
+    Long packetCount = countPackets(file);
+
+    // Provisioning gate: reject captures larger than this instance is sized for, before spending
+    // any
+    // upload/analysis work on them (see enforcePacketLimit — including the size-gated fail-closed
+    // behaviour when capinfos couldn't produce a count).
+    enforcePacketLimit(packetCount, file.getSize(), originalFilename, /* retryable= */ true);
 
     // Generate unique ID and file name
     UUID fileId = UUID.randomUUID();
@@ -111,17 +343,13 @@ public class FileServiceImpl implements FileService {
       String minioPath = storageService.uploadFile(file, fileName);
       log.info("DEBUG: Returned minioPath: {}", minioPath);
 
-      // Count packets up front (best-effort) so the loading view can show a packet-based time
-      // estimate immediately, before analysis has run. Overwritten with the exact count on completion.
-      Integer packetCount = countPackets(file);
-
       // Save metadata to database
       FileEntity fileEntity =
           FileEntity.builder()
               .id(fileId)
               .fileName(originalFilename)
               .fileSize(file.getSize())
-              .packetCount(packetCount)
+              .packetCount(toStoredPacketCount(packetCount))
               .minioPath(minioPath)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -130,22 +358,19 @@ public class FileServiceImpl implements FileService {
               .enableNdpi(enableNdpi)
               .enableSuricata(enableSuricata)
               .enableFileExtraction(enableFileExtraction)
+              // Set with the row, so even a very quick analysis finds it when it completes.
+              .generateStory(generateStory)
+              .storyStatus(generateStory ? FileEntity.STORY_QUEUED : null)
+              .keepForever(keepForever)
               .build();
 
-      fileEntity = fileRepository.save(fileEntity);
+      FileEntity saved = persistOrReportDuplicate(fileEntity, minioPath);
       log.info("File uploaded successfully: {} (ID: {})", originalFilename, fileId);
-      log.info(
-          "DEBUG: About to publish event - fileId value: {}, fileEntity.getId(): {}",
-          fileId,
-          fileEntity.getId());
 
-      // Publish event - listener will trigger async analysis AFTER transaction commits
-      log.info("Publishing file uploaded event for file: {}", fileId);
-      eventPublisher.publishEvent(new FileUploadedEvent(this, fileId));
-      log.info("DEBUG: Event published with fileId: {}", fileId);
+      return fileMapper.toUploadResponse(saved);
 
-      return fileMapper.toUploadResponse(fileEntity);
-
+    } catch (DuplicateFileException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Failed to upload file: {}", originalFilename, e);
       throw new InvalidFileException("Failed to upload file: " + e.getMessage(), e);
@@ -170,6 +395,13 @@ public class FileServiceImpl implements FileService {
       return fileRepository.findBySource(source, pageable).map(fileMapper::toMetadataDto);
     }
     return fileRepository.findAll(pageable).map(fileMapper::toMetadataDto);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<FileMetadataDto> getAllFiles(
+      Pageable pageable, com.tracepcap.file.repository.FileListFilter filter) {
+    return fileRepository.findAll(filter.toSpecification(), pageable).map(fileMapper::toMetadataDto);
   }
 
   @Override
@@ -239,7 +471,9 @@ public class FileServiceImpl implements FileService {
 
     // Check file extension (strip any Windows/Unix path prefix before checking)
     String originalFilename = stripPath(file.getOriginalFilename());
-    if (originalFilename == null || originalFilename.isBlank() || !hasValidExtension(originalFilename)) {
+    if (originalFilename == null
+        || originalFilename.isBlank()
+        || !hasValidExtension(originalFilename)) {
       throw new InvalidFileException(
           "Invalid file type. Only .pcap, .pcapng, and .cap files are supported");
     }
@@ -259,8 +493,8 @@ public class FileServiceImpl implements FileService {
 
   /**
    * Strip any Windows or Unix directory prefix from a filename so that only the bare name is
-   * stored. Legacy browsers (IE11) send the full client-side path (e.g. C:\Users\…\file.pcap)
-   * in the Content-Disposition header; modern browsers send just the filename.
+   * stored. Legacy browsers (IE11) send the full client-side path (e.g. C:\Users\…\file.pcap) in
+   * the Content-Disposition header; modern browsers send just the filename.
    */
   private String stripPath(String originalFilename) {
     if (originalFilename == null) return null;
@@ -269,7 +503,7 @@ public class FileServiceImpl implements FileService {
   }
 
   @Override
-  @Transactional
+  // Deliberately NOT @Transactional — see persistTx (#826).
   public FileUploadResponse mergeFiles(
       List<UUID> fileIds,
       String mergedFileName,
@@ -350,7 +584,7 @@ public class FileServiceImpl implements FileService {
       String fileHash = computeSha256FromFile(tempOutput);
 
       Optional<FileEntity> existing =
-          fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+          fileRepository.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(fileHash);
       if (existing.isPresent()) {
         throw new DuplicateFileException(existing.get().getId());
       }
@@ -360,6 +594,15 @@ public class FileServiceImpl implements FileService {
           (mergedFileName != null && !mergedFileName.isBlank())
               ? sanitizeMergedFileName(mergedFileName)
               : buildAutoMergedName(fileIds);
+
+      // Same provisioning gate as a direct upload — a merge is the other path onto the analysis
+      // pipeline, so two under-limit captures must not merge into one over-limit capture and slip
+      // past it. Checked here, before the upload/persist work below.
+      Long mergedPacketCount = countPackets(tempOutput);
+      // retryable=false: the merged file is deterministic, so a capinfos failure will recur on
+      // retry.
+      enforcePacketLimit(
+          mergedPacketCount, tempOutput.length(), mergedName, /* retryable= */ false);
 
       // Stream-upload the merged file to MinIO (avoids loading it fully into memory)
       UUID newFileId = UUID.randomUUID();
@@ -372,7 +615,7 @@ public class FileServiceImpl implements FileService {
               .id(newFileId)
               .fileName(mergedName)
               .fileSize(tempOutput.length())
-              .packetCount(countPackets(tempOutput))
+              .packetCount(toStoredPacketCount(mergedPacketCount))
               .minioPath(storedName)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -382,15 +625,12 @@ public class FileServiceImpl implements FileService {
               .enableFileExtraction(enableFileExtraction)
               .build();
 
-      fileEntity = fileRepository.save(fileEntity);
+      FileEntity saved = persistOrReportDuplicate(fileEntity, storedName);
       log.info("Merged PCAP saved: {} (ID: {})", mergedName, newFileId);
 
-      // Trigger async analysis
-      eventPublisher.publishEvent(new FileUploadedEvent(this, newFileId));
+      return fileMapper.toUploadResponse(saved);
 
-      return fileMapper.toUploadResponse(fileEntity);
-
-    } catch (InvalidFileException | DuplicateFileException e) {
+    } catch (InvalidFileException | DuplicateFileException | PacketCountExceededException e) {
       throw e;
     } catch (Exception e) {
       log.error("Failed to merge PCAP files", e);
@@ -463,22 +703,41 @@ public class FileServiceImpl implements FileService {
   private static final Pattern PACKET_COUNT_PATTERN =
       Pattern.compile("Number of packets:\\s*(\\d+)");
 
+  /**
+   * Narrows the {@code Long} capinfos count to the entity's {@code Integer} column for the loading
+   * view's estimate. Null-safe; clamps a count above {@link Integer#MAX_VALUE} rather than letting
+   * it wrap to a negative number (the stored value is a best-effort estimate, not the enforced
+   * gate).
+   */
+  private static Integer toStoredPacketCount(Long packetCount) {
+    if (packetCount == null) {
+      return null;
+    }
+    return (int) Math.min(packetCount, Integer.MAX_VALUE);
+  }
+
   // Short bound for the best-effort packet count: capinfos -c only scans record headers and is fast
-  // even on large files, and this runs on the request thread inside the upload/merge transaction, so
-  // it must never hold resources long. On timeout we give up and fall back to the size-based estimate.
+  // even on large files, and this runs on the request thread inside the upload/merge transaction,
+  // so
+  // it must never hold resources long. On timeout we give up and fall back to the size-based
+  // estimate.
   private static final int CAPINFOS_TIMEOUT_SECONDS = 15;
 
   /**
    * Counts packets in an uploaded capture by streaming it through {@code capinfos -M -c -} (reads
-   * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate up
-   * front — cost tracks packets, not bytes. Best-effort: any failure returns {@code null} and the
-   * estimate falls back to a size-based one. Never throws.
+   * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate
+   * up front — cost tracks packets, not bytes. Best-effort: any failure returns {@code null} and
+   * the estimate falls back to a size-based one. Never throws.
+   *
+   * <p>Returns a {@code Long}: the provisioning gate compares against {@code app.max-packets} (a
+   * long) which an operator may raise above {@link Integer#MAX_VALUE}, so the count must not
+   * silently overflow at parse time — a capture past 2^31-1 packets would otherwise throw and
+   * fail-open.
    */
-  private Integer countPackets(MultipartFile file) {
+  private Long countPackets(MultipartFile file) {
     Process process = null;
     try {
-      process =
-          new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
+      process = new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
       final Process p = process;
       // Drain stdout on a daemon thread so waitFor's timeout is honoured even if capinfos hangs
       // without closing stdout (a blocking readAllBytes here would bypass the timeout entirely).
@@ -507,16 +766,17 @@ public class FileServiceImpl implements FileService {
       reader.join(2000);
       if (process.exitValue() != 0) return null;
       Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
-      return m.find() ? Integer.parseInt(m.group(1)) : null;
+      return m.find() ? Long.parseLong(m.group(1)) : null;
     } catch (Exception e) {
-      log.warn("capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
+      log.warn(
+          "capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
       if (process != null) process.destroyForcibly();
       return null;
     }
   }
 
   /** Packet count for a local capture file via {@code capinfos -M -c <path>}. Best-effort. */
-  private Integer countPackets(File file) {
+  private Long countPackets(File file) {
     Process process = null;
     try {
       process =
@@ -533,7 +793,7 @@ public class FileServiceImpl implements FileService {
       reader.join(2000);
       if (process.exitValue() != 0) return null;
       Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
-      return m.find() ? Integer.parseInt(m.group(1)) : null;
+      return m.find() ? Long.parseLong(m.group(1)) : null;
     } catch (Exception e) {
       log.warn("capinfos packet count failed for {}: {}", file.getName(), e.getMessage());
       if (process != null) process.destroyForcibly();

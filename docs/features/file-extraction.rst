@@ -7,9 +7,9 @@ documents, binaries, archives, and more — directly from PCAP payloads.
 Enabling Extraction
 -------------------
 
-File extraction is enabled by default. In the **Analysis options** modal shown
-after file selection, the **Embedded file extraction** stage can be unchecked
-to skip extraction for that upload.
+File extraction is enabled by default. To skip it for an upload, untick
+**Files in the traffic** under **Analyse with** on the home page before
+choosing the file.
 
 Either way, extraction cannot be added retroactively — re-upload the file
 if you need extracted files for a capture processed without it.

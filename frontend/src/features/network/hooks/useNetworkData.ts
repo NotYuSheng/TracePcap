@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { networkService } from '../services/networkService';
-import type { GraphNode, GraphEdge, NetworkStats } from '../types';
+import type { DeviceLink, GraphNode, GraphEdge, NetworkStats } from '../types';
 import type { Conversation, HostClassification, HostIdentity } from '@/types';
 import type { NodeRole } from '@/features/insights/types/insights.types';
+import { occupancyService, type DeviceMove, type ReusedAddress } from '@/features/occupancy/occupancyService';
 import { insightsService } from '@/features/insights/services/insightsService';
 import type { AnalysisSummary } from '@/types';
 import { env } from '@/config/env';
@@ -20,6 +21,8 @@ interface UseNetworkDataReturn {
   hiddenNodes: number;
   hiddenNodesList: GraphNode[];
   crossEdges: GraphEdge[];
+  /** One device on two nodes: it moved to another address in the capture. */
+  deviceLinks: DeviceLink[];
 }
 
 export const CONVERSATION_LIMIT_ENABLED = env.NETWORK_DIAGRAM_CONVERSATION_LIMIT;
@@ -36,7 +39,9 @@ const MAX_CONVERSATIONS = 500;
 export function useNetworkData(
   fileId: string,
   analysisSummary?: AnalysisSummary,
-  maxNodes: number = MAX_DIAGRAM_NODES
+  maxNodes: number = MAX_DIAGRAM_NODES,
+  /** View in this network: its own detection rules' matches show on the edges (#925 phase 3). */
+  networkId?: string
 ): UseNetworkDataReturn {
   const maxConversations = CONVERSATION_LIMIT_ENABLED ? MAX_CONVERSATIONS : Infinity;
 
@@ -45,6 +50,9 @@ export function useNetworkData(
   const hostClassificationsRef = useRef<HostClassification[] | undefined>(undefined);
   const hostIdentitiesRef = useRef<HostIdentity[] | undefined>(undefined);
   const nodeRolesRef = useRef<NodeRole[] | undefined>(undefined);
+  const reusedRef = useRef<ReusedAddress[] | undefined>(undefined);
+  const movesRef = useRef<DeviceMove[] | undefined>(undefined);
+  const [deviceLinks, setDeviceLinks] = useState<DeviceLink[]>([]);
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -68,7 +76,9 @@ export function useNetworkData(
     summary: AnalysisSummary | undefined,
     limit: number,
     hostIdentities?: HostIdentity[],
-    nodeRoles?: NodeRole[]
+    nodeRoles?: NodeRole[],
+    reused?: ReusedAddress[],
+    moves?: DeviceMove[]
   ) => {
     const graphData = networkService.buildNetworkGraph(
       conversations,
@@ -77,8 +87,11 @@ export function useNetworkData(
       hostClassifications,
       limit,
       hostIdentities,
-      nodeRoles
+      nodeRoles,
+      reused,
+      moves
     );
+    setDeviceLinks(graphData.deviceLinks ?? []);
     setNodes(graphData.nodes);
     setEdges(graphData.edges);
     setHiddenNodes(graphData.hiddenNodes ?? 0);
@@ -105,8 +118,9 @@ export function useNetworkData(
 
       // Conversations are required; the other three are best-effort enrichments (older analyses
       // may predate their endpoints). All depend only on fileId, so they run concurrently.
-      const [response, classificationsRes, identitiesRes, rolesRes] = await Promise.allSettled([
+      const [response, classificationsRes, identitiesRes, rolesRes, reusedRes, movesRes] = await Promise.allSettled([
         conversationService.getConversations(fileId, {
+          networkId,
           ip: '',
           port: '',
           payloadContains: '',
@@ -129,6 +143,10 @@ export function useNetworkData(
         conversationService.getHostClassifications(fileId),
         conversationService.getHostIdentities(fileId),
         insightsService.listNodeRoles(fileId),
+        // Addresses more than one device held, drawn as one node per device (#918 slice 2).
+        occupancyService.listForFile(fileId),
+        // Devices that moved to another address: their two nodes are linked.
+        occupancyService.moves(fileId),
       ]);
       if (response.status === 'rejected') throw response.reason;
       const conversations = response.value.data;
@@ -143,12 +161,19 @@ export function useNetworkData(
       const nodeRoles: NodeRole[] | undefined =
         rolesRes.status === 'fulfilled' ? rolesRes.value : undefined;
 
+      const reused: ReusedAddress[] | undefined =
+        reusedRes.status === 'fulfilled' ? reusedRes.value : undefined;
+
+      const moves: DeviceMove[] | undefined = movesRes.status === 'fulfilled' ? movesRes.value : undefined;
+
       conversationsRef.current = conversations;
+      reusedRef.current = reused;
+      movesRef.current = moves;
       hostClassificationsRef.current = hostClassifications;
       hostIdentitiesRef.current = hostIdentities;
       nodeRolesRef.current = nodeRoles;
 
-      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes, hostIdentities, nodeRoles);
+      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes, hostIdentities, nodeRoles, reused, moves);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load network data';
       setError(errorMessage);
@@ -162,7 +187,7 @@ export function useNetworkData(
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId]);
+  }, [fileId, networkId]);
 
   // Re-transform (no network request) when maxNodes or analysisSummary changes
   useEffect(() => {
@@ -173,7 +198,9 @@ export function useNetworkData(
       analysisSummary,
       maxNodes,
       hostIdentitiesRef.current,
-      nodeRolesRef.current
+      nodeRolesRef.current,
+      reusedRef.current,
+      movesRef.current
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxNodes, analysisSummary]);
@@ -188,5 +215,6 @@ export function useNetworkData(
     hiddenNodes,
     hiddenNodesList,
     crossEdges,
+    deviceLinks,
   };
 }

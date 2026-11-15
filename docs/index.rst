@@ -28,7 +28,18 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    :caption: Features
 
    features/pcap-upload
+   features/analysis-navigation
+   features/analysis-overview
+   features/reanalysis
+   features/address-reuse
+   features/network-devices
+   features/overlapping-networks
+   features/network-address-config
    features/network-visualization
+   features/network-time-axis
+   features/network-map
+   features/packet-replay
+   features/device-moves
    features/network-cluster
    features/comparison
    features/ndpi-analysis
@@ -47,6 +58,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/network-monitor
    features/label-staleness
    features/streaming-upload
+   features/settings
 
 .. toctree::
    :maxdepth: 2
@@ -74,6 +86,8 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
 
    sample-files
    demos/strrat-you-dirty-rat
+   demos/devices-on-a-dhcp-network
+   demos/two-sites-one-range
 
 .. toctree::
    :maxdepth: 1

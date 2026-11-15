@@ -251,7 +251,77 @@ class LlmClientTest {
         .andRespond(withSuccess("{\"choices\":[]}", MediaType.APPLICATION_JSON));
 
     assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
-        .isInstanceOf(LlmException.class);
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
     server.verify();
+  }
+
+  @Test
+  void blankContentIsAnLlmError() {
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(withSuccess(messageResponse("  "), MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
+    server.verify();
+  }
+
+  @Test
+  void blankReplyToToolsFallsBackToAPlainCompletion() {
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(withSuccess(messageResponse(""), MediaType.APPLICATION_JSON));
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(withSuccess(messageResponse("plain text"), MediaType.APPLICATION_JSON));
+
+    LlmToolResponse response = client.generateWithTools("sys", "user", List.of(tool()));
+
+    assertThat(response.schemaConstrained()).isFalse();
+    assertThat(response.content()).isEqualTo("plain text");
+    server.verify();
+  }
+
+  @Test
+  void hittingTheTokenCapWithNoMessageIsReportedAsTruncated() {
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(
+            withSuccess(
+                "{\"choices\":[{\"finish_reason\":\"length\"}]}", MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.OUTPUT_TRUNCATED);
+    server.verify();
+  }
+
+  @Test
+  void rejectedCompletionIsNotAnOutage() {
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+    assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
+    server.verify();
+  }
+
+  @Test
+  void rejectedHealthCheckIsNotAnOutage() {
+    RestTemplate healthRestTemplate = new RestTemplate();
+    MockRestServiceServer rejectingHealthServer =
+        MockRestServiceServer.createServer(healthRestTemplate);
+    rejectingHealthServer
+        .expect(requestTo(MODELS_URL))
+        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+    LlmClient rejectedClient = new LlmClient(config, restTemplate, healthRestTemplate);
+
+    assertThatThrownBy(() -> rejectedClient.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
   }
 }

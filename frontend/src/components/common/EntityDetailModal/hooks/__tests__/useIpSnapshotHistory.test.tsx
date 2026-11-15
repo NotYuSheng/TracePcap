@@ -159,4 +159,30 @@ describe('useIpSnapshotHistory', () => {
     await waitFor(() => expect(result.current.ipSnapHistory).toHaveLength(1))
     expect(result.current.ipSnapHistory[0].snap.id).toBe('s2')
   })
+
+  it.each([
+    ['IP', '10.0.0.1', 'ip', '10.0.0.1'],
+    ['DEVICE', 'aa:bb:cc:dd:ee:ff', 'mac', 'aa:bb:cc:dd:ee:ff'],
+  ] as const)(
+    'asks the server for just this %s, not the whole file (#469)',
+    async (type, key, param, value) => {
+      const seen: URLSearchParams[] = []
+      serve({ 'file-1': { classifications: [{ ip: '10.0.0.1', mac: 'aa:bb:cc:dd:ee:ff' }] } })
+      server.use(
+        http.get('*/files/:fileId/ip-mac-observations', ({ request }) => {
+          seen.push(new URL(request.url).searchParams)
+          return HttpResponse.json([{ ip: '10.0.0.1', macs: ['aa:bb:cc:dd:ee:ff'] }])
+        })
+      )
+
+      const { result } = renderHook(() =>
+        useIpSnapshotHistory(type, key, [snapshot('s1', 'file-1', 1)])
+      )
+
+      await waitFor(() => expect(result.current.ipHistoryLoading).toBe(false))
+      expect(seen).toHaveLength(1)
+      expect(seen[0].get(param)).toBe(value)
+      expect(seen[0].has(param === 'ip' ? 'mac' : 'ip')).toBe(false)
+    }
+  )
 })

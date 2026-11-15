@@ -79,6 +79,29 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
   }
 
+  @ExceptionHandler(PacketCountExceededException.class)
+  public ResponseEntity<ErrorResponse> handlePacketCountExceededException(
+      PacketCountExceededException ex, HttpServletRequest request) {
+    if (ex.getPacketCount() == PacketCountExceededException.UNKNOWN_COUNT) {
+      log.warn("Capture rejected: packet count unverifiable, over provisioned limit {}",
+          ex.getMaxPackets());
+    } else {
+      log.warn("Capture rejected: {} packets over provisioned limit {}",
+          ex.getPacketCount(), ex.getMaxPackets());
+    }
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.PAYLOAD_TOO_LARGE.value())
+            .error(HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase())
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+  }
+
   @ExceptionHandler(InvalidFileException.class)
   public ResponseEntity<ErrorResponse> handleInvalidFileException(
       InvalidFileException ex, HttpServletRequest request) {
@@ -167,6 +190,21 @@ public class GlobalExceptionHandler {
             .build();
 
     return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
+  }
+
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<ErrorResponse> handleForbiddenException(
+      ForbiddenException ex, HttpServletRequest request) {
+    log.warn("Forbidden: {}", ex.getMessage());
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.FORBIDDEN.value())
+            .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .build();
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
@@ -278,6 +316,22 @@ public class GlobalExceptionHandler {
 
   private static long ceilDiv(long numerator, long denominator) {
     return (numerator + denominator - 1) / denominator;
+  }
+
+  @ExceptionHandler(FieldValidationException.class)
+  public ResponseEntity<ErrorResponse> handleFieldValidation(
+      FieldValidationException ex, HttpServletRequest request) {
+    log.warn("Validation failed: {}", ex.getErrors());
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .validationErrors(new LinkedHashMap<>(ex.getErrors()))
+            .build();
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

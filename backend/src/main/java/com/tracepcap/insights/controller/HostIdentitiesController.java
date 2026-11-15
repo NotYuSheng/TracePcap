@@ -11,6 +11,8 @@ import com.tracepcap.insights.service.NodeRoleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.web.bind.annotation.RequestParam;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
@@ -35,14 +37,23 @@ public class HostIdentitiesController {
   private final NodeRoleService nodeRoleService;
 
   @GetMapping("/{fileId}/host-identities")
-  @Operation(summary = "Adjudicated identity per host for a file (winner-or-contested)")
-  public ResponseEntity<List<HostIdentityDto>> getHostIdentities(@PathVariable UUID fileId) {
+  @Operation(
+      summary = "Adjudicated identity per host for a file (winner-or-contested)",
+      description =
+          "Every host in the file by default. Pass ips (comma-separated) to get just those hosts,"
+              + " e.g. a conversation's two endpoints, without the file-wide payload. IPs with no"
+              + " identity are omitted rather than reported as errors.")
+  public ResponseEntity<List<HostIdentityDto>> getHostIdentities(
+      @PathVariable UUID fileId,
+      @Parameter(description = "Only these host IPs (comma-separated). Omit for every host.")
+          @RequestParam(required = false)
+          List<String> ips) {
     // Lazy backfill (#521): files analysed before the adjudicator existed have classifications but
     // no identities, so the frontend — which now renders the adjudicated label and nothing else —
     // would show every node as "unknown". Adjudicate on first read instead. Idempotent: it reads
     // the same classifications and produces the same winners, so a file with fresh identities is
     // untouched, and the cost is paid once per legacy file.
-    if (hostIdentityRepository.findByFileId(fileId).isEmpty()) {
+    if (!hostIdentityRepository.existsByFileId(fileId)) {
       try {
         hostIdentityService.adjudicateFile(fileId);
       } catch (DataIntegrityViolationException raced) {
@@ -51,15 +62,20 @@ public class HostIdentitiesController {
         // winner's rows are what we wanted. But this exception can also mean a genuine persistence
         // defect, which must NOT be swallowed into a 200-with-nothing. So only tolerate it when the
         // rows are actually there now; otherwise it was a real failure, and it propagates.
-        if (hostIdentityRepository.findByFileId(fileId).isEmpty()) {
+        if (!hostIdentityRepository.existsByFileId(fileId)) {
           throw raced;
         }
         log.debug("Concurrent backfill for file {} lost the race; reading the winner's rows", fileId);
       }
     }
 
+    List<String> wanted =
+        ips == null ? List.of() : ips.stream().map(String::trim).filter(ip -> !ip.isEmpty()).toList();
     List<HostIdentityDto> result =
-        hostIdentityRepository.findByFileId(fileId).stream()
+        (wanted.isEmpty()
+                ? hostIdentityRepository.findByFileId(fileId)
+                : hostIdentityRepository.findByFileIdAndIpIn(fileId, wanted))
+            .stream()
             .map(
                 e ->
                     HostIdentityDto.builder()

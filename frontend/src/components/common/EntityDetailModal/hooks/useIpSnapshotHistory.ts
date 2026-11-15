@@ -52,10 +52,14 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
       return Promise.all(
         candidates.map(({ snap, host }) =>
           Promise.all([
-            // ip-mac-observations for the whole file — used both to invert (MAC→IPs for a device)
-            // and to find the MACs claiming an IP.
+            // ip-mac-observations scoped server-side to this entity (#469): for a device, the IPs
+            // its MAC claimed (each with all its MACs); for an IP, the MACs that claimed it. This
+            // used to fetch the whole file's observations for every snapshot. The filtering below
+            // still runs, and is a no-op on the already-scoped rows.
             apiClient
-              .get<{ ip: string; macs: string[] }[]>(`/files/${snap.fileId}/ip-mac-observations`)
+              .get<{ ip: string; macs: string[] }[]>(`/files/${snap.fileId}/ip-mac-observations`, {
+                params: isDevice ? { mac: macKey } : { ip: entityKey },
+              })
               .then(r => r.data)
               .catch(() => [] as { ip: string; macs: string[] }[]),
             insightsService.getNodeRole(isDevice ? 'DEVICE' : 'IP', entityKey, snap.fileId).catch(() => null),

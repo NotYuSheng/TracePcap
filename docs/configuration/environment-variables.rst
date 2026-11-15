@@ -1,6 +1,13 @@
 Environment Variables
 =====================
 
+.. tip::
+
+   Every variable below can be seen in the app under **Settings → System**, with its
+   effective value (including values derived from ``APP_MEMORY_MB``) and why it can't be
+   changed there. Secrets show only whether they are set; their values are never shown.
+
+
 All configuration is driven by environment variables defined in the ``.env``
 file at the repository root. Copy ``.env.example`` to ``.env`` before starting.
 
@@ -46,6 +53,38 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
    * - ``POSTGRES_MEM_LIMIT`` / ``POSTGRES_CPU_LIMIT``
      - ``1g`` / ``2``
      - Postgres container limits.
+   * - ``MAX_UPLOAD_PACKETS``
+     - ``2000000``
+     - Most packets accepted in a single capture. A **provisioning contract**, not
+       a hard technical ceiling: packet count is the dominant driver of database
+       row counts, and those drive how much parallel-query shared memory Postgres
+       needs in ``/dev/shm``. Over-limit captures are rejected gracefully at upload
+       (HTTP 413) rather than failing mid-analysis. Set ``0`` to disable the check.
+       Raise it **together with** ``POSTGRES_SHM_SIZE`` / ``POSTGRES_WORK_MEM``
+       below to support larger captures.
+   * - ``MAX_UPLOAD_PACKETS_VERIFY_FRACTION``
+     - ``0.5``
+     - Behaviour when ``capinfos`` can't produce a packet count (timeout/error).
+       The gate fails **closed** (rejects) for files at or above this fraction of
+       the max upload size — an unverifiable large capture is exactly the case the
+       gate exists to stop — and fails **open** (allows) for smaller files, which
+       can't hold a dangerous packet count. Set ``>= 1.0`` for pure fail-open.
+   * - ``POSTGRES_SHM_SIZE``
+     - ``256m``
+     - Size of the Postgres container's ``/dev/shm`` (parallel-query shared
+       memory). Docker's default of 64 MB is too small: a large parallel query can
+       fail with ``could not resize shared memory segment ... No space left on
+       device`` even when the host has ample RAM and disk. Must exceed the
+       worst-case per-query demand set by the three knobs below.
+   * - ``POSTGRES_WORK_MEM`` / ``POSTGRES_HASH_MEM_MULTIPLIER`` / ``POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER``
+     - ``32MB`` / ``2.0`` / ``2``
+     - Postgres per-query memory knobs, pinned so a query's ``/dev/shm`` demand is
+       **bounded** rather than "whatever the planner picks". Worst case for one
+       query is roughly
+       ``work_mem × hash_mem_multiplier × (1 + max_parallel_workers_per_gather)``
+       — with the defaults, ``32MB × 2 × 3 ≈ 192 MB``, which stays under
+       ``POSTGRES_SHM_SIZE``. If you raise ``POSTGRES_WORK_MEM``, raise
+       ``POSTGRES_SHM_SIZE`` to keep it above that product.
    * - ``MINIO_MEM_LIMIT`` / ``MINIO_CPU_LIMIT``
      - ``1g`` / ``2``
      - MinIO container limits.
@@ -77,6 +116,12 @@ documented in its own section below with the surrounding detail.
      - Gates the API behind a Keycloak JWT and adds a login flow. Set to
        ``true`` by the production overlays; you rarely set it directly. See
        :doc:`authentication`.
+   * - ``SYSTEM_SETTINGS_EDITABLE``
+     - ``false``
+     - With login off, decides whether actions marked admin-only (such as
+       changing retention) are allowed for everyone (``true``) or for no one
+       (``false``). Ignored with login on, where the Keycloak client role
+       ``admin`` decides. See :doc:`user-management`.
    * - ``SURICATA_ENABLED``
      - ``true``
      - Deployment-wide switch for intrusion-detection enrichment. ``false``
@@ -117,10 +162,12 @@ documented in its own section below with the surrounding detail.
 
 .. note::
 
-   Two capabilities are switched by configuration rather than a boolean. AI
-   features are governed by ``LLM_API_BASE_URL`` — point it at a reachable local
-   inference server to enable them; the production overlays require it to be set
-   explicitly. Custom detection rules activate when a signatures file is present.
+   AI features are switched by configuration rather than a boolean: they are
+   governed by ``LLM_API_BASE_URL`` — point it at a reachable local inference
+   server to enable them; the production overlays require it to be set
+   explicitly. Custom detection rules are not configured here at all: they live
+   in the database and are edited on the Settings page (see
+   :doc:`signature-rules`).
 
 File Retention
 --------------
@@ -136,6 +183,12 @@ That is sufficient on its own, and it is the **master switch**: the cleanup
 scheduler is not registered at all, so none of the settings below do anything
 while it is ``false``.
 
+Deleting a file, by hand or through expiry, removes the original capture, its
+analysis results and any content extracted from it. An hourly sweep also removes
+extracted content left behind by a failed delete or by an older version. The
+sweep runs even with ``FILE_RETENTION_ENABLED=false``, because it only touches
+content whose file has already been deleted.
+
 .. danger::
 
    ``0`` does **not** mean "never" for ``FILE_RETENTION_HOURS``. It means *delete
@@ -149,6 +202,10 @@ while it is ``false``.
 
 Deletion is only ever triggered by these settings; nothing else in the
 application removes captures or packets on its own.
+
+The three retention hours can also be changed in the app, on the Settings page,
+by an admin (see :ref:`settings-permissions`). The value here stays the
+default, and the app refuses ``FILE_RETENTION_HOURS`` below ``1``.
 
 .. list-table::
    :header-rows: 1
@@ -227,7 +284,11 @@ and MinIO) with a queue of a few hundred is a reasonable starting point.
    * - ``ASYNC_CORE_POOL_SIZE``
      - ``5``
      - Number of threads kept alive to run analyses. These stay up even when
-       idle.
+       idle. This is also how many analyses run at once, because extra threads
+       up to ``ASYNC_MAX_POOL_SIZE`` start only once ``ASYNC_QUEUE_CAPACITY``
+       is full. Each running analysis holds two database connections, so keep
+       ``DB_POOL_MAX_SIZE`` at least ``2 x ASYNC_CORE_POOL_SIZE + 5``. The
+       backend logs a warning at startup when it is smaller.
    * - ``ASYNC_MAX_POOL_SIZE``
      - ``10``
      - Maximum analysis threads. Keep at or below the host CPU core count —
@@ -547,10 +608,11 @@ rebuild (``docker compose up -d --build``).
        **disables** the cap and loads every conversation — this may cause
        browser slowdowns or out-of-memory errors on large captures.
    * - ``APP_VERSION``
-     - ``dev``
+     - the ``APP_VERSION`` file
      - Version string rendered in the app footer (passed as the
-       ``VITE_APP_VERSION`` build arg). In CI this is set from
-       ``git describe --tags``.
+       ``VITE_APP_VERSION`` build arg). When unset, the build reads the
+       ``APP_VERSION`` file at the repo root, which CI rewrites on every merge
+       to ``dev``. GHCR images set it from ``git describe --tags``.
 
 Database Configuration (internal)
 ----------------------------------
@@ -587,3 +649,38 @@ MinIO Configuration (internal)
      - MinIO admin username (default ``minioadmin``) — **change in production**
    * - ``MINIO_ROOT_PASSWORD``
      - MinIO admin password (default ``minioadmin``) — **change in production**
+
+Build Resources
+---------------
+
+The containers' memory and CPU limits (``*_MEM_LIMIT``, ``*_CPU_LIMIT``) apply
+while the stack **runs**. They don't apply to ``docker compose build``, and
+BuildKit has no build-time memory limit, so the build stages cap themselves.
+Building both images at once next to a running stack, uncapped, has frozen a
+15 GB machine.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 15 55
+
+   * - Variable
+     - Default
+     - Description
+   * - ``BUILD_JVM_MAX_HEAP``
+     - ``768m``
+     - Maven's JVM heap for the backend build (otherwise a quarter of the
+       host's RAM).
+   * - ``BUILD_JOBS``
+     - ``2``
+     - Parallel compile jobs for nDPI in the backend image (compiled for arm64
+       images; amd64 uses a prebuilt one).
+   * - ``BUILD_NODE_MAX_HEAP_MB``
+     - ``1536``
+     - Node's heap for ``tsc`` and ``vite`` in the frontend build.
+
+``scripts/rebuild.sh`` builds the images **one at a time** and then starts the
+stack; prefer it to ``docker compose up -d --build``, which builds them in
+parallel. It takes the same ``-f`` arguments as ``docker compose``. Measured on
+an 8-core, 16 GB machine with the stack running: the backend build adds about
+0.5 GB and the frontend build about 2 GB.
+

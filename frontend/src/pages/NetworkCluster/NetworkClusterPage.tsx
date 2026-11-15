@@ -14,10 +14,13 @@ import {
 } from '@/features/cluster/services/clusterApi';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ipOrgRuleService } from '@/features/cluster/services/ipOrgRuleService';
+import { networkAddressService } from '@/features/networkAddress/networkAddressService';
+import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { SummaryStatsBar } from '@components/cluster/SummaryStatsBar/SummaryStatsBar';
 import { ClusterGraph } from '@components/cluster/ClusterGraph/ClusterGraph';
 import { TopHostsTable } from '@components/cluster/TopHostsTable/TopHostsTable';
 import { NetworkControls } from '@components/network/NetworkControls';
+import { SideDrawer, FilterDrawerFooter } from '@components/common/SideDrawer';
 import { toggleSet } from '@/features/network/constants';
 import { nodeIdentityKey } from '@/utils/deviceType';
 
@@ -28,6 +31,7 @@ interface AnalysisOutletContext {
 
 export const NetworkClusterPage = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
+  const [networkId] = useNetworkContext();
 
   const [groupBy, setGroupBy] = useState<GroupBy>('asn');
 
@@ -73,18 +77,22 @@ export const NetworkClusterPage = () => {
     let active = true;
     conversationService.getRiskTypes(fileId).then(v => { if (active) setPresentRiskTypes(v); }).catch(() => {});
     conversationService.getFileTypes(fileId).then(v => { if (active) setPresentFileTypes(v); }).catch(() => {});
-    conversationService.getCustomSignatures(fileId).then(v => { if (active) setPresentCustomSigs(v); }).catch(() => {});
+    conversationService.getCustomSignatures(fileId, networkId).then(v => { if (active) setPresentCustomSigs(v); }).catch(() => {});
     conversationService.getCountries(fileId).then(codes => {
       if (active) setPresentCountries(codes.map(c => c.split('|')[0]).filter(Boolean).sort());
     }).catch(() => {});
     conversationService.getHostClassifications(fileId).then(hosts => {
       if (active) setPresentIdentities(new Set(hosts.map(h => nodeIdentityKey(h))));
     }).catch(() => {});
-    ipOrgRuleService.list().then(rules => {
-      if (active) setPresentNetLabels([...new Set(rules.map(r => r.label))].sort());
+    // The organisations in effect: the network's (picked in "Viewing with") or the default (#915).
+    (networkId
+      ? networkAddressService.list(networkId, 'ip-org-rules').then(networkAddressService.visible)
+      : ipOrgRuleService.list()
+    ).then(rules => {
+      if (active) setPresentNetLabels([...new Set(rules.map(r => r.label ?? '').filter(Boolean))].sort());
     }).catch(() => {});
     return () => { active = false; };
-  }, [fileId]);
+  }, [fileId, networkId]);
 
   // Load the top hosts, re-fetching when the sort metric changes (sorting is server-side).
   useEffect(() => {
@@ -218,7 +226,7 @@ export const NetworkClusterPage = () => {
     setClusterError(null);
     setClusterData(null);
     clusterApi
-      .getClusters(fileId, groupBy, intelFilters)
+      .getClusters(fileId, groupBy, intelFilters, networkId)
       .then(result => {
         if (!active) return;
         setClusterData(result);
@@ -240,7 +248,7 @@ export const NetworkClusterPage = () => {
         if (active) setClusterLoading(false);
       });
     return () => { active = false; };
-  }, [fileId, groupBy, intelFiltersKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fileId, groupBy, intelFiltersKey, networkId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="network-cluster-page">
@@ -348,16 +356,24 @@ export const NetworkClusterPage = () => {
       </Card>
 
       {/* Filter modal */}
-      <Modal
+      <SideDrawer
         show={showFilterModal}
         onHide={() => setShowFilterModal(false)}
-        size="lg"
+        title="Filters"
+        titleId="cluster-filter-drawer-title"
+        badge={activeFilterCount}
+        className="filter-drawer"
+        footer={
+          <FilterDrawerFooter
+            onClearAll={clearAllFilters}
+            canClear={activeFilterCount > 0}
+            onDone={() => setShowFilterModal(false)}
+            doneLabel="Done"
+          />
+        }
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Filters</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
           <NetworkControls
+            embedded
             activeLegendProtocols={activeLegendProtocols}
             onLegendProtocolClick={toggleLegendProtocol}
             onLegendProtocolClear={() => setActiveLegendProtocols([])}
@@ -408,8 +424,7 @@ export const NetworkClusterPage = () => {
             onNetLabelClear={() => setActiveNetLabels([])}
             presentNetLabels={presentNetLabels}
           />
-        </Modal.Body>
-      </Modal>
+      </SideDrawer>
 
     </div>
   );

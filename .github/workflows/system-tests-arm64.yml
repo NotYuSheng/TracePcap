@@ -1,0 +1,30 @@
+name: System Tests (arm64)
+
+# arm64 installs nDPI differently (see docs/getting-started/supported-architectures.rst), so an
+# amd64-only run can't see it break. On a PR this only runs when something that affects the build
+# changes, which is what differs between architectures. Every push to dev and main still runs it.
+
+on:
+  workflow_dispatch:
+  # Release-only: the release PR into main, and main itself. Not on dev pushes or on PRs into dev.
+  # It's the slowest job and only catches arm64-specific build breakage, which is rare enough that
+  # finding it at release time is the right trade. No path filter on the PR trigger, so it runs on
+  # every release PR, not just ones that happen to touch build files. Run it by hand
+  # (workflow_dispatch) to check a risky build change before release.
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  system:
+    uses: ./.github/workflows/system-tests-run.yml
+    with:
+      arch: arm64
+      runner: ubuntu-24.04-arm
+    secrets: inherit

@@ -10,6 +10,9 @@ import lombok.Data;
 public class SubnetDefinitionDto {
   private Long id;
   private String cidr;
+  /** Which of several networks sharing this range it is (#462); null for the range as a whole. */
+  private String segmentKey;
+  private String segmentLabel;
   private String label;
   private String description;
   private String source;
@@ -21,6 +24,12 @@ public class SubnetDefinitionDto {
   private LocalDateTime labeledAt; // when the label was last confirmed (staleness baseline time)
   private LocalDateTime staleSince; // null = not stale
   private List<String> staleFields; // what drifted since the label baseline
+  /** "default", or "network" for a network's own entry (#915 phase 4); null on the default list. */
+  private String scope;
+  /** The network's entry hides the default's subnet for this CIDR. */
+  private boolean hidden;
+  /** A network entry for a CIDR the default also has. */
+  private boolean overridesDefault;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

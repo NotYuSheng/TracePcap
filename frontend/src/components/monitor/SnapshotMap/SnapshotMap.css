@@ -1,0 +1,110 @@
+.snapshot-map-graph {
+  position: relative;
+  border: 1px solid var(--tp-border, #eceef3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.snapshot-map-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tp-text-muted, #525a68);
+  font-size: 0.85rem;
+}
+
+.snapshot-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+/* Each legend item is a row on one centre line: dot, label, and any Show/Hide link. */
+.snapshot-map-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.snapshot-map-legend .btn-link {
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0;
+  border: 0;
+}
+
+.snapshot-map-dot {
+  display: inline-block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid;
+}
+
+.snapshot-map-dot-gone {
+  border: 1.5px dashed #98a2b3;
+}
+
+/* The graph fills the box (it defaults to 70vh), so its play bar sits inside it, not cut off below. */
+.snapshot-map-graph .network-graph-wrapper {
+  height: 100%;
+}
+
+/* Devices gone since the capture before: chips in a box that scrolls past a few rows. */
+.snapshot-map-gone {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 132px;
+  overflow-y: auto;
+  border: 1px solid var(--tp-border, #eceef3);
+  border-radius: 8px;
+}
+
+.snapshot-map-gone-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px dashed #98a2b3;
+  border-radius: 10px;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #374151);
+  font-size: 0.75rem;
+}
+
+.snapshot-map-gone-item:hover,
+.snapshot-map-gone-item.active {
+  border-style: solid;
+  border-color: #5925dc;
+  background: #f7f5ff;
+}
+
+[data-theme='dark'] .snapshot-map-gone-item:hover,
+[data-theme='dark'] .snapshot-map-gone-item.active {
+  border-color: #a993ff;
+  background: rgb(155 125 255 / 12%);
+}
+
+.snapshot-map-ghosts {
+  margin: 0;
+  min-height: 0;
+}
+
+.snapshot-map-ghosts .form-check-label {
+  font-size: inherit;
+}
+
+.snapshot-map-gone-mac {
+  color: var(--tp-text-muted, #525a68);
+}

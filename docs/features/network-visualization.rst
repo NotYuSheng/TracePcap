@@ -4,6 +4,9 @@ Network Visualization
 The Network Visualization tab renders an interactive topology graph of all
 hosts and flows extracted from the PCAP file.
 
+The time axis above the graph picks a window of the capture to show; see
+:doc:`network-time-axis`.
+
 How the Graph Is Constructed
 -----------------------------
 
@@ -59,10 +62,23 @@ node positions are preserved.
 The control is available in both the analysis-mode diagram and the monitor-mode
 snapshot diagram, which share the same underlying graph component.
 
-Node-to-Node Volume Heatmap
----------------------------
+Traffic Card
+------------
 
-Below the diagram, the **Node-to-Node Volume** panel renders a src×dst matrix of
+Above the diagram, the **Traffic** card shows the diagram's totals (hosts,
+connections, packets, bytes) and how many are shown after filters. It has two
+tabs, both collapsed until you open one; the open tab is remembered:
+
+- **Busiest pairs**: the eight host pairs carrying the most bytes, both
+  directions together, with their apps and a bar each. Click a pair to
+  highlight it in the diagram.
+- **Matrix**: the node-to-node volume heatmap, below. The corner button shows
+  it full screen.
+
+Node-to-Node Volume Heatmap
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **Matrix** tab renders a src×dst matrix of
 the displayed hosts, each cell shaded by the volume between that pair on the
 :ref:`shared volume color scale <shared-volume-scale>`. The diagram answers
 *who talks to whom*; the matrix answers *how much*, which a force-directed
@@ -145,7 +161,7 @@ sources:
        for hosts on the other side of a router.
    * - **Vendor**
      - The MAC address OUI prefix (first 3 octets) resolved against the bundled
-       Wireshark ``manuf`` database. Shown in the Node Detail Panel. Not
+       Wireshark ``manuf`` database. Shown in the node details dialog. Not
        available if the MAC address is absent, locally-administered
        (randomised), or belongs to a virtual adapter.
    * - **Node colour and icon**
@@ -155,8 +171,11 @@ sources:
        ``unknown``) use the hardware device classification colour instead
        (IoT = pink, Mobile = violet, Laptop/Desktop = blue, Server = emerald,
        Router = orange). The legend in the graph reflects exactly which colours
-       are present in the current view. See the *Classification* section below
-       for how each signal is derived.
+       are present in the current view. Click a legend entry to highlight it: a
+       node type picks out those devices and their conversations, an edge colour
+       picks out those conversations and the devices at both ends; everything
+       else fades. Click the entry again to clear it. See the *Classification*
+       section below for how each signal is derived.
    * - **Country flag**
      - Shown on external (non-RFC-1918) IP nodes only. Sourced from ipinfo.io
        (online) or the bundled DB-IP Lite MMDB (offline fallback). RFC-1918,
@@ -177,16 +196,17 @@ The graph is rendered with **Sigma.js** (WebGL) using **graphology** as the
 underlying graph model. No external tile servers or map services are used — the
 topology is a pure data-driven graph rendered in the browser.
 
-Two layout algorithms are available:
+Three layouts are available:
 
-- **Force-directed** (default) — ForceAtlas2 run in a Web Worker, followed by
-  a de-overlapping pass. Surfaces natural clusters and hub-and-spoke structure.
+- **Circular** — devices around a ring, followed by a de-overlapping pass.
 - **Hierarchical** — ELK (Eclipse Layout Kernel) ``layered`` algorithm, which
   implements the **Sugiyama method**: nodes are ranked into horizontal layers by
   longest-path analysis, edge crossings between layers are minimised, and
   disconnected components are placed side-by-side. This layout makes
   client → server traffic flow and parent/child relationships immediately
   visible.
+- **Network map** (default) — devices in nested boxes: network, subnet, device
+  type; the internet by domain. See :doc:`network-map`.
 
 Grouping Modes
 --------------
@@ -249,20 +269,40 @@ genuinely present. Four flag types are detected:
 The **Ghost Node Filters** section in the control panel only shows the flag
 types actually present in the current capture. Each is a pill that toggles a
 **hide** filter — selecting it removes nodes carrying that flag from the graph.
-A ghost-flag banner in the Node Detail modal explains why a node was flagged.
+A ghost-flag banner in the node details dialog explains why a node was flagged.
 The active ghost filters are also honoured when exporting the topology to a PDF
 report.
 
-Click a node to open the **Node Detail Panel**, which shows:
+Click a node to open its **details dialog**. It has two halves.
 
-- IP address and MAC address
-- Hostname (SNI extracted from TLS ClientHello, if available)
-- **Identity** — the adjudicated verdict for "what is this host?" (see below)
-- **Evidence weighed** — the measured facts behind the verdict (see below)
-- **Role** — the analyst-assigned name for the host (e.g. *Finance DB*)
-- Packets sent / received and bytes sent / received / total
-- Protocols used across all conversations
-- Connections table: per-peer breakdown sorted by bytes, with application labels
+**On the left, what the host is.** Its name and device type, with whether that
+type is *confirmed*, *not confirmed* or *the signals disagree*. Under it are the
+facts that identify it: address, MAC, maker, where the name came from, the
+signed-in Windows user and the TTL. Then come the **Role** (the analyst-assigned
+name, e.g. *Finance DB*) and **Show its conversations**, which opens the
+Conversations page filtered to this host.
+
+While the type is a machine guess, a **Confirm what it is** box lists the top
+candidates with their scores. Click one to confirm it. This sets the same human
+override as *I disagree*. **Other…** opens the Identity evidence tab to pick
+any other type.
+
+**On the right, the detail in tabs:**
+
+- **Traffic**:
+  - packets sent and received, total bytes (out and in) and the peer count;
+  - the protocols seen;
+  - a **Peers** table, biggest first. Each peer's bar shows its traffic
+    against the busiest peer. Click an address to inspect that host, or the
+    arrow to open the conversations between the two.
+  - Phantom-node and device-move notes also appear here.
+- **Identity evidence**: the adjudicated **Identity** verdict, the devices that
+  held this address, and the **Evidence weighed** (see below).
+- **History**: this host across other captures.
+- **Notes**: a free-text note on the host.
+- A tab per service the host was seen serving (e.g. **DNS**), with its log.
+
+On a narrow screen the two halves stack, with the identity card on top.
 
 Identity & Evidence (facts → votes → verdict)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -365,13 +405,23 @@ is attached to the node and available as a label field, with no active probing.
 Layout Controls
 ---------------
 
-- **Force-directed** — switch to ForceAtlas2 layout (default).
+- **Circular** — switch to the circular layout.
 - **Hierarchical** — switch to ELK Sugiyama layered layout (top-down).
-- **Fit view** — reset the camera to fit all nodes in the viewport.
+- **Network map** — switch to the grouped network map (:doc:`network-map`), the
+  layout the page opens in.
+- **Reset positions** — put dragged nodes back where the layout placed them;
+  shown once a node has been dragged (circular and hierarchical; in the network
+  map a dragged device moves between groups instead, see :doc:`network-map`).
+- **Fit view** — reset the camera to fit all nodes in the viewport. It isn't
+  fullscreen: that's the button at the right of the graph card's header. Pressing
+  Fit view twice more with the graph already fitted points that button out with
+  a short hint.
 - **Filters** — open the filter panel (also accessible in fullscreen mode).
 
 Export
 ------
 
 The topology can be captured as part of the PDF report via the **Export PDF**
-button (see :doc:`../operations/backup-restore`).
+button (see :doc:`../operations/backup-restore`). The **download** button in the
+graph card's header saves the network map as a draw.io diagram to finish by hand
+(see :doc:`network-map`).

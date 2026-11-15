@@ -1,9 +1,10 @@
+import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
-import type { ConversationFilters } from '@/features/conversation/types';
-import { COLUMN_DEFS } from '@/features/conversation/constants';
-import type { ColumnKey } from '@/features/conversation/constants';
+import { Badge, Button, Form, Popover } from '@govtechsg/sgds-react';
+import { SideDrawer, FilterDrawerFooter, FilterPillCount } from '@components/common/SideDrawer';
+import type { ConversationFacetCounts, ConversationFilters } from '@/features/conversation/types';
 import {
   getAppColor,
   getCategoryColor,
@@ -28,6 +29,9 @@ interface CategoryStat {
   category: string;
 }
 
+/** Apps offered as quick chips; the rest are under More filters. */
+const QUICK_APPS = 4;
+
 interface ConversationFilterPanelProps {
   filters: ConversationFilters;
   onFiltersChange: (update: Partial<ConversationFilters>) => void;
@@ -41,15 +45,18 @@ interface ConversationFilterPanelProps {
   customSignatureOptions: string[];
   suricataAlertOptions: string[];
   signatureSeverities?: Record<string, string>;
+  /** Rule name → scope, shown in each pill (#925 phase 3). */
+  signatureScopes?: Record<string, string>;
   countryOptions: string[];
   presentDeviceTypes?: string[];
   activeFilterCount: number;
-  visibleColumns: Set<ColumnKey>;
-  onToggleColumn: (key: ColumnKey) => void;
-  onResetColumns?: () => void;
-  hideColumnToggle?: boolean;
+  /** Conversations matching the current filters, shown on the drawer's close button. */
+  matchCount?: number;
+  /** Conversations per filter value, shown on each chip. */
+  facetCounts?: ConversationFacetCounts | null;
   defaultOpen?: boolean;
 }
+
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: React.ReactNode }) {
   const popover = (
@@ -59,7 +66,7 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -69,7 +76,7 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 
@@ -94,16 +101,17 @@ export function ConversationFilterPanel({
   customSignatureOptions,
   suricataAlertOptions,
   signatureSeverities = {},
+  signatureScopes = {},
   countryOptions,
   presentDeviceTypes,
   activeFilterCount,
-  visibleColumns,
-  onToggleColumn,
-  onResetColumns,
-  hideColumnToggle = false,
-  defaultOpen,
+  matchCount,
+  facetCounts,
+  defaultOpen = false,
 }: ConversationFilterPanelProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen ?? activeFilterCount > 0);
+  const countOf = (facet: keyof ConversationFacetCounts, key: string) =>
+    facetCounts?.[facet]?.[key];
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [ipInput, setIpInput] = useState(filters.ip);
   const [portInput, setPortInput] = useState(filters.port);
   const [payloadInput, setPayloadInput] = useState(filters.payloadContains);
@@ -157,26 +165,105 @@ export function ConversationFilterPanel({
 
   return (
     <div className="conversation-filter-panel mb-3">
+      {/* Quick filters, always in view: search by address, flagged only, the busiest apps.
+          Everything else is under More filters. */}
+      <div className="cfp-quick">
+        <Form.Control
+          type="search"
+          size="sm"
+          className="cfp-search"
+          placeholder="Search by IP address"
+          aria-label="Search conversations by IP address"
+          value={ipInput}
+          onChange={e => handleIpChange(e.target.value)}
+        />
+        <div role="group" aria-label="Quick filters" className="d-flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`cfp-chip${activeFilterCount === 0 ? ' active' : ''}`}
+            aria-pressed={activeFilterCount === 0}
+            onClick={onClearAll}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`cfp-chip${filters.hasRisks ? ' active' : ''}`}
+            aria-pressed={filters.hasRisks}
+            onClick={() => onFiltersChange({ hasRisks: !filters.hasRisks })}
+          >
+            <i className="bi bi-flag-fill me-1" aria-hidden="true" />
+            Flagged
+          </button>
+          {apps.slice(0, QUICK_APPS).map(a => (
+            <button
+              key={a.name}
+              type="button"
+              className={`cfp-chip${filters.apps.includes(a.name) ? ' active' : ''}`}
+              aria-pressed={filters.apps.includes(a.name)}
+              onClick={() => toggle('apps', a.name, filters.apps)}
+            >
+              {a.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Toggle button */}
       <div className="d-flex align-items-center gap-2">
         <Button
           size="sm"
           variant="outline-secondary"
-          onClick={() => setIsOpen(o => !o)}
+          onClick={() => setIsOpen(true)}
+          aria-haspopup="dialog"
         >
           <i className="bi bi-funnel me-1"></i>
-          Filters
+          More filters
           {activeFilterCount > 0 && (
             <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
           )}
-          <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
         </Button>
+        {/* Exact src → dst pair (#471). Only deep links set it, and no input in the panel edits it,
+            so it's shown here (always visible) with its own remove button. Otherwise it would
+            silently narrow the table. */}
+        {(filters.srcIp || filters.dstIp) && (
+          <Badge bg="light" text="dark" className="border d-inline-flex align-items-center gap-1 font-monospace">
+            <i className="bi bi-arrow-right-circle" aria-hidden="true"></i>
+            {filters.srcIp || 'any'} → {filters.dstIp || 'any'}
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 ms-1 text-secondary"
+              aria-label="Remove source → destination filter"
+              onClick={() => onFiltersChange({ srcIp: '', dstIp: '' })}
+            >
+              <i className="bi bi-x" aria-hidden="true"></i>
+            </button>
+          </Badge>
+        )}
       </div>
 
-      {/* Collapsible panel */}
-      {isOpen && (
-        <div className="card mt-2 filter-panel-body">
-          <Card.Body className="p-3">
+      {/* More filters: a right-side drawer. Filters apply as you pick them; the footer
+          button just closes it, showing how many conversations are left. */}
+      <SideDrawer
+        show={isOpen}
+        onHide={() => setIsOpen(false)}
+        title="Filters"
+        titleId="filter-drawer-title"
+        badge={activeFilterCount}
+        className="filter-drawer"
+        footer={
+          <FilterDrawerFooter
+            onClearAll={onClearAll}
+            canClear={activeFilterCount > 0}
+            onDone={() => setIsOpen(false)}
+            doneLabel={
+              matchCount === undefined
+                ? 'Done'
+                : `Show ${matchCount.toLocaleString()} conversation${matchCount === 1 ? '' : 's'}`
+            }
+          />
+        }
+      >
             <div className="row g-3">
               {/* IP / Hostname */}
               <div className="col-md-4">
@@ -333,6 +420,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('protocols', protocol, filters.protocols)}
                         >
                           {protocol}
+                          <FilterPillCount n={countOf('protocols', protocol)} />
                         </button>
                       );
                     })}
@@ -370,6 +458,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('l7Protocols', proto, filters.l7Protocols)}
                         >
                           {proto}
+                          <FilterPillCount n={countOf('l7Protocols', proto.toUpperCase())} />
                         </button>
                       );
                     })}
@@ -422,6 +511,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('apps', name, filters.apps)}
                         >
                           {name}
+                          <FilterPillCount n={countOf('apps', name)} />
                         </button>
                       );
                     })}
@@ -461,6 +551,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('categories', category, filters.categories)}
                         >
                           {category}
+                          <FilterPillCount n={countOf('categories', category)} />
                         </button>
                       );
                     })}
@@ -498,6 +589,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('fileTypes', ft, filters.fileTypes)}
                         >
                           {ft}
+                          <FilterPillCount n={countOf('fileTypes', ft)} />
                         </button>
                       );
                     })}
@@ -536,6 +628,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('riskTypes', rt, filters.riskTypes)}
                         >
                           {rt.replace(/_/g, ' ')}
+                          <FilterPillCount n={countOf('riskTypes', rt)} />
                         </button>
                       );
                     })}
@@ -573,6 +666,8 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('customSignatures', rule, filters.customSignatures)}
                         >
                           {rule.replace(/_/g, ' ')}
+                          <RuleScopeTag scope={signatureScopes[rule]} />
+                          <FilterPillCount n={countOf('customSignatures', rule)} />
                         </button>
                       );
                     })}
@@ -680,6 +775,7 @@ export function ConversationFilterPanel({
                               }
                             />
                             <span>{alert}</span>
+                            <FilterPillCount n={countOf('suricataAlerts', alert)} />
                           </label>
                         );
                       })}
@@ -722,6 +818,7 @@ export function ConversationFilterPanel({
                             onClick={() => toggle('countries', code, filters.countries ?? [])}
                           >
                             {countryFlag(code)} {code}
+                            <FilterPillCount n={countOf('countries', code)} />
                           </button>
                         );
                       })}
@@ -759,6 +856,7 @@ export function ConversationFilterPanel({
                         onClick={() => toggle('deviceTypes', dt, filters.deviceTypes ?? [])}
                       >
                         {deviceTypeLabel(dt)}
+                        <FilterPillCount n={countOf('deviceTypes', dt)} />
                       </button>
                     );
                   })}
@@ -766,59 +864,9 @@ export function ConversationFilterPanel({
               </div>
               )}
 
-              {/* Column visibility */}
-              {!hideColumnToggle && (
-                <div className="col-12 pt-1 border-top mt-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <label className="filter-section-label d-block mb-0">
-                      <i className="bi bi-layout-three-columns me-1"></i>Columns
-                    </label>
-                    {onResetColumns && (
-                      <Button
-                        size="sm"
-                        variant="link"
-                        className="p-0 text-decoration-none"
-                        onClick={onResetColumns}
-                        title="Restore the default set of visible columns"
-                      >
-                        <i className="bi bi-arrow-counterclockwise me-1"></i>Reset to default
-                      </Button>
-                    )}
-                  </div>
-                  <div className="d-flex flex-wrap gap-2">
-                    {COLUMN_DEFS.map(({ key, label }) => (
-                      <div key={key} className="form-check form-check-inline mb-0">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id={`col-${key}`}
-                          checked={visibleColumns.has(key)}
-                          onChange={() => onToggleColumn(key)}
-                        />
-                        <label className="form-check-label" htmlFor={`col-${key}`}>
-                          {label}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {activeFilterCount > 0 && (
-              <div className="mt-3 pt-2 border-top">
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={onClearAll}
-                >
-                  <i className="bi bi-x-circle me-1"></i>Clear filters
-                </Button>
-              </div>
-            )}
-          </Card.Body>
-        </div>
-      )}
+      </SideDrawer>
     </div>
   );
 }

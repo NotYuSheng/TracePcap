@@ -333,34 +333,25 @@ test('README demo walkthrough', async ({ page }) => {
   // Open on the upload screen: the product's actual front door, and the only
   // frame that needs no explanation.
   await page.goto('/');
-  // Two headings carry this text — the page title and the file-list card.
-  await expect(page.getByRole('heading', { name: /Upload PCAP Files/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Analyse a capture/i })).toBeVisible();
   await beat(page, HOLD);
 
-  // The drop zone's input is visually hidden, so set files on it directly —
-  // there is no OS file picker to drive, and none would be recorded anyway.
-  await page.locator('input[type="file"]').setInputFiles(demoFilePath());
-
   // ── 2. Analysis options ────────────────────────────────────────────────
-  // nDPI and file extraction default on; Suricata is the deliberate opt-in, so
-  // ticking it is the beat worth filming.
-  const optionsModal = page.getByRole('dialog');
-  await expect(optionsModal.getByText(/Analysis options/i)).toBeVisible({ timeout: 10_000 });
-  // The modal is a feature in its own right — what the analysis will actually
-  // run — so give it the full landing hold before acting on it.
-  await beat(page, FEATURE);
-
-  // Checkboxes carry no accessible name (their text lives in sibling divs), so
-  // target the Suricata one via the label block that owns it.
-  const suricata = optionsModal
-    .locator('label.tp-suricata-option input[type="checkbox"]');
+  // The stages sit under the drop zone, set before choosing files. nDPI and
+  // file extraction default on; Suricata is the deliberate opt-in, so ticking
+  // it is the beat worth filming.
+  const suricata = page.getByRole('checkbox', { name: /Intrusion alerts/i });
   await expect(suricata).not.toBeChecked();
+  await beat(page, FEATURE);
   await showClick(page, suricata);
   await expect(suricata).toBeChecked();
   // Just long enough for the tick to register on camera before moving on.
   await beat(page, HOLD);
 
-  await showClick(page, optionsModal.getByRole('button', { name: /Start upload/i }));
+  // The drop zone's input is visually hidden, so set files on it directly —
+  // there is no OS file picker to drive, and none would be recorded anyway.
+  // Choosing the file starts the upload.
+  await page.locator('input[type="file"]').setInputFiles(demoFilePath());
 
   // Show the upload/analysis wait briefly, then race through the rest. Suricata
   // makes this the longest wait in the demo (~50s+); the spinner stays on
@@ -428,18 +419,23 @@ test('README demo walkthrough', async ({ page }) => {
   });
   await frameCardTop(filterPanel);
   await beat(page, FEATURE);
-  await showClick(page, filterPanel.getByRole('button', { name: 'Filters' }).first());
-  // Re-frame: expanding pushes the panel's own height down, and the badges the
-  // next step clicks are in the part that just appeared.
-  await frameCardTop(filterPanel);
+  await showClick(page, filterPanel.getByRole('button', { name: /More filters/ }).first());
+  // More filters opens a right-side drawer over the page.
+  const drawer = page.locator('.filter-drawer');
+  await expect(drawer, 'filter drawer did not open').toBeVisible({ timeout: 10_000 });
   await beat(page, FEATURE);
 
   // App badges are buttons, one per detected application. Telegram is the most
-  // recognisable app in this capture.
-  const telegram = page.getByRole('button', { name: 'Telegram', exact: true }).first();
-  await expect(telegram, 'no Telegram badge in the filter panel').toBeVisible({ timeout: 15_000 });
+  // recognisable app in this capture. Scoped to the drawer: the quick chips row
+  // behind it can carry the same name.
+  const telegram = drawer.getByRole('button', { name: 'Telegram', exact: true }).first();
+  await expect(telegram, 'no Telegram badge in the filter drawer').toBeVisible({ timeout: 15_000 });
   await beat(page);
   await showClick(page, telegram);
+  await beat(page);
+  // Filters apply live; the footer button closes the drawer on the narrowed list.
+  await showClick(page, drawer.getByRole('button', { name: /^Show .* conversations?$|^Done$/ }));
+  await expect(drawer).toBeHidden({ timeout: 10_000 });
   // Wait for the filtered refetch rather than a fixed sleep.
   await expect(page.getByRole('heading', { name: /Network Conversations/i })).toBeVisible();
   await beat(page, HOLD);
@@ -447,12 +443,13 @@ test('README demo walkthrough', async ({ page }) => {
   // First row of the filtered set. Targeted positionally, not by address: the
   // demo capture's default sort order is data, not contract, and hardcoding
   // "91.108.16.1:527" broke the moment the ordering shifted.
-  const firstRow = page.locator('tbody tr').first();
+  const firstRow = page.locator('.ccl-row').first();
   await expect(firstRow).toBeVisible({ timeout: 15_000 });
   await expect(firstRow).toContainText('192.168.1.77');
   await showClick(page, firstRow);
 
-  const convModal = page.getByRole('dialog');
+  // The conversation opens in the pane beside the list (Conversations B), not a dialog.
+  const convModal = page.locator('.conv-pane');
   await expect(convModal).toBeVisible({ timeout: 15_000 });
   await beat(page, FEATURE);
 
@@ -476,8 +473,13 @@ test('README demo walkthrough', async ({ page }) => {
   // "Evidence weighed" is the heart of the panel: the independent measured
   // signals (hardware fingerprint, ports/services, behaviour) that the
   // adjudicator combined into one verdict. Scroll it into view inside the modal
-  // body — the modal scrolls, the page behind it does not.
+  // body — the modal scrolls, the page behind it does not. The host modal is the
+  // identity-card view, where the evidence lives on its own tab.
+  const evidenceTab = hostModal.getByRole('tab', { name: /Identity evidence/i });
+  await expect(evidenceTab, 'host modal has no Identity evidence tab').toBeVisible({ timeout: 15_000 });
+  await showClick(page, evidenceTab);
   const evidence = hostModal.getByText(/Evidence weighed/i).first();
+  await expect(evidence).toBeVisible({ timeout: 15_000 });
   if (await evidence.isVisible().catch(() => false)) {
     await evidence.evaluate(el => el.scrollIntoView({ block: 'center' }));
     await beat(page, FEATURE);
@@ -499,12 +501,13 @@ test('README demo walkthrough', async ({ page }) => {
   // though the right thing happened.
   await page.keyboard.press('Escape');
   await expect(page.locator('#entity-detail-title')).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await beat(page, HOLD);
 
 
-  const convBody = convModal.locator('.modal-body');
-  const packetTabs = convModal.locator('ul.card-header-tabs');
+  // The pane scrolls with the page.
+  const convBody = page.locator('html');
+  const packetTabs = convModal.locator('.cd-tabs');
 
   // Packet list + session reconstruction live below the modal's fold. Scroll to
   // frame that card rather than to the bottom of the modal: the tabs sit at the
@@ -518,7 +521,7 @@ test('README demo walkthrough', async ({ page }) => {
   // Both views of the same flow: the packet-by-packet table, then the
   // reassembled session.
   for (const tab of [/^Packets/, /^Session/]) {
-    await showClick(page, packetTabs.getByRole('button', { name: tab }).first());
+    await showClick(page, packetTabs.getByRole('tab', { name: tab }).first());
     // Session reconstruction is fetched on demand, so the tab opens on a
     // "Reconstructing session…" spinner. Hold until the real content is there —
     // otherwise the demo films the spinner and moves on before it resolves.
@@ -545,7 +548,7 @@ test('README demo walkthrough', async ({ page }) => {
       await page.waitForTimeout(150);
     }
     await convBody.evaluate(el => {
-      const strip = el.querySelector('ul.card-header-tabs');
+      const strip = el.querySelector('.cd-tabs');
       if (strip) {
         el.scrollBy(0, strip.getBoundingClientRect().top - el.getBoundingClientRect().top - 40);
       }
@@ -557,12 +560,12 @@ test('README demo walkthrough', async ({ page }) => {
 
   // ── 5. Story ───────────────────────────────────────────────────────────
   await openTab(page, /Story/i);
-  // Not end-anchored: these buttons wrap their label in decorative <i> icons,
-  // which pad the computed accessible name — /^Generate Story$/ never matches.
-  const generateStory = page.getByRole('button', { name: /Generate Story/i }).first();
-  await expect(generateStory, 'Generate Story button not found').toBeVisible({ timeout: 15_000 });
-  // No hold before this click: the tab has nothing to read yet — it is an empty
-  // "No Story Generated Yet" prompt — so pausing here reads as hesitation.
+  // Not end-anchored: the button wraps its label in a decorative <i> icon, which
+  // pads the computed accessible name.
+  const generateStory = page.getByRole('button', { name: /Write the story/i }).first();
+  await expect(generateStory, 'Write the story button not found').toBeVisible({ timeout: 15_000 });
+  // No hold before this click: the tab has nothing to read yet — it is the
+  // "No story yet" prompt — so pausing here reads as hesitation.
   // showClick's own cursor travel is the only beat it needs.
   await showClick(page, generateStory);
 
@@ -571,11 +574,11 @@ test('README demo walkthrough', async ({ page }) => {
   // Wait for the finished story to render, not for the spinner to disappear:
   // the loading view unmounts a beat before the story paints, and cutting on the
   // spinner filmed the demo tabbing away from a blank Story page while the LLM
-  // was still working. "Network Traffic Story" is the heading of the rendered
-  // story, so it only exists once there is one.
+  // was still working. "Story" is the heading of the rendered story (the empty
+  // state's heading says something else), so it only exists once there is one.
   await beat(page, HOLD);
   await timeline.fastForward('Generate Story (LLM)', 2, async () => {
-    await expect(page.getByRole('heading', { name: /Network Traffic Story/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /^Story$/ })).toBeVisible({
       timeout: 300_000,
     });
   });
@@ -595,15 +598,15 @@ test('README demo walkthrough', async ({ page }) => {
   // A suggested question rather than typed prose: it is one click, it is
   // guaranteed answerable against this story, and it puts the affordance itself
   // on camera.
-  const chatCard = page.locator('.card').filter({ hasText: 'Ask the LLM' }).first();
-  await expect(chatCard, 'Ask the LLM card not found').toBeVisible({ timeout: 15_000 });
+  const chatCard = page.locator('.story-chat-panel').first();
+  await expect(chatCard, 'Ask about this capture panel not found').toBeVisible({ timeout: 15_000 });
   await frameCardTop(chatCard);
   await beat(page, FEATURE);
 
   // A suggested question only *fills* the box — it does not send. So click one
   // to show the affordance, hold while the text lands in the input, then send.
   const suggestion = chatCard.getByRole('button').filter({ hasText: /\?/ }).first();
-  const chatInput = chatCard.getByPlaceholder(/Ask a question about this story/i);
+  const chatInput = chatCard.getByPlaceholder(/Ask a question/i);
   await expect(suggestion, 'no suggested question to click').toBeVisible({ timeout: 10_000 });
   await showClick(page, suggestion);
   await beat(page, HOLD);
@@ -638,46 +641,34 @@ test('README demo walkthrough', async ({ page }) => {
   await frameCardTop(chatCard);
   await beat(page, READ_HOLD);
 
-  // The rest of the Story page is stacked panels, not one blob of prose, and the
-  // point of the tab is how they relate: deterministic findings and full-dataset
-  // aggregates are computed, the LLM only writes prose over them. A single
-  // scrollBy past the lot showed none of it, so stop on each in page order with
-  // its header at the top of the screen.
-  //
-  // Anchored on each panel's own heading rather than by scroll distance — the
-  // panels are conditional (aggregates, findings, and investigation each render
-  // only when the story has them), so any fixed offset lands somewhere different
-  // depending on what this capture produced.
-  for (const [label, heading] of [
-    // The narrative itself, with its Key Events rail alongside.
-    ['narrative', /^Narrative/],
-    // What the LLM was given and what it's allowed to do with it.
-    ['generation settings', /How stories are generated/i],
-    // Pre-computed analytics over the whole capture, not a sample.
-    ['traffic intelligence', /Traffic Intelligence/i],
-    // The detector output the narrative is required to cover.
-    ['deterministic findings', /Deterministic Findings/i],
-    // What the LLM went back and looked up while writing.
-    ['investigation steps', /Investigation/i],
-  ] as const) {
-    const panelHeading = page.getByText(heading).first();
-    if (!(await panelHeading.isVisible().catch(() => false))) continue;
-    // Frame the enclosing card, not the heading: scrolling the heading itself to
-    // the top clips the card's own header padding and border, so the panel reads
-    // as starting mid-way through.
-    const card = cardOf(panelHeading);
-    await frameCardTop((await card.count()) ? card.first() : panelHeading);
-    // A brief stop, not a reading pause: these panels are dense enough that
-    // nobody reads them off a GIF, so the job here is to show that they exist
-    // and what shape they are. The Ask-the-LLM answer above is the one thing on
-    // this tab that has to be read, and it keeps its long hold.
+  // Then the rest of the page, in reading order: the four investigation
+  // questions, the story told as a timeline, and the evidence it rests on.
+  const goalsSection = page.getByRole('region', { name: 'Investigation questions' });
+  if (await goalsSection.isVisible().catch(() => false)) {
+    await frameCardTop(goalsSection);
     await beat(page, FEATURE);
-    // Findings is the exception worth an extra look — it is the evidence the
-    // narrative is accountable to, and the densest panel on the page.
-    if (label === 'deterministic findings') await beat(page, HOLD);
+  }
+  const storyCard = cardOf(page.getByRole('heading', { name: 'The story' }));
+  if (await storyCard.count()) {
+    await frameCardTop(storyCard.first());
+    await beat(page, HOLD);
   }
 
-  
+  // The evidence sits in tabs under the story; show each one the story produced.
+  // Conditional like the panels they replaced — a capture without findings has
+  // no Findings tab — so walk whichever tabs exist rather than a fixed list.
+  const evidence = page.getByRole('tablist', { name: 'What the story rests on' });
+  if (await evidence.isVisible().catch(() => false)) {
+    await frameCardTop(cardOf(evidence).first());
+    for (const tab of await evidence.getByRole('tab').all()) {
+      await showClick(page, tab);
+      await beat(page, FEATURE);
+      // Findings is worth an extra look: it is the evidence the narrative is
+      // accountable to, and the densest panel on the page.
+      if (/Findings/.test(await tab.innerText())) await beat(page, HOLD);
+    }
+  }
+
   await page.evaluate(() => window.scrollTo(0, 0));
 
   // ── 6. Filter generator ────────────────────────────────────────────────
@@ -835,7 +826,7 @@ test('README demo walkthrough', async ({ page }) => {
 
   // Hierarchical layout, then fit the view — a hierarchical graph is taller than
   // the viewport, and an unfitted one films as a wall of edges.
-  await showClick(page, page.locator('[title="Hierarchical layout"]').first());
+  await showClick(page, page.locator('[title^="Hierarchical layout"]').first());
   await timeline.fastForward('Hierarchical layout (ELK)', 2, async () => {
     await expect(page.getByText(/Computing layout/i)).toBeHidden({ timeout: 120_000 });
   });
@@ -877,10 +868,10 @@ test('README demo walkthrough', async ({ page }) => {
   // Close the section on the node-to-node volume heatmap: the same traffic the
   // topology draws as edges, read as a matrix instead — which pairs actually
   // carry the bytes. Collapsed by default, so it has to be opened.
-  const heatmapCard = cardOf(page.getByText('Node-to-Node Volume').first());
+  const heatmapCard = page.locator('.traffic-card').first();
   await expect(heatmapCard, 'heatmap card not found').toBeVisible({ timeout: 15_000 });
   await frameCardTop(heatmapCard);
-  await showClick(page, heatmapCard.getByRole('button', { name: /^Show/ }).first());
+  await showClick(page, heatmapCard.getByRole('tab', { name: 'Matrix' }));
   await expect(page.locator('.tp-heatmap-body'), 'heatmap did not expand').toBeVisible({
     timeout: 20_000,
   });
@@ -1020,12 +1011,12 @@ test('README demo walkthrough', async ({ page }) => {
   // ── 10. Monitor ────────────────────────────────────────────────────────
   // Same machinery, applied over time instead of within one capture.
   await page.goto('/monitor');
-  await expect(page.getByRole('heading', { name: /Network Monitor/i }).first()).toBeVisible({
+  await expect(page.getByRole('heading', { name: /Monitored networks/i }).first()).toBeVisible({
     timeout: 20_000,
   });
   await beat(page, HOLD);
 
-  const card = page.getByText(NETWORK_NAME, { exact: true }).first();
+  const card = page.getByRole('link', { name: NETWORK_NAME, exact: true }).first();
   await expect(card, 'demo network card not found').toBeVisible({ timeout: 15_000 });
   await showClick(page, card);
   await page.waitForURL(/\/monitor\/[0-9a-f-]{36}/, { timeout: 30_000 });

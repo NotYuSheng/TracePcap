@@ -4,6 +4,8 @@ import com.tracepcap.analysis.spi.HostServiceLogExtractor;
 import com.tracepcap.analysis.spi.HostServiceLogResult;
 import com.tracepcap.analysis.spi.HostServiceSuspicion;
 import com.tracepcap.analysis.spi.ServiceLogRoles;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
 import com.tracepcap.hostlog.repository.DnsQueryLogRepository;
 import com.tracepcap.file.entity.FileEntity;
@@ -80,15 +82,12 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
           Map.entry("9", "NOTAUTH"));
 
   private final DnsQueryLogRepository dnsQueryLogRepository;
+  // The thresholds are editable in the app (#915 phase 5), so they're read per analysis.
+  private final RuntimePolicy runtimePolicy;
 
-  @Value("${tracepcap.dns.nxdomain-suspicious-ratio:0.5}")
-  private double nxdomainSuspiciousRatio;
-
-  @Value("${tracepcap.dns.nxdomain-min-queries:20}")
-  private int nxdomainMinQueries;
-
-  public DnsQueryLogExtractor(DnsQueryLogRepository dnsQueryLogRepository) {
+  public DnsQueryLogExtractor(DnsQueryLogRepository dnsQueryLogRepository, RuntimePolicy runtimePolicy) {
     this.dnsQueryLogRepository = dnsQueryLogRepository;
+    this.runtimePolicy = runtimePolicy;
   }
 
   @Override
@@ -150,6 +149,8 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
 
     // Score servers for suspicion.
     List<HostServiceSuspicion> suspicions = new ArrayList<>();
+    int nxdomainMinQueries = runtimePolicy.getInt(EditablePolicy.DNS_NXDOMAIN_MIN_QUERIES);
+    double nxdomainSuspiciousRatio = runtimePolicy.getDouble(EditablePolicy.DNS_NXDOMAIN_SUSPICIOUS_RATIO);
     for (Map.Entry<String, ServerStats> e : serverStats.entrySet()) {
       ServerStats s = e.getValue();
       if (s.totalResponses < nxdomainMinQueries) continue;

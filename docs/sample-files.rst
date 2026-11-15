@@ -23,6 +23,23 @@ Included Files
      - Crafted PCAP that triggers all 17 custom signature demo rules defined
        in ``signatures.sample.yml``. Use this to verify that custom signature
        matching is working correctly.
+   * - ``dhcp_address_reuse.pcap``
+     - One address held by two devices in turn: a Dell laptop until 10:59, then
+       a Samsung phone that starts beaconing at 11:32. Shows each device as its
+       own node, classified from its own traffic (see
+       :doc:`features/address-reuse`). Regenerate with
+       ``python3 sample-files/gen_dhcp_reuse.py``.
+   * - ``private_mac_week1.pcap``, ``private_mac_week2.pcap``
+     - Two weekly snapshots: Bob's iPhone changes its private MAC between
+       them, keeping its DHCP fingerprint and hostname; Carol's Pixel keeps
+       its own. Add both to one network to see the suggestion (see
+       :doc:`features/network-devices`). Regenerate with
+       ``python3 sample-files/gen_private_mac_rotation.py``.
+   * - ``two_sites_overlap.pcap``, ``two_sites_overlap_untagged.pcap``
+     - Two sites, HQ and Branch, both on ``192.168.1.0/24``, in one capture:
+       with VLAN tags, and without. TracePcap tells them apart by VLAN or by
+       each site's DHCP server (see :doc:`features/overlapping-networks`).
+       Regenerate with ``python3 sample-files/gen_overlapping_sites.py``.
    * - ``monitor_large/week1_baseline.pcap`` … ``week8_near_baseline.pcap``
      - Eight weekly captures from the **Office Audit demo scenario**. Used to
        demonstrate the Network Monitor, subnet detection, node role annotation,
@@ -45,8 +62,8 @@ The script produces ``sample-files/demo_all_rules.pcap``.
 Walkthrough: Custom Signature Demo
 ------------------------------------
 
-1. Copy ``signatures.sample.yml`` into the TracePcap browser editor:
-   Navigate to **Custom Detection Rules** → paste the file contents → **Save**.
+1. Import ``signatures.sample.yml``: on the **Settings** page open
+   **Detection rules** → **Import**, choose the file, and click **Import**.
 
 2. Upload ``demo_all_rules.pcap`` with **nDPI Analysis** enabled.
 
@@ -269,11 +286,13 @@ Walkthrough: Office Audit Demo
 **Step 1 — Upload and analyse all eight files**
 
 Upload each ``week*.pcap`` file via the standard upload flow with nDPI analysis
-enabled. Wait for all eight to reach status *Completed*.
+enabled. Wait for all eight to reach status *Completed*. They are deleted by file
+retention unless you untick **Delete after …** on the upload panel, but once they
+are added to a monitored network (Step 3) they are kept with it either way.
 
 **Step 2 — Create a Network Monitor session**
 
-Navigate to **Monitor** → **Create Network** → name it
+Navigate to **Monitor** → **New network** → name it
 ``Office Audit — Corp HQ`` and set the description to::
 
     Corporate HQ office network — weekly PCAP captures from the managed switch spanning eight weeks. Segment covers staff workstations, servers, printers, and BYOD WiFi.
@@ -281,29 +300,36 @@ Navigate to **Monitor** → **Create Network** → name it
 The description is included in the LLM prompt when generating Network Insights,
 giving the model useful context about the environment and capture method.
 
-**Step 3 — Add snapshots**
+**Step 3 — Add the captures**
 
-Click **Add Snapshot** and add all eight files. The Monitor orders them by
-capture time automatically. Change events appear as soon as the second snapshot
-is added.
+Open the network and click **Add a capture** (top right); add all eight files.
+The Monitor orders them by capture time automatically, and change events appear
+as soon as the second one is added: on this data, 164 *new device* events, plus
+new apps and protocols, security alerts appearing and clearing, and two gateway
+changes (weeks 4 and 7). The **Timeline** tab lists each capture with the changes
+it brought.
 
-**Step 4 — Detect subnets**
+**Step 4 — Define the subnets**
 
-In the **Subnet Definitions** panel, select ``week1_baseline.pcap`` from the
-dropdown and click **Detect Subnets**. The engine should propose four candidates:
+Open **Settings** (top right); the **Subnets** section is in the drawer. The
+segments here are ``/24`` each, but the detector does not propose them: it scores
+candidates by host density and prefers the tightest prefix that fits, so **Detect**
+on ``week1_baseline.pcap`` (or **Scan All Snapshots**) proposes narrower ranges
+such as ``10.0.1.64/26``, ``10.0.1.32/27`` and ``10.0.2.0/27``. Add the four
+segments with **Add Manually** instead:
 
-- ``10.0.1.0/24`` — staff workstations
-- ``10.0.2.0/24`` — servers
-- ``10.0.3.0/24`` — printers
+- ``10.0.1.0/24`` — Staff workstations
+- ``10.0.2.0/24`` — Servers
+- ``10.0.3.0/24`` — Printers / peripherals
 - ``10.0.4.0/24`` — WiFi / BYOD
 
-Save all four and add labels. The IP Addresses drift panel will now group all
-IPs by subnet.
+The **Addresses** tab under **Inventory** will now group all IPs by subnet.
 
 **Step 5 — Annotate key devices**
 
-Click IP badges in the drift panels to open the Entity Detail modal. There are
-two distinct fields — keep them separate:
+Open **Inventory** and click a device (Devices tab) or an IP badge (Addresses tab)
+to open its detail. Labels set here are saved against the **latest** capture
+(week 8). There are two distinct fields — keep them separate:
 
 - **Role label** (Details tab → *Role*) describes *what a host is* — its stable
   identity or function (e.g. "File Server (SMB)", "Alice — Staff Workstation").
@@ -379,10 +405,10 @@ Roles are **per-snapshot**: a confirmed label is carried forward onto each new
 snapshot and validated against the new pcap (see :doc:`features/network-monitor`
 → *Label Staleness Detection*). The File Server makes a clean demonstration.
 
-1. Open the **week 2** snapshot's network diagram (Capture Timeline → click the
-   ``week2_personal_laptop_vpn.pcap`` row) and click the ``10.0.2.10`` node. In
-   the **Role** section, confirm **File Server (SMB)**. This captures a week-2
-   baseline — SMB only, before Carol's Telnet.
+1. Open **Timeline**, pick ``week2_personal_laptop_vpn.pcap`` in the list (or
+   step to it with the arrows above the map), and click the ``10.0.2.10`` node on
+   the map. In the **Role** section, confirm **File Server (SMB)**. This captures a
+   week-2 baseline — SMB only, before Carol's Telnet.
 2. Saving the label immediately carries it forward onto every later snapshot and
    re-validates each one. Because Carol begins Telnet to the file server in
    **week 3**, the week-3 classification is flagged straight away — no need to
@@ -390,9 +416,11 @@ snapshot and validated against the new pcap (see :doc:`features/network-monitor`
 
 The label is flagged:
 
-- The **Change Events** feed shows a ``LABEL_STALE`` (WARNING) event —
-  *"Label may be stale: 10.0.2.10 (File Server (SMB)) — new protocol (TELNET)"*.
-- Opening ``10.0.2.10`` in the week-3 snapshot (or the Devices drift panel) shows
+- The **Timeline** shows a ``LABEL_STALE`` (WARNING) change under the week-3
+  capture — *"Label may be stale: 10.0.2.10 (File Server (SMB)) — new protocol
+  (TELNET)"*. It is the only stale label: the Step 5 labels sit on the latest
+  capture, so there is nothing later for them to go stale against.
+- Opening ``10.0.2.10`` on the week-3 map (or from **Inventory**) shows
   an amber **Stale** badge and a warning banner with **Update label** and
   **Dismiss — label is still correct** actions.
 
@@ -403,8 +431,8 @@ behaviour as the new baseline, or **Update label** to revise it.
 
 **Step 7 — Add external events**
 
-In the **External Events** panel, click **Add Event** and log the audit
-milestone that explains the behavioural shift. Each event has three fields:
+Open **Timeline** and click **Outside event**, then **Add Event**, and log the
+audit milestone that explains the behavioural shift. Each event has three fields:
 
 - **Date & Time** *(required)* — when the real-world event actually happened, not
   when you are logging it. Set this to the start of the **week 7** capture window
@@ -423,7 +451,8 @@ remove it.
 
 **Step 8 — Generate insights**
 
-Click **Generate Insights**. With device roles and the external event in
+On the **Overview**, click **Generate Insights** in the **Insights** card. With
+device roles and the external event in
 context, the LLM should correlate the violation drop-off in week 7 with the
 audit notice, identify the shadow device as the highest-severity finding, and
 surface the lingering personal-device policy gap in week 8.

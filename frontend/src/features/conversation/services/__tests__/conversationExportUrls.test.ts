@@ -111,4 +111,17 @@ describe('conversation export URLs', () => {
     expect(url.startsWith('/api/v1/')).toBe(true)
     expect(new URLSearchParams(url.split('?')[1]).get('protocols')).toBe('TCP')
   })
+
+  it('exports the same src → dst pair the table is showing (#471)', () => {
+    const pair = filters({ srcIp: '10.0.0.1', dstIp: '8.8.8.8' })
+
+    for (const url of [
+      conversationService.getExportUrl(FILE_ID, pair),
+      conversationService.getPcapExportUrl(FILE_ID, pair),
+    ]) {
+      const query = new URLSearchParams(url.split('?')[1])
+      expect(query.get('srcIp')).toBe('10.0.0.1')
+      expect(query.get('dstIp')).toBe('8.8.8.8')
+    }
+  })
 })

@@ -42,6 +42,11 @@ public class ConversationResponse {
    */
   private String initiatorIp;
 
+  /** Each side's MAC (#462): the machine, or for outside traffic the site's router. */
+  private String srcMac;
+
+  private String dstMac;
+
   private Integer initiatorPort;
 
   private String protocol;
@@ -67,4 +72,38 @@ public class ConversationResponse {
   private Long durationMs;
   private GeoInfo srcGeo;
   private GeoInfo dstGeo;
+
+  /**
+   * Who was logged in on each endpoint when this conversation started (#812 follow-up). Null when
+   * no Windows login had been seen on that host by then. With several accounts, {@code username}
+   * is null and {@code accountCount} says how many: the host's timeline has the detail.
+   */
+  private AccountAtTime srcAccount;
+  private AccountAtTime dstAccount;
+
+  /**
+   * Fills {@link #srcAccount} / {@link #dstAccount} from the conversation's start time, using
+   * logins loaded once for the whole page. Returns this, for use in a stream.
+   */
+  public ConversationResponse withAccountsFrom(
+      com.tracepcap.analysis.spi.WindowsLogonLookup.AccountsAtTime accounts) {
+    this.srcAccount = AccountAtTime.of(accounts.at(srcIp, startTime));
+    this.dstAccount = AccountAtTime.of(accounts.at(dstIp, startTime));
+    return this;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class AccountAtTime {
+    private String username;
+    private int accountCount;
+    /** When that account was first seen logging in (a login, not a session start-to-end). */
+    private LocalDateTime firstLoginAt;
+
+    static AccountAtTime of(com.tracepcap.analysis.spi.WindowsLogonLookup.UserAtTime u) {
+      return u == null ? null : new AccountAtTime(u.username(), u.accountCount(), u.firstLoginAt());
+    }
+  }
 }

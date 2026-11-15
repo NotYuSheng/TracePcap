@@ -1,6 +1,7 @@
 package com.tracepcap.conversation.controller;
 
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
+import com.tracepcap.analysis.dto.ConversationFacetCountsResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.dto.EntityStatsResponse;
@@ -105,7 +106,22 @@ public class ConversationsController {
               description =
                   "Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG)")
           @RequestParam(required = false)
-          String countries) {
+          String countries,
+      @Parameter(
+              description =
+                  "Exact source address. With dstIp, matches one directional src → dst pair (#471);"
+                      + " unlike ip, which is a contains-match on either end")
+          @RequestParam(required = false)
+          String srcIp,
+      @Parameter(description = "Exact destination address (see srcIp)")
+          @RequestParam(required = false)
+          String dstIp,
+      @Parameter(
+              description =
+                  "View in this network (#925): its own detection rules' matches are added to"
+                      + " customSignatures and count for that filter")
+          @RequestParam(required = false)
+          UUID networkId) {
 
     if (page < 1) page = 1;
     if (pageSize < 1) pageSize = 25;
@@ -129,7 +145,9 @@ public class ConversationsController {
             sortDir,
             search,
             deviceTypes,
-            countries);
+            countries,
+            srcIp,
+            dstIp);
 
     log.info(
         "GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, l7Protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
@@ -148,7 +166,7 @@ public class ConversationsController {
         sortBy,
         sortDir);
 
-    return ResponseEntity.ok(conversationQueryService.getConversations(fileId, page, pageSize, params));
+    return ResponseEntity.ok(conversationQueryService.getConversations(fileId, page, pageSize, params, networkId));
   }
 
   /**
@@ -168,6 +186,13 @@ public class ConversationsController {
     return ResponseEntity.ok(conversationQueryService.getEntityStats(fileId, app, l7Protocol));
   }
 
+  /** Conversations per filter value, for the counts beside each filter chip. */
+  @GetMapping("/{fileId}/facet-counts")
+  @Operation(summary = "Count conversations per filter value (protocol, app, risk, country, ...)")
+  public ResponseEntity<ConversationFacetCountsResponse> getFacetCounts(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(conversationQueryService.getFacetCounts(fileId));
+  }
+
   /** Returns the distinct detected file types found in packets for this file. */
   @GetMapping("/{fileId}/file-types")
   @Operation(summary = "List distinct detected file types for a file")
@@ -185,8 +210,9 @@ public class ConversationsController {
   /** Returns the distinct custom signature rule names triggered for this file. */
   @GetMapping("/{fileId}/custom-signatures")
   @Operation(summary = "List distinct custom signature rule names for a file")
-  public ResponseEntity<List<String>> getCustomSignatures(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(conversationQueryService.getDistinctCustomSignatures(fileId));
+  public ResponseEntity<List<String>> getCustomSignatures(
+      @PathVariable UUID fileId, @RequestParam(required = false) UUID networkId) {
+    return ResponseEntity.ok(conversationQueryService.getDistinctCustomSignatures(fileId, networkId));
   }
 
   /** Returns the distinct Suricata IDS alert strings present for this file. */
@@ -252,6 +278,8 @@ public class ConversationsController {
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String deviceTypes,
       @RequestParam(required = false) String countries,
+      @RequestParam(required = false) String srcIp,
+      @RequestParam(required = false) String dstIp,
       HttpServletResponse response)
       throws IOException {
 
@@ -273,7 +301,9 @@ public class ConversationsController {
             sortDir,
             search,
             deviceTypes,
-            countries);
+            countries,
+            srcIp,
+            dstIp);
     List<ConversationResponse> rows = conversationQueryService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -332,6 +362,8 @@ public class ConversationsController {
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String deviceTypes,
       @RequestParam(required = false) String countries,
+      @RequestParam(required = false) String srcIp,
+      @RequestParam(required = false) String dstIp,
       HttpServletResponse response)
       throws IOException {
 
@@ -353,7 +385,9 @@ public class ConversationsController {
             sortDir,
             search,
             deviceTypes,
-            countries);
+            countries,
+            srcIp,
+            dstIp);
 
     String filename = conversationQueryService.getBulkPcapFilename(fileId);
     response.setContentType("application/vnd.tcpdump.pcap");
@@ -376,9 +410,12 @@ public class ConversationsController {
   @GetMapping("/detail/{conversationId}")
   @Operation(summary = "Get conversation details with packet stream")
   public ResponseEntity<ConversationDetailResponse> getConversationDetail(
-      @PathVariable UUID conversationId) {
+      @PathVariable UUID conversationId,
+      @Parameter(description = "View in this network (#925): adds its own detection rules' matches")
+          @RequestParam(required = false)
+          UUID networkId) {
     log.info("GET /api/conversations/detail/{}", conversationId);
-    return ResponseEntity.ok(conversationQueryService.getConversationDetail(conversationId));
+    return ResponseEntity.ok(conversationQueryService.getConversationDetail(conversationId, networkId));
   }
 
   /** Export a single conversation as a PCAP file filtered from the original capture. */
@@ -413,7 +450,9 @@ public class ConversationsController {
       String sortDir,
       String search,
       String deviceTypes,
-      String countries) {
+      String countries,
+      String srcIp,
+      String dstIp) {
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
         .ip(resolvedIp)
@@ -430,6 +469,9 @@ public class ConversationsController {
         .payloadContains(payloadContains)
         .deviceTypes(splitComma(deviceTypes))
         .countries(splitComma(countries))
+        // Blank is "no filter", not "match the empty address".
+        .srcIp(srcIp == null || srcIp.isBlank() ? null : srcIp.trim())
+        .dstIp(dstIp == null || dstIp.isBlank() ? null : dstIp.trim())
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

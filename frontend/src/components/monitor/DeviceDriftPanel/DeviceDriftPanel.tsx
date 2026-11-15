@@ -1,4 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { absentBadge, describeRule, presenceOf } from '@/features/monitor/utils/presence';
+import type { NetworkSettings } from '@/features/monitor/types/monitor.types';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
@@ -26,6 +28,8 @@ function hashBadgeStyle(s: string): CSSProperties {
 
 interface DeviceDriftPanelProps {
   snapshots: NetworkSnapshot[];
+  /** The network's inactivity rule (#488); defaults to today's behaviour. */
+  settings?: NetworkSettings;
 }
 
 interface HostClassification {
@@ -37,7 +41,7 @@ type SelectedMac =
   | { mac: string; fileId: string; isActive: boolean; lastSeenTime?: string | null }
   | null;
 
-export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
+export const DeviceDriftPanel = ({ snapshots, settings }: DeviceDriftPanelProps) => {
   const [selectedAbsent, setSelectedAbsent] = useState<AbsentEntity | null>(null);
   const [selectedMac, setSelectedMac] = useState<SelectedMac>(null);
   const [activeMacs, setActiveMacs] = useState<string[]>([]);
@@ -82,6 +86,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
             lastSeenFileName: snap.fileName,
             lastSeenStartTime: snap.startTime,
             lastSeenFileId: snap.fileId,
+              presence: presenceOf(snap, sorted, settings),
           });
         }
       }
@@ -92,7 +97,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
       setLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshots.map(s => s.id).join(',')]);
+  }, [snapshots.map(s => s.id).join(','), settings?.inactivityMode, settings?.inactivityThreshold]);
 
   if (loading) {
     return <div className="text-muted small text-center py-3"><Spinner animation="border" size="sm" className="me-2" />Loading…</div>;
@@ -147,10 +152,10 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
             type="button"
             variant="secondary"
             size="sm"
-            className="text-decoration-line-through border-0 py-0 px-1"
-            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(item.entity.key) }}
+            className={absentBadge(item.entity).className}
+            style={{ ...hashBadgeStyle(item.entity.key), ...absentBadge(item.entity).style }}
             onClick={() => setSelectedAbsent(item.entity)}
-            title={`Last seen in ${item.entity.lastSeenFileName}`}
+            title={absentBadge(item.entity).title}
           >
             {item.entity.key}
           </Button>
@@ -170,7 +175,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
       {absentMacs.length > 0 && (
         <small className="text-muted d-block mt-2">
           <i className="bi bi-info-circle me-1"></i>
-          Greyed-out devices are no longer seen. Click any device for history.
+          Struck-through devices are {describeRule(settings)}; dashed ones are quiet (not in the latest capture, but still within this network's rule). Click for details.
         </small>
       )}
 

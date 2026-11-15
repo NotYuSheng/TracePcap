@@ -5,6 +5,7 @@
  * label mapping the whole contract.
  */
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { HostnameSourceBadge } from '../HostnameSourceBadge'
@@ -24,11 +25,15 @@ describe('HostnameSourceBadge', () => {
     expect(screen.getByText(label)).toBeInTheDocument()
   })
 
-  it('explains the provenance on hover', () => {
+  it('explains the provenance when clicked, not through a native tooltip (#812)', async () => {
     render(<HostnameSourceBadge source="dhcp" />)
 
-    // The chip is four characters; the tooltip is where the caveat lives.
-    expect(screen.getByTitle(/DHCP request \(option 12\)/)).toBeInTheDocument()
+    // The chip is four characters; the popover is where the caveat lives. A real button, so it
+    // works from a keyboard and on touch, which title= never did.
+    const chip = screen.getByRole('button', { name: /DHCP/ })
+    expect(chip).not.toHaveAttribute('title')
+    await userEvent.click(chip)
+    expect(await screen.findByText(/DHCP request \(option 12\)/)).toBeInTheDocument()
   })
 
   it.each([undefined, null, ''])('renders nothing for %s', source => {

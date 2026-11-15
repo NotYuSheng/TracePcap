@@ -1,16 +1,15 @@
 package com.tracepcap.knowledge.contributor;
 
-import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
+import com.tracepcap.knowledge.spi.KnowledgeContext;
 import com.tracepcap.knowledge.spi.KnowledgeContributor;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +29,6 @@ public class TrafficContributor implements KnowledgeContributor {
 
   static final String COMMUNICATES_WITH = "communicates-with";
 
-  private final ConversationLookup conversationLookup;
 
   @Override
   public String name() {
@@ -38,10 +36,10 @@ public class TrafficContributor implements KnowledgeContributor {
   }
 
   @Override
-  public void contribute(UUID fileId, CaseKnowledgeBuilder board) {
+  public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     // internal host -> (external ip -> total bytes)
     Map<String, Map<String, Long>> bytesByPair = new LinkedHashMap<>();
-    for (ConversationFacts conv : conversationLookup.conversationFacts(fileId)) {
+    for (ConversationFacts conv : context.conversationFacts()) {
       String a = conv.flow().srcIp();
       String b = conv.flow().dstIp();
       if (a == null || b == null) continue;

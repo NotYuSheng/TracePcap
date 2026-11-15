@@ -29,7 +29,7 @@ class CustomRangeLocalityPolicyTest {
   private final CustomRangeLocalityPolicy policy = new CustomRangeLocalityPolicy(ranges);
 
   private void overrideIs(Override verdict) {
-    when(ranges.loadRanges()).thenReturn(List.of(new CustomPrivateRangeEntity()));
+    when(ranges.loadRanges((java.util.UUID) null)).thenReturn(List.of(new CustomPrivateRangeEntity()));
     when(ranges.overrideFor(anyString(), anyList())).thenReturn(verdict);
   }
 
@@ -100,6 +100,16 @@ class CustomRangeLocalityPolicyTest {
     rules.isLocal("10.0.0.2");
     rules.isLocal("8.8.8.8");
 
-    verify(ranges, times(1)).loadRanges();
+    verify(ranges, times(1)).loadRanges((java.util.UUID) null);
+  }
+
+  @Test
+  void aNetworksRulesComeFromItsOwnLayeredRanges() {
+    // #915 phase 4: a network's view reads that network's ranges, not the default's.
+    java.util.UUID net = java.util.UUID.randomUUID();
+    when(ranges.loadRanges(net)).thenReturn(List.of(new CustomPrivateRangeEntity()));
+    when(ranges.overrideFor(anyString(), anyList())).thenReturn(Override.FORCE_PUBLIC);
+    assertThat(policy.currentRules(net, null).isLocal("10.0.0.1")).isFalse();
+    verify(ranges).loadRanges(net);
   }
 }

@@ -12,9 +12,12 @@ interface Message {
 interface StoryChatProps {
   storyId: string;
   suggestedQuestions?: string[];
+  /** 'panel' fills a side column: messages scroll, the input stays at the bottom. */
+  variant?: 'card' | 'panel';
 }
 
-export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
+export const StoryChat = ({ storyId, suggestedQuestions, variant = 'card' }: StoryChatProps) => {
+  const panel = variant === 'panel';
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentSuggestions, setCurrentSuggestions] = useState<string[]>(suggestedQuestions ?? []);
   const [input, setInput] = useState('');
@@ -65,19 +68,27 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
   };
 
   return (
-    <Card className="mb-4">
+    <Card className={panel ? 'story-chat-panel' : 'mb-4'}>
       <Card.Header>
         <h6 className="mb-0">
-          <i className="bi bi-chat-dots me-2"></i>
-          Ask the LLM
+          <i className="bi bi-chat-dots me-2" aria-hidden="true"></i>
+          {panel ? 'Ask about this capture' : 'Ask the LLM'}
         </h6>
+        {panel && (
+          <div className="text-muted small">Answers come from the findings and the story.</div>
+        )}
       </Card.Header>
-      <Card.Body className="p-0">
+      <Card.Body className={panel ? 'p-0 story-chat-body' : 'p-0'}>
+        {panel && messages.length === 0 && !loading && (
+          <p className="text-muted small px-3 pt-3 mb-0 story-chat-empty">
+            Ask anything about this capture: a host, a time, why something was flagged.
+          </p>
+        )}
         {messages.length > 0 && (
           <div
             ref={messagesContainerRef}
-            className="px-3 pt-3"
-            style={{ maxHeight: '320px', overflowY: 'auto' }}
+            className={panel ? 'px-3 pt-3 story-chat-messages' : 'px-3 pt-3'}
+            style={panel ? undefined : { maxHeight: '320px', overflowY: 'auto' }}
           >
             {messages.map((msg, i) => (
               <div
@@ -149,7 +160,7 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
             as="textarea"
             size="sm"
             rows={2}
-            placeholder="Ask a question about this story… (Enter to send, Shift+Enter for new line)"
+            placeholder={panel ? 'Ask a question… (Enter to send)' : 'Ask a question about this story… (Enter to send, Shift+Enter for new line)'}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

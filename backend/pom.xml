@@ -28,6 +28,9 @@
         <postgresql.version>42.7.2</postgresql.version>
         <tomcat.version>10.1.35</tomcat.version>
         <tika.version>3.2.2</tika.version>
+        <!-- Overrides Boot 3.2.1's 1.19.3, whose docker-java negotiates API 1.32: Docker on
+             ubuntu-26.04 runners rejects anything below 1.40 (#871). -->
+        <testcontainers.version>1.21.4</testcontainers.version>
         <jacoco.version>0.8.12</jacoco.version>
         <!-- -Djacoco.skip.check=true to build without a Docker daemon; see the check execution. -->
         <jacoco.skip.check>false</jacoco.skip.check>

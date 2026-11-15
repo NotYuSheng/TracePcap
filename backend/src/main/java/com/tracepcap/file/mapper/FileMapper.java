@@ -122,7 +122,10 @@ public class FileMapper {
         .fileSize(entity.getFileSize())
         .uploadedAt(entity.getUploadedAt())
         .status(entity.getStatus().name().toLowerCase())
+        .derivedFrom(entity.getDerivedFrom() != null ? entity.getDerivedFrom().toString() : null)
+        .version(entity.isVersion())
         .packetCount(entity.getPacketCount())
+        .packetsRemoved(entity.getPacketsPrunedAt() != null)
         .duration(entity.getDuration())
         .startTime(entity.getStartTime())
         .endTime(entity.getEndTime())
@@ -130,6 +133,9 @@ public class FileMapper {
         .enableNdpi(entity.isEnableNdpi())
         .enableSuricata(effectiveSuricata)
         .enableFileExtraction(entity.isEnableFileExtraction())
+        .storyStatus(entity.getStoryStatus())
+        .storyError(entity.getStoryError())
+        .keepForever(entity.isKeepForever())
         .estimatedAnalysisSeconds(
             estimateAnalysisSeconds(
                 entity.getFileSize(),

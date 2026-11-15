@@ -78,3 +78,57 @@
 
 /* Compact search inputs (IP / Port / Payload) use the shared `.tp-compact-search`
    class — see assets/styles/index.css. */
+
+/* Quick filters in view (Conversations B): search, Flagged, the busiest apps. */
+.cfp-quick {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+.cfp-quick .cfp-search {
+  width: 260px;
+  flex: none;
+}
+.cfp-chip {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  border: 1px solid var(--tp-border, #d5d9e1);
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #374151);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.cfp-chip:hover {
+  border-color: #a78bfa;
+}
+.cfp-chip.active {
+  border-color: #c4b5fd;
+  background: #ede9fe;
+  color: #3b1891;
+}
+[data-theme='dark'] .cfp-chip.active {
+  border-color: rgba(155, 125, 255, 0.5);
+  background: rgba(155, 125, 255, 0.18);
+  color: #c9b8ff;
+}
+@media (max-width: 575.98px) {
+  .cfp-quick .cfp-search {
+    width: 100%;
+  }
+}
+/* The quick filters and More filters share one row; the opened panel goes full width below. */
+.conversation-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.conversation-filter-panel > .cfp-quick {
+  margin-bottom: 0;
+}
+.conversation-filter-panel > .filter-panel-body {
+  flex-basis: 100%;
+}

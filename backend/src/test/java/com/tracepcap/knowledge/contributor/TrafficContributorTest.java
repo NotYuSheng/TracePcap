@@ -1,5 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.knowledge.spi.KnowledgeContext;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -37,7 +39,7 @@ class TrafficContributorTest {
   private CaseKnowledge run(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new TrafficContributor(conversationLookup).contribute(FILE, board);
+    new TrafficContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
     return board.build();
   }
 

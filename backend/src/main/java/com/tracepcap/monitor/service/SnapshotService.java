@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import java.util.Set;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.common.exception.InvalidFileException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
@@ -42,6 +43,8 @@ public class SnapshotService {
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
   private final ConversationLookup conversationLookup;
+  private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
+  private final org.springframework.context.ApplicationEventPublisher events;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -64,7 +67,11 @@ public class SnapshotService {
     // Batch absolute security-signal counts, keyed by fileId (one query for all snapshots)
     Map<UUID, Long> securityCounts =
         securitySignalCounts(
+            networkId,
             snapshots.stream().map(s -> s.getFile().getId()).distinct().collect(Collectors.toList()));
+
+    // One query for every snapshot's insight flag, instead of one per row (#469).
+    Set<UUID> withInsights = insightPresence.snapshotsWithInsights(ids);
 
     return snapshots.stream()
         .map(s -> toDto(
@@ -72,7 +79,8 @@ public class SnapshotService {
             changeCounts.getOrDefault(s.getId(), 0L),
             criticalCounts.getOrDefault(s.getId(), 0L),
             securityCounts.getOrDefault(s.getFile().getId(), 0L),
-            overridesMap.getOrDefault(s.getId(), Collections.emptyList())))
+            overridesMap.getOrDefault(s.getId(), Collections.emptyList()),
+            withInsights.contains(s.getId())))
         .collect(Collectors.toList());
   }
 
@@ -157,8 +165,11 @@ public class SnapshotService {
     long changeCount = changeEventRepository.countByToSnapshotId(snapshot.getId());
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshot.getId());
     List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshot.getId());
+    // Detection rules (#925): the network's rules get checked on the new capture.
+    events.publishEvent(
+        new com.tracepcap.monitor.event.SnapshotMembershipChangedEvent(networkId, fileId, true));
     return toDto(snapshot, changeCount, criticalCount,
-        securitySignalCount(snapshot.getFile().getId()), overrides);
+        securitySignalCount(snapshot), overrides);
   }
 
   public NetworkSnapshotDto patchSnapshot(UUID networkId, UUID snapshotId, PatchSnapshotRequest req) {
@@ -227,19 +238,46 @@ public class SnapshotService {
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshotId);
     List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshotId);
     return toDto(snapshot, changeCount, criticalCount,
-        securitySignalCount(snapshot.getFile().getId()), overrides);
+        securitySignalCount(snapshot), overrides);
   }
 
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
     networkService.findOrThrow(networkId);
-    snapshotRepository
-        .findById(snapshotId)
-        .filter(s -> s.getNetwork().getId().equals(networkId))
-        .orElseThrow(() -> new ResourceNotFoundException("Snapshot not found: " + snapshotId));
+    NetworkSnapshotEntity removed =
+        snapshotRepository
+            .findById(snapshotId)
+            .filter(s -> s.getNetwork().getId().equals(networkId))
+            .orElseThrow(() -> new ResourceNotFoundException("Snapshot not found: " + snapshotId));
+    UUID removedFileId = removed.getFile() != null ? removed.getFile().getId() : null;
 
     snapshotRepository.deleteById(snapshotId);
+    // Detection rules (#925): this network's rule matches no longer apply to the capture.
+    if (removedFileId != null) {
+      events.publishEvent(
+          new com.tracepcap.monitor.event.SnapshotMembershipChangedEvent(networkId, removedFileId, false));
+    }
     reorderSnapshots(networkId);
     rerunChangeDetectionChain(networkId);
+  }
+
+  /**
+   * Brings every network whose snapshot order has gaps back in line, exactly as
+   * {@link #removeSnapshot} does after its own delete: renumber, then re-run change detection
+   * (#635). Returns the networks it repaired.
+   *
+   * <p>Called after a file delete has committed (see {@code SnapshotFileDeletionListener}).
+   * {@code REQUIRES_NEW} because in an AFTER_COMMIT callback a plain REQUIRED transaction would join
+   * the already-completed one, and its writes would never commit.
+   */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+  public List<UUID> repairNetworksWithSnapshotGaps() {
+    List<UUID> networks = snapshotRepository.findNetworkIdsWithSnapshotOrderGaps();
+    for (UUID networkId : networks) {
+      reorderSnapshots(networkId);
+      rerunChangeDetectionChain(networkId);
+      log.info("Repaired snapshot order and change history for network {} after a file delete", networkId);
+    }
+    return networks;
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -292,6 +330,12 @@ public class SnapshotService {
 
   NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount,
       long securitySignalCount, List<SnapshotSubnetOverrideDto> overrides) {
+    return toDto(s, changeCount, criticalCount, securitySignalCount, overrides,
+        insightPresence.snapshotHasInsights(s.getId()));
+  }
+
+  NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount,
+      long securitySignalCount, List<SnapshotSubnetOverrideDto> overrides, boolean hasInsights) {
     return NetworkSnapshotDto.builder()
         .id(s.getId())
         .networkId(s.getNetwork().getId())
@@ -307,20 +351,52 @@ public class SnapshotService {
         .securitySignalCount(securitySignalCount)
         .context(s.getContext())
         .notes(s.getNotes())
-        .hasInsights(insightPresence.snapshotHasInsights(s.getId()))
+        .hasInsights(hasInsights)
         .addedAt(s.getAddedAt())
         .subnetOverrides(overrides)
         .build();
   }
 
-  /** Absolute distinct security-signal count for a single file (0 if none). */
-  private long securitySignalCount(UUID fileId) {
-    return securitySignalCounts(List.of(fileId)).getOrDefault(fileId, 0L);
+  /** Distinct security-signal count for a snapshot, as seen in its network (0 if none). */
+  private long securitySignalCount(NetworkSnapshotEntity snapshot) {
+    UUID fileId = snapshot.getFile().getId();
+    return securitySignalCounts(snapshot.getNetwork().getId(), List.of(fileId)).getOrDefault(fileId, 0L);
   }
 
-  /** Batched fileId → distinct security-signal count. Files with no signals are absent from the map. */
-  private Map<UUID, Long> securitySignalCounts(List<UUID> fileIds) {
+  /**
+   * Batched fileId → distinct security-signal count, as seen in the network (#925): the stored
+   * signals, minus the global rules this network suppresses, plus the network's own rules that
+   * matched. Files with no signals are absent from the map.
+   */
+  private Map<UUID, Long> securitySignalCounts(UUID networkId, List<UUID> fileIds) {
     if (fileIds.isEmpty()) return Map.of();
-    return conversationLookup.securitySignalCounts(fileIds);
+    Map<UUID, Long> base = conversationLookup.securitySignalCounts(fileIds);
+    Set<String> suppressed = networkRuleOverlay.suppressedNames(networkId);
+    Map<UUID, Set<String>> networkNames = networkRuleOverlay.matchedNamesByFile(networkId, fileIds);
+    if (suppressed.isEmpty() && networkNames.isEmpty()) return base;
+    Map<UUID, Set<String>> stored = conversationLookup.customSignatureNames(fileIds);
+    Map<UUID, Long> out = new java.util.HashMap<>();
+    for (UUID fileId : fileIds) {
+      long n =
+          adjustedCount(
+              base.getOrDefault(fileId, 0L),
+              stored.getOrDefault(fileId, Set.of()),
+              suppressed,
+              networkNames.getOrDefault(fileId, Set.of()));
+      if (n > 0) out.put(fileId, n);
+    }
+    return out;
+  }
+
+  /**
+   * The custom-rule part of a count, recomputed for a network: {@code base} counts each stored rule
+   * name once; drop the suppressed ones, and add network rule names not already counted.
+   */
+  static long adjustedCount(long base, Set<String> stored, Set<String> suppressed, Set<String> networkNames) {
+    Set<String> visible = new java.util.HashSet<>(stored);
+    visible.removeAll(suppressed);
+    long removed = stored.size() - visible.size();
+    long added = networkNames.stream().filter(n -> !visible.contains(n)).count();
+    return Math.max(0, base - removed + added);
   }
 }

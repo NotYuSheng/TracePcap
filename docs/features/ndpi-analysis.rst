@@ -66,7 +66,7 @@ nDPI data surfaces across multiple views:
   and risk alerts.
 - **Conversations tab** — per-row columns for Application, Category, Risk,
   JA3C, JA3S, and SNI; filterable by any of these fields.
-- **Node Detail Panel** — risk badges on individual host nodes in the network
+- **Node details dialog** — risk badges on individual host nodes in the network
   graph.
 
 Risk Flags
@@ -85,9 +85,9 @@ to these nDPI-native detections.
 Enabling nDPI
 -------------
 
-nDPI analysis is enabled by default. In the **Analysis options** modal shown
-after file selection, the **Protocol & application classification** stage can
-be unchecked to skip nDPI for that upload.
+nDPI analysis is enabled by default. To skip it for an upload, untick
+**Protocols and apps (nDPI)** under **Analyse with** on the home page before
+choosing the file.
 
 Either way, nDPI results cannot be added after upload — re-upload the file
 if you need nDPI data for a capture that was processed without it.

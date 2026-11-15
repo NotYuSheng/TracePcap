@@ -6,16 +6,24 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import { EdgeArrowProgram } from 'sigma/rendering';
 import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
+import { animatedEdges, drawDeviceLinks, drawEffects, drawFlights, drawParticles, windowEffects, type GraphEffect, type LiveFlight } from './trafficParticles';
+
+const EMPTY_LINKS: { from: string; to: string; label: string }[] = [];
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
-import type { GraphNode, GraphEdge } from '@/features/network/types';
+import type { GraphNode, GraphEdge, GraphLayoutType } from '@/features/network/types';
+import { buildGroupTree, layoutGroups, CELL_H, CELL_W, NODE_TOP, type GroupedLayout } from '@/features/network/services/networkGroups';
+import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
+import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
+import { drawGroupBoxes } from './groupBoxes';
+import { groupingEdits, type NetworkMapEdits } from '@/features/network/services/networkMapEdits';
 import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, buildAppLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
 import { getAppColor } from '@/utils/appColors';
 import { makeVolumeEdgeColor } from '@/utils/volumeColor';
 import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
-import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
 import { GENERIC_NODE_TYPES, getNodeIcon } from './nodeIcons';
+import { buildNodeLines } from './nodeLines';
 import './NetworkGraph.css';
 
 // ---------------------------------------------------------------------------
@@ -35,8 +43,8 @@ interface NetworkGraphProps {
   edges: GraphEdge[];
   onNodeClick?: (node: GraphNode) => void;
   onClusterClick?: (clusterId: string) => void;
-  layoutType?: 'circular' | 'hierarchicalTd';
-  onLayoutChange?: (layout: 'circular' | 'hierarchicalTd') => void;
+  layoutType?: GraphLayoutType;
+  onLayoutChange?: (layout: GraphLayoutType) => void;
   onLayoutComplete?: () => void;
   primarySource?: string;
   hiddenNodesList?: GraphNode[];
@@ -45,6 +53,42 @@ interface NetworkGraphProps {
   activeFilterCount?: number;
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
+  /**
+   * The time axis's window: what was active in it. Nodes outside it are dimmed and edges outside it
+   * hidden, by redrawing only, so the layout never moves while the window plays. Null shows all.
+   */
+  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string>; hiddenNodeIds?: Set<string>; faintNodeIds?: Set<string>; window?: { from: number; to: number } } | null;
+  /**
+   * Called when Fit view is pressed again with the graph already fitted: nothing visibly happens, so
+   * the user is probably after the header's fullscreen button (the two used to share an icon).
+   */
+  onFitViewRepeated?: () => void;
+  /** Networks found from DHCP/VLANs (#462): the network map layout's second level. */
+  networkSegments?: NetworkSegment[];
+  /** The user's private-range overrides: what counts as "Your networks" in the network map. */
+  customPrivateRanges?: CustomPrivateRange[];
+  /** Address → the name clients looked it up by: the network map's domain for unnamed hosts. */
+  dnsNames?: Map<string, string>;
+  /** The analyst's edits to the network map (#649): moves, their own groups, names and notes. */
+  mapEdits?: NetworkMapEdits;
+  /** Called when a box's name on the network map is clicked: to rename it, add a note… */
+  onGroupClick?: (groupId: string) => void;
+  /**
+   * Called when a device is dropped onto another box of the network map: move it there. Without it
+   * (no permission) a dropped device goes back to its box.
+   */
+  onMoveToGroup?: (nodeId: string, groupId: string) => void;
+  /**
+   * Packet replay's current moment: its packets fly along their edges. A new `key` launches them;
+   * null when the replay is off.
+   */
+  packetFlights?: { key: number; flights: { from: string; to: string; color: string }[]; durationMs: number } | null;
+  /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
+  bottomBar?: import('react').ReactNode;
+  /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
+  animateTraffic?: boolean;
+  /** One device on two nodes (it moved to another address): drawn as dashed links. */
+  deviceLinks?: { from: string; to: string; at?: number; label: string; hideLabel?: boolean }[];
   /**
    * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
    * volume shades each edge by `totalBytes` on the shared volume scale — the same
@@ -96,67 +140,10 @@ const LIGHT_BG = '#f6f8fa';
  *   3. Accent-colored Bootstrap Icon centered inside
  *   4. Text label below
  */
-/**
- * Builds the ordered list of text lines drawn under a node, from the user's label
- * configuration. Cluster nodes ignore the config and keep their descriptive label.
- * Always returns at least one line so a node is never left unlabelled.
- */
-function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
-  if (node.data.isCluster) return node.label ? [node.label] : [];
-
-  const lines: string[] = [];
-  for (const opt of cfg.fields) {
-    if (!opt.enabled) continue;
-    let value: string | undefined;
-    switch (opt.field) {
-      case 'roleLabel':
-        value = node.data.roleLabel;
-        break;
-      case 'ip':
-        value = node.data.ip;
-        break;
-      case 'hostname':
-        value = node.data.hostname;
-        break;
-      case 'loggedInUser':
-        value = node.data.loggedInUser;
-        break;
-      case 'mac':
-        value = node.data.mac;
-        break;
-      case 'deviceType':
-        // Adjudicated identity is the display authority (#512 slice 5b): a human-confirmed
-        // label replaces the machine type; a contested identity is marked as a question.
-        if (node.data.identityBasis === 'HUMAN' && node.data.identityLabel) {
-          value = node.data.identityLabel;
-        } else {
-          value =
-            node.data.deviceType && node.data.deviceType !== 'UNKNOWN'
-              ? deviceTypeLabel(node.data.deviceType)
-              : undefined;
-          if (value && node.data.identityContested) value += ' (contested)';
-        }
-        break;
-      case 'manufacturer':
-        value = node.data.manufacturer;
-        break;
-    }
-    // Skip repeats: a confirmed role also becomes the HUMAN identity label, so with both the
-    // role and device-type lines enabled the same text would otherwise print twice.
-    if (value && !lines.includes(value)) lines.push(value);
-  }
-  for (const t of cfg.customText) {
-    const custom = t.trim();
-    if (custom) lines.push(custom);
-  }
-  // Never render an unlabelled node — fall back to IP (or the node's display label).
-  if (lines.length === 0) lines.push(node.data.ip || node.label || '');
-  return lines.filter(Boolean);
-}
 
 function drawNodeLabel(
   ctx: CanvasRenderingContext2D,
-  data: { x: number; y: number; size: number; label: string | null; color: string },
+  data: { key?: string; x: number; y: number; size: number; label: string | null; color: string },
   labelColor: string,
   nodeFill: string,
   ntMap: Map<string, string>,
@@ -164,12 +151,17 @@ function drawNodeLabel(
   linesMap: Map<string, string[]>,
   hlMap?: Map<string, NodeHighlight>,
   contestedMap?: Map<string, boolean>,
+  fit?: { w: number; below: number } | null,
 ): void {
   const { x, y, size, label, color: accentColor } = data;
-  const nodeType = ntMap.get(label ?? '') ?? 'unknown';
-  const deviceType = dtMap.get(label ?? '') ?? '';
+  // The per-node sidecars are keyed by node id: two nodes can share a label (one device that moved
+  // to another address, or two devices that shared one, both named by the same hostname).
+  const id = data.key ?? label ?? '';
+  const nodeType = ntMap.get(id) ?? 'unknown';
+  const deviceType = dtMap.get(id) ?? '';
+  // Change highlights (Monitor) name nodes by their label (IP or MAC).
   const highlight = label ? hlMap?.get(label) : undefined;
-  const contested = label ? contestedMap?.get(label) ?? false : false;
+  const contested = contestedMap?.get(id) ?? false;
 
   // Outer glow ring for highlighted (changed) nodes
   if (highlight) {
@@ -217,7 +209,21 @@ function drawNodeLabel(
 
   // Text label(s) below — one line per configured field.
   // An empty label means the node is dimmed (hover) and should draw no text.
-  const lines = label ? linesMap.get(label) ?? [label] : [];
+  let lines = label ? linesMap.get(id) ?? linesMap.get(label) ?? [label] : [];
+  if (fit && lines.length > 0) {
+    // A cell of the network map: as many lines as fit under the node, each cut to the cell's width,
+    // so neighbours never overlap; zooming in shows the rest.
+    const room = Math.floor((fit.below - size - 8) / 13);
+    lines = lines.slice(0, Math.max(0, room));
+    ctx.font = `500 11px Inter, system-ui, sans-serif`;
+    const maxW = fit.w - 10;
+    lines = lines.map(l => {
+      if (ctx.measureText(l).width <= maxW) return l;
+      let t = l;
+      while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+      return t.length > 1 ? t + '…' : '';
+    }).filter(Boolean);
+  }
   if (lines.length > 0) {
     ctx.font = `500 11px Inter, system-ui, sans-serif`;
     ctx.fillStyle = labelColor;
@@ -422,6 +428,7 @@ function buildGraph(
       // Kept on the edge so the colour mode can be switched by repainting in
       // place, without rebuilding the graph and throwing away the layout.
       totalBytes: e.data.totalBytes ?? 0,
+      bidirectional: !!e.data.bidirectional,
       protocol: e.data.protocol,
       appName,
     });
@@ -474,6 +481,9 @@ async function applyHierarchicalLayout(graph: Graph, elk: InstanceType<typeof EL
 // Main component
 // ---------------------------------------------------------------------------
 
+const EMPTY_SEGMENTS: NetworkSegment[] = [];
+const EMPTY_RANGES: CustomPrivateRange[] = [];
+
 export const NetworkGraph = memo(function NetworkGraph({
   nodes,
   edges,
@@ -488,6 +498,18 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  activeInWindow = null,
+  animateTraffic = false,
+  bottomBar,
+  deviceLinks = EMPTY_LINKS,
+  onFitViewRepeated,
+  packetFlights = null,
+  networkSegments = EMPTY_SEGMENTS,
+  customPrivateRanges = EMPTY_RANGES,
+  dnsNames,
+  mapEdits,
+  onGroupClick,
+  onMoveToGroup,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -521,6 +543,20 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, []);
 
   const sigmaRef = useRef<Sigma | null>(null);
+  // Sigma only re-measures on window resizes; a CSS fullscreen or a resized card would leave its
+  // canvases stretched (and the network map's boxes, drawn at the real size, out of line).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const sigma = sigmaRef.current;
+      if (!sigma) return;
+      sigma.resize();
+      sigma.refresh();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const graphRef = useRef<Graph | null>(null);
   const nodeTypeByLabel = useRef<Map<string, string>>(new Map());
   const deviceTypeByLabel = useRef<Map<string, string>>(new Map());
@@ -551,10 +587,156 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigmaRef.current?.refresh();
   }, [highlightedNodes]);
 
+  // Traffic dots: an overlay canvas over Sigma's, redrawn every frame while on (and the tab shows).
+  const particlesRef = useRef<HTMLCanvasElement>(null);
+  // The network map layout: its group boxes, drawn on a canvas under the graph.
+  const groupsCanvasRef = useRef<HTMLCanvasElement>(null);
+  const groupLayoutRef = useRef<GroupedLayout | null>(null);
+  // Dragged nodes keep their place until the layout runs again; this puts them back.
+  const [nodesMoved, setNodesMoved] = useState(false);
+  const resetLayoutRef = useRef<(() => void) | null>(null);
+  // The network map's cell size on screen, refreshed each render: labels are fitted to it.
+  const labelFitRef = useRef<{ w: number; below: number } | null>(null);
+  // Legend highlight: click a node type or an edge colour to pick out its nodes and edges.
+  const [legendFocus, setLegendFocus] = useState<LegendFocus | null>(null);
+  const legendMatchRef = useRef<{ nodes: Set<string>; edges: Set<string> } | null>(null);
+  const grouping = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, ...(mapEdits ? groupingEdits(mapEdits) : {}) };
+  const groupingRef = useRef(grouping);
+  groupingRef.current = grouping;
+  const onGroupClickRef = useRef(onGroupClick);
+  onGroupClickRef.current = onGroupClick;
+  const onMoveToGroupRef = useRef(onMoveToGroup);
+  onMoveToGroupRef.current = onMoveToGroup;
+  // While a device is dragged on the network map: the box it would be dropped into.
+  const dropTargetRef = useRef<string | null>(null);
+  const deviceLinksRef = useRef(deviceLinks);
+  deviceLinksRef.current = deviceLinks;
+  const darkRef = useRef(darkMode);
+  darkRef.current = darkMode;
+  const hasLinks = deviceLinks.length > 0;
+  const hasWindow = activeInWindow != null;
+  const hasFlights = packetFlights != null;
+  // Packet replay: the moment's packets, launched when its key changes.
+  const flightsRef = useRef<LiveFlight[]>([]);
+  const flightKey = packetFlights?.key;
+  useEffect(() => {
+    if (!packetFlights) {
+      flightsRef.current.length = 0;
+      return;
+    }
+    const now = performance.now();
+    for (const f of packetFlights.flights) flightsRef.current.push({ ...f, t0: now, dur: packetFlights.durationMs });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flightKey]);
+  // Appear rings and device-move animations, set off as the time window crosses them.
+  const effectsRef = useRef<GraphEffect[]>([]);
+  useEffect(() => {
+    if (!animateTraffic && !hasLinks && !hasWindow && !hasFlights) {
+      const c = particlesRef.current;
+      c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
+      return;
+    }
+    let raf = 0;
+    let lastSigma: unknown = null;
+    let lastSize = -1;
+    let edges: ReturnType<typeof animatedEdges> = [];
+    const frame = (now: number) => {
+      raf = requestAnimationFrame(frame);
+      const sigma = sigmaRef.current;
+      const canvas = particlesRef.current;
+      if (!sigma || !canvas || document.hidden) return;
+      // Match the canvas to its box (and the screen's pixel ratio).
+      const ratio = window.devicePixelRatio || 1;
+      const w = Math.round(canvas.clientWidth * ratio);
+      const h = Math.round(canvas.clientHeight * ratio);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      const size = sigma.getGraph().size;
+      if (sigma !== lastSigma || size !== lastSize) {
+        edges = animatedEdges(sigma);
+        lastSigma = sigma;
+        lastSize = size;
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      if (animateTraffic) drawParticles(ctx, sigma, edges, now);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawDeviceLinks(ctx, sigma, deviceLinksRef.current, darkRef.current);
+      drawEffects(ctx, sigma, effectsRef.current, now, darkRef.current);
+      drawFlights(ctx, sigma, flightsRef.current, now);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [animateTraffic, hasLinks, hasWindow, hasFlights]);
+
+  const activeInWindowRef = useRef(activeInWindow);
+  useEffect(() => {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (!reduced) {
+      const fresh = windowEffects(activeInWindowRef.current, activeInWindow, deviceLinksRef.current, performance.now());
+      if (fresh.length) effectsRef.current.push(...fresh);
+    }
+    if (!activeInWindow) effectsRef.current.length = 0;
+    activeInWindowRef.current = activeInWindow;
+    sigmaRef.current?.refresh();
+  }, [activeInWindow]);
+
+  // The network map's grouping can arrive after the graph (segments load separately): regroup.
+  useEffect(() => {
+    const sigma = sigmaRef.current;
+    if (layoutType !== 'grouped' || !sigma) return;
+    applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+    sigma.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [networkSegments, customPrivateRanges, dnsNames, mapEdits]);
+
+  // Work out what the legend highlight picks out, whenever it or the graph changes. A frame
+  // later, so a graph rebuilt or repainted by the effects below is the one matched.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const sigma = sigmaRef.current;
+      if (!sigma) return;
+      if (!legendFocus) {
+        legendMatchRef.current = null;
+        sigma.refresh();
+        return;
+      }
+      const graph = sigma.getGraph();
+      const matchNodes = new Set<string>();
+      const matchEdges = new Set<string>();
+      if (legendFocus.kind === 'node') {
+        graph.forEachNode((id, a) => {
+          if (legendNodeMatches(legendFocus.key, a['nodeType'] as string | undefined, a['deviceType'] as string | undefined)) matchNodes.add(id);
+        });
+        graph.forEachEdge((id, _a, src, tgt) => {
+          if (matchNodes.has(src) || matchNodes.has(tgt)) matchEdges.add(id);
+        });
+      } else {
+        graph.forEachEdge((id, a, src, tgt) => {
+          if (a['color'] === legendFocus.color) {
+            matchEdges.add(id);
+            matchNodes.add(src);
+            matchNodes.add(tgt);
+          }
+        });
+      }
+      // The picked type is gone from the graph (filtered away): drop the highlight.
+      if (matchNodes.size === 0) {
+        setLegendFocus(null);
+        return;
+      }
+      legendMatchRef.current = { nodes: matchNodes, edges: matchEdges };
+      sigma.refresh();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [legendFocus, nodes, edges, edgeColorMode, layoutType]);
+
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
     const lines = new Map<string, string[]>();
-    for (const n of nodesRef.current) lines.set(n.label, buildNodeLines(n, nodeLabelConfig));
+    for (const n of nodesRef.current) lines.set(n.id, buildNodeLines(n, nodeLabelConfig));
     nodeLinesByLabel.current = lines;
     sigmaRef.current?.refresh();
   }, [nodeLabelConfig]);
@@ -617,7 +799,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     // config change alone doesn't force a full graph rebuild + relayout (handled below).
     const initialCfg = useStore.getState().nodeLabelConfig;
     const initialLines = new Map<string, string[]>();
-    for (const n of nodes) initialLines.set(n.label, buildNodeLines(n, initialCfg));
+    for (const n of nodes) initialLines.set(n.id, buildNodeLines(n, initialCfg));
     nodeLinesByLabel.current = initialLines;
 
     const bgColor = darkMode ? DARK_BG : LIGHT_BG;
@@ -637,14 +819,25 @@ export const NetworkGraph = memo(function NetworkGraph({
       },
       labelDensity: 1,
       labelGridCellSize: 60,
+      // Finer zoom: each wheel step scales by 1.2 (sigma's default, 1.7, jumps too far at a time).
+      zoomingRatio: 1.2,
+      zoomDuration: 150,
       labelRenderedSizeThreshold: -Infinity, // always call drawNodeLabel at every zoom level
       minEdgeThickness: 0.5,
       zIndex: true,
       defaultDrawNodeLabel: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current);
+        const faint = activeInWindowRef.current?.faintNodeIds?.has(data.key) ?? false;
+        ctx.save();
+        if (faint) ctx.globalAlpha = 0.3;
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current, labelFitRef.current);
+        ctx.restore();
       },
       defaultDrawNodeHover: (ctx, data) => {
+        const faint = activeInWindowRef.current?.faintNodeIds?.has(data.key) ?? false;
+        ctx.save();
+        if (faint) ctx.globalAlpha = 0.3;
         drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current);
+        ctx.restore();
       },
       nodeReducer: (node, data) => {
         const res = { ...data };
@@ -660,6 +853,32 @@ export const NetworkGraph = memo(function NetworkGraph({
         if (hovNode && !isHovered && !neighbors.has(node)) {
           res['color'] = dimColor;
           res['label'] = '';
+        }
+
+        // Legend highlight: everything but the picked type (or the ends of the picked edges) fades.
+        const lm = legendMatchRef.current;
+        if (lm && !lm.nodes.has(node)) {
+          res['color'] = dimColor;
+          res['label'] = '';
+          res['zIndex'] = 0;
+        } else if (lm) {
+          // Drawn in full (icon and label) even where the label grid would skip it.
+          res['forceLabel'] = true;
+          res['zIndex'] = 2;
+        }
+
+        // Time axis: quiet in the window → dimmed, label kept so the node is still findable.
+        const win = activeInWindowRef.current;
+        if (win?.hiddenNodeIds?.has(node)) {
+          // Not seen yet (the "appear when first seen" option): not drawn at all.
+          res['hidden'] = true;
+        } else if (win?.faintNodeIds?.has(node)) {
+          // Not seen yet, shown faint: a ghost of the node, its label drawn at low alpha too.
+          res['color'] = blendColor(String(res['color'] ?? dimColor), bgColor, 0.82);
+          res['zIndex'] = 0;
+        } else if (win && !win.nodeIds.has(node)) {
+          res['color'] = dimColor;
+          res['zIndex'] = 0;
         }
 
         // Compare-mode secondary
@@ -681,11 +900,38 @@ export const NetworkGraph = memo(function NetworkGraph({
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.5);
         }
+        const lmEdges = legendMatchRef.current?.edges;
+        if (lmEdges && !lmEdges.has(edge)) {
+          res['color'] = blendColor(data['color'] as string, bgColor, 0.12);
+          res['zIndex'] = 0;
+        }
+        // Time axis: a conversation outside the window isn't drawn. An edge standing for several
+        // conversations between the same pair (deduplicateEdges joins their ids with '|') is
+        // drawn when any of them is in the window.
+        const win = activeInWindowRef.current;
+        if (win && !win.edgeIds.has(edge) && !edge.split('|').some(id => win.edgeIds.has(id))) {
+          res['hidden'] = true;
+        }
         return res;
       },
     });
 
     sigmaRef.current = sigma;
+    groupLayoutRef.current = null;
+    sigma.on('afterRender', () => {
+      const canvas = groupsCanvasRef.current;
+      const layout = groupLayoutRef.current;
+      if (!canvas) return;
+      drawGroupBoxes(
+        canvas,
+        sigma,
+        layout?.boxes ?? [],
+        layout?.headerFor ?? (() => 0),
+        darkMode,
+        activeInWindowRef.current?.nodeIds ?? null,
+        dropTargetRef.current,
+      );
+    });
 
     // Test seam for the README demo recording (frontend/e2e/demo.spec.ts).
     //
@@ -793,12 +1039,34 @@ export const NetworkGraph = memo(function NetworkGraph({
       const pos = sigma.viewportToGraph({ x, y });
       graph.setNodeAttribute(dragNode, 'x', pos.x);
       graph.setNodeAttribute(dragNode, 'y', pos.y);
+      // Network map: the innermost box under the pointer is where the device would go.
+      const layout = groupLayoutRef.current;
+      if (layout) {
+        const hit = layout.boxes.filter(b => b.leaf && pos.x >= b.x && pos.x <= b.x + b.w && -pos.y >= b.y && -pos.y <= b.y + b.h);
+        dropTargetRef.current = hit[0]?.id ?? null;
+      }
       sigma.refresh();
     };
 
     const onDragEnd = () => {
       if (!dragNode) return;
       suppressNextClick = dragMoved;
+      const layout = groupLayoutRef.current;
+      if (layout && dragMoved) {
+        // Network map: a device always sits in a box. Dropped on another one, it moves there;
+        // anywhere else (or without the right to edit) it goes back to its own.
+        const target = dropTargetRef.current;
+        const home = layout.boxes.find(b => b.leaf && b.memberIds.includes(dragNode!));
+        dropTargetRef.current = null;
+        if (target && home && target !== home.id && onMoveToGroupRef.current) {
+          onMoveToGroupRef.current(dragNode, target);
+        } else {
+          applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+          sigma.refresh();
+        }
+      } else if (dragMoved) {
+        setNodesMoved(true);
+      }
       dragNode = null;
       dragMoved = false;
       sigma.getCamera().enable();
@@ -811,15 +1079,20 @@ export const NetworkGraph = memo(function NetworkGraph({
     // Before each render, rebuild the label→nodeType/deviceType sidecar maps.
     // Keyed by label (IP/hostname) which is unique per node in this graph.
     sigma.on('beforeRender', () => {
+      if (groupLayoutRef.current) {
+        const o = sigma.graphToViewport({ x: 0, y: 0 });
+        const c = sigma.graphToViewport({ x: CELL_W, y: -(CELL_H - NODE_TOP) });
+        labelFitRef.current = { w: Math.abs(c.x - o.x), below: Math.abs(c.y - o.y) };
+      } else {
+        labelFitRef.current = null;
+      }
       nodeTypeByLabel.current.clear();
       deviceTypeByLabel.current.clear();
       contestedByLabel.current.clear();
-      graph.forEachNode((_node, attrs) => {
-        const label = attrs['label'] as string ?? '';
-        if (!label) return;
-        nodeTypeByLabel.current.set(label, attrs['nodeType'] as string ?? 'unknown');
-        deviceTypeByLabel.current.set(label, attrs['deviceType'] as string ?? '');
-        if (attrs['identityContested']) contestedByLabel.current.set(label, true);
+      graph.forEachNode((node, attrs) => {
+        nodeTypeByLabel.current.set(node, attrs['nodeType'] as string ?? 'unknown');
+        deviceTypeByLabel.current.set(node, attrs['deviceType'] as string ?? '');
+        if (attrs['identityContested']) contestedByLabel.current.set(node, true);
       });
     });
 
@@ -834,7 +1107,9 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     // Override background color via the canvas element behind WebGL
     const canvas = containerRef.current.querySelector('canvas');
-    if (canvas) (canvas as HTMLCanvasElement).style.background = bgColor;
+    // In the network map the group boxes sit under the graph, so its canvas stays clear (the
+    // wrapper behind it carries the same background colour).
+    if (canvas) (canvas as HTMLCanvasElement).style.background = layoutType === 'grouped' ? 'transparent' : bgColor;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -871,6 +1146,19 @@ export const NetworkGraph = memo(function NetworkGraph({
       onNodeClick?.(original);
     });
 
+    // Network map: a click on a box's name opens it (rename, note…). The deepest box whose header
+    // band holds the click wins.
+    sigma.on('clickStage', ({ event }) => {
+      const layout = groupLayoutRef.current;
+      if (!layout || !onGroupClickRef.current) return;
+      const p = sigma.viewportToGraph({ x: event.x, y: event.y });
+      const y = -p.y;
+      const hit = layout.boxes
+        .filter(b => p.x >= b.x && p.x <= b.x + b.w && y >= b.y && y <= b.y + b.header)
+        .sort((a, b) => b.level - a.level)[0];
+      if (hit) onGroupClickRef.current(hit.id);
+    });
+
     // Double-click to zoom into node
     sigma.on('doubleClickNode', ({ node }) => {
       const cam = sigma.getCamera();
@@ -888,7 +1176,29 @@ export const NetworkGraph = memo(function NetworkGraph({
       });
     }
 
-    if (layoutType === 'hierarchicalTd') {
+    setNodesMoved(false);
+    resetLayoutRef.current = () => {
+      setNodesMoved(false);
+      if (layoutType === 'grouped') {
+        applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+        sigma.refresh();
+      } else if (layoutType === 'hierarchicalTd') {
+        applyHierarchicalLayout(graph, elkRef.current!).then(() => !cancelled && sigma.refresh());
+      } else {
+        circular.assign(graph, { scale: 1 });
+        noverlap.assign(graph, { maxIterations: 50, settings: { margin: 6 } });
+        sigma.refresh();
+      }
+    };
+
+    if (layoutType === 'grouped') {
+      applyGroupedLayout(sigma, nodes, groupingRef.current, groupLayoutRef);
+      sigma.refresh();
+      requestAnimationFrame(() => {
+        revealCanvas();
+        onLayoutCompleteRef.current?.();
+      });
+    } else if (layoutType === 'hierarchicalTd') {
       setLayouting(true);
       applyHierarchicalLayout(graph, elkRef.current!).then(() => {
         if (cancelled) return;
@@ -977,8 +1287,26 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, [edgeColorMode]);
 
   // Fit view
+  const onFitViewRepeatedRef = useRef(onFitViewRepeated);
+  onFitViewRepeatedRef.current = onFitViewRepeated;
+  const noopFits = useRef<number[]>([]);
   const handleFitView = useCallback(() => {
-    sigmaRef.current?.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
+    const camera = sigmaRef.current?.getCamera();
+    if (!camera) return;
+    const { x, y, ratio } = camera.getState();
+    const fitted = Math.abs(x - 0.5) < 1e-3 && Math.abs(y - 0.5) < 1e-3 && Math.abs(ratio - 1) < 1e-3;
+    if (fitted) {
+      // Two presses that changed nothing, close together: point the user at fullscreen.
+      const now = Date.now();
+      noopFits.current = [...noopFits.current.filter(t => now - t < 5000), now];
+      if (noopFits.current.length >= 2) {
+        noopFits.current = [];
+        onFitViewRepeatedRef.current?.();
+      }
+      return;
+    }
+    noopFits.current = [];
+    camera.animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
   }, []);
 
   return (
@@ -991,10 +1319,25 @@ export const NetworkGraph = memo(function NetworkGraph({
        * The canvas is the thing they sit on, so the canvas is what they follow.
        */
       data-graph-theme={darkMode ? 'dark' : 'light'}
+      data-has-bottom-bar={bottomBar ? 'true' : undefined}
       style={{ background: darkMode ? DARK_BG : LIGHT_BG }}
     >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
+      {/* Network map group boxes, under the graph. */}
+      <canvas
+        ref={groupsCanvasRef}
+        className="network-graph-groups"
+        aria-hidden="true"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      />
       <div className="network-graph-canvas" ref={containerRef} />
+      {/* Traffic dots, drawn over the graph; clicks go through to it. */}
+      <canvas
+        ref={particlesRef}
+        className="network-graph-particles"
+        aria-hidden="true"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      />
 
       {/* Empty-state overlay — sits on top when there is nothing to show */}
       {nodes.length === 0 && (
@@ -1009,26 +1352,48 @@ export const NetworkGraph = memo(function NetworkGraph({
         </div>
       )}
 
+      {bottomBar}
+
       {/* ── Bottom-right controls ────────────────────────────────────────── */}
       <div className="ng-overlay-controls">
-        <button className="ng-ctrl-btn" title="Fit view" onClick={handleFitView}>
-          <i className="bi bi-fullscreen" />
+        {nodesMoved && (
+          <button
+            className="ng-ctrl-btn"
+            title="Reset positions"
+            aria-label="Reset positions: put dragged nodes back"
+            onClick={() => resetLayoutRef.current?.()}
+          >
+            <i className="bi bi-arrow-counterclockwise" aria-hidden="true" />
+          </button>
+        )}
+        <button className="ng-ctrl-btn" title="Fit view" aria-label="Fit view" onClick={handleFitView}>
+          <i className="bi bi-bounding-box-circles" aria-hidden="true" />
         </button>
         {onLayoutChange && (
           <>
             <button
               className={`ng-ctrl-btn${layoutType === 'circular' ? ' active' : ''}`}
-              title="Circular layout"
+              title="Circular layout: devices around a ring, spread out so none overlap"
+              aria-label="Circular layout: devices around a ring, spread out so none overlap"
               onClick={() => onLayoutChange('circular')}
             >
-              <i className="bi bi-diagram-2" />
+              <i className="bi bi-diagram-2" aria-hidden="true" />
             </button>
             <button
               className={`ng-ctrl-btn${layoutType === 'hierarchicalTd' ? ' active' : ''}`}
-              title="Hierarchical layout"
+              title="Hierarchical layout: layered top to bottom by who talks to whom"
+              aria-label="Hierarchical layout: layered top to bottom by who talks to whom"
               onClick={() => onLayoutChange('hierarchicalTd')}
             >
-              <i className="bi bi-diagram-3" />
+              <i className="bi bi-diagram-3" aria-hidden="true" />
+            </button>
+            <button
+              className={`ng-ctrl-btn${layoutType === 'grouped' ? ' active' : ''}`}
+              title="Network map: grouped by network. Drag a device onto another box to move it there"
+              aria-label="Network map: grouped by network. Drag a device onto another box to move it there"
+              onClick={() => onLayoutChange('grouped')}
+            >
+              <i className="bi bi-grid-1x2" aria-hidden="true" />
             </button>
           </>
         )}
@@ -1074,23 +1439,27 @@ export const NetworkGraph = memo(function NetworkGraph({
       {/* ── Node-type legend — data-driven, matches getNodeColor/getNodeIcon ── */}
       {/* Scrollable on-screen so a long protocol list can't overflow the canvas; the PDF-capture
           render (forceLight) keeps the full height so nothing is clipped in the export. */}
-      <div className={`ng-legend${forceLight ? '' : ' ng-legend--scroll'}`}>
+      <div
+        className={`ng-legend${forceLight ? '' : ' ng-legend--scroll'}${legendFocus ? ' ng-legend--focused' : ''}`}
+        role="group"
+        aria-label="Legend: click an entry to highlight it"
+      >
         {/* Specific service nodeTypes present in this graph */}
         {Object.entries(NODE_TYPE_CONFIG)
           .filter(([type]) => !GENERIC_NODE_TYPES.has(type) && type !== 'cluster' &&
             nodes.some(n => !n.data.isCluster && (n.data.nodeType ?? 'unknown') === type))
           .map(([type, cfg]) => (
-            <div key={type} className="ng-legend-item">
-              <i className={`bi ${cfg.icon} ng-legend-icon`} style={{ color: cfg.color }} />
+            <LegendButton key={type} focus={legendFocus} value={{ kind: 'node', key: `type:${type}` }} onPick={setLegendFocus}>
+              <i className={`bi ${cfg.icon} ng-legend-icon`} style={{ color: cfg.color }} aria-hidden="true" />
               <span className="ng-legend-label">{cfg.label}</span>
-            </div>
+            </LegendButton>
           ))}
         {/* Device types present among generic (client/unknown) nodes */}
         {DEVICE_TYPES
           .filter(dt => dt !== 'UNKNOWN' &&
             nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && n.data.deviceType === dt))
           .map(dt => (
-            <div key={dt} className="ng-legend-item">
+            <LegendButton key={dt} focus={legendFocus} value={{ kind: 'node', key: `device:${dt}` }} onPick={setLegendFocus}>
               {/*
                 Swatch matches what the node actually renders. Generic nodes (client/unknown) now
                 take their colour from NODE_TYPE_CONFIG[nodeType], not from deviceTypeColor — so
@@ -1100,16 +1469,17 @@ export const NetworkGraph = memo(function NetworkGraph({
               <i
                 className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`}
                 style={{ color: NODE_TYPE_CONFIG['client'].color }}
+                aria-hidden="true"
               />
               <span className="ng-legend-label">{deviceTypeLabel(dt)}</span>
-            </div>
+            </LegendButton>
           ))}
         {/* Fallback: show Unknown only if generic nodes exist with no specific deviceType */}
         {nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && (!n.data.deviceType || n.data.deviceType === 'UNKNOWN')) && (
-          <div className="ng-legend-item">
-            <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} />
+          <LegendButton focus={legendFocus} value={{ kind: 'node', key: 'unknown' }} onPick={setLegendFocus}>
+            <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} aria-hidden="true" />
             <span className="ng-legend-label">Unknown</span>
-          </div>
+          </LegendButton>
         )}
 
         {/* ── Edge-protocol colours — line swatches, driven by PROTOCOL_COLORS ── */}
@@ -1118,16 +1488,16 @@ export const NetworkGraph = memo(function NetworkGraph({
             <div className="ng-legend-divider" />
             <div className="ng-legend-heading">Edges</div>
             {protocolLegend.entries.map(({ color, label }) => (
-              <div key={color} className="ng-legend-item">
-                <span className="ng-legend-line" style={{ background: color }} />
+              <LegendButton key={color} focus={legendFocus} value={{ kind: 'edge', color }} onPick={setLegendFocus}>
+                <span className="ng-legend-line" style={{ background: color }} aria-hidden="true" />
                 <span className="ng-legend-label">{label}</span>
-              </div>
+              </LegendButton>
             ))}
             {protocolLegend.hasUnmapped && (
-              <div className="ng-legend-item">
-                <span className="ng-legend-line" style={{ background: DEFAULT_EDGE_COLOR }} />
+              <LegendButton focus={legendFocus} value={{ kind: 'edge', color: DEFAULT_EDGE_COLOR }} onPick={setLegendFocus}>
+                <span className="ng-legend-line" style={{ background: DEFAULT_EDGE_COLOR }} aria-hidden="true" />
                 <span className="ng-legend-label">Other</span>
-              </div>
+              </LegendButton>
             )}
           </>
         )}
@@ -1152,4 +1522,72 @@ function blendColor(hex: string, bg: string, alpha: number): string {
   const g = Math.round(g1 * alpha + g2 * (1 - alpha));
   const b = Math.round(b1 * alpha + b2 * (1 - alpha));
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * The network map layout: nested group boxes (networks, subnets, device types), each device in a
+ * grid cell of its innermost group. Boxes are kept for the under-graph canvas to draw.
+ */
+function applyGroupedLayout(
+  sigma: Sigma,
+  nodes: GraphNode[],
+  grouping: Parameters<typeof buildGroupTree>[1],
+  out: { current: GroupedLayout | null },
+): void {
+  const graph = sigma.getGraph();
+  const present = nodes.filter(n => graph.hasNode(n.id));
+  const layout = layoutGroups(buildGroupTree(present, grouping));
+  layout.positions.forEach((p, id) => {
+    if (!graph.hasNode(id)) return;
+    graph.setNodeAttribute(id, 'x', p.x);
+    graph.setNodeAttribute(id, 'y', -p.y);
+  });
+  out.current = layout;
+  // Frame the boxes, not just the nodes: the camera fits the bounding box, and the outer boxes and
+  // their names reach past the outermost devices.
+  if (layout.boxes.length) {
+    const xs = layout.boxes.flatMap(b => [b.x, b.x + b.w]);
+    const ys = layout.boxes.flatMap(b => [-b.y, -(b.y + b.h)]);
+    const [top, bottom] = [Math.max(...ys), Math.min(...ys)];
+    // Extra room at the bottom, where the time axis bar sits over the graph.
+    const below = (top - bottom) * 0.08;
+    sigma.setCustomBBox({ x: [Math.min(...xs), Math.max(...xs)], y: [bottom - below, top] });
+  }
+}
+
+/** What a legend click picks out: a node type (`type:<nodeType>`, `device:<deviceType>`, `unknown`) or an edge colour. */
+type LegendFocus = { kind: 'node'; key: string } | { kind: 'edge'; color: string };
+
+/** Mirrors how the legend lists node types: specific service types, else generic nodes by device type. */
+function legendNodeMatches(key: string, nodeType: string | undefined, deviceType: string | undefined): boolean {
+  const nt = nodeType ?? 'unknown';
+  if (key.startsWith('type:')) return nt === key.slice(5);
+  const generic = GENERIC_NODE_TYPES.has(nt);
+  if (key.startsWith('device:')) return generic && deviceType === key.slice(7);
+  return generic && (!deviceType || deviceType === 'UNKNOWN');
+}
+
+function sameFocus(a: LegendFocus | null, b: LegendFocus): boolean {
+  if (!a || a.kind !== b.kind) return false;
+  return a.kind === 'node' ? a.key === (b as { key: string }).key : a.color === (b as { color: string }).color;
+}
+
+/** A legend entry: a toggle that highlights its nodes or edges; pressing it again clears. */
+function LegendButton({
+  focus,
+  value,
+  onPick,
+  children,
+}: {
+  focus: LegendFocus | null;
+  value: LegendFocus;
+  onPick: (f: LegendFocus | null) => void;
+  children: import('react').ReactNode;
+}) {
+  const on = sameFocus(focus, value);
+  return (
+    <button type="button" className="ng-legend-item ng-legend-btn" aria-pressed={on} onClick={() => onPick(on ? null : value)}>
+      {children}
+    </button>
+  );
 }

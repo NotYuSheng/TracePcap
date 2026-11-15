@@ -1,5 +1,8 @@
 package com.tracepcap.insights.service;
 
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collection;
 import com.tracepcap.insights.repository.NetworkInsightRepository;
 import com.tracepcap.insights.repository.SnapshotInsightRepository;
 import com.tracepcap.monitor.spi.InsightPresence;
@@ -26,5 +29,18 @@ public class InsightPresenceAdapter implements InsightPresence {
   @Override
   public boolean snapshotHasInsights(UUID snapshotId) {
     return snapshotInsightRepository.existsBySnapshotId(snapshotId);
+  }
+
+  @Override
+  public Set<UUID> networksWithInsights(Collection<UUID> networkIds) {
+    // An empty IN () is invalid SQL on some databases, and there's nothing to ask anyway.
+    if (networkIds.isEmpty()) return Set.of();
+    return new HashSet<>(networkInsightRepository.findNetworkIdsWithInsights(networkIds));
+  }
+
+  @Override
+  public Set<UUID> snapshotsWithInsights(Collection<UUID> snapshotIds) {
+    if (snapshotIds.isEmpty()) return Set.of();
+    return new HashSet<>(snapshotInsightRepository.findSnapshotIdsWithInsights(snapshotIds));
   }
 }

@@ -96,6 +96,16 @@ public class SuricataService implements Extractor {
     return Outcome.completed("suricata ran");
   }
 
+  /** The engine run (the slow part) needs only the file, so it happens before the pipeline's transaction (#409). */
+  @Override
+  public Prepared prepare(ExtractionTarget target) {
+    Map<String, Set<String>> alertMap = runSuricata(target.capture());
+    return conversations -> {
+      applyAlerts(alertMap, conversations);
+      return Outcome.completed("suricata ran");
+    };
+  }
+
   private static final String SURICATA_BINARY = "suricata";
 
   /** Suricata writes its JSON event log here, relative to the {@code -l} output directory. */
@@ -114,9 +124,13 @@ public class SuricataService implements Extractor {
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
+    applyAlerts(runSuricata(pcapFile), conversations);
+  }
 
-    Map<String, Set<String>> alertMap = runSuricata(pcapFile);
-    if (alertMap.isEmpty()) return;
+  /** Resolves engine alerts onto conversations by 5-tuple. Shared by {@link #enrich} and {@link #prepare}. */
+  private void applyAlerts(
+      Map<String, Set<String>> alertMap, List<PcapParserService.ConversationInfo> conversations) {
+    if (alertMap.isEmpty() || conversations.isEmpty()) return;
 
     for (PcapParserService.ConversationInfo conv : conversations) {
       Set<String> alerts = resolve(alertMap, conv);

@@ -1,4 +1,5 @@
-import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
+import { Badge, Button, Card, Popover } from '@govtechsg/sgds-react';
 import type { Finding, FindingSeverity } from '@/types';
 
 function FindingsInfoPopover() {
@@ -25,7 +26,7 @@ function FindingsInfoPopover() {
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="left" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="left" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -35,7 +36,7 @@ function FindingsInfoPopover() {
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 

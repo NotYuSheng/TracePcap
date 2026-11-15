@@ -47,7 +47,7 @@ class LayerDependencyTest {
    * own signature returns {@code HostClassificationEntity} — so the class touches the entity because
    * the seam hands it over, which is the contract working as designed. This rule matches on package
    * names and cannot tell "reached around the port" from "used the type the port gave you". Removing
-   * these 27 requires changing what {@code HostClassifier} returns (the entity conceptually belongs
+   * them requires changing what {@code HostClassifier} returns (the entity conceptually belongs
    * to {@code hostclassification} but physically lives in {@code analysis.entity} for JPA's sake) —
    * a schema-shaped change, tracked separately, not part of the seam migration.
    */

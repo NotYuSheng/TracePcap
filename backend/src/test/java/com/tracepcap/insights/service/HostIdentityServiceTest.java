@@ -260,4 +260,29 @@ class HostIdentityServiceTest {
 
     verify(identityRepo).deleteByFileId(fileId);
   }
+
+  @Test
+  void reusedAddress_eachDeviceIsAdjudicated_andALabelOnOneDeviceStaysOnIt() {
+    // #918 slice 3: 10.0.0.50 was a laptop, then a phone. The address's blended row is replaced by
+    // its devices; the first keeps the bare IP, the phone is keyed by its start.
+    String phone = "10.0.0.50@2026-11-10T11:00:01.020";
+    when(lookup.classifiedHosts(fileId))
+        .thenReturn(List.of(host("10.0.0.50", "LAPTOP_DESKTOP", 100, 75, null, null), host("10.0.0.20", "SERVER", 40, 20, null, null)));
+    when(lookup.deviceHosts(fileId))
+        .thenReturn(List.of(host("10.0.0.50", "LAPTOP_DESKTOP", 100, 75, null, null), host(phone, "MOBILE", 67, 50, null, null)));
+    com.tracepcap.common.adjudication.HumanOverrideEntity label =
+        com.tracepcap.common.adjudication.HumanOverrideEntity.builder()
+            .question(HostIdentityService.QUESTION).fileId(fileId).entityKey(phone).label("IOT").actor("ana").build();
+    when(overrideRepo.findByQuestionAndFileId(HostIdentityService.QUESTION, fileId)).thenReturn(List.of(label));
+
+    service.adjudicateFile(fileId);
+
+    java.util.Map<String, HostIdentityEntity> byKey = new java.util.HashMap<>();
+    for (HostIdentityEntity e : adjudicated()) byKey.put(e.getIp(), e);
+    assertThat(byKey).containsOnlyKeys("10.0.0.50", phone, "10.0.0.20");
+    assertThat(byKey.get(phone).getPrimaryLabel()).isEqualTo("IOT");
+    assertThat(byKey.get(phone).getBasis()).isEqualTo(HostIdentityEntity.BASIS_HUMAN);
+    assertThat(byKey.get("10.0.0.50").getPrimaryLabel()).isEqualTo("LAPTOP_DESKTOP");
+    assertThat(byKey.get("10.0.0.50").getBasis()).isEqualTo(HostIdentityEntity.BASIS_MACHINE);
+  }
 }

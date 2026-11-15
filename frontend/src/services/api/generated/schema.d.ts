@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audited changes, newest first
+         * @description search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.
+         */
+        get: operations["list_14"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{fileId}/dns-servers": {
         parameters: {
             query?: never;
@@ -399,6 +419,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{fileId}/facet-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count conversations per filter value (protocol, app, risk, country, ...) */
+        get: operations["getFacetCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{fileId}/file-types": {
         parameters: {
             query?: never;
@@ -458,10 +495,13 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_4"];
+        get: operations["list_13"];
         put?: never;
-        /** Add a custom private range */
-        post: operations["create_3"];
+        /**
+         * Set a custom private range in the shared default
+         * @description Adds it, or changes the classification of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.
+         */
+        post: operations["create_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -478,8 +518,165 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a custom private range */
+        /**
+         * Delete a custom private range from the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
+        delete: operations["delete_8"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the global detection rules, by name
+         * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
+         */
+        get: operations["list_12"];
+        put?: never;
+        /** Create a global detection rule (audited) */
+        post: operations["create_5"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download every global rule as a YAML file
+         * @description For backups and for moving rules between installs. Import reads the same format.
+         */
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a YAML rules file (audited, all or nothing)
+         * @description Accepts an export or an old signatures.yml. Rules are matched by name. MERGE adds and updates; REPLACE also deletes global rules the file doesn't contain. One invalid rule rejects the whole file, with validationErrors keyed by rule.
+         */
+        post: operations["importRules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What a rule would match in one capture, without saving it
+         * @description Returns the number of matching conversations and a sample. Nothing is stored, so it's 200 rather than 201, and needs no edit permission.
+         */
+        post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/stale-captures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The captures out of date with at least one enabled rule, by id */
+        get: operations["staleCaptures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many captures are out of date with the enabled rules */
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one detection rule */
+        get: operations["get_3"];
+        /** Replace a detection rule (audited; bumps its version if anything changed) */
+        put: operations["update_1"];
+        post?: never;
+        /** Delete a detection rule (audited) */
         delete: operations["delete_7"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/{id}/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote a capture rule to a global rule (audited)
+         * @description Creates a linked global copy, checked against the source capture at once. Needs DETECTION_RULES_GLOBAL, and DETECTION_RULES_CAPTURE too when the original is removed.
+         */
+        post: operations["promote"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -530,7 +727,7 @@ export interface paths {
         };
         /**
          * Get all files
-         * @description Get all uploaded files with pagination
+         * @description Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).
          */
         get: operations["getAllFiles"];
         put?: never;
@@ -650,9 +847,9 @@ export interface paths {
             cookie?: never;
         };
         /** The human override for a question about an entity, if one is set */
-        get: operations["get"];
+        get: operations["get_2"];
         /** Set or replace the human override; re-runs adjudication (actor from token) */
-        put: operations["put"];
+        put: operations["put_1"];
         post?: never;
         /** Clear the human override, letting the machine vote decide again */
         delete: operations["delete_5"];
@@ -670,6 +867,44 @@ export interface paths {
         };
         /** Deterministic answers to the standard investigation questions for a file */
         get: operations["getAnswers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/detection-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This capture's own rules */
+        get: operations["list_11"];
+        put?: never;
+        /** Add a rule to this capture; it's checked at once (audited) */
+        post: operations["create_4"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/device-moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Devices that moved to another address in the capture
+         * @description The same MAC on one address, then another (a new DHCP lease, a re-plugged cable), with when it left, when it arrived, its hostname on each, and each side's device key. A MAC on two addresses at once (multi-homed) isn't a move.
+         */
+        get: operations["moves"];
         put?: never;
         post?: never;
         delete?: never;
@@ -757,7 +992,7 @@ export interface paths {
             cookie?: never;
         };
         /** Preview an extracted file inline (browser-renderable types only) */
-        get: operations["preview"];
+        get: operations["preview_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -790,7 +1025,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Adjudicated identity per host for a file (winner-or-contested) */
+        /**
+         * Adjudicated identity per host for a file (winner-or-contested)
+         * @description Every host in the file by default. Pass ips (comma-separated) to get just those hosts, e.g. a conversation's two endpoints, without the file-wide payload. IPs with no identity are omitted rather than reported as errors.
+         */
         get: operations["getHostIdentities"];
         put?: never;
         post?: never;
@@ -812,6 +1050,83 @@ export interface paths {
          * @description The full explainable classification for a single IP — the verdict (label/basis/confidence/contested/candidates) and the measured facts behind it (hardware, service, behaviour) — so any surface holding a fileId+ip can render 'the verdict, and why' without the graph.
          */
         get: operations["getHostIdentityEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which devices held this address, and when
+         * @description Occupancies come from ARP ownership claims and DHCP leases, corrected by analysts' split and merge decisions. One occupancy means one device for the whole capture. Includes suggested split points.
+         */
+        get: operations["occupancies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split the address at a time, or merge away an automatic boundary
+         * @description Needs the HOST_OCCUPANCY permission. Audited. Returns the updated occupancies.
+         */
+        post: operations["decide_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions/{decisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo a split or merge
+         * @description Needs the HOST_OCCUPANCY permission. Audited.
+         */
+        delete: operations["undo_1"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/hosts/{ip}/windows-logons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Windows accounts seen on a host, with when (login timeline) */
+        get: operations["getWindowsLogons"];
         put?: never;
         post?: never;
         delete?: never;
@@ -847,7 +1162,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List distinct source MACs observed per IP in a file */
+        /**
+         * List distinct source MACs observed per IP in a file
+         * @description Every IP in the file by default. ip= narrows to that IP (the MACs that claimed it); mac= narrows to the IPs that MAC claimed, each with all its MACs. If both are given, ip wins.
+         */
         get: operations["getIpMacObservations"];
         put?: never;
         post?: never;
@@ -866,6 +1184,71 @@ export interface paths {
         };
         /** Assembled knowledge board (entities, relationships, findings) for a file */
         get: operations["getKnowledge"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/network-map-edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A capture's network map edits
+         * @description Which group each moved device was put in, the analyst's own groups, and the names and notes they gave groups. Empty when the map was never edited.
+         */
+        get: operations["getNetworkMapEdits"];
+        /**
+         * Save a capture's network map edits
+         * @description Replaces the edits. Needs the NETWORK_MAP permission. Audited.
+         */
+        put: operations["saveNetworkMapEdits"];
+        post?: never;
+        /**
+         * Reset a capture's network map to automatic
+         * @description Drops every edit. Needs the NETWORK_MAP permission. Audited.
+         */
+        delete: operations["resetNetworkMapEdits"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/network-segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The networks a capture holds
+         * @description Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.
+         */
+        get: operations["segments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The networks this capture is a snapshot of */
+        get: operations["list_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -894,6 +1277,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/occupancies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every address that more than one device held
+         * @description Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.
+         */
+        get: operations["list_9"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/packets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A capture's packets, in capture order
+         * @description One page of packets, headers only: frame number, time, addresses and ports, protocol, size, conversation and the dissector's summary. Pages run in frame order. With `at`, the page returned is the one holding the first packet captured at or after that time (its number is in `page`), so a replay can start anywhere. 404 when the capture's packets were pruned.
+         */
+        get: operations["packets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/reanalyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-analyse a capture with other options, as a new version
+         * @description Creates a new capture (its own copy in storage, derivedFrom the original) and analyses it with the given options. The original and its analysis are kept. The capture's own detection rules are copied to the version.
+         */
+        post: operations["reanalyse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/report": {
         parameters: {
             query?: never;
@@ -911,6 +1354,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/rule-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which enabled rules one capture is out of date for, or couldn't re-check */
+        get: operations["fileStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/security-alerts": {
         parameters: {
             query?: never;
@@ -920,6 +1380,23 @@ export interface paths {
         };
         /** Get conversations with nDPI security risk flags */
         get: operations["getSecurityAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A capture and its re-analysis versions, the original first */
+        get: operations["versions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -976,10 +1453,13 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_3"];
+        get: operations["list_8"];
         put?: never;
-        /** Add an IP organization rule */
-        post: operations["create_2"];
+        /**
+         * Set an IP organization rule in the shared default
+         * @description Adds it, or changes the label of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.
+         */
+        post: operations["create_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -996,8 +1476,28 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete an IP organization rule */
+        /**
+         * Delete an IP organization rule from the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         delete: operations["delete_4"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who I am and what I may change */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1048,10 +1548,10 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_2"];
+        get: operations["list_7"];
         put?: never;
         /** Create an annotation */
-        post: operations["create_1"];
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1073,7 +1573,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update an annotation's body */
-        patch: operations["update"];
+        patch: operations["update_2"];
         trace?: never;
     };
     "/api/v1/monitor/networks/{networkId}/baseline/definitions": {
@@ -1145,6 +1645,203 @@ export interface paths {
         patch: operations["patchEvent"];
         trace?: never;
     };
+    "/api/v1/monitor/networks/{networkId}/custom-private-ranges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A network's private/public range overrides: its own entries and the default's */
+        get: operations["listRanges"];
+        put?: never;
+        /**
+         * Set the network's range override for a CIDR, or hide the default's
+         * @description With hidden=true, hides the default's entry for the CIDR. Needs NETWORK_SETTINGS. Audited.
+         */
+        post: operations["putRange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/custom-private-ranges/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the network's range entry, so the default applies again
+         * @description Needs NETWORK_SETTINGS. Audited.
+         */
+        delete: operations["revertRange"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/detection-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This network's own rules */
+        get: operations["list_6"];
+        put?: never;
+        /**
+         * Add a rule to this network (audited)
+         * @description Checked against each capture that joins the network from now on, and against the network's existing captures on Re-apply.
+         */
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/detection-rules/suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The global rules switched off in this network's views */
+        get: operations["suppressions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/detection-rules/suppressions/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch a global rule off in this network's views (audited, idempotent)
+         * @description The rule keeps running elsewhere; its matches are hidden when viewed in this network.
+         */
+        put: operations["suppress"];
+        post?: never;
+        /** Switch a global rule back on in this network's views (audited) */
+        delete: operations["unsuppress"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many devices a network has: all, irregular, and with a private MAC */
+        get: operations["counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-link-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Private MACs that look like one device
+         * @description Pairs of private (device-chosen) MACs where one stopped before the other began and they share a DHCP fingerprint, hostname, TLS fingerprints or signed-in user, with nothing against it. Suggestions only; undecided pairs, strongest first.
+         */
+        get: operations["suggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that two MACs are one device, or not
+         * @description Needs the HOST_OCCUPANCY permission. Audited. Linked MACs show as one device.
+         */
+        post: operations["decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo a same / not-the-same decision
+         * @description Needs the HOST_OCCUPANCY permission. Audited.
+         */
+        delete: operations["undo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A network's devices across its snapshots
+         * @description One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.
+         */
+        get: operations["list_5"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/monitor/networks/{networkId}/external-events": {
         parameters: {
             query?: never;
@@ -1153,7 +1850,7 @@ export interface paths {
             cookie?: never;
         };
         /** List external events for a network */
-        get: operations["list_1"];
+        get: operations["list_4"];
         put?: never;
         /** Create an external event */
         post: operations["create"];
@@ -1208,6 +1905,68 @@ export interface paths {
         /** Get the latest generated insight for a network */
         get: operations["getLatest_1"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/ip-org-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A network's IP-org rules: its own entries and the default's */
+        get: operations["listOrgRules"];
+        put?: never;
+        /**
+         * Set the network's IP-org rule for a CIDR, or hide the default's
+         * @description With hidden=true, hides the default's rule for the CIDR. Needs NETWORK_SETTINGS. Audited.
+         */
+        post: operations["putOrgRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/ip-org-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the network's IP-org rule, so the default applies again
+         * @description Needs NETWORK_SETTINGS. Audited.
+         */
+        delete: operations["revertOrgRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a network's settings (inactivity rule) */
+        get: operations["getSettings_1"];
+        /**
+         * Replace a network's settings (inactivity rule)
+         * @description inactivityMode SNAPSHOTS: a device, IP or protocol is 'no longer seen' once missing from the last inactivityThreshold captures. DAYS: once not seen for more than inactivityThreshold days, counted from the latest capture. Before that it's 'quiet'. Default SNAPSHOTS / 1, which is the behaviour before this setting.
+         */
+        put: operations["updateSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1277,6 +2036,67 @@ export interface paths {
         };
         /** Get the latest generated insight for a snapshot */
         get: operations["getLatest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/subnets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A network's subnets: its own entries and the default's
+         * @description Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.
+         */
+        get: operations["list_3"];
+        put?: never;
+        /**
+         * Set the network's subnet for a CIDR, or hide the default's
+         * @description An override or an addition; with hidden=true, hides the default's subnet. Needs NETWORK_SETTINGS. Audited.
+         */
+        post: operations["put_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/subnets/{subnetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the network's entry, so the default applies again
+         * @description Needs NETWORK_SETTINGS. Audited.
+         */
+        delete: operations["revert"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/network-memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every capture that is a snapshot of a monitored network, with the network */
+        get: operations["list_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1361,17 +2181,16 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/signatures": {
+    "/api/v1/permissions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get custom signatures file content */
-        get: operations["getSignatures"];
-        /** Save custom signatures file content */
-        put: operations["saveSignatures"];
+        /** List configurable actions, the level each requires, and whether I may do it */
+        get: operations["list_1"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1379,15 +2198,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/signatures/rules": {
+    "/api/v1/permissions/{action}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List configured signature rules with severity */
-        get: operations["getSignatureRules"];
+        get?: never;
+        /** Set the level an action requires (admin only; audited) */
+        put: operations["update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get my preferences (shared by everyone when login is off) */
+        get: operations["get_1"];
+        /** Replace my preferences (shared by everyone when login is off) */
+        put: operations["put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rule-reapply-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The most recent Re-apply jobs, newest first */
+        get: operations["recent"];
+        put?: never;
+        /**
+         * Re-apply the rules to one capture, or to every out-of-date one (audited)
+         * @description Runs in the background; poll the job. 201 for a new job; 200 with the running job if one is already running. Needs DETECTION_RULES_GLOBAL.
+         */
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rule-reapply-jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Re-apply job and its progress */
+        get: operations["get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1467,10 +2342,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List defined subnets */
+        /**
+         * List defined subnets
+         * @description Without networkId, the shared default. With networkId, the subnets in effect in that network (its own entries layered on the default, #915 phase 4), with staleness against that network's snapshots.
+         */
         get: operations["list"];
         put?: never;
-        /** Create or update a subnet definition */
+        /**
+         * Create or update a subnet in the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         post: operations["upsert_2"];
         delete?: never;
         options?: never;
@@ -1521,7 +2402,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Persist an auto-detected subnet */
+        /**
+         * Persist an auto-detected subnet in the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         post: operations["saveDetected"];
         delete?: never;
         options?: never;
@@ -1559,7 +2443,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a subnet definition */
+        /**
+         * Delete a subnet from the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         delete: operations["delete"];
         options?: never;
         head?: never;
@@ -1630,11 +2517,52 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get runtime limits (upload size, analysis and LLM timeouts) */
+        /** Get runtime limits (upload size, analysis and LLM timeouts, capture retention) */
         get: operations["getLimits"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every deploy-time setting with its effective value (read-only)
+         * @description Lists each environment-driven setting, grouped as infrastructure, memory-tied or analysis policy, with its effective value and why it can't be changed in the app. Secrets are reported as set or not set; their values are never returned.
+         */
+        get: operations["getSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Override an editable policy setting (retention, detection thresholds)
+         * @description Needs the RETENTION or ANALYSIS_POLICY permission. Setting the deployment's value removes the override. Audited.
+         */
+        put: operations["set"];
+        post?: never;
+        /** Remove an override, so the deployment's value applies again (audited) */
+        delete: operations["reset"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1755,10 +2683,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountAtTime: {
+            /** Format: int32 */
+            accountCount?: number;
+            /** Format: date-time */
+            firstLoginAt?: string;
+            username?: string;
+        };
         AddSnapshotRequest: {
             /** Format: uuid */
             fileId: string;
             subnetOverrides?: components["schemas"]["SubnetOverrideInput"][];
+        };
+        Address: {
+            /** Format: int32 */
+            firstSnapshot?: number;
+            ip?: string;
+            /** Format: int32 */
+            lastSnapshot?: number;
         };
         AnalysisProgressResponse: {
             /** Format: int32 */
@@ -1830,6 +2772,18 @@ export interface components {
             /** Format: double */
             pct?: number;
         };
+        AuditLogDto: {
+            action?: string;
+            actor?: string;
+            after?: Record<string, never>;
+            /** Format: date-time */
+            at?: string;
+            before?: Record<string, never>;
+            /** Format: int64 */
+            id?: number;
+            targetId?: string;
+            targetType?: string;
+        };
         BaselineDefinitionDto: {
             /** Format: date-time */
             createdAt?: string;
@@ -1855,6 +2809,15 @@ export interface components {
             flowCount?: number;
             protocol?: string;
             srcIp?: string;
+        };
+        CaptureMark: {
+            baseline?: boolean;
+            /** Format: date-time */
+            capturedAt?: string;
+            changes?: string;
+            fileName?: string;
+            /** Format: uuid */
+            snapshotId?: string;
         };
         CaseKnowledgeResponse: {
             entities?: components["schemas"]["EntityDto"][];
@@ -1900,6 +2863,11 @@ export interface components {
             byteLength?: number;
             direction?: string;
             text?: string;
+        };
+        Client: {
+            hostname?: string;
+            ip?: string;
+            mac?: string;
         };
         ClusterEdgeDto: {
             /** Format: int64 */
@@ -1981,6 +2949,7 @@ export interface components {
             customSignatures?: string[];
             dstGeo?: components["schemas"]["GeoInfo"];
             dstIp?: string;
+            dstMac?: string;
             /** Format: int32 */
             dstPort?: number;
             /** Format: int64 */
@@ -2001,6 +2970,7 @@ export interface components {
             protocol?: string;
             srcGeo?: components["schemas"]["GeoInfo"];
             srcIp?: string;
+            srcMac?: string;
             /** Format: int32 */
             srcPort?: number;
             /** Format: date-time */
@@ -2038,6 +3008,38 @@ export interface components {
             /** Format: int64 */
             totalBytes?: number;
         };
+        ConversationFacetCountsResponse: {
+            apps?: {
+                [key: string]: number;
+            };
+            categories?: {
+                [key: string]: number;
+            };
+            countries?: {
+                [key: string]: number;
+            };
+            customSignatures?: {
+                [key: string]: number;
+            };
+            deviceTypes?: {
+                [key: string]: number;
+            };
+            fileTypes?: {
+                [key: string]: number;
+            };
+            l7Protocols?: {
+                [key: string]: number;
+            };
+            protocols?: {
+                [key: string]: number;
+            };
+            riskTypes?: {
+                [key: string]: number;
+            };
+            suricataAlerts?: {
+                [key: string]: number;
+            };
+        };
         ConversationResponse: {
             appName?: string;
             category?: string;
@@ -2045,8 +3047,10 @@ export interface components {
             conversationId?: string;
             customSignatures?: string[];
             detectedFileTypes?: string[];
+            dstAccount?: components["schemas"]["AccountAtTime"];
             dstGeo?: components["schemas"]["GeoInfo"];
             dstIp?: string;
+            dstMac?: string;
             /** Format: int32 */
             dstPort?: number;
             /** Format: int64 */
@@ -2064,8 +3068,10 @@ export interface components {
             /** Format: int64 */
             packetCount?: number;
             protocol?: string;
+            srcAccount?: components["schemas"]["AccountAtTime"];
             srcGeo?: components["schemas"]["GeoInfo"];
             srcIp?: string;
+            srcMac?: string;
             /** Format: int32 */
             srcPort?: number;
             /** Format: date-time */
@@ -2149,8 +3155,22 @@ export interface components {
              * @enum {string}
              */
             classification: "PRIVATE" | "PUBLIC";
+            hidden?: boolean;
             /** Format: int64 */
             id?: number;
+            overridesDefault?: boolean;
+            scope?: string;
+        };
+        Decision: {
+            action?: string;
+            actor?: string;
+            /** Format: date-time */
+            at?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            id?: number;
+            reason?: string;
         };
         DetectedApplication: {
             /** Format: int64 */
@@ -2158,6 +3178,85 @@ export interface components {
             name?: string;
             /** Format: int64 */
             packetCount?: number;
+        };
+        DetectionRuleDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            description?: string;
+            deviceType?: string;
+            /** Format: int32 */
+            deviceTypeWeight?: number;
+            enabled?: boolean;
+            /** Format: uuid */
+            fileId?: string;
+            /** Format: uuid */
+            id?: string;
+            match?: components["schemas"]["Match"];
+            matchAll?: boolean;
+            name?: string;
+            /** Format: uuid */
+            networkId?: string;
+            networkName?: string;
+            payloadContains?: components["schemas"]["PayloadPattern"][];
+            payloadRegex?: components["schemas"]["RegexPattern"][];
+            /** Format: uuid */
+            promotedFrom?: string;
+            scope?: string;
+            severity?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+            /** Format: int32 */
+            version?: number;
+        };
+        DetectionRuleRequest: {
+            description?: string;
+            deviceType?: string;
+            /** Format: int32 */
+            deviceTypeWeight?: number;
+            enabled?: boolean;
+            match?: components["schemas"]["Match"];
+            matchAll?: boolean;
+            name: string;
+            payloadContains?: components["schemas"]["PayloadPattern"][];
+            payloadRegex?: components["schemas"]["RegexPattern"][];
+            severity: string;
+        };
+        DeviceLinkRequest: {
+            decision: string;
+            macA: string;
+            macB: string;
+            reason: string;
+        };
+        DeviceLinkSuggestionDto: {
+            evidence?: components["schemas"]["Evidence"][];
+            /** Format: int32 */
+            firstSnapshotA?: number;
+            /** Format: int32 */
+            firstSnapshotB?: number;
+            /** Format: int32 */
+            lastSnapshotA?: number;
+            /** Format: int32 */
+            lastSnapshotB?: number;
+            macA?: string;
+            macB?: string;
+            nameA?: string;
+            nameB?: string;
+        };
+        DeviceMoveDto: {
+            /** Format: date-time */
+            arrived?: string;
+            evidence?: string;
+            fromHostname?: string;
+            fromIp?: string;
+            fromKey?: string;
+            /** Format: date-time */
+            left?: string;
+            mac?: string;
+            toHostname?: string;
+            toIp?: string;
+            toKey?: string;
         };
         DnsQueryEntryDto: {
             /** Format: int64 */
@@ -2223,6 +3322,11 @@ export interface components {
             /** Format: int64 */
             totalBytes?: number;
         };
+        Evidence: {
+            detail?: string;
+            strength?: string;
+            what?: string;
+        };
         EvidenceDto: {
             actor?: string;
             /** Format: date-time */
@@ -2271,6 +3375,7 @@ export interface components {
             sizeLimitFiles?: components["schemas"]["SkippedFile"][];
         };
         FileMetadataDto: {
+            derivedFrom?: string;
             /** Format: int64 */
             duration?: number;
             enableFileExtraction?: boolean;
@@ -2284,14 +3389,19 @@ export interface components {
             fileName?: string;
             /** Format: int64 */
             fileSize?: number;
+            keepForever?: boolean;
             /** Format: int32 */
             packetCount?: number;
+            packetsRemoved?: boolean;
             source?: string;
             /** Format: date-time */
             startTime?: string;
             status?: string;
+            storyError?: string;
+            storyStatus?: string;
             /** Format: date-time */
             uploadedAt?: string;
+            version?: boolean;
         };
         FileUploadResponse: {
             fileId?: string;
@@ -2339,7 +3449,7 @@ export interface components {
             summary?: string;
             title?: string;
             /** @enum {string} */
-            type?: "NDPI_RISK" | "BEACON" | "TLS_ANOMALY" | "VOLUME" | "FAN_OUT" | "LONG_SESSION" | "UNKNOWN_APP" | "PORT_PROTOCOL_MISMATCH" | "COVERAGE_GAP";
+            type?: "NDPI_RISK" | "BEACON" | "TLS_ANOMALY" | "VOLUME" | "FAN_OUT" | "LONG_SESSION" | "UNKNOWN_APP" | "PORT_PROTOCOL_MISMATCH" | "COVERAGE_GAP" | "DETECTION_RULE";
         };
         FindingDto: {
             attributes?: {
@@ -2352,6 +3462,11 @@ export interface components {
             severity?: string;
             source?: string;
             summary?: string;
+        };
+        Flag: {
+            kind?: string;
+            severity?: string;
+            text?: string;
         };
         GenerateInsightRequest: {
             audience?: string;
@@ -2366,6 +3481,8 @@ export interface components {
             maxFindings?: number;
             /** Format: int32 */
             maxRiskMatrix?: number;
+            /** Format: uuid */
+            networkId?: string;
         };
         GeoInfo: {
             asn?: string;
@@ -2398,19 +3515,24 @@ export interface components {
             text?: string;
         };
         HostClassificationResponse: {
+            addressKind?: string;
             /** Format: int32 */
             confidence?: number;
             deviceType?: string;
             hostname?: string;
             hostnameSource?: string;
+            identityWarning?: string;
             ip?: string;
             loggedInUser?: string;
+            /** Format: int32 */
+            loggedInUserCount?: number;
             loggedInUserSource?: string;
             mac?: string;
             manufacturer?: string;
             serviceRoles?: string[];
             /** Format: int32 */
             ttl?: number;
+            ttls?: number[];
         };
         HostIdentityDto: {
             basis?: string;
@@ -2424,6 +3546,7 @@ export interface components {
             primaryLabel?: string;
         };
         HostIdentityEvidenceDto: {
+            addressKind?: string;
             /** Format: int32 */
             answeredConversations?: number;
             asn?: string;
@@ -2439,6 +3562,7 @@ export interface components {
             country?: string;
             countryCode?: string;
             geoSource?: string;
+            identityWarning?: string;
             /** Format: int32 */
             initiatedConversations?: number;
             ip?: string;
@@ -2448,9 +3572,28 @@ export interface components {
             /** Format: int32 */
             peerCount?: number;
             primaryLabel?: string;
+            reclassified?: {
+                [key: string]: Record<string, never>;
+            };
             serviceRoles?: string[];
             /** Format: int32 */
             ttl?: number;
+            ttls?: number[];
+        };
+        HostOccupancyResponse: {
+            canEdit?: boolean;
+            decisions?: components["schemas"]["Decision"][];
+            editReason?: string;
+            /** Format: date-time */
+            firstActivity?: string;
+            ip?: string;
+            /** Format: date-time */
+            lastActivity?: string;
+            networks?: string[];
+            occupancies?: components["schemas"]["Occupancy"][];
+            overlapping?: boolean;
+            suggestions?: components["schemas"]["Suggestion"][];
+            virtualAddress?: boolean;
         };
         HostSummaryDto: {
             /** Format: int64 */
@@ -2553,9 +3696,42 @@ export interface components {
         };
         IpOrgRuleDto: {
             cidr?: string;
+            hidden?: boolean;
             /** Format: int64 */
             id?: number;
             label?: string;
+            overridesDefault?: boolean;
+            scope?: string;
+        };
+        Link: {
+            actor?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            decision?: string;
+            /** Format: int64 */
+            id?: number;
+            macA?: string;
+            macB?: string;
+            reason?: string;
+        };
+        Match: {
+            app?: string;
+            cidr?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            hostname?: string;
+            ip?: string;
+            ja3?: string;
+            protocol?: string;
+            /** Format: int32 */
+            srcPort?: number;
+        };
+        MeDto: {
+            admin?: boolean;
+            authEnabled?: boolean;
+            canManagePermissions?: boolean;
+            permissions?: components["schemas"]["PermissionDto"][];
+            username?: string;
         };
         MediaInfo: {
             codec?: string;
@@ -2594,7 +3770,32 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        NetworkDeviceCountsDto: {
+            /** Format: int64 */
+            all?: number;
+            /** Format: int64 */
+            irregular?: number;
+            /** Format: int64 */
+            privateMac?: number;
+        };
+        NetworkDeviceDto: {
+            addresses?: components["schemas"]["Address"][];
+            deviceType?: string;
+            flags?: components["schemas"]["Flag"][];
+            label?: string;
+            /** Format: uuid */
+            lastFileId?: string;
+            lastKey?: string;
+            links?: components["schemas"]["Link"][];
+            mac?: string;
+            macKind?: string;
+            macs?: string[];
+            name?: string;
+            seenInFileIds?: string[];
+            vendor?: string;
+        };
         NetworkDto: {
+            captures?: components["schemas"]["CaptureMark"][];
             /** Format: date-time */
             createdAt?: string;
             /** Format: int64 */
@@ -2604,6 +3805,7 @@ export interface components {
             /** Format: uuid */
             id?: string;
             name?: string;
+            settings?: components["schemas"]["NetworkSettingsDto"];
             /** Format: int32 */
             snapshotCount?: number;
             /** Format: date-time */
@@ -2647,6 +3849,46 @@ export interface components {
             recommendations?: string[];
             status?: string;
             summary?: string;
+        };
+        NetworkMapEdits: {
+            groups?: components["schemas"]["UserGroup"][];
+            names?: {
+                [key: string]: string;
+            };
+            notes?: {
+                [key: string]: string;
+            };
+            placements?: {
+                [key: string]: string;
+            };
+        };
+        NetworkMapEditsResponse: {
+            edits?: components["schemas"]["NetworkMapEdits"];
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        NetworkMembership: {
+            /** Format: uuid */
+            fileId?: string;
+            /** Format: uuid */
+            networkId?: string;
+            networkName?: string;
+        };
+        NetworkRef: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+        };
+        NetworkSegmentsResponse: {
+            overlaps?: components["schemas"]["Overlap"][];
+            segments?: components["schemas"]["Segment"][];
+        };
+        NetworkSettingsDto: {
+            /** @enum {string} */
+            inactivityMode: "SNAPSHOTS" | "DAYS";
+            /** Format: int32 */
+            inactivityThreshold: number;
         };
         NetworkSnapshotDto: {
             /** Format: date-time */
@@ -2697,6 +3939,53 @@ export interface components {
             staleSince?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        Occupancy: {
+            automatic?: boolean;
+            boundaryKey?: string;
+            classification?: components["schemas"]["OccupancyClassification"];
+            /** Format: int64 */
+            conversations?: number;
+            /** Format: date-time */
+            endsAt?: string;
+            hostname?: string;
+            /** Format: int32 */
+            idx?: number;
+            key?: string;
+            mac?: string;
+            network?: string;
+            networkMacs?: string[];
+            startEvidence?: string;
+            startSource?: string;
+            /** Format: date-time */
+            startsAt?: string;
+        };
+        OccupancyClassification: {
+            /** Format: int32 */
+            confidence?: number;
+            deviceType?: string;
+            loggedInUser?: string;
+            manufacturer?: string;
+            runnerUpReasons?: string;
+            /** Format: int32 */
+            runnerUpScore?: number;
+            runnerUpType?: string;
+            /** Format: int32 */
+            ttl?: number;
+            winnerReasons?: string;
+            /** Format: int32 */
+            winnerScore?: number;
+        };
+        OccupancyDecisionRequest: {
+            action: string;
+            /** Format: date-time */
+            at: string;
+            reason: string;
+        };
+        Overlap: {
+            cidr?: string;
+            segmentKeys?: string[];
+            sharedAddresses?: string[];
         };
         OverrideDto: {
             actor?: string;
@@ -2754,6 +4043,17 @@ export interface components {
             /** Format: date-time */
             timestamp?: string;
         };
+        PagedResponseAuditLogDto: {
+            data?: components["schemas"]["AuditLogDto"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PagedResponseConversationResponse: {
             data?: components["schemas"]["ConversationResponse"][];
             /** Format: int32 */
@@ -2776,10 +4076,59 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PagedResponseNetworkDeviceDto: {
+            data?: components["schemas"]["NetworkDeviceDto"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PagedResponseReplayPacket: {
+            data?: components["schemas"]["ReplayPacket"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PatchSnapshotRequest: {
             context?: string;
             notes?: string;
             subnetOverrides?: components["schemas"]["SubnetOverrideInput"][];
+        };
+        PayloadPattern: {
+            ascii?: string;
+            hex?: string;
+        };
+        PermissionDto: {
+            /** @enum {string} */
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
+            allowed?: boolean;
+            /** @enum {string} */
+            defaultLevel?: "ANALYST" | "ADMIN";
+            description?: string;
+            label?: string;
+            /** @enum {string} */
+            level?: "ANALYST" | "ADMIN";
+            reason?: string;
+        };
+        PreferencesDto: {
+            conversationColumns?: string[];
+            nodeLabelConfig?: {
+                [key: string]: Record<string, never>;
+            };
+            shared?: boolean;
+            themeMode?: string;
+        };
+        PromoteRuleRequest: {
+            keepOriginal?: boolean;
         };
         Protocol: {
             layer?: string;
@@ -2809,6 +4158,15 @@ export interface components {
                 [key: string]: components["schemas"]["ProtocolStat"];
             };
         };
+        ReanalyseRequest: {
+            enableFileExtraction?: boolean;
+            enableNdpi?: boolean;
+            enableSuricata?: boolean;
+        };
+        RegexPattern: {
+            caseInsensitive?: boolean;
+            pattern: string;
+        };
         RelatedData: {
             conversations?: string[];
             packets?: string[];
@@ -2823,15 +4181,141 @@ export interface components {
             source?: string;
             to?: components["schemas"]["EntityRefDto"];
         };
+        ReplayPacket: {
+            /** Format: uuid */
+            conversationId?: string;
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            info?: string;
+            /** Format: int64 */
+            number?: number;
+            protocol?: string;
+            /** Format: int32 */
+            size?: number;
+            srcIp?: string;
+            /** Format: int32 */
+            srcPort?: number;
+            /** Format: date-time */
+            timestamp?: string;
+        };
         ReportRequest: {
             activeFilters?: string[];
             forceDirectedImage?: string;
             hierarchicalImage?: string;
+            /** Format: uuid */
+            networkId?: string;
             nodeLimitNote?: string;
+        };
+        ReusedAddress: {
+            ip?: string;
+            occupancies?: components["schemas"]["Occupancy"][];
         };
         RoleSuggestionDto: {
             roleDescription?: string;
             roleLabel?: string;
+        };
+        RuleImportRequest: {
+            content: string;
+            /** @enum {string} */
+            mode: "MERGE" | "REPLACE";
+        };
+        RuleImportResult: {
+            /** Format: int32 */
+            created?: number;
+            /** Format: int32 */
+            deleted?: number;
+            duplicates?: string[];
+            /** Format: int32 */
+            unchanged?: number;
+            /** Format: int32 */
+            updated?: number;
+        };
+        RulePreviewDto: {
+            /** Format: int32 */
+            conversations?: number;
+            /** Format: uuid */
+            fileId?: string;
+            fileName?: string;
+            /** Format: int32 */
+            matches?: number;
+            packetsDeleted?: boolean;
+            sample?: components["schemas"]["Sample"][];
+        };
+        RulePreviewRequest: {
+            /** Format: uuid */
+            fileId: string;
+            rule: components["schemas"]["DetectionRuleRequest"];
+        };
+        RuleReapplyJobDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            done?: number;
+            error?: string;
+            /** Format: int32 */
+            failed?: number;
+            /** Format: uuid */
+            fileId?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: uuid */
+            id?: string;
+            reclassified?: {
+                [key: string]: Record<string, never>;
+            }[];
+            /** Format: int32 */
+            reclassifiedCount?: number;
+            requestedBy?: string;
+            /** Format: int32 */
+            staleLabelsCount?: number;
+            status?: string;
+            /** Format: int32 */
+            total?: number;
+        };
+        RuleSuppressionDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            /** Format: uuid */
+            ruleId?: string;
+            ruleName?: string;
+        };
+        RuleSyncStatusDto: {
+            /** Format: int32 */
+            captures?: number;
+            /** Format: int32 */
+            staleCaptures?: number;
+            staleRules?: string[];
+            /** Format: int32 */
+            uncheckableCaptures?: number;
+            uncheckableRules?: string[];
+        };
+        Sample: {
+            appName?: string;
+            /** Format: uuid */
+            conversationId?: string;
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            hostname?: string;
+            protocol?: string;
+            srcIp?: string;
+            /** Format: int32 */
+            srcPort?: number;
+        };
+        Segment: {
+            cidr?: string;
+            clients?: components["schemas"]["Client"][];
+            domains?: string[];
+            key?: string;
+            label?: string;
+            leaseSeconds?: number[];
+            routers?: string[];
+            serverIds?: string[];
+            serverMac?: string;
+            /** Format: int32 */
+            vlanId?: number;
         };
         ServiceServerSummaryDto: {
             /** Format: double */
@@ -2860,6 +4344,9 @@ export interface components {
             totalServerBytes?: number;
             truncated?: boolean;
         };
+        SetValueRequest: {
+            value: string;
+        };
         SkippedFile: {
             /** Format: uuid */
             conversationId?: string;
@@ -2876,6 +4363,10 @@ export interface components {
             id?: number;
             inherited?: boolean;
             label?: string;
+        };
+        StartReapplyRequest: {
+            /** Format: uuid */
+            fileId?: string;
         };
         StepExplanation: {
             explanation?: string;
@@ -2909,6 +4400,8 @@ export interface components {
             id?: string;
             investigationSteps?: components["schemas"]["InvestigationStep"][];
             narrative?: components["schemas"]["NarrativeSection"][];
+            networkId?: string;
+            networkName?: string;
             suggestedQuestions?: string[];
             timeline?: components["schemas"]["StoryTimelineEvent"][];
         };
@@ -2939,6 +4432,7 @@ export interface components {
             /** Format: double */
             densityScore?: number;
             description?: string;
+            hidden?: boolean;
             /** Format: int32 */
             hostCount?: number;
             /** Format: int64 */
@@ -2946,6 +4440,10 @@ export interface components {
             label?: string;
             /** Format: date-time */
             labeledAt?: string;
+            overridesDefault?: boolean;
+            scope?: string;
+            segmentKey?: string;
+            segmentLabel?: string;
             /** Format: int32 */
             snapshotsSeen?: number;
             source?: string;
@@ -2980,6 +4478,29 @@ export interface components {
             description?: string;
             inherited?: boolean;
             label?: string;
+        };
+        Suggestion: {
+            /** Format: date-time */
+            at?: string;
+            description?: string;
+            key?: string;
+            kind?: string;
+        };
+        SystemSettingDto: {
+            defaultValue?: string;
+            deployValue?: string;
+            description?: string;
+            editable?: boolean;
+            group?: string;
+            inAppEditable?: boolean;
+            key?: string;
+            label?: string;
+            lockedReason?: string;
+            overridden?: boolean;
+            secret?: boolean;
+            set?: boolean;
+            takesEffect?: string;
+            value?: string;
         };
         TimelineDataDto: {
             /** Format: int64 */
@@ -3076,6 +4597,10 @@ export interface components {
             description?: string;
             name: string;
         };
+        UpdatePermissionRequest: {
+            /** @enum {string} */
+            level: "ANALYST" | "ADMIN";
+        };
         UpsertNodeRoleRequest: {
             confirmedByHuman?: boolean;
             entityKey?: string;
@@ -3094,9 +4619,17 @@ export interface components {
             cidr?: string;
             confirmed?: boolean;
             description?: string;
+            hidden?: boolean;
             label?: string;
             /** Format: uuid */
             networkId?: string;
+            segmentKey?: string;
+            segmentLabel?: string;
+        };
+        UserGroup: {
+            id: string;
+            name: string;
+            parentId: string;
         };
         WebServerDetailResponse: {
             api?: boolean;
@@ -3117,6 +4650,21 @@ export interface components {
             tls?: components["schemas"]["TlsInfo"];
             /** Format: int64 */
             totalRequests?: number;
+        };
+        WindowsLogonResponse: {
+            candidateOnly?: boolean;
+            directoryEntry?: string;
+            domain?: string;
+            evidence?: string;
+            /** Format: date-time */
+            firstSeen?: string;
+            folder?: string;
+            folderKind?: string;
+            /** Format: date-time */
+            lastSeen?: string;
+            /** Format: int32 */
+            seenCount?: number;
+            username?: string;
         };
     };
     responses: never;
@@ -3189,6 +4737,31 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnalysisSummaryResponse"];
+                };
+            };
+        };
+    };
+    list_14: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                targetTypes?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseAuditLogDto"];
                 };
             };
         };
@@ -3270,6 +4843,8 @@ export interface operations {
                 countries?: string;
                 /** @description Comma-separated network label names (e.g. 'Office,DMZ') */
                 networkLabels?: string;
+                /** @description View in this network: its IP-org rules and private/public ranges layered on the default (#915 phase 4) */
+                networkId?: string;
             };
             header?: never;
             path: {
@@ -3385,7 +4960,10 @@ export interface operations {
     };
     getConversationDetail: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description View in this network (#925): adds its own detection rules' matches */
+                networkId?: string;
+            };
             header?: never;
             path: {
                 conversationId: string;
@@ -3488,6 +5066,12 @@ export interface operations {
                 deviceTypes?: string;
                 /** @description Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG) */
                 countries?: string;
+                /** @description Exact source address. With dstIp, matches one directional src → dst pair (#471); unlike ip, which is a contains-match on either end */
+                srcIp?: string;
+                /** @description Exact destination address (see srcIp) */
+                dstIp?: string;
+                /** @description View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter */
+                networkId?: string;
             };
             header?: never;
             path: {
@@ -3532,7 +5116,9 @@ export interface operations {
     };
     getCustomSignatures: {
         parameters: {
-            query?: never;
+            query?: {
+                networkId?: string;
+            };
             header?: never;
             path: {
                 fileId: string;
@@ -3665,6 +5251,8 @@ export interface operations {
                 search?: string;
                 deviceTypes?: string;
                 countries?: string;
+                srcIp?: string;
+                dstIp?: string;
             };
             header?: never;
             path: {
@@ -3703,6 +5291,8 @@ export interface operations {
                 search?: string;
                 deviceTypes?: string;
                 countries?: string;
+                srcIp?: string;
+                dstIp?: string;
             };
             header?: never;
             path: {
@@ -3718,6 +5308,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getFacetCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConversationFacetCountsResponse"];
+                };
             };
         };
     };
@@ -3787,7 +5399,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_13: {
         parameters: {
             query?: never;
             header?: never;
@@ -3807,7 +5419,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3831,7 +5443,7 @@ export interface operations {
             };
         };
     };
-    delete_7: {
+    delete_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -3848,6 +5460,256 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_12: {
+        parameters: {
+            query?: {
+                fileId?: string;
+                /** @description With fileId: also this network's rules (#925 phase 3) */
+                networkId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"][];
+                };
+            };
+        };
+    };
+    create_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/yaml": string;
+                };
+            };
+        };
+    };
+    importRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleImportRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleImportResult"];
+                };
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RulePreviewDto"];
+                };
+            };
+        };
+    };
+    staleCaptures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
+                };
+            };
+        };
+    };
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSyncStatusDto"];
+                };
+            };
+        };
+    };
+    get_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    update_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    delete_7: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    promote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PromoteRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
             };
         };
     };
@@ -3949,6 +5811,11 @@ export interface operations {
                 pageSize?: number;
                 sort?: string;
                 source?: "ANALYSIS" | "MONITOR";
+                search?: string;
+                status?: ("UPLOADING" | "PROCESSING" | "COMPLETED" | "FAILED")[];
+                fileIds?: string[];
+                excludeFileIds?: string[];
+                uploadedBefore?: number;
             };
             header?: never;
             path?: never;
@@ -3974,6 +5841,8 @@ export interface operations {
                 enableSuricata?: boolean;
                 enableFileExtraction?: boolean;
                 source?: "ANALYSIS" | "MONITOR";
+                generateStory?: boolean;
+                expires?: boolean;
             };
             header?: never;
             path?: never;
@@ -4197,7 +6066,7 @@ export interface operations {
             };
         };
     };
-    get: {
+    get_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -4230,7 +6099,7 @@ export interface operations {
             };
         };
     };
-    put: {
+    put_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4298,6 +6167,76 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnswerResponse"][];
+                };
+            };
+        };
+    };
+    list_11: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"][];
+                };
+            };
+        };
+    };
+    create_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    moves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DeviceMoveDto"][];
                 };
             };
         };
@@ -4393,7 +6332,7 @@ export interface operations {
             };
         };
     };
-    preview: {
+    preview_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4440,7 +6379,10 @@ export interface operations {
     };
     getHostIdentities: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only these host IPs (comma-separated). Omit for every host. */
+                ips?: string[];
+            };
             header?: never;
             path: {
                 fileId: string;
@@ -4483,6 +6425,101 @@ export interface operations {
             };
         };
     };
+    occupancies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HostOccupancyResponse"];
+                };
+            };
+        };
+    };
+    decide_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OccupancyDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HostOccupancyResponse"];
+                };
+            };
+        };
+    };
+    undo_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+                decisionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getWindowsLogons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WindowsLogonResponse"][];
+                };
+            };
+        };
+    };
     getInvestigation: {
         parameters: {
             query?: never;
@@ -4507,7 +6544,12 @@ export interface operations {
     };
     getIpMacObservations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only this IP */
+                ip?: string;
+                /** @description Only the IPs this MAC claimed (case-insensitive) */
+                mac?: string;
+            };
             header?: never;
             path: {
                 fileId: string;
@@ -4549,6 +6591,118 @@ export interface operations {
             };
         };
     };
+    getNetworkMapEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkMapEditsResponse"];
+                };
+            };
+        };
+    };
+    saveNetworkMapEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkMapEdits"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkMapEditsResponse"];
+                };
+            };
+        };
+    };
+    resetNetworkMapEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    segments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkSegmentsResponse"];
+                };
+            };
+        };
+    };
+    list_10: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkRef"][];
+                };
+            };
+        };
+    };
     listFileNodeRoles: {
         parameters: {
             query?: never;
@@ -4567,6 +6721,80 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NodeRoleDto"][];
+                };
+            };
+        };
+    };
+    list_9: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReusedAddress"][];
+                };
+            };
+        };
+    };
+    packets: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                at?: string;
+            };
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseReplayPacket"];
+                };
+            };
+        };
+    };
+    reanalyse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReanalyseRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FileUploadResponse"];
                 };
             };
         };
@@ -4597,6 +6825,28 @@ export interface operations {
             };
         };
     };
+    fileStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSyncStatusDto"];
+                };
+            };
+        };
+    };
     getSecurityAlerts: {
         parameters: {
             query?: never;
@@ -4615,6 +6865,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ConversationResponse"][];
+                };
+            };
+        };
+    };
+    versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FileMetadataDto"][];
                 };
             };
         };
@@ -4674,7 +6946,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -4694,7 +6966,7 @@ export interface operations {
             };
         };
     };
-    create_2: {
+    create_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -4735,6 +7007,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MeDto"];
+                };
             };
         };
     };
@@ -4850,7 +7142,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -4872,7 +7164,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -4919,7 +7211,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    update_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5069,7 +7361,308 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    listRanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomPrivateRangeDto"][];
+                };
+            };
+        };
+    };
+    putRange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomPrivateRangeDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomPrivateRangeDto"];
+                };
+            };
+        };
+    };
+    revertRange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_6: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"][];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    suppressions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSuppressionDto"][];
+                };
+            };
+        };
+    };
+    suppress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSuppressionDto"][];
+                };
+            };
+        };
+    };
+    unsuppress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkDeviceCountsDto"];
+                };
+            };
+        };
+    };
+    suggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DeviceLinkSuggestionDto"][];
+                };
+            };
+        };
+    };
+    decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Link"];
+                };
+            };
+        };
+    };
+    undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                linkId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_5: {
+        parameters: {
+            query?: {
+                q?: string;
+                show?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseNetworkDeviceDto"];
+                };
+            };
+        };
+    };
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -5209,6 +7802,123 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NetworkInsightDto"];
+                };
+            };
+        };
+    };
+    listOrgRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IpOrgRuleDto"][];
+                };
+            };
+        };
+    };
+    putOrgRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IpOrgRuleDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IpOrgRuleDto"];
+                };
+            };
+        };
+    };
+    revertOrgRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getSettings_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkSettingsDto"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkSettingsDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkSettingsDto"];
                 };
             };
         };
@@ -5355,6 +8065,95 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NetworkInsightDto"];
+                };
+            };
+        };
+    };
+    list_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SubnetDefinitionDto"][];
+                };
+            };
+        };
+    };
+    put_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertSubnetRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SubnetDefinitionDto"];
+                };
+            };
+        };
+    };
+    revert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                subnetId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkMembership"][];
                 };
             };
         };
@@ -5537,7 +8336,7 @@ export interface operations {
             };
         };
     };
-    getSignatures: {
+    list_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -5552,14 +8351,58 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
+                    "*/*": components["schemas"]["PermissionDto"][];
                 };
             };
         };
     };
-    saveSignatures: {
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePermissionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PermissionDto"];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PreferencesDto"];
+                };
+            };
+        };
+    };
+    put: {
         parameters: {
             query?: never;
             header?: never;
@@ -5568,9 +8411,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: string;
-                };
+                "application/json": components["schemas"]["PreferencesDto"];
             };
         };
         responses: {
@@ -5580,14 +8421,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
+                    "*/*": components["schemas"]["PreferencesDto"];
                 };
             };
         };
     };
-    getSignatureRules: {
+    recent: {
         parameters: {
             query?: never;
             header?: never;
@@ -5602,9 +8441,53 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: string;
-                    }[];
+                    "*/*": components["schemas"]["RuleReapplyJobDto"][];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartReapplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleReapplyJobDto"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleReapplyJobDto"];
                 };
             };
         };
@@ -5705,7 +8588,9 @@ export interface operations {
     };
     list: {
         parameters: {
-            query?: never;
+            query?: {
+                networkId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5958,6 +8843,72 @@ export interface operations {
                         [key: string]: Record<string, never>;
                     };
                 };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"][];
+                };
+            };
+        };
+    };
+    set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetValueRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"];
+                };
+            };
+        };
+    };
+    reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

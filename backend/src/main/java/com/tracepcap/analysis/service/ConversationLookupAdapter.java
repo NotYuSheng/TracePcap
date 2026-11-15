@@ -117,6 +117,31 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public FacetCounts facetCounts(UUID fileId) {
+    return new FacetCounts(
+        counts(repository.countByProtocol(fileId)),
+        counts(repository.countByL7ProtocolUpper(fileId)),
+        counts(repository.countByAppName(fileId)),
+        counts(repository.countByCategory(fileId)),
+        counts(repository.countByFileType(fileId)),
+        counts(repository.countByRiskType(fileId)),
+        counts(repository.countByCustomSignature(fileId)),
+        counts(repository.countBySuricataAlert(fileId)),
+        counts(repository.countByCountry(fileId)),
+        counts(repository.countByDeviceType(fileId)));
+  }
+
+  /** (value, count) rows into a map; null or blank values dropped. */
+  private static Map<String, Long> counts(List<Object[]> rows) {
+    Map<String, Long> out = new HashMap<>();
+    for (Object[] r : rows) {
+      if (r[0] == null || r[0].toString().isBlank()) continue;
+      out.put(r[0].toString(), asLong(r[1]));
+    }
+    return out;
+  }
+
+  @Override
   public EntityStats statsForApp(UUID fileId, String appName, int topPeerLimit) {
     return stats(
         repository.aggregateStatsByApp(fileId, appName),
@@ -215,6 +240,18 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public Map<UUID, java.util.Set<String>> customSignatureNames(Collection<UUID> fileIds) {
+    if (fileIds == null || fileIds.isEmpty()) return Map.of();
+    Map<UUID, java.util.Set<String>> out = new HashMap<>();
+    for (Object[] row : repository.findDistinctCustomSignaturesByFileIds(List.copyOf(fileIds))) {
+      String name = (String) row[1];
+      if (name == null || name.isBlank()) continue;
+      out.computeIfAbsent((UUID) row[0], k -> new java.util.HashSet<>()).add(name);
+    }
+    return out;
+  }
+
+  @Override
   public List<HostFanOut> fanOutCandidates(UUID fileId) {
     return repository.findFanOutCandidatesByFileId(fileId).stream()
         .map(r -> new HostFanOut((String) r[0], asLong(r[1]), asLong(r[2])))
@@ -303,7 +340,9 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getPacketCount() == null ? 0 : e.getPacketCount(),
             e.getTotalBytes() == null ? 0 : e.getTotalBytes(),
             e.getStartTime(),
-            e.getEndTime()),
+            e.getEndTime(),
+            e.getSrcMac(),
+            e.getDstMac()),
         new TlsFacts(
             e.getHostname(),
             e.getTlsIssuer(),

@@ -84,6 +84,15 @@ public class HostClassificationEntity {
   @Column(name = "logged_in_user_real_name", length = 255)
   private String loggedInUserRealName;
 
+  /**
+   * How many distinct accounts the sign-in label is choosing between (#812). {@link #loggedInUser}
+   * is only set when this is exactly 1; with more, the UI shows "N accounts" and the host's login
+   * timeline instead of picking one.
+   */
+  @Builder.Default
+  @Column(name = "logged_in_user_count", nullable = false)
+  private int loggedInUserCount = 0;
+
   /** First-seen IP TTL value (may be null for non-IP traffic). */
   @Column(name = "ttl")
   private Integer ttl;
@@ -136,4 +145,48 @@ public class HostClassificationEntity {
   /** Newline-joined reasons the runner-up scored; null on walkover/override. */
   @Column(name = "runner_up_reasons", columnDefinition = "text")
   private String runnerUpReasons;
+
+  // ── Re-scoring rule votes (#925, V60) ─────────────────────────────────────────
+  // The full score board, so a detection rule's device-type vote can be re-scored after a rule
+  // change without the analysis-time inputs. Null on hosts classified before V60.
+
+  /** Points per device type. */
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+  @Column(name = "type_scores", columnDefinition = "jsonb")
+  private java.util.Map<String, Integer> typeScores;
+
+  /** Reasons per device type, in the order they were added. */
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+  @Column(name = "type_reasons", columnDefinition = "jsonb")
+  private java.util.Map<String, java.util.List<String>> typeReasons;
+
+  /** The detection rules' votes counted in {@link #typeScores}: [{rule, deviceType, weight}]. */
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+  @Column(name = "rule_votes", columnDefinition = "jsonb")
+  private java.util.List<java.util.Map<String, Object>> ruleVotes;
+
+  /** The last time re-scoring changed the device type, and from what, by whom, and which rules. */
+  @Column(name = "rescored_at")
+  private java.time.LocalDateTime rescoredAt;
+
+  @Column(name = "rescored_from", length = 100)
+  private String rescoredFrom;
+
+  @Column(name = "rescored_by", length = 255)
+  private String rescoredBy;
+
+  @Column(name = "rescored_rules", columnDefinition = "TEXT")
+  private String rescoredRules;
+
+  /** Every TTL seen from this IP, lowest first (#918 item 1c). */
+  @Column(name = "ttls", columnDefinition = "integer[]")
+  private Integer[] ttls;
+
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918 item 2); else null. */
+  @Column(name = "address_kind", length = 40)
+  private String addressKind;
+
+  /** Why this may be more than one machine (#918 item 2); null when nothing conflicts. */
+  @Column(name = "identity_warning", columnDefinition = "text")
+  private String identityWarning;
 }

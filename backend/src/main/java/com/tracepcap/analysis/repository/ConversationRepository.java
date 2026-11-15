@@ -27,12 +27,34 @@ public interface ConversationRepository
   long countByFileId(UUID fileId);
 
   /** All conversations in a file in which the given IP is either endpoint (initiator or peer). */
+  /** Each conversation's MAC and address on both ends, its start and end, and packet count: when a MAC used an address. */
+  @Query(
+      "SELECT c.srcMac, c.srcIp, c.dstMac, c.dstIp, c.startTime, c.endTime, c.packetCount FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId AND (c.srcMac IS NOT NULL OR c.dstMac IS NOT NULL)")
+  List<Object[]> findMacUseByFileId(@Param("fileId") UUID fileId);
+
   @Query(
       "SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId"
           + " AND (c.srcIp = :ip OR c.dstIp = :ip)"
           + " ORDER BY c.packetCount DESC")
   List<ConversationEntity> findByFileIdAndIp(
       @Param("fileId") UUID fileId, @Param("ip") String ip);
+
+  /** Start and end of every conversation the IP took part in, earliest first (#918 item 3). */
+  @Query(
+      "SELECT c.startTime, c.endTime FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND (c.srcIp = :ip OR c.dstIp = :ip) ORDER BY c.startTime")
+  List<Object[]> findTimesByFileIdAndIp(@Param("fileId") UUID fileId, @Param("ip") String ip);
+
+  /**
+   * TLS client fingerprints (JA3) of the connections this IP opened, with when (#918 slice 4b).
+   * Rows: start time, JA3. An unknown initiator counts when the IP is the lower-port side.
+   */
+  @Query(
+      "SELECT c.startTime, c.ja3Client FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND c.ja3Client IS NOT NULL AND (c.initiatorIp = :ip"
+          + " OR (c.initiatorIp IS NULL AND c.srcIp = :ip))")
+  List<Object[]> findClientJa3ByFileIdAndIp(@Param("fileId") UUID fileId, @Param("ip") String ip);
 
   /** Returns the distinct detected file types present in packets for the given file. */
   @Query(
@@ -313,6 +335,14 @@ public interface ConversationRepository
   List<ConversationEntity> findTopConversationByRiskType(
       @Param("fileId") UUID fileId, @Param("riskType") String riskType);
 
+  /** (file_id, rule name) for every distinct stored custom signature in the files (#925). */
+  @Query(
+      value =
+          "SELECT DISTINCT file_id, unnest(custom_signatures) AS rule_name FROM conversations"
+              + " WHERE file_id IN (:fileIds) AND custom_signatures IS NOT NULL",
+      nativeQuery = true)
+  List<Object[]> findDistinctCustomSignaturesByFileIds(@Param("fileIds") List<UUID> fileIds);
+
   /** Returns the distinct custom signature rule names triggered for a file. */
   @Query(
       value =
@@ -569,6 +599,10 @@ public interface ConversationRepository
                                 cb.literal(sig)),
                             0))
                 .collect(java.util.stream.Collectors.toList());
+        // Network rules' matches aren't stored on the row (#925 phase 3); they come in as ids.
+        if (params.getCustomSignatureMatchIds() != null && !params.getCustomSignatureMatchIds().isEmpty()) {
+          sigPreds.add(root.get("id").in(params.getCustomSignatureMatchIds()));
+        }
         predicates.add(cb.or(sigPreds.toArray(new Predicate[0])));
       }
 
@@ -695,4 +729,86 @@ public interface ConversationRepository
     }
     return sb.toString();
   }
+
+  // ── Facet counts: conversations per filter value, for the counts on the filter chips. ──
+  // Each returns (value, conversation count) rows. Array facets count DISTINCT ids so a
+  // conversation listing the same risk twice is counted once.
+
+  @Query(
+      value =
+          "SELECT protocol, count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND protocol IS NOT NULL GROUP BY protocol",
+      nativeQuery = true)
+  List<Object[]> countByProtocol(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT upper(tshark_protocol), count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND tshark_protocol IS NOT NULL AND tshark_protocol <> ''"
+              + " GROUP BY upper(tshark_protocol)",
+      nativeQuery = true)
+  List<Object[]> countByL7ProtocolUpper(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT app_name, count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND app_name IS NOT NULL AND app_name <> '' GROUP BY app_name",
+      nativeQuery = true)
+  List<Object[]> countByAppName(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT category, count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND category IS NOT NULL AND category <> '' GROUP BY category",
+      nativeQuery = true)
+  List<Object[]> countByCategory(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.flow_risks) r"
+              + " WHERE c.file_id = :fileId GROUP BY r",
+      nativeQuery = true)
+  List<Object[]> countByRiskType(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.custom_signatures) r"
+              + " WHERE c.file_id = :fileId GROUP BY r",
+      nativeQuery = true)
+  List<Object[]> countByCustomSignature(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.suricata_alerts) r"
+              + " WHERE c.file_id = :fileId GROUP BY r",
+      nativeQuery = true)
+  List<Object[]> countBySuricataAlert(@Param("fileId") UUID fileId);
+
+  /** Same semantics as the country filter: either end resolves to the country. */
+  @Query(
+      value =
+          "SELECT g.country_code, count(DISTINCT c.id) FROM conversations c"
+              + " JOIN ip_geo_cache g ON g.ip = c.src_ip OR g.ip = c.dst_ip"
+              + " WHERE c.file_id = :fileId AND g.country_code IS NOT NULL"
+              + " GROUP BY g.country_code",
+      nativeQuery = true)
+  List<Object[]> countByCountry(@Param("fileId") UUID fileId);
+
+  /** Same semantics as the device-type filter: either end is classified as the type. */
+  @Query(
+      value =
+          "SELECT h.device_type, count(DISTINCT c.id) FROM conversations c"
+              + " JOIN host_classifications h ON h.file_id = c.file_id"
+              + " AND (h.ip = c.src_ip OR h.ip = c.dst_ip)"
+              + " WHERE c.file_id = :fileId GROUP BY h.device_type",
+      nativeQuery = true)
+  List<Object[]> countByDeviceType(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT detected_file_type, count(DISTINCT conversation_id) FROM packets"
+              + " WHERE file_id = :fileId AND detected_file_type IS NOT NULL"
+              + " AND conversation_id IS NOT NULL GROUP BY detected_file_type",
+      nativeQuery = true)
+  List<Object[]> countByFileType(@Param("fileId") UUID fileId);
 }

@@ -3,7 +3,7 @@
   align-items: center;
   gap: 0.875rem;
   padding: 0.875rem 1rem;
-  border: 1px solid var(--tp-border, #e4e7ec);
+  border: 1px solid var(--tp-card-border);
   border-radius: 8px;
   background: var(--tp-surface, #fff);
   color: var(--tp-text, #1d2939);

@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import java.time.LocalDateTime;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -84,18 +85,94 @@ public class WindowsIdentityResolverService {
   private static final Pattern PERSON_DN =
       Pattern.compile("^CN=((?:[^,\\\\]|\\\\.)+),CN=Users,DC=.*$", Pattern.CASE_INSENSITIVE);
 
+  /**
+   * An account in a custom folder (an OU the organisation created): {@code CN=Clark Collier,
+   * OU=Staff,DC=...}. People live there, but so do computers, groups and service accounts, and the
+   * path can't tell them apart. These are recorded as candidates for the analyst to judge, and are
+   * never used as a default sign-in or as classification evidence. Built-in containers
+   * ({@code CN=System}, {@code CN=Configuration}...) don't match, because only {@code OU=} folders do.
+   */
+  private static final Pattern FOLDER_DN =
+      Pattern.compile(
+          "^CN=((?:[^,\\\\]|\\\\.)+),((?:OU=(?:[^,\\\\]|\\\\.)+,)+)(DC=.*)$",
+          Pattern.CASE_INSENSITIVE);
+
+  /** Where in the directory an LDAP-looked-up account lives. */
+  public enum FolderKind {
+    /** Windows' default {@code CN=Users} container: normally people. */
+    USERS,
+    /** An organisation-made OU: could be a person, a computer or a group. */
+    CUSTOM
+  }
+
   /** One claim: {@code source} asserted that {@code ip}'s logged-in/queried identity is {@code username}. */
   public record Claim(String ip, String username, String source) {}
 
-  /** Scans the capture and returns every Windows-identity claim found via Kerberos AS-REQ or LDAP. */
-  public List<Claim> resolve(File pcapFile) {
-    // Concurrent: the stdout reader (background thread) writes while the main thread reads size().
-    Map<Claim, Boolean> result = new ConcurrentHashMap<>();
+  /**
+   * Every login-type event for one (host, account, source, directory entry), with when it was seen
+   * (#812). Unlike {@link Claim}, which is a deduplicated "this happened" for classification, this
+   * keeps the time dimension, because a host can have several accounts over one capture (a shift
+   * change, a shared PC, an admin signing in remotely), and "who" depends on "when".
+   *
+   * @param directoryEntry the full LDAP DN for an LDAP lookup; null for a Kerberos login
+   * @param folder the folder path in plain words ("Users", or "Staff / Sales" for nested OUs); null
+   *     for Kerberos
+   * @param folderKind USERS or CUSTOM for LDAP; null for Kerberos
+   * @param domain the DNS-style domain the entry is in ("example.com"); null for Kerberos
+   */
+  public record Logon(
+      String ip,
+      String username,
+      String source,
+      String directoryEntry,
+      String folder,
+      FolderKind folderKind,
+      String domain,
+      LocalDateTime firstSeen,
+      LocalDateTime lastSeen,
+      int seenCount) {
 
-    // Fields (pipe-separated, first occurrence only):
+    /** A candidate only: an account in a custom folder, shown to the analyst but never used by default. */
+    public boolean isCandidateOnly() {
+      return folderKind == FolderKind.CUSTOM;
+    }
+  }
+
+  /**
+   * Every Windows-identity claim, deduplicated, for classification. The same set as before #812:
+   * Kerberos logins, plus LDAP lookups of accounts in the default Users folder. Custom-folder
+   * candidates are excluded.
+   */
+  public List<Claim> resolve(File pcapFile) {
+    return toClaims(resolveLogons(pcapFile));
+  }
+
+  /** The classification view of {@link #resolveLogons}: see {@link #resolve}. */
+  public static List<Claim> toClaims(List<Logon> logons) {
+    return logons.stream()
+        .filter(l -> !l.isCandidateOnly())
+        .map(l -> new Claim(l.ip(), l.username(), l.source()))
+        .distinct()
+        .toList();
+  }
+
+  /**
+   * Scans the capture once and returns every login event, aggregated per (host, account, source,
+   * directory entry) with first/last seen and a count, ordered by first seen.
+   */
+  public List<Logon> resolveLogons(File pcapFile) {
+    // Concurrent: the stdout reader (background thread) writes while the main thread reads size().
+    Map<LogonKey, LogonAgg> result = new ConcurrentHashMap<>();
+
+    // Fields (pipe-separated; every occurrence, joined by AGGREGATOR):
     //   0 frame.number  1 ip.src  2 ip.dst
     //   3 ldap.baseObject
     //   4 kerberos.msg_type  5 kerberos.CNameString
+    //   6 frame.time_epoch
+    // Every occurrence, not just the first (#812 item 4): one TCP-reassembled frame can carry
+    // several Kerberos or LDAP messages, and reading only the first skipped a real AS-REQ when an
+    // earlier message in the frame had another type. The aggregator is a control character, not
+    // tshark's default ',', because DNs contain commas.
     // The filter keys on ldap.baseObject alone — it is a searchRequest field, so it already selects
     // the right message type. It deliberately does NOT also require ldap.AttributeDescription: a
     // searchRequest asking for all attributes carries an empty attribute list and no
@@ -114,7 +191,9 @@ public class WindowsIdentityResolverService {
             "-E",
             "separator=|",
             "-E",
-            "occurrence=f",
+            "occurrence=a",
+            "-E",
+            "aggregator=" + AGGREGATOR,
             "-e",
             "frame.number",
             "-e",
@@ -126,7 +205,9 @@ public class WindowsIdentityResolverService {
             "-e",
             "kerberos.msg_type",
             "-e",
-            "kerberos.CNameString");
+            "kerberos.CNameString",
+            "-e",
+            "frame.time_epoch");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -194,38 +275,159 @@ public class WindowsIdentityResolverService {
       if (ioExecutor != null) ioExecutor.shutdownNow();
     }
 
-    log.info("Collected {} Windows identity claim(s) from Kerberos/LDAP", result.size());
-    return new ArrayList<>(result.keySet());
+    log.info("Collected {} Windows login record(s) from Kerberos/LDAP", result.size());
+    return result.values().stream()
+        .map(LogonAgg::toLogon)
+        .sorted(java.util.Comparator.comparing(Logon::firstSeen, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+        .toList();
+  }
+
+  /** Separates multiple occurrences of a field in one frame. ASCII unit separator: never in a DN. */
+  static final char AGGREGATOR = '\u001f';
+
+  private record LogonKey(String ip, String username, String source, String directoryEntry) {}
+
+  /** Mutable per-key aggregate. Only the stdout reader thread touches it. */
+  private static final class LogonAgg {
+    final LogonKey key;
+    final String folder;
+    final FolderKind folderKind;
+    final String domain;
+    LocalDateTime first;
+    LocalDateTime last;
+    int count;
+
+    LogonAgg(LogonKey key, String folder, FolderKind folderKind, String domain) {
+      this.key = key;
+      this.folder = folder;
+      this.folderKind = folderKind;
+      this.domain = domain;
+    }
+
+    void seen(LocalDateTime at) {
+      count++;
+      if (at != null) {
+        if (first == null || at.isBefore(first)) first = at;
+        if (last == null || at.isAfter(last)) last = at;
+      }
+    }
+
+    Logon toLogon() {
+      return new Logon(
+          key.ip(), key.username(), key.source(), key.directoryEntry(), folder, folderKind, domain,
+          first, last, count);
+    }
   }
 
   // ── Row parsing ─────────────────────────────────────────────────────────────
 
-  private void parseRow(String[] f, Map<Claim, Boolean> result) {
+  private void parseRow(String[] f, Map<LogonKey, LogonAgg> result) {
     if (f.length < 6) return;
+    String ip = firstValue(f[1]);
+    LocalDateTime at = f.length > 6 ? epochToLocal(first(split(f[6]))) : null;
 
-    String baseObject = trimToNull(f[3]);
-    if (baseObject != null) {
-      String personName = personNameFromDn(baseObject);
-      if (personName != null) {
-        record(result, firstValue(f[1]), personName, SOURCE_LDAP_DN);
-      }
+    // Every LDAP searchRequest DN in the frame.
+    List<String> dns = split(f[3]);
+    if (!dns.isEmpty()) {
+      for (String dn : dns) recordLdap(result, ip, dn, at);
       return;
     }
 
-    if (KERBEROS_MSG_TYPE_AS_REQ.equals(trimToNull(f[4]))) {
-      String principal = trimToNull(f[5]);
-      if (principal != null && !isMachineAccount(principal)) {
-        record(result, firstValue(f[1]), principal, SOURCE_KERBEROS_AS_REQ);
+    // Kerberos: msg_type and CNameString list one value per message. When the counts line up, pair
+    // them, so only the AS-REQ's own principal is taken. When they don't (CNameString is optional
+    // per message), fall back to the frame's single principal if there is exactly one. Ambiguous
+    // frames are skipped rather than crediting the wrong account.
+    List<String> types = split(f[4]);
+    if (!types.contains(KERBEROS_MSG_TYPE_AS_REQ)) return;
+    List<String> names = split(f[5]);
+    List<String> principals = new ArrayList<>();
+    if (names.size() == types.size()) {
+      for (int i = 0; i < types.size(); i++) {
+        if (KERBEROS_MSG_TYPE_AS_REQ.equals(types.get(i))) principals.add(names.get(i));
+      }
+    } else if (names.stream().distinct().count() == 1) {
+      principals.add(names.get(0));
+    }
+    for (String principal : principals) {
+      if (!isMachineAccount(principal)) {
+        record(result, ip, principal, SOURCE_KERBEROS_AS_REQ, null, null, null, null, at);
       }
     }
   }
 
-  /** Records one claim verbatim. No winner-picking here — that is the adjudicator's job. */
-  private void record(Map<Claim, Boolean> result, String ip, String rawUsername, String source) {
+  private void recordLdap(Map<LogonKey, LogonAgg> result, String ip, String dn, LocalDateTime at) {
+    String trimmed = dn.trim();
+    Matcher users = PERSON_DN.matcher(trimmed);
+    if (users.matches()) {
+      record(result, ip, unescapeRfc4514(users.group(1)).trim(), SOURCE_LDAP_DN, trimmed, "Users",
+          FolderKind.USERS, domainOf(trimmed), at);
+      return;
+    }
+    Matcher folder = FOLDER_DN.matcher(trimmed);
+    if (folder.matches()) {
+      record(result, ip, unescapeRfc4514(folder.group(1)).trim(), SOURCE_LDAP_DN, trimmed,
+          folderPath(folder.group(2)), FolderKind.CUSTOM, domainOf(trimmed), at);
+    }
+  }
+
+  /** Aggregates one sighting. No winner-picking here: that is the caller's job. */
+  private void record(
+      Map<LogonKey, LogonAgg> result, String ip, String rawUsername, String source,
+      String directoryEntry, String folder, FolderKind kind, String domain, LocalDateTime at) {
     if (!isUsableIp(ip)) return;
     String username = cleanUsername(rawUsername);
     if (username == null) return;
-    result.putIfAbsent(new Claim(ip, username, source), Boolean.TRUE);
+    LogonKey key = new LogonKey(ip, username, source, directoryEntry);
+    result.computeIfAbsent(key, k -> new LogonAgg(k, folder, kind, domain)).seen(at);
+  }
+
+  /** "OU=Sales,OU=Staff," (innermost first, as in a DN) becomes "Staff / Sales" (outermost first). */
+  static String folderPath(String ouComponents) {
+    List<String> parts = new ArrayList<>();
+    for (String c : ouComponents.split("(?<!\\\\),")) {
+      if (c.isBlank()) continue;
+      String v = c.trim();
+      if (v.regionMatches(true, 0, "OU=", 0, 3)) v = v.substring(3);
+      parts.add(0, unescapeRfc4514(v));
+    }
+    return String.join(" / ", parts);
+  }
+
+  /** "...,DC=example,DC=com" becomes "example.com". */
+  static String domainOf(String dn) {
+    List<String> labels = new ArrayList<>();
+    for (String c : dn.split("(?<!\\\\),")) {
+      String v = c.trim();
+      if (v.regionMatches(true, 0, "DC=", 0, 3)) labels.add(v.substring(3));
+    }
+    return labels.isEmpty() ? null : String.join(".", labels);
+  }
+
+  /** Splits an aggregated field into its non-blank occurrences. */
+  private static List<String> split(String field) {
+    if (field == null || field.isBlank()) return List.of();
+    List<String> out = new ArrayList<>();
+    for (String v : field.split(String.valueOf(AGGREGATOR), -1)) {
+      String t = v.trim();
+      if (!t.isEmpty()) out.add(t);
+    }
+    return out;
+  }
+
+  private static String first(List<String> values) {
+    return values.isEmpty() ? null : values.get(0);
+  }
+
+  /** Same conversion as PcapParserService, so login times line up with conversation times. */
+  private static LocalDateTime epochToLocal(String epoch) {
+    if (epoch == null) return null;
+    try {
+      double sec = Double.parseDouble(epoch);
+      return LocalDateTime.ofInstant(
+          java.time.Instant.ofEpochMilli((long) (sec * 1000)), java.time.ZoneId.systemDefault());
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   // ── Field helpers ────────────────────────────────────────────────────────────
@@ -278,13 +480,12 @@ public class WindowsIdentityResolverService {
     return principal.endsWith("$");
   }
 
-  /** tshark may join multiple occurrences with ','; take the first non-blank token. */
+  /** The first non-blank occurrence (tshark joins occurrences with {@link #AGGREGATOR}, or ','). */
   private String firstValue(String field) {
-    if (field == null) return null;
-    String trimmed = field.trim();
-    if (trimmed.isEmpty()) return null;
-    int comma = trimmed.indexOf(',');
-    return comma >= 0 ? trimmed.substring(0, comma).trim() : trimmed;
+    String v = first(split(field));
+    if (v == null) return null;
+    int comma = v.indexOf(',');
+    return comma >= 0 ? v.substring(0, comma).trim() : v;
   }
 
   private String cleanUsername(String raw) {

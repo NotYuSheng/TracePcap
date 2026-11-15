@@ -28,7 +28,25 @@ export default defineConfig([
       // Definition lives in eslint.contract.js so the blocking CI job (lint:contract)
       // enforces exactly this rule, with no chance of the two configs drifting.
       'no-restricted-syntax': noHardCodedApiUrls,
+      // SGDS's Alert renders nothing unless `show` is passed (it relies on defaultProps), so a
+      // direct import silently hides error and notice messages. The wrapper sets the default.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@govtechsg/sgds-react',
+              importNames: ['Alert'],
+              message: "Use Alert from '@components/common/Alert': SGDS's renders nothing without show.",
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    files: ['src/components/common/Alert/**'],
+    rules: { 'no-restricted-imports': 'off' },
   },
   {
     files: contractRuleExemptions,

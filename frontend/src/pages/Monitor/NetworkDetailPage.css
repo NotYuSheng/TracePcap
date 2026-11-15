@@ -1,0 +1,149 @@
+/* Network B: the analysis page's rail and capture bar, for a monitored network. */
+.network-page {
+  width: 100%;
+}
+.network-review-pill {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+[data-theme='dark'] .network-review-pill {
+  background: rgba(252, 211, 77, 0.16);
+  color: #fcd34d;
+}
+.network-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.network-stat {
+  padding: 16px;
+  border: 1px solid var(--tp-card-border);
+  border-radius: 12px;
+  background: var(--tp-surface, #fff);
+  text-align: left;
+  color: var(--tp-text, #1f2937);
+}
+.network-stat-button {
+  font: inherit;
+}
+.network-stat-button:hover {
+  border-color: #5925dc;
+}
+.network-stat-warn {
+  border-color: #fde68a;
+}
+.network-stat-label {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.network-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.network-stat-warn .network-stat-value {
+  color: #b45309;
+}
+[data-theme='dark'] .network-stat-warn .network-stat-value {
+  color: #fcd34d;
+}
+.network-stat-sub {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767.98px) {
+  .network-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* A tab that holds several sections stacks their cards. */
+.network-page .analysis-body > .card + .card {
+  margin-top: 1rem;
+}
+
+/* Overview: the latest capture's map beside the insights. */
+.network-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1199.98px) {
+  .network-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Inventory: one card, three tabs. */
+.network-inventory {
+  border-radius: 14px;
+}
+
+.network-inventory-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+
+.network-inventory-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--tp-text-muted, #525a68);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.network-inventory-tab.active {
+  border-bottom-color: #5925dc;
+  color: #3b1891;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .network-inventory-tab.active {
+  color: #c9b8ff;
+  border-bottom-color: #a993ff;
+}
+
+.network-inventory-count {
+  font-size: 0.72rem;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--tp-bg-subtle, #f3f4f6);
+}
+
+/* Settings drawer: expected state and subnets have tables, so it is wider than a filter drawer. */
+.modal-dialog.side-drawer.network-settings-drawer {
+  width: 760px;
+}
+
+.network-settings-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--tp-border, #eceef3);
+}
+
+.network-settings-section:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.network-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

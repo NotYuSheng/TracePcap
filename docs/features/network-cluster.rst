@@ -42,8 +42,8 @@ Select a strategy from the **Group by** dropdown:
      - Predicted device class from the multi-signal classifier (Router, Mobile,
        Server, etc.) — see :doc:`geolocation` for the scoring algorithm.
    * - **Network Labels**
-     - Custom CIDR-to-label mappings defined in the **Network Labels** tab of
-       the Custom Detection Rules modal — see :doc:`custom-signatures`. Only
+     - Custom CIDR-to-label mappings: the organisations in **Settings ›
+       Address defaults › Organisations** — see :doc:`custom-signatures`. Only
        conversations where at least one endpoint is a labelled IP are shown;
        unlabelled-only traffic is suppressed.
 
@@ -97,10 +97,10 @@ Clicking a cluster opens a panel on the right showing:
 Filters
 -------
 
-The Network Cluster tab exposes the full conversation filter panel
-(IP, port, protocol, application, country, device type, risk, custom
-signatures, etc.), identical to the Conversations tab. Filters apply to
-both the cluster graph and the side-panel conversation list.
+The funnel button opens the filter drawer on the right (IP, port, protocol,
+application, country, device type, risk, custom signatures, etc.), the same
+drawer as the network map's. Filters apply to both the cluster graph and the
+side-panel conversation list as you pick them; **Done** closes the drawer.
 
 Country Map View
 ----------------

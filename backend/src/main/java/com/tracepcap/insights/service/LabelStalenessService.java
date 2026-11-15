@@ -89,12 +89,17 @@ public class LabelStalenessService implements LabelStalenessCheck {
             .collect(Collectors.toSet());
 
     for (NodeRoleEntity prev : confirmed) {
-      if (ownKeys.contains(prev.getEntityType() + "|" + prev.getEntityKey())) continue;
+      String key =
+          "IP".equalsIgnoreCase(prev.getEntityType())
+              ? carryKey(prev.getEntityKey(), prevFileId, newFileId)
+              : prev.getEntityKey();
+      if (key == null) continue; // a device not seen in this snapshot
+      if (ownKeys.contains(prev.getEntityType() + "|" + key)) continue;
 
       // computeProperties' own "observed" flag also covers IPs seen only in conversations
       // (no host_classifications row), which a host-classification-only pre-filter would miss.
       Map<String, Object> observed =
-          computeProperties(prev.getEntityType(), prev.getEntityKey(), newFileId);
+          computeProperties(prev.getEntityType(), key, newFileId);
       if (!Boolean.TRUE.equals(observed.get("observed"))) continue; // absent in this snapshot
 
       Map<String, Object> baseline = prev.getObservedProperties();
@@ -111,7 +116,7 @@ public class LabelStalenessService implements LabelStalenessCheck {
         staleFields = changes;
         drifts.add(
             new Drift(
-                prev.getEntityType(), prev.getEntityKey(), prev.getRoleLabel(), changes));
+                prev.getEntityType(), key, prev.getRoleLabel(), changes));
       } else if (prev.getStaleSince() != null) {
         staleSince = prev.getStaleSince();
         staleFields = prev.getStaleFields();
@@ -121,7 +126,7 @@ public class LabelStalenessService implements LabelStalenessCheck {
           NodeRoleEntity.builder()
               .fileId(newFileId)
               .entityType(prev.getEntityType())
-              .entityKey(prev.getEntityKey())
+              .entityKey(key)
               .roleLabel(prev.getRoleLabel())
               .roleDescription(prev.getRoleDescription())
               .origin(ORIGIN_CARRIED_FORWARD)
@@ -169,10 +174,12 @@ public class LabelStalenessService implements LabelStalenessCheck {
         // predecessor, so skipping CARRIED_FORWARD rows made an override vanish after one hop
         // (manual on A → carried to B → gone from C). The original actor and sticky staleness
         // ride along; the node-role carry above has always chained the same way.
-        if (ownKeys.contains(prev.getEntityKey())) continue;
+        String key = carryKey(prev.getEntityKey(), prevFileId, newFileId);
+        if (key == null) continue; // a device not seen in this snapshot
+        if (ownKeys.contains(key)) continue;
 
         // Overrides are keyed by IP (host-identity/axes are per-host). Reuse the IP property snapshot.
-        Map<String, Object> observed = computeProperties("IP", prev.getEntityKey(), newFileId);
+        Map<String, Object> observed = computeProperties("IP", key, newFileId);
         if (!Boolean.TRUE.equals(observed.get("observed"))) continue; // absent in this snapshot
 
         // A MANUAL override set directly on the previous file has no stored baseline (unlike node
@@ -190,7 +197,7 @@ public class LabelStalenessService implements LabelStalenessCheck {
         if (!changes.isEmpty()) {
           staleSince = prev.getStaleSince() != null ? prev.getStaleSince() : LocalDateTime.now();
           staleFields = changes;
-          drifts.add(new Drift("IP", prev.getEntityKey(), prev.getLabel(), changes));
+          drifts.add(new Drift("IP", key, prev.getLabel(), changes));
         } else if (prev.getStaleSince() != null) {
           staleSince = prev.getStaleSince();
           staleFields = prev.getStaleFields();
@@ -200,7 +207,7 @@ public class LabelStalenessService implements LabelStalenessCheck {
             HumanOverrideEntity.builder()
                 .question(question)
                 .fileId(newFileId)
-                .entityKey(prev.getEntityKey())
+                .entityKey(key)
                 .label(prev.getLabel())
                 .rationale(prev.getRationale())
                 .actor(prev.getActor())
@@ -212,6 +219,22 @@ public class LabelStalenessService implements LabelStalenessCheck {
       }
     }
     return drifts;
+  }
+
+  /**
+   * Where a label carries to in the next snapshot (#918 slice 3). A label on an address carries by
+   * IP, as it always has. A label on one device of a reused address follows that device's MAC: its
+   * address and start time won't be the same next time. Null when the device isn't in the snapshot,
+   * or has no MAC to follow.
+   */
+  String carryKey(String prevKey, UUID prevFileId, UUID newFileId) {
+    if (hostClassificationLookup.deviceSpan(prevFileId, prevKey).isEmpty()) {
+      // Not a device on a reused address: an address label (or a key whose device is gone).
+      return com.tracepcap.analysis.spi.DeviceKeys.isDeviceKey(prevKey) ? null : prevKey;
+    }
+    String mac = hostClassificationLookup.deviceFacts(prevFileId, prevKey).map(HostClassificationLookup.HostFacts::mac).orElse(null);
+    if (mac == null) return null;
+    return hostClassificationLookup.keyForMac(newFileId, mac).orElse(null);
   }
 
   // ── Property computation ──────────────────────────────────────────────────────
@@ -226,9 +249,12 @@ public class LabelStalenessService implements LabelStalenessCheck {
 
     String ip = null;
     if ("IP".equalsIgnoreCase(entityType)) {
-      ip = entityKey;
+      // A device key (ip@start, #918 slice 3) snapshots that device's own MAC and type; its
+      // protocols and orgs are the address's.
+      ip = com.tracepcap.analysis.spi.DeviceKeys.ipOf(entityKey);
       hostClassificationLookup
-          .hostFactsByIp(fileId, entityKey)
+          .deviceFacts(fileId, entityKey)
+          .or(() -> hostClassificationLookup.hostFactsByIp(fileId, entityKey))
           .ifPresent(
               h -> {
                 props.put("observed", true);

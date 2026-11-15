@@ -3,9 +3,8 @@ package com.tracepcap.signatures.service;
 import com.tracepcap.analysis.service.PcapParserService;
 import com.tracepcap.analysis.spi.PacketLookup;
 import com.tracepcap.analysis.spi.SignatureApplier;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import com.tracepcap.signatures.entity.DetectionRuleEntity;
+import com.tracepcap.signatures.repository.DetectionRuleRepository;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -13,24 +12,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
- * Loads custom detection rules from {@code signatures.yml} and applies them to each conversation
- * after nDPI enrichment. Matched rule names are appended to the conversation's {@code
+ * Applies the enabled global detection rules (#925, stored in {@code detection_rules}) to each
+ * conversation after nDPI enrichment. Matched rule names are appended to the conversation's {@code
  * customSignatures} list, making them visible in the UI alongside nDPI's built-in risk flags.
  *
- * <p>The file is reloaded on every analysis run so admins can update rules without restarting the
- * application.
+ * <p>The rules are read from the database on every analysis run, so an edit applies to the next
+ * analysis without a restart. Each rule is handed to the matcher in the same map shape the old
+ * {@code signatures.yml} used (see {@link RuleCodec}), so matching is unchanged.
  *
  * <p>Supported match fields (all optional; a rule fires when ALL specified fields match):
  *
@@ -74,8 +71,9 @@ public class CustomSignatureService implements SignatureApplier {
   // never reach the lines that use it.
   private final PacketLookup packetLookup;
 
-  @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
-  private String signaturesPath;
+  // Nullable only for the reflective unit tests of the payload matchers, which never load rules.
+  private final DetectionRuleRepository ruleRepository;
+  private final RuleSync ruleSync;
 
   /**
    * Evaluates all loaded rules against each conversation in a single pass: appends matched rule
@@ -98,19 +96,58 @@ public class CustomSignatureService implements SignatureApplier {
    *     device_type}; empty if there are none
    */
   @Override
-  public Map<String, String> applySignatures(List<PcapParserService.ConversationInfo> conversations) {
-    List<Map<String, Object>> rules = loadRules();
-    if (rules.isEmpty() || conversations.isEmpty()) return Map.of();
+  public Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> applySignatures(
+      UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
+    // Global rules, plus the capture's own if it has any (a capture analysed again keeps them).
+    List<DetectionRuleEntity> rules =
+        new ArrayList<>(ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL));
+    rules.addAll(
+        ruleRepository.findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.CAPTURE, fileId));
+    if (rules.isEmpty()) return Map.of();
 
+    // Same lock as Re-apply, so the two never write one capture's matches at once (#925).
+    ruleSync.lockFile(fileId);
+    Map<UUID, List<UUID>> matched = evaluate(conversations, rules);
+
+    // Label the conversations in rule order, as before; AnalysisService persists the labels.
+    Map<UUID, PcapParserService.ConversationInfo> byId = new HashMap<>();
+    for (PcapParserService.ConversationInfo c : conversations) byId.put(c.getEntityId(), c);
     int matchCount = 0;
+    for (DetectionRuleEntity rule : rules) {
+      for (UUID convId : matched.getOrDefault(rule.getId(), List.of())) {
+        PcapParserService.ConversationInfo conv = byId.get(convId);
+        if (conv != null && !conv.getCustomSignatures().contains(rule.getName())) {
+          conv.getCustomSignatures().add(rule.getName());
+          matchCount++;
+        }
+      }
+    }
+    // Record what was checked, at which versions, so a later rule edit shows this capture as stale.
+    ruleSync.replaceResults(fileId, rules, matched, List.of());
+    if (matchCount > 0) {
+      log.info("Custom signatures: {} match(es) across {} conversations", matchCount, conversations.size());
+    }
+    return classificationHints(rules, matched, byId);
+  }
+
+  /**
+   * Which conversations each rule matches (#925): rule id → conversation ids. The matching itself
+   * is the same as it has always been; see the class comment for the fields. Shared by analysis
+   * and Re-apply. A payload rule reads the conversation's packets, so callers must not pass one
+   * for a capture whose packets were pruned.
+   */
+  public Map<UUID, List<UUID>> evaluate(
+      List<PcapParserService.ConversationInfo> conversations, List<DetectionRuleEntity> rules) {
+    Map<UUID, List<UUID>> result = new HashMap<>();
+    if (rules.isEmpty() || conversations.isEmpty()) return result;
+    List<Map<String, Object>> shaped = toMaps(rules);
     for (PcapParserService.ConversationInfo conv : conversations) {
       // Fetched at most once per conversation, only if some rule actually needs it — most
       // deployments have no payload_contains/payload_regex rules at all, and this is a database
       // round trip now that payloads live there instead of on ConversationInfo (#779).
       List<String> payloads = null;
-      for (Map<String, Object> rule : rules) {
-        String name = (String) rule.get("name");
-        if (name == null || name.isBlank()) continue;
+      for (int i = 0; i < shaped.size(); i++) {
+        Map<String, Object> rule = shaped.get(i);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> match = (Map<String, Object>) rule.get("match");
@@ -147,91 +184,84 @@ public class CustomSignatureService implements SignatureApplier {
           if (!payloadRegexMatch(payloads, payloadRegex, matchAll)) continue;
         }
 
-        if (!conv.getCustomSignatures().contains(name)) {
-          conv.getCustomSignatures().add(name);
-          matchCount++;
-        }
+        result.computeIfAbsent(rules.get(i).getId(), k -> new java.util.ArrayList<>()).add(conv.getEntityId());
       }
     }
-    if (matchCount > 0) {
-      log.info(
-          "Custom signatures: {} match(es) across {} conversations",
-          matchCount,
-          conversations.size());
-    }
+    return result;
+  }
 
-    return computeDeviceTypeOverrides(rules, conversations);
+  /** Whether a rule looks inside packets, and so can't be checked once they're pruned. */
+  public static boolean isPayloadRule(DetectionRuleEntity r) {
+    return (r.getPayloadContains() != null && !r.getPayloadContains().isEmpty())
+        || (r.getPayloadRegex() != null && !r.getPayloadRegex().isEmpty());
   }
 
   /**
-   * Derives IP → custom device-type overrides from the already-loaded {@code rules} and the matches
-   * applied by {@link #applySignatures}. Only IPs from conversations matched by a rule carrying a
-   * {@code device_type} are included.
+   * The classification hints of the matched rules that carry one (#926), by IP. Which endpoint
+   * gets the vote follows from the rule: the one that matched its {@code ip} or {@code cidr}; else
+   * the one on its {@code dstPort} (or {@code srcPort}); else, with nothing endpoint-specific to go
+   * on, both. (The old override labelled both ends, so a client talking to a camera became a
+   * camera too.) One vote per rule per host.
    */
-  private Map<String, String> computeDeviceTypeOverrides(
-      List<Map<String, Object>> rules, List<PcapParserService.ConversationInfo> conversations) {
-    // Build rule-name → device_type map in one pass over rules
-    Map<String, String> ruleDeviceType = new HashMap<>();
-    for (Map<String, Object> rule : rules) {
-      String deviceType = (String) rule.get("device_type");
-      String name = (String) rule.get("name");
-      if (deviceType != null && !deviceType.isBlank() && name != null && !name.isBlank()) {
-        ruleDeviceType.put(name, deviceType);
-      }
-    }
-    if (ruleDeviceType.isEmpty()) return Map.of();
-
-    // One pass over conversations — look up each matched signature in the map
-    Map<String, String> overrides = new HashMap<>();
-    for (PcapParserService.ConversationInfo conv : conversations) {
-      for (String sig : conv.getCustomSignatures()) {
-        String deviceType = ruleDeviceType.get(sig);
-        if (deviceType != null) {
-          if (conv.getSrcIp() != null) overrides.putIfAbsent(conv.getSrcIp(), deviceType);
-          if (conv.getDstIp() != null) overrides.putIfAbsent(conv.getDstIp(), deviceType);
+  Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> classificationHints(
+      List<DetectionRuleEntity> rules,
+      Map<UUID, List<UUID>> matched,
+      Map<UUID, PcapParserService.ConversationInfo> byId) {
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> out = new HashMap<>();
+    for (DetectionRuleEntity rule : rules) {
+      if (rule.getDeviceType() == null || rule.getDeviceType().isBlank()) continue;
+      int weight = rule.getDeviceTypeWeight() != null ? rule.getDeviceTypeWeight() : DEFAULT_HINT_WEIGHT;
+      var hint = new com.tracepcap.analysis.spi.ClassificationHint(rule.getName(), rule.getDeviceType(), weight);
+      java.util.Set<String> voted = new java.util.HashSet<>();
+      for (UUID convId : matched.getOrDefault(rule.getId(), List.of())) {
+        PcapParserService.ConversationInfo conv = byId.get(convId);
+        if (conv == null) continue;
+        for (String ip : hintTargets(rule.getMatchCriteria(), conv)) {
+          if (ip != null && voted.add(ip)) out.computeIfAbsent(ip, k -> new ArrayList<>()).add(hint);
         }
       }
     }
-    return overrides;
+    return out;
+  }
+
+  /** The weight of a classification hint that doesn't say. */
+  public static final int DEFAULT_HINT_WEIGHT = 40;
+
+  private List<String> hintTargets(Map<String, Object> match, PcapParserService.ConversationInfo conv) {
+    if (match == null) match = Map.of();
+    List<String> both = new ArrayList<>(List.of(conv.getSrcIp(), conv.getDstIp()));
+    both.removeIf(java.util.Objects::isNull);
+    if (match.containsKey("ip")) {
+      String ip = String.valueOf(match.get("ip"));
+      return both.stream().filter(ip::equals).toList();
+    }
+    if (match.containsKey("cidr")) {
+      String cidr = String.valueOf(match.get("cidr"));
+      return both.stream().filter(x -> inCidr(x, cidr)).toList();
+    }
+    if (match.containsKey("dstPort") && conv.getDstIp() != null) return List.of(conv.getDstIp());
+    if (match.containsKey("srcPort") && conv.getSrcIp() != null) return List.of(conv.getSrcIp());
+    return both;
   }
 
   // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
 
-  /**
-   * Load and parse the signatures file. Returns an empty list if the file is missing or invalid.
-   */
-  @SuppressWarnings("unchecked")
-  private List<Map<String, Object>> loadRules() {
-    File file = new File(signaturesPath);
-    if (!file.exists()) {
-      return List.of();
+  /** Rules in the YAML-shaped map form the matcher reads. */
+  private static List<Map<String, Object>> toMaps(List<DetectionRuleEntity> rules) {
+    List<Map<String, Object>> out = new ArrayList<>(rules.size());
+    for (DetectionRuleEntity e : rules) {
+      Map<String, Object> rule = new HashMap<>();
+      rule.put("name", e.getName());
+      rule.put("match", e.getMatchCriteria());
+      rule.put("payload_contains", e.getPayloadContains());
+      rule.put("payload_regex", e.getPayloadRegex());
+      rule.put("match_all", e.isMatchAll());
+      if (e.getDeviceType() != null) rule.put("device_type", e.getDeviceType());
+      out.add(rule);
     }
-
-    try (FileInputStream fis = new FileInputStream(file)) {
-      Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
-      Map<String, Object> root = yaml.load(fis);
-      if (root == null || !root.containsKey("signatures")) return List.of();
-
-      Object signaturesObj = root.get("signatures");
-      if (!(signaturesObj instanceof List)) return List.of();
-
-      List<?> raw = (List<?>) signaturesObj;
-      List<Map<String, Object>> rules = new ArrayList<>();
-      for (Object item : raw) {
-        if (item instanceof Map) {
-          rules.add((Map<String, Object>) item);
-        }
-      }
-      return rules;
-    } catch (IOException e) {
-      log.warn("Could not read signatures file at {}: {}", signaturesPath, e.getMessage());
-      return List.of();
-    } catch (Exception e) {
-      log.warn("Failed to parse signatures file at {}: {}", signaturesPath, e.getMessage());
-      return List.of();
-    }
+    return out;
   }
 
   /** Returns true if the conversation satisfies ALL non-null criteria in the match block. */

@@ -1,5 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.knowledge.spi.KnowledgeContext;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +30,7 @@ class HostIdentityContributorTest {
   private CaseKnowledge run(HostFacts... hosts) {
     when(hostClassificationLookup.hostFacts(FILE)).thenReturn(List.of(hosts));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new HostIdentityContributor(hostClassificationLookup).contribute(FILE, board);
+    new HostIdentityContributor().contribute(KnowledgeContext.of(FILE, null, hostClassificationLookup), board);
     return board.build();
   }
 
@@ -37,7 +39,7 @@ class HostIdentityContributorTest {
     HostFacts victim =
         new HostFacts(
             "172.16.1.66", "00:1e:64:ec:f3:08", "Intel Corporate", "DESKTOP-SKBR25F", "mdns",
-            "ccollier", "kerberos_as_req", "Clark Collier", 128, "LAPTOP_DESKTOP", 100, List.of());
+            "ccollier", "kerberos_as_req", "Clark Collier", 1, 128, "LAPTOP_DESKTOP", 100, List.of());
 
     CaseKnowledge k = run(victim);
 
@@ -60,7 +62,7 @@ class HostIdentityContributorTest {
   void ldapOnlySignIn_isGradedReported() {
     HostFacts host =
         new HostFacts(
-            "10.0.0.5", null, null, null, null, "Clark Collier", "ldap_dn", null, null,
+            "10.0.0.5", null, null, null, null, "Clark Collier", "ldap_dn", null, 1, null,
             "LAPTOP_DESKTOP", 80, List.of());
 
     CaseKnowledge k = run(host);
@@ -72,7 +74,7 @@ class HostIdentityContributorTest {
   @Test
   void hostWithNoSignIn_postsOnlyTheHost() {
     HostFacts host =
-        new HostFacts("10.0.0.9", null, null, null, null, null, null, null, 64, "SERVER", 90, List.of("dns"));
+        new HostFacts("10.0.0.9", null, null, null, null, null, null, null, 0, 64, "SERVER", 90, List.of("dns"));
 
     CaseKnowledge k = run(host);
 

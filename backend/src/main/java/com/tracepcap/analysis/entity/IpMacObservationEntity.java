@@ -1,6 +1,7 @@
 package com.tracepcap.analysis.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -39,4 +40,11 @@ public class IpMacObservationEntity {
 
   @Column(nullable = false, length = 50)
   private String mac;
+
+  /** When the ARP claim was first and last seen (#918 item 3); null on rows from before V58. */
+  @Column(name = "first_seen")
+  private LocalDateTime firstSeen;
+
+  @Column(name = "last_seen")
+  private LocalDateTime lastSeen;
 }

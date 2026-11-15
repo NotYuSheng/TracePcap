@@ -7,6 +7,8 @@ import com.tracepcap.file.entity.FileEntity;
 import java.io.File;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -45,9 +47,53 @@ public class ExtractorRunner {
    * conversations} and recording each one's provenance.
    */
   public void runAll(FileEntity file, File capture, List<PcapParserService.ConversationInfo> conversations) {
+    runAll(file, capture, conversations, PreparedExtractions.NONE);
+  }
+
+  /**
+   * Runs each enabled extractor's {@link Extractor#prepare} phase: the slow, capture-only tool runs
+   * (#409). The pipeline calls this <b>before</b> it opens its database transaction, so Suricata,
+   * ndpiReader and tshark don't hold a pooled connection while they run.
+   *
+   * <p>Writes nothing. Manifest rows are recorded by {@link #runAll} inside the transaction, as
+   * before, so a failed analysis still rolls back cleanly. A prepare that throws is held as a
+   * failed outcome and reported there. It costs that extractor's facts and nothing else.
+   */
+  public PreparedExtractions prepareAll(FileEntity file, File capture) {
+    // No conversations yet; see Extractor#prepare for why that is the contract.
+    ExtractionTarget target = new Target(file, capture, List.of());
+    Map<String, Extractor.Prepared> prepared = new HashMap<>();
+    for (Extractor extractor : ordered()) {
+      long started = System.currentTimeMillis();
+      try {
+        if (!extractor.enabledFor(target)) continue;
+        Extractor.Prepared p = extractor.prepare(target);
+        if (p != null) prepared.put(extractor.name(), p);
+      } catch (Exception e) {
+        log.warn("[{}] extractor {} failed to prepare", file.getId(), extractor.name(), e);
+        String detail = e.getClass().getSimpleName() + ": " + e.getMessage();
+        prepared.put(extractor.name(), conversations -> Extractor.Outcome.failed(detail));
+      }
+      log.debug(
+          "[{}] extractor {} prepared ({}ms)",
+          file.getId(),
+          extractor.name(),
+          System.currentTimeMillis() - started);
+    }
+    return new PreparedExtractions(prepared);
+  }
+
+  /**
+   * As {@link #runAll(FileEntity, File, List)}, but extractors with a {@link Extractor.Prepared}
+   * result in {@code prepared} only apply it. Their tool already ran in {@link #prepareAll}.
+   */
+  public void runAll(
+      FileEntity file,
+      File capture,
+      List<PcapParserService.ConversationInfo> conversations,
+      PreparedExtractions prepared) {
     ExtractionTarget target = new Target(file, capture, conversations);
-    List<Extractor> ordered =
-        extractors.stream().sorted(Comparator.comparingInt(Extractor::order)).toList();
+    List<Extractor> ordered = ordered();
 
     for (Extractor extractor : ordered) {
       long started = System.currentTimeMillis();
@@ -58,7 +104,9 @@ public class ExtractorRunner {
           record(extractor, file.getId(), Extractor.Outcome.skipped("not enabled for this file"));
           continue;
         }
-        Extractor.Outcome outcome = extractor.extract(target);
+        Extractor.Prepared ready = prepared.forExtractor(extractor.name());
+        Extractor.Outcome outcome =
+            ready != null ? ready.applyTo(conversations) : extractor.extract(target);
         if (outcome == null) {
           // The port says "never null", but Extractor is a public SPI and a third-party module can
           // break that. Say what happened rather than NPE into the catch below and report a
@@ -86,6 +134,19 @@ public class ExtractorRunner {
 
     log.info(
         "[{}] Extract: {} extractors ({})", file.getId(), ordered.size(), tierBreakdown(ordered));
+  }
+
+  private List<Extractor> ordered() {
+    return extractors.stream().sorted(Comparator.comparingInt(Extractor::order)).toList();
+  }
+
+  /** Output of {@link #prepareAll}, handed back to {@link #runAll}. Keyed by extractor name. */
+  public record PreparedExtractions(Map<String, Extractor.Prepared> byName) {
+    public static final PreparedExtractions NONE = new PreparedExtractions(Map.of());
+
+    Extractor.Prepared forExtractor(String name) {
+      return byName.get(name);
+    }
   }
 
   /** Records provenance for extractors that claim a manifest key; the rest pass silently. */

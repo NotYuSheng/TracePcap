@@ -116,8 +116,9 @@ export const useAnalysisData = (fileId: string) => {
     };
   }, [fileId, cachedSummary, setCurrentFileId, setAnalysisSummary]);
 
-  const refetch = async () => {
-    setLoading(true);
+  /** Reloads the summary. {@code silent} keeps the page as it is while loading (#925). */
+  const refetch = async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
     setError(null);
 
     try {
@@ -128,7 +129,7 @@ export const useAnalysisData = (fileId: string) => {
       const error = err instanceof Error ? err : new Error('Failed to fetch analysis');
       setError(error);
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
   };
 

@@ -17,6 +17,24 @@ services:
     image: postgres:15-alpine
     container_name: tracepcap-postgres
     restart: unless-stopped
+    # Pin the memory knobs that drive parallel-query shared-memory use so a query's /dev/shm demand
+    # is BOUNDED rather than "whatever the planner picks" — the worst case is roughly
+    # work_mem × hash_mem_multiplier × (1 + max_parallel_workers_per_gather). With the defaults
+    # below (32MB × 2 × 3 ≈ 192MB) that stays under shm_size. Raise these together with
+    # POSTGRES_SHM_SIZE and MAX_UPLOAD_PACKETS to provision for larger captures — see .env.example.
+    command:
+      - "postgres"
+      - "-c"
+      - "work_mem=${POSTGRES_WORK_MEM:-32MB}"
+      - "-c"
+      - "hash_mem_multiplier=${POSTGRES_HASH_MEM_MULTIPLIER:-2.0}"
+      - "-c"
+      - "max_parallel_workers_per_gather=${POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER:-2}"
+    # Postgres puts parallel-query shared memory (parallel hash joins/sorts, etc.) in /dev/shm.
+    # Docker's default 64MB /dev/shm is far too small — a single parallel query can try to
+    # allocate 100MB+ and fail with `could not resize shared memory segment ... No space left
+    # on device` even when the host has ample RAM and disk. Raise the cap. Override via .env.
+    shm_size: ${POSTGRES_SHM_SIZE:-256m}
     deploy:
       resources:
         limits:
@@ -45,6 +63,38 @@ services:
     networks:
       - tracepcap-network
 
+  # One-shot volume-ownership repair (#854). The Chainguard image runs MinIO as UID 65532, but a
+  # minio_data volume created by the old quay.io image (any install from before #838) is owned by
+  # root, so MinIO cannot write to it and crash-loops with "file access denied". This runs as root
+  # before minio starts and hands the volume to 65532 — only when something in it is not already
+  # owned that way, so on a healthy volume it is a read-only walk. It reuses the minio image so an
+  # air-gapped host needs nothing beyond the offline bundle. `network_mode: none`: it touches only
+  # the volume.
+  minio-volume-perms:
+    image: cgr.dev/chainguard/minio:latest-dev
+    container_name: tracepcap-minio-volume-perms
+    user: "0:0"
+    network_mode: none
+    deploy:
+      resources:
+        limits:
+          cpus: ${MINIO_INIT_CPU_LIMIT:-0.5}
+          memory: ${MINIO_INIT_MEM_LIMIT:-128m}
+    volumes:
+      - minio_data:/data
+    # `$$` escapes `$` from Compose interpolation so the container's shell expands it.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        if [ -n "$$(find /data \( ! -user 65532 -o ! -group 65532 \) -print | head -n 1)" ]; then
+          echo "minio_data has entries not owned by 65532:65532 (fresh volume, or one from the pre-#838 image); fixing"
+          chown -R 65532:65532 /data
+        else
+          echo "minio_data ownership OK"
+        fi
+
   # MinIO Object Storage
   # Image source: Chainguard (cgr.dev/chainguard/minio), NOT Docker Hub or quay.io. In 2026 MinIO
   # removed its community images from every public registry — `minio/minio` was deleted from Docker
@@ -60,6 +110,9 @@ services:
     container_name: tracepcap-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
+    depends_on:
+      minio-volume-perms:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -134,6 +187,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # Build-time caps (deploy.resources below apply only to the running container): Maven's heap
+      # and nDPI's parallel compile jobs. See .env.example.
+      args:
+        BUILD_JVM_MAX_HEAP: ${BUILD_JVM_MAX_HEAP:-768m}
+        BUILD_JOBS: ${BUILD_JOBS:-2}
     container_name: tracepcap-backend
     restart: unless-stopped
     deploy:
@@ -152,6 +210,8 @@ services:
       # Authentication off by default — the app runs fully open. To enable OIDC,
       # use docker-compose.prod.yml (bundles Keycloak) or set TRACEPCAP_AUTH_ENABLED + KEYCLOAK_* envs.
       TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
+      # Login off only: allow admin-only actions (#915) for everyone. Default false.
+      SYSTEM_SETTINGS_EDITABLE: ${SYSTEM_SETTINGS_EDITABLE:-false}
       # Must resolve to the same values as the postgres service above.
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tracepcap}
       DATABASE_USERNAME: ${POSTGRES_USER:-tracepcap_user}
@@ -167,6 +227,10 @@ services:
       # Memory allocation — all limits (JVM heap, max upload, timeouts) are derived
       # from this single value in the container entrypoint script
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # Packet-count upload gate (see application.yml app.max-packets). Raise together with
+      # POSTGRES_SHM_SIZE / POSTGRES_WORK_MEM above; 0 disables.
+      MAX_UPLOAD_PACKETS: ${MAX_UPLOAD_PACKETS:-2000000}
+      MAX_UPLOAD_PACKETS_VERIFY_FRACTION: ${MAX_UPLOAD_PACKETS_VERIFY_FRACTION:-0.5}
       # LLM Configuration (OpenAI API Format)
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-https://api.openai.com/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
@@ -213,7 +277,6 @@ services:
       # effect (#641). Defaults match application.yml exactly.
       GEO_ENRICHMENT_ENABLED: ${GEO_ENRICHMENT_ENABLED:-true}
       GEO_MMDB_PATH: ${GEO_MMDB_PATH:-}
-      SIGNATURES_PATH: ${SIGNATURES_PATH:-/app/config/signatures.yml}
       DNS_NXDOMAIN_MIN_QUERIES: ${DNS_NXDOMAIN_MIN_QUERIES:-20}
       DNS_NXDOMAIN_SUSPICIOUS_RATIO: ${DNS_NXDOMAIN_SUSPICIOUS_RATIO:-0.5}
       HTTP_MIN_REQUESTS: ${HTTP_MIN_REQUESTS:-20}
@@ -244,13 +307,15 @@ services:
       context: .
       dockerfile: ./nginx/Dockerfile
       args:
+        # Build-time cap on tsc/vite's heap (deploy.resources apply only to the running container).
+        BUILD_NODE_MAX_HEAP_MB: ${BUILD_NODE_MAX_HEAP_MB:-1536}
         VITE_API_BASE_URL: /api/v1
         VITE_SUPPORTED_FILE_TYPES: ${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}
         VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT: ${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}
-        # The default below is rewritten on every merge to main by
-        # .github/workflows/app-version.yml — it is the version local builds bake in.
-        # Export APP_VERSION to override (CI passes the live `git describe` for GHCR images).
-        VITE_APP_VERSION: ${APP_VERSION:-v0.2.0-129-g04f2475}
+        # Empty unless APP_VERSION is exported (CI passes the live `git describe` for GHCR
+        # images); the build then reads the APP_VERSION file at the repo root, which
+        # .github/workflows/app-version.yml rewrites on every merge to dev.
+        VITE_APP_VERSION: ${APP_VERSION:-}
     container_name: tracepcap-nginx
     restart: unless-stopped
     deploy:

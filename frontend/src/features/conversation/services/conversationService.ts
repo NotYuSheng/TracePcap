@@ -3,6 +3,7 @@ import { directApiUrl } from '@/services/api/directUrl';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import type {
+  AccountAtTime,
   Conversation,
   ConversationGeoInfo,
   NetworkEndpoint,
@@ -13,7 +14,7 @@ import type {
   HostIdentity,
   HostIdentityEvidence,
 } from '@/types';
-import type { ConversationFilters } from '../types';
+import type { ConversationFacetCounts, ConversationFilters, WindowsLogon } from '../types';
 
 // Backend response types
 interface ConversationApiResponse {
@@ -24,6 +25,8 @@ interface ConversationApiResponse {
   dstPort: number | null;
   /** Who sent SYN without ACK (#496). Null when unknown — no handshake, or capture joined mid-flow. */
   initiatorIp?: string | null;
+  srcMac?: string | null;
+  dstMac?: string | null;
   initiatorPort?: number | null;
   protocol: string;
   appName?: string | null;
@@ -43,6 +46,8 @@ interface ConversationApiResponse {
   detectedFileTypes?: string[] | null;
   srcGeo?: ConversationGeoInfo | null;
   dstGeo?: ConversationGeoInfo | null;
+  srcAccount?: AccountAtTime | null;
+  dstAccount?: AccountAtTime | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[];
@@ -102,8 +107,9 @@ function transformConversation(
   apiData: ConversationApiResponse,
   packets: Packet[] = []
 ): Conversation {
-  const srcEndpoint: NetworkEndpoint = { ip: apiData.srcIp, port: apiData.srcPort ?? 0 };
-  const dstEndpoint: NetworkEndpoint = { ip: apiData.dstIp, port: apiData.dstPort ?? 0 };
+  // Each side's MAC (#462): the machine, or for outside traffic the site's router.
+  const srcEndpoint: NetworkEndpoint = { ip: apiData.srcIp, port: apiData.srcPort ?? 0, mac: apiData.srcMac ?? undefined };
+  const dstEndpoint: NetworkEndpoint = { ip: apiData.dstIp, port: apiData.dstPort ?? 0, mac: apiData.dstMac ?? undefined };
 
   return {
     id: apiData.conversationId,
@@ -128,6 +134,8 @@ function transformConversation(
     detectedFileTypes: apiData.detectedFileTypes ?? [],
     srcGeo: apiData.srcGeo ?? undefined,
     dstGeo: apiData.dstGeo ?? undefined,
+    srcAccount: apiData.srcAccount ?? undefined,
+    dstAccount: apiData.dstAccount ?? undefined,
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
@@ -223,6 +231,9 @@ export const conversationService = {
       pageSize: String(filters.pageSize),
     };
     if (filters.ip) params.ip = filters.ip;
+    if (filters.srcIp) params.srcIp = filters.srcIp;
+    if (filters.dstIp) params.dstIp = filters.dstIp;
+    if (filters.networkId) params.networkId = filters.networkId;
     if (filters.port) params.port = filters.port;
     if (filters.payloadContains) params.payloadContains = filters.payloadContains;
     if (filters.protocols.length > 0) params.protocols = filters.protocols.join(',');
@@ -234,8 +245,7 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
     if (filters.customSignatures.length > 0)
       params.customSignatures = filters.customSignatures.join(',');
-    if (filters.suricataAlerts.length > 0)
-      params.suricataAlerts = filters.suricataAlerts.join(',');
+    if (filters.suricataAlerts.length > 0) params.suricataAlerts = filters.suricataAlerts.join(',');
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.deviceTypes = filters.deviceTypes.join(',');
     if (filters.countries && filters.countries.length > 0)
@@ -266,6 +276,8 @@ export const conversationService = {
   getExportUrl: (fileId: string, filters: ConversationFilters): string => {
     const params = new URLSearchParams();
     if (filters.ip) params.set('ip', filters.ip);
+    if (filters.srcIp) params.set('srcIp', filters.srcIp);
+    if (filters.dstIp) params.set('dstIp', filters.dstIp);
     if (filters.port) params.set('port', filters.port);
     if (filters.payloadContains) params.set('payloadContains', filters.payloadContains);
     if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
@@ -302,6 +314,8 @@ export const conversationService = {
   getPcapExportUrl: (fileId: string, filters: ConversationFilters): string => {
     const params = new URLSearchParams();
     if (filters.ip) params.set('ip', filters.ip);
+    if (filters.srcIp) params.set('srcIp', filters.srcIp);
+    if (filters.dstIp) params.set('dstIp', filters.dstIp);
     if (filters.port) params.set('port', filters.port);
     if (filters.payloadContains) params.set('payloadContains', filters.payloadContains);
     if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
@@ -328,8 +342,12 @@ export const conversationService = {
   /**
    * Returns distinct custom signature rule names triggered for the given file.
    */
-  getCustomSignatures: async (fileId: string): Promise<string[]> => {
-    const response = await apiClient.get<string[]>(`/conversations/${fileId}/custom-signatures`);
+  getCustomSignatures: async (fileId: string, networkId?: string): Promise<string[]> => {
+    // In a network, its own rules' matches too (#925 phase 3).
+    const response = await apiClient.get<string[]>(
+      `/conversations/${fileId}/custom-signatures`,
+      networkId ? { params: { networkId } } : undefined
+    );
     return response.data;
   },
 
@@ -342,10 +360,34 @@ export const conversationService = {
   },
 
   /**
-   * Returns configured signature rules with their severity from signatures.yml.
+   * Returns the global detection rules' names and severities (#925), to colour matches by
+   * severity. Disabled rules are included: their old matches still carry the name.
    */
-  getSignatureRules: async (): Promise<{ name: string; severity: string }[]> => {
-    const response = await apiClient.get<{ name: string; severity: string }[]>('/signatures/rules');
+  getSignatureRules: async (
+    fileId?: string,
+    networkId?: string
+  ): Promise<{ name: string; severity: string; scope: string }[]> => {
+    // With a capture, its own rules too; with a network, that network's (#925 phase 3), so their
+    // matches get a colour and a scope label. A network rule's scope is "NETWORK:<name>".
+    const params: Record<string, string> = {};
+    if (fileId) params.fileId = fileId;
+    if (fileId && networkId) params.networkId = networkId;
+    const response = await apiClient.get<
+      { name: string; severity: string; scope: string; networkName?: string | null }[]
+    >(API_ENDPOINTS.DETECTION_RULES, { params });
+    return response.data.map(r => ({
+      name: r.name,
+      severity: r.severity,
+      scope: r.scope === 'NETWORK' ? `NETWORK:${r.networkName ?? 'network'}` : r.scope,
+    }));
+  },
+
+
+  /** Conversations per filter value, for the counts on the filter chips. */
+  getFacetCounts: async (fileId: string): Promise<ConversationFacetCounts> => {
+    const response = await apiClient.get<ConversationFacetCounts>(
+      `/conversations/${fileId}/facet-counts`
+    );
     return response.data;
   },
 
@@ -376,6 +418,12 @@ export const conversationService = {
   /**
    * Returns device-type classifications for all unique hosts in the given file.
    */
+  /** Every Windows account seen on one host, oldest first: its login timeline (#812). */
+  getWindowsLogons: async (fileId: string, ip: string): Promise<WindowsLogon[]> => {
+    const response = await apiClient.get<WindowsLogon[]>(API_ENDPOINTS.WINDOWS_LOGONS(fileId, ip));
+    return response.data;
+  },
+
   getHostClassifications: async (fileId: string): Promise<HostClassification[]> => {
     const response = await apiClient.get<HostClassification[]>(
       API_ENDPOINTS.HOST_CLASSIFICATIONS(fileId)
@@ -383,9 +431,17 @@ export const conversationService = {
     return response.data;
   },
 
-  /** Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). */
-  getHostIdentities: async (fileId: string): Promise<HostIdentity[]> => {
-    const response = await apiClient.get<HostIdentity[]>(API_ENDPOINTS.HOST_IDENTITIES(fileId));
+  /**
+   * Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). Pass `ips` to
+   * fetch only those hosts (#576), e.g. a conversation's two endpoints, instead of every host in the
+   * file. Sent as one comma-separated param, because axios's default `ips[]=` form doesn't bind to
+   * Spring's List<String>.
+   */
+  getHostIdentities: async (fileId: string, ips?: string[]): Promise<HostIdentity[]> => {
+    const response = await apiClient.get<HostIdentity[]>(
+      API_ENDPOINTS.HOST_IDENTITIES(fileId),
+      ips && ips.length > 0 ? { params: { ips: ips.join(',') } } : undefined
+    );
     return response.data;
   },
 
@@ -393,12 +449,9 @@ export const conversationService = {
    * Full explainable classification (verdict + evidence axes) for one host, keyed by fileId+ip —
    * lets any surface render the graph's "verdict, and why" panel without the graph's node data.
    */
-  getHostIdentityEvidence: async (
-    fileId: string,
-    ip: string,
-  ): Promise<HostIdentityEvidence> => {
+  getHostIdentityEvidence: async (fileId: string, ip: string): Promise<HostIdentityEvidence> => {
     const response = await apiClient.get<HostIdentityEvidence>(
-      API_ENDPOINTS.HOST_IDENTITY_EVIDENCE(fileId, ip),
+      API_ENDPOINTS.HOST_IDENTITY_EVIDENCE(fileId, ip)
     );
     return response.data;
   },
@@ -408,7 +461,7 @@ export const conversationService = {
    */
   reconstructSession: async (conversationId: string): Promise<SessionData> => {
     const response = await apiClient.get<SessionData>(
-      `/conversations/detail/${conversationId}/session`,
+      `/conversations/detail/${conversationId}/session`
     );
     return response.data;
   },
@@ -416,9 +469,10 @@ export const conversationService = {
   /**
    * Get detailed conversation info including the full packet stream.
    */
-  getConversationDetail: async (conversationId: string): Promise<Conversation> => {
+  getConversationDetail: async (conversationId: string, networkId?: string): Promise<Conversation> => {
     const response = await apiClient.get<ConversationDetailApiResponse>(
-      API_ENDPOINTS.CONVERSATION_DETAIL(conversationId)
+      API_ENDPOINTS.CONVERSATION_DETAIL(conversationId),
+      networkId ? { params: { networkId } } : undefined
     );
 
     const apiData = response.data;

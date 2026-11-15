@@ -3,6 +3,8 @@ export const API_ENDPOINTS = {
   UPLOAD_PCAP: '/files',
   FILES_LIST: '/files',
   FILE_METADATA: (fileId: string) => `/files/${fileId}`,
+  FILE_REANALYSES: (fileId: string) => `/files/${fileId}/reanalyses`,
+  FILE_VERSIONS: (fileId: string) => `/files/${fileId}/versions`,
   FILE_DELETE: (fileId: string) => `/files/${fileId}`,
   FILE_DOWNLOAD: (fileId: string) => `/files/${fileId}/download`,
   FILES_MERGE: '/files/merge',
@@ -16,6 +18,36 @@ export const API_ENDPOINTS = {
 
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
+  WINDOWS_LOGONS: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/windows-logons`,
+  /** A network's own address entries layered on the default (#915 phase 4). */
+  NETWORK_SUBNETS: (networkId: string) => `/monitor/networks/${networkId}/subnets`,
+  NETWORK_SUBNET: (networkId: string, subnetId: number) => `/monitor/networks/${networkId}/subnets/${subnetId}`,
+  NETWORK_PRIVATE_RANGES: (networkId: string) => `/monitor/networks/${networkId}/custom-private-ranges`,
+  NETWORK_PRIVATE_RANGE: (networkId: string, id: number) => `/monitor/networks/${networkId}/custom-private-ranges/${id}`,
+  /** A network's devices across its snapshots, by MAC (#918 slice 4). */
+  NETWORK_DEVICES: (networkId: string) => `/monitor/networks/${networkId}/devices`,
+  NETWORK_DEVICE_COUNTS: (networkId: string) => `/monitor/networks/${networkId}/device-counts`,
+  NETWORK_DEVICE_LINK_SUGGESTIONS: (networkId: string) => `/monitor/networks/${networkId}/device-link-suggestions`,
+  NETWORK_DEVICE_LINKS: (networkId: string) => `/monitor/networks/${networkId}/device-links`,
+  NETWORK_DEVICE_LINK: (networkId: string, linkId: number) => `/monitor/networks/${networkId}/device-links/${linkId}`,
+  NETWORK_ORG_RULES: (networkId: string) => `/monitor/networks/${networkId}/ip-org-rules`,
+  NETWORK_ORG_RULE: (networkId: string, id: number) => `/monitor/networks/${networkId}/ip-org-rules/${id}`,
+  /** The networks a capture holds, told apart by their DHCP leases (#462). */
+  FILE_NETWORK_SEGMENTS: (fileId: string) => `/files/${fileId}/network-segments`,
+  FILE_PACKETS: (fileId: string) => `/files/${fileId}/packets`,
+  FILE_NETWORK_MAP_EDITS: (fileId: string) => `/files/${fileId}/network-map-edits`,
+  /** Devices that moved to another address within a capture (same MAC, a new address). */
+  FILE_DEVICE_MOVES: (fileId: string) => `/files/${fileId}/device-moves`,
+  /** Every address more than one device held, with each device's classification (#918 slice 2). */
+  FILE_OCCUPANCIES: (fileId: string) => `/files/${fileId}/occupancies`,
+  /** Which devices held an address when, and the analyst's split/merge decisions (#918). */
+  HOST_OCCUPANCIES: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancies`,
+  HOST_OCCUPANCY_DECISIONS: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancy-decisions`,
+  HOST_OCCUPANCY_DECISION: (fileId: string, ip: string, decisionId: number) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancy-decisions/${decisionId}`,
   /** Deterministic answers to the standard investigation questions (#813). */
   ANSWERS: (fileId: string) => `/files/${fileId}/answers`,
   /** Goal-driven autonomous investigation report — producers plus pivots (#819). */
@@ -103,6 +135,31 @@ export const API_ENDPOINTS = {
   // System
   SYSTEM_TIME: '/system/time',
   SYSTEM_LIMITS: '/system/limits',
+  SYSTEM_SETTINGS: '/system/settings',
+  SYSTEM_SETTING: (key: string) => `/system/settings/${key}`,
+  PREFERENCES: '/preferences',
+  ME: '/me',
+  PERMISSIONS: '/permissions',
+  PERMISSION: (action: string) => `/permissions/${action}`,
+  AUDIT_LOG: '/audit-log',
+  NETWORK_MEMBERSHIPS: '/network-memberships',
+  STALE_CAPTURES: '/detection-rules/stale-captures',
+  DETECTION_RULES: '/detection-rules',
+  DETECTION_RULE: (id: string) => `/detection-rules/${id}`,
+  DETECTION_RULES_EXPORT: '/detection-rules/export',
+  DETECTION_RULES_IMPORT: '/detection-rules/import',
+  DETECTION_RULES_STATUS: '/detection-rules/status',
+  CAPTURE_DETECTION_RULES: (fileId: string) => `/files/${fileId}/detection-rules`,
+  NETWORK_DETECTION_RULES: (networkId: string) => `/monitor/networks/${networkId}/detection-rules`,
+  FILE_NETWORKS: (fileId: string) => `/files/${fileId}/networks`,
+  NETWORK_RULE_SUPPRESSIONS: (networkId: string) => `/monitor/networks/${networkId}/detection-rules/suppressions`,
+  NETWORK_RULE_SUPPRESSION: (networkId: string, ruleId: string) =>
+    `/monitor/networks/${networkId}/detection-rules/suppressions/${ruleId}`,
+  DETECTION_RULE_PREVIEWS: '/detection-rules/previews',
+  DETECTION_RULE_PROMOTIONS: (id: string) => `/detection-rules/${id}/promotions`,
+  FILE_RULE_STATUS: (fileId: string) => `/files/${fileId}/rule-status`,
+  RULE_REAPPLY_JOBS: '/rule-reapply-jobs',
+  RULE_REAPPLY_JOB: (id: string) => `/rule-reapply-jobs/${id}`,
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
@@ -119,6 +176,7 @@ export const API_ENDPOINTS = {
 export const MONITOR_ENDPOINTS = {
   NETWORKS: '/monitor/networks',
   NETWORK: (id: string) => `/monitor/networks/${id}`,
+  NETWORK_SETTINGS: (id: string) => `/monitor/networks/${id}/settings`,
   SNAPSHOTS: (networkId: string) => `/monitor/networks/${networkId}/snapshots`,
   SNAPSHOT: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,

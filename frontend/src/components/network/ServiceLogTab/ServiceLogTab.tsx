@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert } from '@components/common/Alert';
 import type { ServiceTabConfig, ServiceLogCellContext } from '@/features/network/serviceTabs';
+import './ServiceLogTab.css';
 
 interface ServiceLogTabProps {
   fileId: string;
@@ -57,6 +58,13 @@ export function ServiceLogTab({ fileId, ip, config }: ServiceLogTabProps) {
   const rows = config.getRows(detail);
   const banner = config.getBanner(detail);
   const infoFields = config.getInfoFields?.(detail) ?? [];
+  // Fields by where they sit in an entry; a column with no slot is the title if it comes first.
+  const slotOf = (i: number) => config.columns[i].slot ?? (i === 0 ? 'title' : 'meta');
+  const bySlot = (slot: string) => config.columns.filter((_, i) => slotOf(i) === slot);
+  const lead = bySlot('lead');
+  const title = bySlot('title');
+  const aside = bySlot('aside');
+  const meta = bySlot('meta');
 
   return (
     <div>
@@ -77,26 +85,32 @@ export function ServiceLogTab({ fileId, ip, config }: ServiceLogTabProps) {
         </dl>
       )}
       <p className="text-muted small mb-2">{config.getSummary(detail)}</p>
-      <div className="table-responsive rounded border overflow-hidden">
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: '0.8rem' }}>
-          <thead className="table-light">
-            <tr>
-              {config.columns.map(col => (
-                <th key={col.header}>{col.header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} style={config.rowStyle?.(row)}>
-                {config.columns.map(col => (
-                  <td key={col.header}>{col.cell(row, cellCtx)}</td>
+      {rows.length > 0 && (
+        <ul className="svc-list" aria-label={`${config.label} activity`}>
+          {rows.map((row, i) => (
+            <li key={i} className={`svc-item${config.rowTone?.(row) === 'danger' ? ' svc-item-danger' : ''}`}>
+              <div className="svc-item-head">
+                {lead.map(col => (
+                  <span key={col.header} className="svc-lead">{col.cell(row, cellCtx)}</span>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                <span className="svc-title">{title.map(col => <span key={col.header}>{col.cell(row, cellCtx)}</span>)}</span>
+                {aside.map(col => (
+                  <span key={col.header} className="svc-aside">{col.cell(row, cellCtx)}</span>
+                ))}
+              </div>
+              {meta.length > 0 && (
+                <div className="svc-item-meta">
+                  {meta.map(col => (
+                    <span key={col.header} className="svc-meta">
+                      <span className="svc-meta-label">{col.header}</span> {col.cell(row, cellCtx)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {rows.length === 0 && (
         <p className="text-muted small fst-italic mt-2 mb-0">No {config.label} activity recorded.</p>
       )}

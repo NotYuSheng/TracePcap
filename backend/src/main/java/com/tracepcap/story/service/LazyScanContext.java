@@ -17,6 +17,7 @@ import java.util.function.Supplier;
 final class LazyScanContext implements ScanContext {
 
   private final UUID fileId;
+  private final UUID networkId;
   private final long totalConversations;
   private final long totalBytes;
   private final Supplier<List<ConversationFacts>> conversations;
@@ -24,7 +25,13 @@ final class LazyScanContext implements ScanContext {
 
   LazyScanContext(
       UUID fileId, long totalConversations, long totalBytes, ConversationLookup lookup) {
+    this(fileId, null, totalConversations, totalBytes, lookup);
+  }
+
+  LazyScanContext(
+      UUID fileId, UUID networkId, long totalConversations, long totalBytes, ConversationLookup lookup) {
     this.fileId = fileId;
+    this.networkId = networkId;
     this.totalConversations = totalConversations;
     this.totalBytes = totalBytes;
     this.conversations = memoise(() -> lookup.conversationFacts(fileId));
@@ -57,6 +64,11 @@ final class LazyScanContext implements ScanContext {
   @Override
   public UUID fileId() {
     return fileId;
+  }
+
+  @Override
+  public UUID networkId() {
+    return networkId;
   }
 
   @Override

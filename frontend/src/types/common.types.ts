@@ -87,7 +87,22 @@ export interface Conversation {
   direction: 'bidirectional' | 'unidirectional';
   srcGeo?: ConversationGeoInfo;
   dstGeo?: ConversationGeoInfo;
+  /** Who was logged in on each endpoint when this started (#812). */
+  srcAccount?: AccountAtTime;
+  dstAccount?: AccountAtTime;
 }
+
+/**
+ * Who was logged in on a conversation endpoint when it started (#812 follow-up). Only answered
+ * when unambiguous: with several accounts, `username` is null and `accountCount` says how many.
+ */
+export interface AccountAtTime {
+  username?: string | null;
+  accountCount: number;
+  /** When that account was first seen logging in. */
+  firstLoginAt?: string | number[] | null;
+}
+
 
 // Analysis Types
 export interface AnalysisSummary {
@@ -286,7 +301,10 @@ export type FindingType =
   | 'FAN_OUT'
   | 'LONG_SESSION'
   | 'UNKNOWN_APP'
-  | 'PORT_PROTOCOL_MISMATCH';
+  | 'PORT_PROTOCOL_MISMATCH'
+  | 'COVERAGE_GAP'
+  /** Conversations matched by a detection rule (#925). */
+  | 'DETECTION_RULE';
 
 export type FindingSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -362,6 +380,9 @@ export interface Story {
   aggregates?: StoryAggregates;
   findings?: Finding[];
   investigationSteps?: InvestigationStep[];
+  /** The network whose detection rules the story used (#925); absent for the shared rules only. */
+  networkId?: string | null;
+  networkName?: string | null;
 }
 
 export interface NarrativeSection {
@@ -423,8 +444,9 @@ export type DeviceType =
   | 'DNS_SERVER'
   | 'WEB_SERVER'
   | 'API_SERVER'
+  | 'VIRTUAL_ADDRESS'
   | 'UNKNOWN'
-  | string; // custom override values from YAML
+  | string; // custom values from detection-rule classification hints (#926)
 
 export interface HostClassification {
   ip: string;
@@ -438,7 +460,18 @@ export interface HostClassification {
   loggedInUser?: string;
   /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
   loggedInUserSource?: string;
+  /**
+   * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
+   * 1. With more, show "N accounts" and the host's login timeline rather than picking one.
+   */
+  loggedInUserCount?: number;
   ttl?: number;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  ttls?: number[] | null;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918). */
+  addressKind?: string | null;
+  /** Why this may be more than one machine (#918); absent when nothing conflicts. */
+  identityWarning?: string | null;
   deviceType: DeviceType;
   confidence: number;
   /** Service roles this host was detected serving (e.g. ["dns"]); drives node-modal tabs. */
@@ -475,6 +508,14 @@ export interface HostIdentityEvidence {
   // Hardware facts
   manufacturer?: string | null;
   ttl?: number | null;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  ttls?: number[] | null;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918). */
+  addressKind?: string | null;
+  /** Why this may be more than one machine (#918); absent when nothing conflicts. */
+  identityWarning?: string | null;
+  /** The last time Re-apply re-scored rule votes and changed the device type (#925). */
+  reclassified?: { at: string; from: string; by: string; rules: string } | null;
   // Service facts
   serviceRoles: string[];
   ndpiApps: string[];

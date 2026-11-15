@@ -12,6 +12,11 @@ public interface HostIdentityRepository extends JpaRepository<HostIdentityEntity
 
   List<HostIdentityEntity> findByFileId(UUID fileId);
 
+  /** The identities of just these hosts, e.g. a conversation's two endpoints (#576). */
+  List<HostIdentityEntity> findByFileIdAndIpIn(UUID fileId, java.util.Collection<String> ips);
+
+  boolean existsByFileId(UUID fileId);
+
   /** Bulk delete — re-adjudication regenerates the file's rows. */
   @Modifying
   @Query("DELETE FROM HostIdentityEntity h WHERE h.fileId = :fileId")

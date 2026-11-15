@@ -21,7 +21,11 @@ export function useConversationFilters() {
   // This prevents ConversationPage's useEffect from firing on every render.
   const filters = useMemo(
     (): ConversationFilters => ({
+      // The network context (#925 phase 3): set by the Analysis page's picker or a monitor link.
+      networkId: searchParams.get('networkId') ?? undefined,
       ip: searchParams.get('ip') ?? '',
+      srcIp: searchParams.get('srcIp') ?? '',
+      dstIp: searchParams.get('dstIp') ?? '',
       port: searchParams.get('port') ?? '',
       payloadContains: searchParams.get('payloadContains') ?? '',
       protocols: splitComma(searchParams.get('protocols')),
@@ -47,6 +51,8 @@ export function useConversationFilters() {
     () =>
       [
         filters.ip,
+        // The pair is one filter, however many of its ends are set.
+        Boolean(filters.srcIp || filters.dstIp),
         filters.port,
         filters.payloadContains,
         filters.protocols.length > 0,
@@ -74,6 +80,8 @@ export function useConversationFilters() {
 
           const cur: ConversationFilters = {
             ip: prev.get('ip') ?? '',
+            srcIp: prev.get('srcIp') ?? '',
+            dstIp: prev.get('dstIp') ?? '',
             port: prev.get('port') ?? '',
             payloadContains: prev.get('payloadContains') ?? '',
             protocols: splitComma(prev.get('protocols')),
@@ -102,6 +110,8 @@ export function useConversationFilters() {
           };
 
           set('ip', merged.ip || undefined);
+          set('srcIp', merged.srcIp || undefined);
+          set('dstIp', merged.dstIp || undefined);
           set('port', merged.port || undefined);
           set('payloadContains', merged.payloadContains || undefined);
           set('protocols', joinComma(merged.protocols));

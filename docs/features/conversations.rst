@@ -4,6 +4,37 @@ Conversations
 The Conversations tab lists every network flow (conversation) extracted from
 the PCAP file — one row per unique bidirectional flow.
 
+The List and the Pane
+---------------------
+
+The tab shows a compact list on the left and the selected conversation on the
+right, with no dialog.
+
+- Each row shows the endpoints, the app, whether the conversation is flagged,
+  its size and its start time.
+- **Sort** above the list orders it in capture order, newest first, by most
+  bytes, most packets, longest, or by source or destination address.
+- The first conversation is selected when the list loads. **↑**/**↓** (or
+  **←**/**→**) move through the list, and the selected row stays in view.
+- The right pane holds the conversation's hosts, signals, timing,
+  geolocation, packets and session, with **Trace**, **CSV** and **PCAP**.
+
+Above the list, the quick filters stay in view:
+
+- a search box for an IP address;
+- **All**, which clears every filter;
+- **Flagged**, which shows only conversations with risks, custom-rule matches
+  or IDS alerts;
+- a chip for each of the capture's four busiest apps.
+
+**More filters** opens a drawer on the right with the full set, one section
+per filter, each chip showing how many conversations in the capture carry it: address, port, payload, protocols, apps, categories, file types,
+risk types, rules, IDS alerts, countries and device types. Filters apply as you
+pick them, and the list behind the drawer updates straight away. The button at
+the foot of the drawer says how many conversations match ("Show 7
+conversations") and closes it; **Clear all** resets everything. Escape or the
+× also closes the drawer. The button keeps a count of the active filters.
+
 How Conversations Are Built
 ----------------------------
 
@@ -262,7 +293,7 @@ with AND logic — a conversation must satisfy all active filters to be shown.
      - Individual nDPI risk flag names (e.g. ``clear_text_credentials``,
        ``tls_self_signed_certificate``). Multiple selections are OR-matched.
    * - **Custom Rules** (pills)
-     - Custom detection rule names from ``signatures.yml`` that fired in this
+     - Custom detection rule names (System > Detection rules) that fired in this
        PCAP. Only rules that matched at least one conversation are shown.
        Severity quick-select buttons (critical/high/medium/low) select all
        rules of that severity level at once.

@@ -6,12 +6,14 @@ import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.service.HostnameResolverService;
 import com.tracepcap.analysis.service.PcapParserService;
 import com.tracepcap.analysis.service.WindowsIdentityResolverService.Claim;
+import com.tracepcap.analysis.spi.ClassificationHint;
 import com.tracepcap.analysis.spi.HostClassifier;
 import com.tracepcap.hostclassification.service.classifier.DeviceClassificationSignal;
 import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
 import com.tracepcap.hostclassification.service.classifier.HostContext;
 import com.tracepcap.hostclassification.service.classifier.HostProfile;
 import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
+import com.tracepcap.hostclassification.service.classifier.signals.CustomRuleClassificationSignal;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -38,8 +40,8 @@ import org.springframework.stereotype.Service;
  *       very high peer count → router; limited app variety + low volume → IoT
  * </ol>
  *
- * <p>A YAML {@code device_type} override (set by CustomSignatureService) takes precedence over all
- * heuristics and sets confidence to 100.
+ * <p>Detection rules don't override the result: a rule's classification hint is one more weighted
+ * vote ({@code CustomRuleClassificationSignal}, #926), and a human label wins over the vote.
  */
 @Slf4j
 @Service
@@ -142,7 +144,7 @@ public class DeviceClassifierService implements HostClassifier {
    * @param conversations parsed conversation list
    * @param hostTtls first-seen TTL per source IP
    * @param hostMacs first-seen MAC per source IP
-   * @param deviceOverrides IP → custom device type string set by YAML rules (may be empty)
+   * @param ruleHints IP → detection rules' weighted device-type votes (#926; may be empty)
    * @param hostnames IP → passively-discovered hostname/source (may be empty)
    * @param serviceRolesByIp IP → service roles the host was detected serving, e.g. {@code "dns"}
    *     (may be empty); feeds role-aware signals and is recorded on each host
@@ -152,15 +154,17 @@ public class DeviceClassifierService implements HostClassifier {
    * @return one HostClassificationEntity per unique IP
    */
   @Override
-  public List<HostClassificationEntity> classify(
-      FileEntity file,
-      List<PcapParserService.ConversationInfo> conversations,
-      Map<String, Integer> hostTtls,
-      Map<String, String> hostMacs,
-      Map<String, String> deviceOverrides,
-      Map<String, HostnameResolverService.ResolvedHostname> hostnames,
-      Map<String, Set<String>> serviceRolesByIp,
-      Map<String, List<Claim>> windowsIdentityClaimsByIp) {
+  public List<HostClassificationEntity> classify(HostClassifier.ClassificationRequest request) {
+    java.util.Map<String, Board> boards = request.boardsOut();
+    // Unpacked into the names the body has always used, so this refactor (#421) leaves it untouched.
+    FileEntity file = request.file();
+    List<PcapParserService.ConversationInfo> conversations = request.conversations();
+    Map<String, Integer> hostTtls = request.hostTtls();
+    Map<String, String> hostMacs = request.hostMacs();
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> ruleHints = request.ruleHints();
+    Map<String, HostnameResolverService.ResolvedHostname> hostnames = request.hostnames();
+    Map<String, Set<String>> serviceRolesByIp = request.serviceRolesByIp();
+    Map<String, List<Claim>> windowsIdentityClaimsByIp = request.windowsIdentityClaimsByIp();
 
     // Build per-host profiles from all conversations
     Map<String, HostProfile> profiles = new LinkedHashMap<>();
@@ -181,25 +185,11 @@ public class DeviceClassifierService implements HostClassifier {
       Set<String> roles = serviceRolesByIp.getOrDefault(ip, Set.of());
       List<Claim> windowsIdentityClaims = windowsIdentityClaimsByIp.getOrDefault(ip, List.of());
 
-      // Check YAML device_type override first
-      if (deviceOverrides.containsKey(ip)) {
-        results.add(
-            HostClassificationEntity.builder()
-                .file(file)
-                .ip(ip)
-                .mac(mac)
-                .manufacturer(manufacturer)
-                .ttl(ttl)
-                .deviceType(deviceOverrides.get(ip))
-                .confidence(100)
-                .serviceRoles(joinRoles(roles))
-                .build());
-        continue;
-      }
-
       // Run every registered signal into a shared score board; the highest-scoring type wins.
       HostContext ctx =
-          new HostContext(ip, profile, ttl, mac, manufacturer, ouiHint, null, roles, windowsIdentityClaims);
+          new HostContext(
+              ip, profile, ttl, mac, manufacturer, ouiHint, null, roles, windowsIdentityClaims,
+              ruleHints.getOrDefault(ip, List.of()));
       ScoreBoard board = new ScoreBoard();
       for (DeviceClassificationSignal signal : signals) {
         try {
@@ -230,6 +220,8 @@ public class DeviceClassifierService implements HostClassifier {
               .winnerReasons(joinReasons(board.reasonsFor(deviceType)))
               .runnerUpReasons(runnerUp != null ? joinReasons(board.reasonsFor(runnerUp.getKey())) : null)
               .build());
+      // The whole board and the rule votes in it, so a rule change can be re-scored (#925).
+      boards.put(ip, new Board(board.scores(), board.allReasons(), votingHints(ctx.ruleHints())));
     }
 
     // Attach passively-discovered hostnames (DHCP/mDNS/NBNS/reverse DNS) to matching hosts.
@@ -247,6 +239,33 @@ public class DeviceClassifierService implements HostClassifier {
     return results;
   }
 
+  @Override
+  public java.util.Optional<Verdict> rescoreRuleVotes(Board stored, List<ClassificationHint> votes) {
+    if (stored == null || stored.scores() == null) return java.util.Optional.empty();
+    List<ClassificationHint> oldVotes = stored.ruleVotes() == null ? List.of() : stored.ruleVotes();
+    List<ClassificationHint> newVotes = votingHints(votes);
+    if (new java.util.HashSet<>(oldVotes).equals(new java.util.HashSet<>(newVotes))) return java.util.Optional.empty();
+    ScoreBoard board = ScoreBoard.of(stored.scores(), stored.reasons());
+    for (ClassificationHint h : oldVotes) board.remove(h.deviceType(), h.weight(), CustomRuleClassificationSignal.reason(h));
+    for (ClassificationHint h : newVotes) board.add(h.deviceType(), h.weight(), CustomRuleClassificationSignal.reason(h));
+    String deviceType = board.winner(DeviceTypes.UNKNOWN);
+    java.util.Map.Entry<String, Integer> runnerUp = board.runnerUp();
+    return java.util.Optional.of(
+        new Verdict(
+            deviceType,
+            board.confidence(CONFIDENCE_MARGIN_FOR_FULL),
+            board.scores().get(deviceType),
+            runnerUp != null ? runnerUp.getKey() : null,
+            runnerUp != null ? runnerUp.getValue() : null,
+            joinReasons(board.reasonsFor(deviceType)),
+            runnerUp != null ? joinReasons(board.reasonsFor(runnerUp.getKey())) : null,
+            new Board(board.scores(), board.allReasons(), newVotes)));
+  }
+
+  private static List<ClassificationHint> votingHints(List<ClassificationHint> hints) {
+    return hints == null ? List.of() : hints.stream().filter(CustomRuleClassificationSignal::votes).toList();
+  }
+
   // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
@@ -257,7 +276,8 @@ public class DeviceClassifierService implements HostClassifier {
       PcapParserService.ConversationInfo conv,
       boolean isSrc) {
 
-    if (ip == null) return;
+    // Broadcast, multicast and the unspecified address are destinations, not machines (#918).
+    if (ip == null || !com.tracepcap.common.net.IpLocality.isHostAddress(ip)) return;
     HostProfile p = profiles.computeIfAbsent(ip, k -> new HostProfile());
 
     p.totalBytes += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;

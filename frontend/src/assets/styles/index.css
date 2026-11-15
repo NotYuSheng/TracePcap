@@ -25,13 +25,15 @@
 /* Light mode tokens (default) */
 [data-theme='light'],
 :root {
-  --tp-bg: #f8fafc;
+  --tp-bg: #f0f2f6;
   --tp-bg-subtle: #f8f9fa;
   --tp-surface: #fff;
   --tp-surface-hover: #f8f9fa;
-  --tp-border: #dee2e6;
+  --tp-border: #d5d9e1;
+  /* A card's outline: the same as an SGDS Card's, so custom cards match them. */
+  --tp-card-border: #98a2b3;
   --tp-text: #212529;
-  --tp-text-muted: #6c757d;
+  --tp-text-muted: #525a68;
   --tp-header-bg: #fff;
   --tp-footer-bg: #f8f9fa;
   --tp-scrollbar: #adb5bd;
@@ -44,8 +46,9 @@
   --tp-surface: #1e2130;
   --tp-surface-hover: #252840;
   --tp-border: #2e3349;
+  --tp-card-border: #2e3349;
   --tp-text: #e2e8f0;
-  --tp-text-muted: #8892a4;
+  --tp-text-muted: #a3acbd;
   --tp-header-bg: #13151f;
   --tp-footer-bg: #13151f;
   --tp-scrollbar: #3a4060;
@@ -70,9 +73,17 @@ body {
   flex-direction: column;
 }
 
-/* Container width - consistent with MeetMemo */
+/* One page width for every centred page (home, Monitor, Settings), under the full-width header. */
 .container {
-  max-width: 1200px;
+  max-width: 1280px;
+}
+
+/* The design system's line-height of 2 made text and table rows loose; 1.5 reads better. */
+body {
+  line-height: 1.5;
+}
+.table > :not(caption) > * > * {
+  padding: 0.6rem 0.75rem;
 }
 
 /* Main Layout Styles */
@@ -91,12 +102,40 @@ body {
   z-index: 100;
 }
 
+/* The header runs full width, one slim row, its edge lined up with the rail and the page. */
+.main-navbar {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+.main-navbar-inner {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+.main-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 28px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: inherit !important;
+  text-decoration: none;
+}
+
 .main-content {
   flex: 1;
   padding: 2rem;
 }
 
+/* A page with a section rail runs edge to edge: the rail is flush with the window's left side. */
+.main-content.main-content-flush {
+  padding: 0;
+}
+
 .main-footer {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  font-size: 0.78rem;
   border-top: 1px solid var(--tp-border);
   background-color: var(--tp-footer-bg) !important;
   color: var(--tp-text-muted);
@@ -260,11 +299,15 @@ body {
 /* Page Styles */
 .home-page,
 .upload-page,
-.analysis-page,
 .network-diagram-page,
 .not-found-page {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
+}
+
+.analysis-page {
+  /* Edge to edge: the section rail sits flush against the window's left side. */
+  width: 100%;
 }
 
 @keyframes spin {
@@ -314,4 +357,11 @@ body {
   align-items: center;
   padding-inline: 0.55rem;
   line-height: 1;
+}
+
+/* A table inside a bordered, rounded box: the box draws the bottom edge, so the last row's own
+   bottom border would double it into a thick line. */
+.border > .table > tbody > tr:last-child > *,
+.border > .table > tfoot > tr:last-child > * {
+  border-bottom-width: 0;
 }

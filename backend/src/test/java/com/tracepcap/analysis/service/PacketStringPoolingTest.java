@@ -112,4 +112,32 @@ class PacketStringPoolingTest {
     assertThat(pooled(pool, overflow)).isEqualTo("203.0.113.42");
     assertThat(pool).doesNotContainKey("203.0.113.42");
   }
+
+  /**
+   * The pool stops growing at its cap (#797). Otherwise a capture with millions of distinct
+   * addresses (a spoofed-source flood, an internet-wide scan) would grow one entry per value and
+   * cause the OutOfMemoryError the pool exists to prevent. Past the cap, values already pooled still
+   * deduplicate and new ones are passed through unpooled.
+   */
+  @Test
+  void poolStopsGrowingAtItsCap_butKeepsDeduplicatingWhatItHolds() throws Exception {
+    java.lang.reflect.Field capField = PcapParserService.class.getDeclaredField("MAX_POOL_SIZE");
+    capField.setAccessible(true);
+    int cap = capField.getInt(null);
+    Map<String, String> pool = new HashMap<>();
+    String early = new String("10.0.0.0");
+    pooled(pool, early);
+
+    for (int i = 1; i < cap + 1_000; i++) {
+      pooled(pool, new String("10." + (i >> 16 & 255) + "." + (i >> 8 & 255) + "." + (i & 255)));
+    }
+
+    assertThat(pool).as("never grows past the cap").hasSize(cap);
+    assertThat(pooled(pool, new String("10.0.0.0")))
+        .as("a value pooled before the cap still deduplicates")
+        .isSameAs(early);
+    String unseen = new String("203.0.113.7");
+    assertThat(pooled(pool, unseen)).as("a new value past the cap passes through").isSameAs(unseen);
+    assertThat(pool).hasSize(cap);
+  }
 }

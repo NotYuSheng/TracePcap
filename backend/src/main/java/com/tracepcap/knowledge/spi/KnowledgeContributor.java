@@ -1,6 +1,5 @@
 package com.tracepcap.knowledge.spi;
 
-import java.util.UUID;
 
 /**
  * A knowledge source (blackboard sense): it reads what its own library produced for a capture and
@@ -21,6 +20,10 @@ public interface KnowledgeContributor {
   /** Stable identifier for logging and to attribute the artifacts this source posts. Kebab-case. */
   String name();
 
-  /** Reads this source's output for {@code fileId} and posts artifacts onto {@code board}. */
-  void contribute(UUID fileId, CaseKnowledgeBuilder board);
+  /**
+   * Reads this source's output for {@code context.fileId()} and posts artifacts onto {@code board}.
+   * Read the file's facts through {@code context}, not a lookup of your own: they are loaded once
+   * and shared across every contributor in the assembly (#816).
+   */
+  void contribute(KnowledgeContext context, CaseKnowledgeBuilder board);
 }

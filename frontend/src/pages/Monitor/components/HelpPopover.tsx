@@ -1,5 +1,6 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import type { ReactNode, CSSProperties } from 'react';
-import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Popover } from '@govtechsg/sgds-react';
 
 interface HelpPopoverProps {
   /** DOM id for the popover (also its a11y handle). */
@@ -21,10 +22,9 @@ interface HelpPopoverProps {
  * the network detail page. Factors out the repeated OverlayTrigger boilerplate.
  */
 export const HelpPopover = ({ id, title, children, maxWidth = 380, buttonTitle, buttonStyle }: HelpPopoverProps) => (
-  <OverlayTrigger
+  <EscapableOverlayTrigger
     trigger="click"
     placement="right"
-    rootClose
     overlay={
       <Popover id={id} style={{ maxWidth }}>
         <Popover.Header>{title}</Popover.Header>
@@ -43,5 +43,5 @@ export const HelpPopover = ({ id, title, children, maxWidth = 380, buttonTitle, 
     >
       <i className="bi bi-info-circle"></i>
     </Button>
-  </OverlayTrigger>
+  </EscapableOverlayTrigger>
 );

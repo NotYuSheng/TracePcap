@@ -1,0 +1,32 @@
+.fullscreen-hint {
+  /* Above the CSS-fullscreen graph, which sits at up to 1080 over the snapshot dialog. */
+  z-index: 1090;
+  max-width: 260px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tp-text, #1f2937);
+  background: var(--tp-surface, #ffffff);
+  border: 1px solid #5925dc;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+}
+
+.fullscreen-toggle-pulse {
+  border-radius: 6px;
+  animation: fullscreen-toggle-pulse 1.2s ease-out 3;
+}
+
+@keyframes fullscreen-toggle-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(89, 37, 220, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(89, 37, 220, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fullscreen-toggle-pulse {
+    animation: none;
+    outline: 2px solid #5925dc;
+    outline-offset: 2px;
+  }
+}

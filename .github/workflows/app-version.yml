@@ -1,9 +1,13 @@
 name: Sync App Version
 
-# Keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest
-# dev commit, so a plain `docker compose up -d --build` bakes in a real version
-# with no local setup. Compose only interpolates ${...} from the shell env and .env
-# (which is gitignored), so the value has to live in the compose file itself.
+# Keeps the APP_VERSION file at the repo root pointing at the latest dev commit, so a
+# plain image build bakes in a real version with no local setup (nginx/Dockerfile
+# reads it when no VITE_APP_VERSION build arg is given).
+#
+# It's a file of its own, not a default in docker-compose.yml, on purpose: a bump PR
+# touching docker-compose.yml matched the path filters of five compose workflows, and
+# because this PR merges and deletes its branch within seconds, those runs ended as
+# "failure" with no jobs, five phantom red runs on every merge to dev.
 #
 # main is a protected branch (changes must go through a PR), so this cannot push
 # directly. It opens a bump PR and merges it immediately, retrying while GitHub
@@ -45,38 +49,15 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Rewrite the VITE_APP_VERSION default
-        run: |
-          python3 - "$VERSION" <<'PY'
-          import re, sys
-
-          version = sys.argv[1]
-          path = "docker-compose.yml"
-
-          with open(path) as f:
-              content = f.read()
-
-          pattern = re.compile(r'(VITE_APP_VERSION: \$\{APP_VERSION:-)([^}]*)(\})')
-          if not pattern.search(content):
-              sys.exit("VITE_APP_VERSION default not found in docker-compose.yml — "
-                       "the anchor changed; update app-version.yml to match.")
-
-          updated = pattern.sub(lambda m: m.group(1) + version + m.group(3), content, count=1)
-
-          if updated == content:
-              print("Version already current; nothing to write.")
-          else:
-              with open(path, "w") as f:
-                  f.write(updated)
-              print(f"Wrote VITE_APP_VERSION default: {version}")
-          PY
+      - name: Write the APP_VERSION file
+        run: printf '%s\n' "$VERSION" > APP_VERSION
 
       - name: Open and auto-merge a bump PR if changed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if git diff --quiet docker-compose.yml; then
-            echo "docker-compose.yml already up to date — no PR needed."
+          if git diff --quiet APP_VERSION; then
+            echo "APP_VERSION already up to date — no PR needed."
             exit 0
           fi
 
@@ -88,7 +69,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          git add docker-compose.yml
+          git add APP_VERSION
           git commit -m "chore: sync app version to ${VERSION}"
           git push --force-with-lease origin "$BRANCH"
 
@@ -99,7 +80,7 @@ jobs:
               --base dev \
               --head "$BRANCH" \
               --title "chore: sync app version to ${VERSION}" \
-              --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest dev commit. Opened by .github/workflows/app-version.yml.")
+              --body "Automated: keeps the APP_VERSION file pointing at the latest dev commit. Opened by .github/workflows/app-version.yml.")
           fi
 
           # Step off the bump branch: git refuses to delete a checked-out branch.

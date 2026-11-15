@@ -1,0 +1,183 @@
+/* Story mode, design B: questions, the story as a timeline, Q&A beside it, evidence in tabs. */
+.story-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.story-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.story-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.story-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1199.98px) {
+  .story-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.story-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.story-card {
+  border-radius: 14px;
+}
+
+.story-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.story-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+
+.story-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--tp-text-muted, #525a68);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.story-tab.active {
+  border-bottom-color: #5925dc;
+  color: #3b1891;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .story-tab.active {
+  color: #c9b8ff;
+  border-bottom-color: #a993ff;
+}
+
+.story-tab-count {
+  font-size: 0.7rem;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--tp-bg-subtle, #f3f4f6);
+}
+
+.story-tab-body {
+  padding: 16px;
+}
+
+/* The tab bodies are existing panels that bring their own card; drop the double frame. */
+.story-tab-body > .card {
+  border: 0;
+  box-shadow: none;
+}
+
+.story-tab-body > .card > .card-body {
+  padding: 0;
+}
+
+/* Q&A beside the story: sticky, as tall as the viewport allows, input pinned at the bottom. */
+.story-aside {
+  position: sticky;
+  top: 140px;
+}
+
+.story-chat-panel {
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 170px);
+  min-height: 420px;
+}
+
+.story-chat-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.story-chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.story-chat-empty {
+  flex: 1;
+}
+
+@media (max-width: 1199.98px) {
+  .story-aside {
+    position: static;
+  }
+
+  .story-chat-panel {
+    height: auto;
+    min-height: 0;
+  }
+}
+
+/* Not written yet. */
+.story-start {
+  max-width: 760px;
+  margin: 8px auto 0;
+}
+
+.story-start-card {
+  border-radius: 14px;
+}
+
+.story-start-card .card-body {
+  padding: 26px 28px;
+}
+
+.story-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: var(--tp-bg-subtle, #f3f4f6);
+  color: var(--tp-text-muted, #525a68);
+}
+
+.story-start-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 10px 0 6px;
+}
+
+.story-pill-writing {
+  background: #ede9fe;
+  color: #3b1891;
+}
+
+[data-theme='dark'] .story-pill-writing {
+  background: rgb(155 125 255 / 18%);
+  color: #c9b8ff;
+}

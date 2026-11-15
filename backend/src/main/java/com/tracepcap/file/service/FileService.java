@@ -20,12 +20,29 @@ public interface FileService {
    * @param file the multipart file
    * @return upload response with file metadata
    */
+  default FileUploadResponse uploadFile(
+      MultipartFile file,
+      boolean enableNdpi,
+      boolean enableSuricata,
+      boolean enableFileExtraction,
+      FileSource source) {
+    return uploadFile(file, enableNdpi, enableSuricata, enableFileExtraction, source, false, false);
+  }
+
+  /**
+   * Upload a PCAP file with the upload-time options.
+   *
+   * @param generateStory write the story in the background when analysis completes
+   * @param keepForever skip the retention cleanup: kept until someone deletes it
+   */
   FileUploadResponse uploadFile(
       MultipartFile file,
       boolean enableNdpi,
       boolean enableSuricata,
       boolean enableFileExtraction,
-      FileSource source);
+      FileSource source,
+      boolean generateStory,
+      boolean keepForever);
 
   /**
    * Get file metadata by ID
@@ -35,6 +52,12 @@ public interface FileService {
    */
   FileMetadataDto getFileMetadata(UUID fileId);
 
+  /** Re-analyses a capture with other options, as a new version (#915 phase 3). */
+  FileUploadResponse reanalyse(UUID fileId, boolean enableNdpi, boolean enableSuricata, boolean enableFileExtraction);
+
+  /** A capture and its versions, the original first (#915 phase 3). */
+  java.util.List<FileMetadataDto> versions(UUID fileId);
+
   /**
    * Get all files with pagination
    *
@@ -42,6 +65,9 @@ public interface FileService {
    * @return page of file metadata
    */
   Page<FileMetadataDto> getAllFiles(Pageable pageable, FileSource source);
+
+  /** The captures list, narrowed by {@link FileListFilter}. */
+  Page<FileMetadataDto> getAllFiles(Pageable pageable, com.tracepcap.file.repository.FileListFilter filter);
 
   /**
    * Download a file

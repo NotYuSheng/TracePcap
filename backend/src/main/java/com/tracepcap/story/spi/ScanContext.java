@@ -47,4 +47,12 @@ public interface ScanContext {
    * conversation" has one answer across the suite instead of one per scanner.
    */
   List<ConversationFacts> tlsConversations();
+
+  /**
+   * The network the capture is viewed in (#925), or null for the shared rules only. Scanners that
+   * read detection-rule matches use it to include the network's own rules.
+   */
+  default UUID networkId() {
+    return null;
+  }
 }

@@ -1,18 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation, HostClassification } from '@/types';
-import type { SortField } from '@/features/conversation/types';
-import {
-  loadVisibleColumns,
-  defaultVisibleColumns,
-  COLUMN_STORAGE_KEY,
-} from '@/features/conversation/constants';
-import type { ColumnKey } from '@/features/conversation/constants';
+import type { ConversationFacetCounts, SortField } from '@/features/conversation/types';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { clusterApi } from '@/features/cluster/services/clusterApi';
-import { ConversationList } from '@components/conversation/ConversationList';
+import { ConversationListCompact } from '@components/conversation/ConversationListCompact';
+import './ConversationPage.css';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
 import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
 import { ConversationFilterPanel } from '@components/conversation/ConversationFilterPanel';
@@ -50,27 +45,12 @@ export const ConversationPage = () => {
   const [customSignatureOptions, setCustomSignatureOptions] = useState<string[]>([]);
   const [suricataAlertOptions, setSuricataAlertOptions] = useState<string[]>([]);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
+  const [facetCounts, setFacetCounts] = useState<ConversationFacetCounts | null>(null);
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
+  const [signatureScopes, setSignatureScopes] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
-  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
   const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
   const [highlightPacket, setHighlightPacket] = useState<number | null>(null);
-
-  const toggleColumn = useCallback((key: ColumnKey) => {
-    setVisibleColumns(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }, []);
-
-  // Restore the default visible-column set, clearing any stored override.
-  const resetColumns = useCallback(() => {
-    localStorage.removeItem(COLUMN_STORAGE_KEY);
-    setVisibleColumns(defaultVisibleColumns());
-  }, []);
 
   // Fetch available file types and risk types once per file
   useEffect(() => {
@@ -78,7 +58,7 @@ export const ConversationPage = () => {
     conversationService.getFileTypes(fileId).then(setFileTypeOptions).catch(console.error);
     conversationService.getRiskTypes(fileId).then(setRiskTypeOptions).catch(console.error);
     conversationService
-      .getCustomSignatures(fileId)
+      .getCustomSignatures(fileId, filters.networkId)
       .then(setCustomSignatureOptions)
       .catch(console.error);
     // Clear first so stale options from the previous file aren't shown while/if the fetch fails.
@@ -91,13 +71,16 @@ export const ConversationPage = () => {
         setSuricataAlertOptions([]);
       });
     conversationService
-      .getSignatureRules()
+      .getSignatureRules(fileId, filters.networkId)
       .then(rules => {
         const map: Record<string, string> = {};
+        const scopes: Record<string, string> = {};
         rules.forEach(r => {
           map[r.name] = r.severity;
+          scopes[r.name] = r.scope;
         });
         setSignatureSeverities(map);
+        setSignatureScopes(scopes);
       })
       .catch(console.error);
     conversationService
@@ -105,7 +88,8 @@ export const ConversationPage = () => {
       .then(list => setHostClassMap(new Map(list.map(c => [c.ip, c]))))
       .catch(console.error);
     conversationService.getCountries(fileId).then(setCountryOptions).catch(console.error);
-  }, [fileId]);
+    conversationService.getFacetCounts(fileId).then(setFacetCounts).catch(console.error);
+  }, [fileId, filters.networkId]);
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
   useEffect(() => {
@@ -137,7 +121,7 @@ export const ConversationPage = () => {
     setSearchParams(next, { replace: true });
     setDetailLoading(true);
     conversationService
-      .getConversationDetail(highlightId)
+      .getConversationDetail(highlightId, filters.networkId)
       .then(conv => {
         setSelectedConversation(conv);
         setSelectedIndex(-1);
@@ -161,7 +145,7 @@ export const ConversationPage = () => {
       .getPacketLocation(fileId, frame)
       .then(loc => {
         if (!loc) return undefined;
-        return conversationService.getConversationDetail(loc.conversationId).then(conv => {
+        return conversationService.getConversationDetail(loc.conversationId, filters.networkId).then(conv => {
           setSelectedConversation(conv);
           setSelectedIndex(-1);
           setHighlightPacket(frame);
@@ -204,7 +188,7 @@ export const ConversationPage = () => {
       if (conversation.packets && conversation.packets.length > 0) {
         setSelectedConversation(conversation);
       } else {
-        const full = await conversationService.getConversationDetail(conversation.id);
+        const full = await conversationService.getConversationDetail(conversation.id, filters.networkId);
         setSelectedConversation(full);
       }
     } catch (err) {
@@ -213,12 +197,25 @@ export const ConversationPage = () => {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [filters.networkId]);
 
-  const closeModal = useCallback(() => {
-    setSelectedConversation(null);
-    setHighlightPacket(null);
-  }, []);
+  // List and detail: something is always shown. Pick the first conversation when nothing (or a
+  // conversation no longer on this page) is selected, and keep the selected row in view.
+  useEffect(() => {
+    if (conversations.length === 0) return;
+    if (!selectedConversation || !conversations.some(c => c.id === selectedConversation.id)) {
+      if (selectedIndex === -1 && selectedConversation) return; // a deep link, kept as is
+      openConversation(conversations[0], 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations]);
+  useEffect(() => {
+    if (!selectedConversation) return;
+    document
+      .querySelector(`[data-conversation-id="${selectedConversation.id}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [selectedConversation]);
+
 
   const exportConversationCsv = useCallback((conversation: Conversation) => {
     const hexToAscii = (hex: string) => {
@@ -308,32 +305,19 @@ export const ConversationPage = () => {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!selectedConversation) return;
-      if (e.key === 'ArrowLeft') handlePrev();
-      if (e.key === 'ArrowRight') handleNext();
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+      const fwd = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+      if (back || fwd) e.preventDefault();
+      if (back) handlePrev();
+      if (fwd) handleNext();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [selectedConversation, handlePrev, handleNext]);
 
-  useEffect(() => {
-    document.body.style.overflow = selectedConversation ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [selectedConversation]);
 
-  // Sort: cycle empty → asc → desc → empty
-  const handleSort = (field: SortField) => {
-    if (!field) {
-      setFilters({ sortBy: '', sortDir: 'asc' });
-    } else if (filters.sortBy !== field) {
-      setFilters({ sortBy: field, sortDir: 'asc' });
-    } else if (filters.sortDir === 'asc') {
-      setFilters({ sortBy: field, sortDir: 'desc' });
-    } else {
-      setFilters({ sortBy: '', sortDir: 'asc' });
-    }
-  };
 
   // Filter options from the already-loaded analysis summary
   const protocolOptions = (data.protocolDistribution ?? []).map(p => ({
@@ -342,7 +326,13 @@ export const ConversationPage = () => {
   }));
   const appOptions = (data.detectedApplications ?? []).map(a => ({ name: a.name }));
   const categoryOptions = (data.categoryDistribution ?? []).map(c => ({ category: c.category }));
-  const presentDeviceTypes = [...new Set(Array.from(hostClassMap.values()).map(h => h.deviceType).filter(Boolean))];
+  const presentDeviceTypes = [
+    ...new Set(
+      Array.from(hostClassMap.values())
+        .map(h => h.deviceType)
+        .filter(Boolean)
+    ),
+  ];
 
   // CSV export URL
   const exportUrl = conversationService.getExportUrl(fileId, filters);
@@ -368,7 +358,7 @@ export const ConversationPage = () => {
                 ({totalItems.toLocaleString()})
               </span>
             </h4>
-            <div className="d-flex gap-2">
+            <div className="d-flex gap-2 align-items-center">
               <a
                 href={exportUrl}
                 download={exportFilename}
@@ -405,54 +395,56 @@ export const ConversationPage = () => {
             customSignatureOptions={customSignatureOptions}
             suricataAlertOptions={suricataAlertOptions}
             signatureSeverities={signatureSeverities}
+            signatureScopes={signatureScopes}
             countryOptions={countryOptions}
             presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
-            visibleColumns={visibleColumns}
-            onToggleColumn={toggleColumn}
-            onResetColumns={resetColumns}
+            matchCount={totalItems}
+            facetCounts={facetCounts}
           />
         </div>
       </div>
 
-      <div className="row">
-        <div className="col-12">
-          <Card style={{ overflow: 'hidden' }}>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <h6 className="mb-0">Conversations</h6>
-              <small className="text-muted">Click a row to view details</small>
-            </Card.Header>
-            <Card.Body className="p-0" style={{ position: 'relative' }}>
+        <div className="conv-split">
+          <section className="conv-list-card" aria-label="Conversation list">
+            <div className="conv-list-head">
+              <Form.Label htmlFor="conv-sort" className="mb-0 small text-muted">
+                Sort
+              </Form.Label>
+              <Form.Select
+                id="conv-sort"
+                size="sm"
+                className="conv-sort"
+                value={`${filters.sortBy}:${filters.sortDir}`}
+                onChange={e => {
+                  const [sortBy, sortDir] = e.target.value.split(':') as [SortField, 'asc' | 'desc'];
+                  setFilters({ sortBy, sortDir, page: 1 });
+                }}
+              >
+                <option value=":asc">In capture order</option>
+                <option value="startTime:desc">Newest first</option>
+                <option value="bytes:desc">Most bytes</option>
+                <option value="packets:desc">Most packets</option>
+                <option value="duration:desc">Longest</option>
+                <option value="srcIp:asc">Source address</option>
+                <option value="dstIp:asc">Destination address</option>
+              </Form.Select>
+            </div>
+            <div className="conv-list-scroll" style={{ opacity: loading ? 0.4 : 1 }}>
               {loading && conversations.length === 0 && (
                 <LoadingSpinner size="medium" message="Loading conversations..." />
               )}
-              {conversations.length > 0 && (
-                <div
-                  style={{
-                    opacity: loading ? 0.4 : 1,
-                    pointerEvents: loading ? 'none' : 'auto',
-                    transition: 'opacity 0.15s',
-                  }}
-                >
-                  <ConversationList
-                    conversations={conversations}
-                    onSelectConversation={c => {
-                      const idx = conversations.findIndex(x => x.id === c.id);
-                      openConversation(c, idx);
-                    }}
-                    sortBy={filters.sortBy}
-                    sortDir={filters.sortDir}
-                    onSort={handleSort}
-                    onRiskFilterClick={() => setFilters({ hasRisks: true })}
-                    visibleColumns={visibleColumns}
-                    signatureSeverities={signatureSeverities}
-                    hostClassMap={hostClassMap}
-                  />
-                </div>
+              {!loading && conversations.length === 0 && (
+                <p className="text-muted small p-3 mb-0">No conversations match these filters.</p>
               )}
-            </Card.Body>
+              <ConversationListCompact
+                conversations={conversations}
+                selectedId={selectedConversation?.id ?? null}
+                onSelect={(c, i) => openConversation(c, i)}
+              />
+            </div>
             {totalPages > 1 && (
-              <Card.Footer>
+              <div className="conv-list-foot">
                 <Pagination
                   currentPage={filters.page}
                   totalPages={totalPages}
@@ -462,41 +454,15 @@ export const ConversationPage = () => {
                   showPageSizeSelector
                   onPageSizeChange={pageSize => setFilters({ pageSize, page: 1 })}
                 />
-              </Card.Footer>
+              </div>
             )}
-          </Card>
-        </div>
-      </div>
-
-      {/* Conversation detail modal */}
-      <Modal show={!!selectedConversation} onHide={closeModal} size="xl" centered scrollable>
-        <Modal.Header closeButton>
-          <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-            <Button
-              size="sm"
-              variant="outline-secondary"
-              onClick={handlePrev}
-              disabled={selectedIndex <= 0}
-              title="Previous conversation"
-            >
-              ‹ Prev
-            </Button>
-            <Modal.Title className="text-truncate mb-0 font-monospace small" as="h5">
-              {modalTitle}
-            </Modal.Title>
-            <Button
-              size="sm"
-              variant="outline-secondary"
-              onClick={handleNext}
-              disabled={selectedIndex >= conversations.length - 1}
-              title="Next conversation"
-            >
-              Next ›
-            </Button>
-            <span className="text-muted small text-nowrap">
-              {selectedIndex + 1} / {conversations.length}
-            </span>
-          </div>
+          </section>
+          <section className="conv-pane" aria-label="Conversation detail">
+            {selectedConversation ? (
+              <>
+                <div className="conv-pane-head">
+                  <h2 className="conv-pane-title">{modalTitle}</h2>
+                  <div className="conv-pane-actions">
           <Button
             type="button"
             size="sm"
@@ -531,8 +497,9 @@ export const ConversationPage = () => {
               <i className="bi bi-download me-1"></i>PCAP
             </a>
           )}
-        </Modal.Header>
-        <Modal.Body>
+                  </div>
+                </div>
+                <div className="conv-pane-body">
           {detailLoading ? (
             <LoadingSpinner size="medium" message="Loading conversation..." />
           ) : (
@@ -540,14 +507,21 @@ export const ConversationPage = () => {
               <ConversationDetail
                 conversation={selectedConversation}
                 signatureSeverities={signatureSeverities}
+                signatureScopes={signatureScopes}
                 hostClassMap={hostClassMap}
                 fileId={fileId}
                 highlightPacketNumber={highlightPacket}
+                bare
               />
             )
           )}
-        </Modal.Body>
-      </Modal>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted small p-4 mb-0">Pick a conversation on the left to see it here.</p>
+            )}
+          </section>
+        </div>
 
       {/* Conversation Tracer modal */}
       {tracerConversationId && (

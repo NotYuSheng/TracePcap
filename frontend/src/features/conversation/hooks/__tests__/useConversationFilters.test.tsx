@@ -120,4 +120,22 @@ describe('useConversationFilters', () => {
     expect(result.current.location.search).toBe('')
     expect(result.current.activeFilterCount).toBe(0)
   })
+
+  it('reads an exact src → dst pair from the URL and counts it as one filter (#471)', () => {
+    const { result } = renderFilters('?srcIp=10.0.0.1&dstIp=8.8.8.8&suricataAlerts=ET%20SCAN')
+
+    expect(result.current.filters.srcIp).toBe('10.0.0.1')
+    expect(result.current.filters.dstIp).toBe('8.8.8.8')
+    // The pair plus the alert: two filters, not three.
+    expect(result.current.activeFilterCount).toBe(2)
+  })
+
+  it('removing the pair drops both params from the URL', () => {
+    const { result } = renderFilters('?srcIp=10.0.0.1&dstIp=8.8.8.8')
+
+    act(() => result.current.setFilters({ srcIp: '', dstIp: '' }))
+
+    expect(result.current.location.search).not.toContain('srcIp')
+    expect(result.current.location.search).not.toContain('dstIp')
+  })
 })

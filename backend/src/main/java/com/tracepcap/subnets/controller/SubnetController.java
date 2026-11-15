@@ -42,25 +42,30 @@ public class SubnetController {
   }
 
   @GetMapping
-  @Operation(summary = "List defined subnets")
-  public ResponseEntity<List<SubnetDefinitionDto>> list() {
-    return ResponseEntity.ok(subnetService.list());
+  @Operation(
+      summary = "List defined subnets",
+      description =
+          "Without networkId, the shared default. With networkId, the subnets in effect in that"
+              + " network (its own entries layered on the default, #915 phase 4), with staleness"
+              + " against that network's snapshots.")
+  public ResponseEntity<List<SubnetDefinitionDto>> list(@RequestParam(required = false) UUID networkId) {
+    return ResponseEntity.ok(subnetService.list(networkId));
   }
 
   @PostMapping
-  @Operation(summary = "Create or update a subnet definition")
+  @Operation(summary = "Create or update a subnet in the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<SubnetDefinitionDto> upsert(@RequestBody UpsertSubnetRequest req) {
     return ResponseEntity.ok(subnetService.upsert(req));
   }
 
   @PostMapping("/detected")
-  @Operation(summary = "Persist an auto-detected subnet")
+  @Operation(summary = "Persist an auto-detected subnet in the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<SubnetDefinitionDto> saveDetected(@RequestBody UpsertSubnetRequest req) {
     return ResponseEntity.ok(subnetService.saveDetected(req));
   }
 
   @DeleteMapping("/{id}")
-  @Operation(summary = "Delete a subnet definition")
+  @Operation(summary = "Delete a subnet from the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     subnetService.delete(id);
     return ResponseEntity.noContent().build();
@@ -107,7 +112,7 @@ public class SubnetController {
       @PathVariable Long id, @RequestParam UUID networkId) {
     return subnetService
         .find(id)
-        .map(s -> ResponseEntity.ok(subnetStalenessService.history(s.getCidr(), networkId)))
+        .map(s -> ResponseEntity.ok(subnetStalenessService.history(s.getCidr(), s.getSegmentKey(), networkId)))
         .orElseThrow(
             () ->
                 new com.tracepcap.common.exception.ResourceNotFoundException(

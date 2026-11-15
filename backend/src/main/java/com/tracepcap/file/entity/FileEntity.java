@@ -36,7 +36,8 @@ public class FileEntity {
   @Column(name = "minio_path", nullable = false, length = 512)
   private String minioPath;
 
-  @Column(name = "file_hash", length = 64)
+  // Unique (V44 uq_files_file_hash): one stored capture per content hash. NULL is allowed, and repeatable.
+  @Column(name = "file_hash", length = 64, unique = true)
   private String fileHash;
 
   @Builder.Default
@@ -55,6 +56,29 @@ public class FileEntity {
   @Builder.Default
   @Column(name = "enable_file_extraction", nullable = false)
   private boolean enableFileExtraction = true;
+
+  public static final String STORY_QUEUED = "QUEUED";
+  public static final String STORY_WRITING = "WRITING";
+  public static final String STORY_READY = "READY";
+  public static final String STORY_FAILED = "FAILED";
+
+  /** Write the story in the background once analysis completes (an upload option). */
+  @Builder.Default
+  @Column(name = "generate_story", nullable = false)
+  private boolean generateStory = false;
+
+  /** How far the background story got: null when none was asked for, else one of STORY_*. */
+  @Column(name = "story_status", length = 20)
+  private String storyStatus;
+
+  /** Opted out of the retention cleanup at upload: kept until someone deletes it. */
+  @Builder.Default
+  @Column(name = "keep_forever", nullable = false)
+  private boolean keepForever = false;
+
+  /** Why the background story failed, when it did. */
+  @Column(name = "story_error", columnDefinition = "text")
+  private String storyError;
 
   /**
    * Comma-separated conversation IDs whose raw stream hit the per-stream match cap during
@@ -84,6 +108,15 @@ public class FileEntity {
    */
   @Column(name = "packets_pruned_at")
   private LocalDateTime packetsPrunedAt;
+
+  /** The capture this is a re-analysis of (#915 phase 3); null for an upload. */
+  @Column(name = "derived_from")
+  private UUID derivedFrom;
+
+  /** A re-analysis version rather than an upload (#915 phase 3). */
+  @Column(name = "is_version", nullable = false)
+  @Builder.Default
+  private boolean isVersion = false;
 
   @Column(name = "status", nullable = false, length = 50)
   @Enumerated(EnumType.STRING)

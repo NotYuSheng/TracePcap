@@ -828,7 +828,8 @@ public class ChangeDetectionService {
    * overrides so force-public rules apply regardless of snapshot scope.
    */
   /**
-   * Locality for a snapshot: the operator's global configuration, plus this snapshot's own subnet
+   * Locality for a snapshot: its network's configuration (the default with the network's own
+   * entries layered on, #915 phase 4), plus this snapshot's own subnet
    * definitions as extra internal ranges (#733).
    *
    * <p>The override precedence used to live here and nowhere else, which is why a range declared
@@ -837,7 +838,9 @@ public class ChangeDetectionService {
    * are genuinely local to the monitor, are still assembled here.
    */
   private LocalityRules effectiveCidrs(NetworkSnapshotEntity snapshot) {
-    List<CustomPrivateRangeEntity> global = customPrivateRangeService.loadRanges();
+    // The snapshot's network's ranges: its own entries layered on the default (#915 phase 4).
+    UUID networkId = snapshot != null ? snapshotNetworkId(snapshot) : null;
+    List<CustomPrivateRangeEntity> ranges = customPrivateRangeService.loadRanges(networkId);
     if (snapshot != null) {
       List<SnapshotSubnetOverrideEntity> overrides =
           snapshotSubnetOverrideRepository.findBySnapshotId(snapshot.getId());
@@ -846,16 +849,21 @@ public class ChangeDetectionService {
             overrides.stream()
                 .map(SnapshotSubnetOverrideEntity::getCidr)
                 .collect(Collectors.toList());
-        return localityPolicy.currentRules(ip -> customPrivateRangeService.isInCidrs(ip, snapshotCidrs));
+        return localityPolicy.currentRules(networkId, ip -> customPrivateRangeService.isInCidrs(ip, snapshotCidrs));
       }
     }
-    List<String> globalPrivateCidrs =
-        global.stream()
+    List<String> privateCidrs =
+        ranges.stream()
             .filter(e -> e.getClassification() == IpClassification.PRIVATE)
             .map(CustomPrivateRangeEntity::getCidr)
             .collect(Collectors.toList());
     return localityPolicy.currentRules(
-        ip -> customPrivateRangeService.isInCidrs(ip, globalPrivateCidrs));
+        networkId, ip -> customPrivateRangeService.isInCidrs(ip, privateCidrs));
+  }
+
+  /** The snapshot's network id, without initialising a lazy proxy. */
+  private static UUID snapshotNetworkId(NetworkSnapshotEntity snapshot) {
+    return snapshot.getNetwork() == null ? null : snapshot.getNetwork().getId();
   }
 
   private static String orEmpty(String s) {

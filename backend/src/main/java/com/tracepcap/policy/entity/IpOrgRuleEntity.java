@@ -2,6 +2,7 @@ package com.tracepcap.policy.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -37,4 +38,13 @@ public class IpOrgRuleEntity {
 
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
+
+  /** Null for the shared default; set for a network's own entry (#915 phase 4). */
+  @Column(name = "network_id")
+  private UUID networkId;
+
+  /** A network entry that hides the default's entry for this CIDR in that network. */
+  @Column(nullable = false)
+  @Builder.Default
+  private boolean hidden = false;
 }

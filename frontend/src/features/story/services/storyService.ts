@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { Answer, InvestigationReport, Story } from '@/types';
 
 /** Goal → the standard-question key the panel already has a label and icon for. */
-const GOAL_QUESTION: Record<string, string> = {
+export const GOAL_QUESTION: Record<string, string> = {
   VICTIM: 'victim',
   USER: 'signed-in-user',
   MALWARE: 'malware',
@@ -11,7 +11,7 @@ const GOAL_QUESTION: Record<string, string> = {
 };
 
 /** Answers that indicate an incident (as opposed to context such as who is signed in). */
-const INCIDENT_QUESTIONS = new Set(['victim', 'c2', 'malware']);
+export const INCIDENT_QUESTIONS = new Set(['victim', 'c2', 'malware']);
 
 /** What the Investigation Summary renders: the conclusions, and the goals still unknown. */
 export interface InvestigationSummary {
@@ -61,6 +61,12 @@ export const storyService = {
     return investigationToSummary(response.data);
   },
 
+  /** The investigation as reported: every standing goal with its outcome, answered or not. */
+  getInvestigationReport: async (fileId: string): Promise<InvestigationReport> => {
+    const response = await apiClient.get<InvestigationReport>(API_ENDPOINTS.INVESTIGATION(fileId));
+    return response.data;
+  },
+
   /**
    * Generate a story/narrative for a PCAP file
    */
@@ -70,13 +76,16 @@ export const storyService = {
     timeoutMs?: number,
     customPrompt?: string,
     maxFindings?: number,
-    maxRiskMatrix?: number
+    maxRiskMatrix?: number,
+    /** The "Viewing with" network (#925): the story uses its detection rules too. */
+    networkId?: string
   ): Promise<Story> => {
     const body: Record<string, string | number> = { fileId };
     if (additionalContext?.trim()) body.additionalContext = additionalContext.trim();
     if (customPrompt?.trim()) body.customPrompt = customPrompt.trim();
     if (maxFindings !== undefined) body.maxFindings = maxFindings;
     if (maxRiskMatrix !== undefined) body.maxRiskMatrix = maxRiskMatrix;
+    if (networkId) body.networkId = networkId;
     const response = await apiClient.post<Story>(API_ENDPOINTS.STORIES, body, {
       ...(timeoutMs !== undefined && { timeout: timeoutMs + 10000 }),
     });

@@ -28,7 +28,7 @@ public class CustomPrivateRangeController {
   }
 
   @PostMapping
-  @Operation(summary = "Add a custom private range")
+  @Operation(summary = "Set a custom private range in the shared default", description = "Adds it, or changes the classification of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<?> create(@RequestBody CustomPrivateRangeDto dto) {
     if (dto.getCidr() == null || dto.getCidr().isBlank()) {
       return ResponseEntity.badRequest().body("IP address or CIDR is required");
@@ -43,7 +43,7 @@ public class CustomPrivateRangeController {
   }
 
   @DeleteMapping("/{id}")
-  @Operation(summary = "Delete a custom private range")
+  @Operation(summary = "Delete a custom private range from the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     service.delete(id);
     return ResponseEntity.noContent().build();

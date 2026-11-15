@@ -202,7 +202,7 @@ public class FilterService {
             "Failed to generate valid filter after {} attempts. Last error: {}",
             MAX_GENERATION_RETRIES,
             lastValidationError);
-        throw new RuntimeException(
+        throw new LlmException(
             String.format(
                 "LLM was unable to generate a valid display filter after %d attempts. "
                     + "Last validation error: %s. Please try rephrasing your query or use a more specific request.",

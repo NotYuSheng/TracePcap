@@ -199,8 +199,8 @@ annotations get their authority at Adjudicate (ranked first), and ``confirmedByH
 the **only** kind that feeds back into scanning at full weight.
 
 New annotation surfaces must reuse this shape. Where they have not, the cost is visible: device
-classification has no override path at all while ``signatures.yml`` carries a separate,
-incompatible one (#506).
+classification has no override path at all while custom detection rules (``device_type``) carry a
+separate, incompatible one (#506).
 
 
 A worked example
@@ -307,7 +307,7 @@ Twenty backend modules under ``com.tracepcap``, placed by centre of gravity. Tie
    * - Scan
      - ``signatures``
      - D + H
-     - User-authored rules (``signatures.yml``) — a data-driven scanner: plugin surface without
+     - User-authored rules (``detection_rules``) — a data-driven scanner: plugin surface without
        code.
    * - Scan
      - ``reconciliation``

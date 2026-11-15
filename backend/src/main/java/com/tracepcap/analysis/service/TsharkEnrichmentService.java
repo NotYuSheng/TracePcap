@@ -84,6 +84,27 @@ public class TsharkEnrichmentService implements Extractor {
     return Outcome.completed("tshark enrichment ran");
   }
 
+  /**
+   * The tshark pass needs only the file, so it runs before the pipeline's transaction (#409). The
+   * nDPI dependency noted on {@link #order()} is in the apply half, which still runs after nDPI's.
+   */
+  @Override
+  public Prepared prepare(ExtractionTarget target) {
+    TsharkPass pass = new TsharkPass();
+    runTshark(target.capture(), pass.flowFreq, pass.ipPairFreq, pass.userAgentMap);
+    return conversations -> {
+      applyPass(pass, conversations);
+      return Outcome.completed("tshark enrichment ran");
+    };
+  }
+
+  /** The output of one tshark pass, held between {@link #prepare} and its apply. */
+  private static final class TsharkPass {
+    final Map<String, Map<String, Integer>> flowFreq = new HashMap<>();
+    final Map<String, Map<String, Integer>> ipPairFreq = new HashMap<>();
+    final Map<String, Set<String>> userAgentMap = new HashMap<>();
+  }
+
   private static final String TSHARK_BINARY = "tshark";
 
   /** Normalise IANA keyword names to match what tshark/nDPI emit. */
@@ -129,12 +150,17 @@ public class TsharkEnrichmentService implements Extractor {
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
+    TsharkPass pass = new TsharkPass();
+    runTshark(pcapFile, pass.flowFreq, pass.ipPairFreq, pass.userAgentMap);
+    applyPass(pass, conversations);
+  }
 
-    Map<String, Map<String, Integer>> flowFreq = new HashMap<>();
-    Map<String, Map<String, Integer>> ipPairFreq = new HashMap<>();
-    Map<String, Set<String>> userAgentMap = new HashMap<>();
-
-    runTshark(pcapFile, flowFreq, ipPairFreq, userAgentMap);
+  /** Maps one tshark pass onto conversations. Shared by {@link #enrich} and {@link #prepare}. */
+  private void applyPass(TsharkPass pass, List<PcapParserService.ConversationInfo> conversations) {
+    if (conversations.isEmpty()) return;
+    Map<String, Map<String, Integer>> flowFreq = pass.flowFreq;
+    Map<String, Map<String, Integer>> ipPairFreq = pass.ipPairFreq;
+    Map<String, Set<String>> userAgentMap = pass.userAgentMap;
 
     int protoEnriched = 0;
     int uaEnriched = 0;

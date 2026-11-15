@@ -15,4 +15,9 @@ public class UpsertSubnetRequest {
    * composition baseline is captured from this network's latest snapshot for staleness detection.
    */
   private UUID networkId;
+  /** On a network's entry (#915 phase 4): hide the default's subnet for this CIDR in the network. */
+  private boolean hidden;
+  /** On a network's entry (#462): which of several networks sharing the range it's for. */
+  private String segmentKey;
+  private String segmentLabel;
 }

@@ -12,6 +12,26 @@ import org.springframework.stereotype.Repository;
 public interface PacketRepository extends JpaRepository<PacketEntity, UUID> {
   List<PacketEntity> findByConversationIdOrderByPacketNumberAsc(UUID conversationId);
 
+  /**
+   * Packets {@code from}..{@code to} (frame numbers, inclusive) of a file, headers only, in capture
+   * order: one page of the packet replay. Frame numbers run 1..N with no gaps, so a page is a range
+   * scan of the (file_id, packet_number) index, however deep it is.
+   */
+  @Query(
+      "SELECT new com.tracepcap.analysis.dto.replay.ReplayPacket(p.packetNumber, p.timestamp,"
+          + " p.srcIp, p.srcPort, p.dstIp, p.dstPort, p.protocol, p.packetSize, p.conversation.id, p.info)"
+          + " FROM PacketEntity p WHERE p.file.id = :fileId AND p.packetNumber BETWEEN :from AND :to"
+          + " ORDER BY p.packetNumber ASC")
+  List<com.tracepcap.analysis.dto.replay.ReplayPacket> findReplayPage(
+      @Param("fileId") UUID fileId, @Param("from") long from, @Param("to") long to);
+
+  long countByFile_Id(UUID fileId);
+
+  /** The first frame captured at or after {@code at}: where a replay that seeks to that time starts. */
+  @Query(
+      "SELECT MIN(p.packetNumber) FROM PacketEntity p WHERE p.file.id = :fileId AND p.timestamp >= :at")
+  Long findFirstPacketNumberAtOrAfter(@Param("fileId") UUID fileId, @Param("at") java.time.LocalDateTime at);
+
   /** Locates a packet by its frame number within a file (packetNumber == tshark frame.number). */
   java.util.Optional<PacketEntity> findFirstByFile_IdAndPacketNumber(UUID fileId, Long packetNumber);
 

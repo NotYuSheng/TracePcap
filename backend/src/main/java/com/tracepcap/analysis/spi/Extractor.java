@@ -1,5 +1,8 @@
 package com.tracepcap.analysis.spi;
 
+import com.tracepcap.analysis.service.PcapParserService;
+import java.util.List;
+
 import com.tracepcap.common.stage.Tier;
 
 /**
@@ -84,6 +87,37 @@ public interface Extractor {
    * for the file.
    */
   Outcome extract(ExtractionTarget target);
+
+  /**
+   * Optional first phase: the slow work that needs only the capture file, run before the pipeline
+   * opens its database transaction (#409).
+   *
+   * <p>Most of an analysis is external tools reading the capture (Suricata alone is about 90% of a
+   * run). None of that needs the database. Until this phase existed, all of it ran inside the
+   * pipeline transaction, holding a pooled connection open and idle the whole time. An extractor
+   * that splits into "run the tool on the file" and "map the output onto conversations" does the
+   * first half here and returns the second half as a {@link Prepared}. The runner applies it, inside
+   * the transaction, once parsing has produced the conversations.
+   *
+   * <p>At this point {@code target.conversations()} is <b>empty</b>, because nothing has been parsed
+   * yet. Use only {@code capture()} and {@code file()}. {@link #enabledFor} is evaluated against the
+   * same target, so it must not depend on the conversations either.
+   *
+   * <p>The default, {@code null}, means "no split". The runner then calls {@link #extract} inside the
+   * transaction as before, so an extractor that never overrides this behaves exactly as it always
+   * did. An exception thrown here is recorded as this extractor's FAILED outcome, and the others
+   * carry on.
+   */
+  default Prepared prepare(ExtractionTarget target) {
+    return null;
+  }
+
+  /** The second half of a {@link #prepare}d extraction: applies the tool's output to conversations. */
+  @FunctionalInterface
+  interface Prepared {
+    /** Writes facts onto {@code conversations}, as {@link #extract} would. Never returns null. */
+    Outcome applyTo(List<PcapParserService.ConversationInfo> conversations);
+  }
 
   /**
    * What happened, for the manifest.

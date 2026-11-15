@@ -12,6 +12,7 @@ import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.file.entity.FileEntity;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -104,5 +105,27 @@ class ConversationLookupAdapterTest {
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
     assertThat(adapter.conversationFactsById(id)).isEmpty();
+  }
+
+  /** Facet counts arrive as (value, count) rows; nulls and blanks are dropped, counts kept. */
+  @Test
+  void facetCountsMapRowsAndDropBlankValues() {
+    List<Object[]> protocolRows = new ArrayList<>();
+    protocolRows.add(new Object[] {"TCP", 50L});
+    protocolRows.add(new Object[] {"UDP", 14});
+    protocolRows.add(new Object[] {null, 3L});
+    protocolRows.add(new Object[] {" ", 2L});
+    when(repository.countByProtocol(FILE)).thenReturn(protocolRows);
+    List<Object[]> riskRows = new ArrayList<>();
+    riskRows.add(new Object[] {"Malicious Fingerprint", 7L});
+    when(repository.countByRiskType(FILE)).thenReturn(riskRows);
+
+    var counts = adapter.facetCounts(FILE);
+
+    assertThat(counts.protocols()).containsOnly(
+        org.assertj.core.api.Assertions.entry("TCP", 50L),
+        org.assertj.core.api.Assertions.entry("UDP", 14L));
+    assertThat(counts.riskTypes()).containsEntry("Malicious Fingerprint", 7L);
+    assertThat(counts.countries()).isEmpty();
   }
 }

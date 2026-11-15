@@ -34,8 +34,13 @@ public class FindingsService {
   private final ConversationLookup conversationLookup;
 
   public List<Finding> detectAll(UUID fileId, long totalConversations, long totalBytes) {
+    return detectAll(fileId, totalConversations, totalBytes, null);
+  }
+
+  /** As above, viewed in a network (#925): rule-reading scanners include its own rules. */
+  public List<Finding> detectAll(UUID fileId, long totalConversations, long totalBytes, UUID networkId) {
     ScanContext context =
-        new LazyScanContext(fileId, totalConversations, totalBytes, conversationLookup);
+        new LazyScanContext(fileId, networkId, totalConversations, totalBytes, conversationLookup);
 
     List<Finding> findings = new ArrayList<>();
     for (Scanner scanner : scanners) {

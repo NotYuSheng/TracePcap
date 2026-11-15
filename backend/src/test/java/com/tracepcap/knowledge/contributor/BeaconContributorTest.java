@@ -1,5 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.knowledge.spi.KnowledgeContext;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -44,7 +46,7 @@ class BeaconContributorTest {
   private CaseKnowledge run(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new BeaconContributor(conversationLookup).contribute(FILE, board);
+    new BeaconContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
     return board.build();
   }
 

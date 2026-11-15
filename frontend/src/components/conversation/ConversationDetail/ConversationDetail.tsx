@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
+import { Fragment, useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import type { Conversation, ConversationGeoInfo, Packet, HostClassification, HostIdentity } from '@/types';
+import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity } from '@/types';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
@@ -19,7 +20,7 @@ import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
-import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { HostDetailModal } from '@components/common/EntityDetailModal';
 import { isPrivateIp } from '@/utils/ipClassification';
 import type { DeviceType } from '@/types';
 import './ConversationDetail.css';
@@ -27,10 +28,14 @@ import './ConversationDetail.css';
 interface ConversationDetailProps {
   conversation: Conversation;
   signatureSeverities?: Record<string, string>;
+  /** Rule name → scope, shown in each badge (#925 phase 3). */
+  signatureScopes?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
   fileId?: string;
   /** When set, the packet with this frame number is scrolled into view and briefly highlighted. */
   highlightPacketNumber?: number | null;
+  /** Docked in a pane that already has its own frame and title: drop the outer card. */
+  bare?: boolean;
 }
 
 function countryFlag(code: string): string {
@@ -40,7 +45,6 @@ function countryFlag(code: string): string {
     .map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
     .join('');
 }
-
 
 const GEO_SOURCE_INFO: Record<string, { label: string; title: string; description: string; bg: string }> = {
   ipinfo: {
@@ -171,7 +175,14 @@ function HostFlowCard({
   onOpen?: () => void;
 }) {
   // Prefer the adjudicated verdict; fall back to the raw device type when identities haven't loaded.
-  const label = identity?.primaryLabel ?? (cls ? deviceTypeLabel(cls.deviceType) : null);
+  // A machine verdict's primaryLabel is a DeviceType code ("LAPTOP_DESKTOP"): show it in words.
+  const label = identity?.primaryLabel
+    ? identity.basis === 'HUMAN'
+      ? identity.primaryLabel
+      : deviceTypeLabel(identity.primaryLabel as DeviceType)
+    : cls
+      ? deviceTypeLabel(cls.deviceType)
+      : null;
   // primaryLabel is only a DeviceType code for MACHINE verdicts; a HUMAN label (e.g. "Bob's Laptop")
   // is free text, so it must not be cast to DeviceType or the icon/colour lookup gets garbage. Fall
   // back to the machine classification's deviceType for the icon in that case.
@@ -264,9 +275,11 @@ function hasReadableAscii(hex: string): boolean {
 export const ConversationDetail = ({
   conversation,
   signatureSeverities = {},
+  signatureScopes = {},
   hostClassMap,
   fileId,
   highlightPacketNumber,
+  bare,
 }: ConversationDetailProps) => {
   const navigate = useNavigate();
   const [source, destination] = conversation.endpoints;
@@ -314,16 +327,18 @@ export const ConversationDetail = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightPacketNumber, conversation.id, packetPageSize]);
 
-  // Load adjudicated identities for the file's hosts (for the flow-header chip). One call per file.
-  // Also re-run when the host-detail modal closes, so an in-modal "I disagree" override is reflected
-  // in the chip without waiting for a remount.
+  // Load adjudicated identities for the flow-header chips. Only the two endpoints are fetched, not
+  // every host in the file (#576). Also re-run when the host-detail modal closes, so an in-modal
+  // "I disagree" override is reflected in the chip without waiting for a remount.
+  const sourceIp = source.ip;
+  const destinationIp = destination.ip;
   const refreshIdentities = useCallback(() => {
     if (!fileId) return;
     conversationService
-      .getHostIdentities(fileId)
+      .getHostIdentities(fileId, [sourceIp, destinationIp])
       .then(list => setIdentityMap(new Map(list.map(i => [i.ip, i]))))
       .catch(() => setIdentityMap(new Map()));
-  }, [fileId]);
+  }, [fileId, sourceIp, destinationIp]);
 
   useEffect(() => {
     refreshIdentities();
@@ -347,31 +362,13 @@ export const ConversationDetail = ({
 
   const togglePacket = (id: string) => setExpandedPacketId(prev => (prev === id ? null : id));
 
-  const thStyle: React.CSSProperties = {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  };
-
-  const getDirectionIndicator = (packet: Packet) => {
-    if (packet.source.ip === source.ip) {
-      return '→'; // Outgoing from source
-    }
-    return '←'; // Incoming to source
-  };
-
-  const getDirectionClass = (packet: Packet) => {
-    if (packet.source.ip === source.ip) {
-      return 'text-primary'; // Outgoing
-    }
-    return 'text-success'; // Incoming
-  };
-
   return (
     <div className="conversation-detail">
-      <Card className="mb-4">
-        <Card.Header className="d-flex align-items-center justify-content-between">
-          <h5 className="mb-0">Conversation Details</h5>
+      <Card className={bare ? 'mb-4 cd-bare' : 'mb-4'}>
+        <Card.Header
+          className={`d-flex align-items-center justify-content-between${bare && !(extractedCount && fileId) ? ' d-none' : ''}`}
+        >
+          <h5 className={bare ? 'visually-hidden' : 'mb-0'}>Conversation Details</h5>
           {extractedCount != null && extractedCount > 0 && fileId && (
             <Button
               size="sm"
@@ -441,7 +438,7 @@ export const ConversationDetail = ({
               ))}
               {conversation.customSignatures?.map(rule => {
                 const { bg, text } = getSeverityColor(signatureSeverities[rule]);
-                return <span key={rule} className="cd-chip" style={{ backgroundColor: bg, color: text }}>{rule.replace(/_/g, ' ')}</span>;
+                return <span key={rule} className="cd-chip" style={{ backgroundColor: bg, color: text }}>{rule.replace(/_/g, ' ')}<RuleScopeTag scope={signatureScopes[rule]} /></span>;
               })}
               {conversation.suricataAlerts?.map(alert => (
                 <span key={alert} className="cd-chip" style={{ backgroundColor: IDS_BADGE.bg, color: IDS_BADGE.text }}>{alert}</span>
@@ -519,164 +516,106 @@ export const ConversationDetail = ({
         </Card.Body>
       </Card>
 
-      <div className="card">
-        <div className="card-header">
-          <ul className="nav nav-tabs card-header-tabs">
-            <li className="nav-item">
-              <button
-                className={`nav-link${activeTab === 'packets' ? ' active' : ''}`}
-                onClick={() => setActiveTab('packets')}
-              >
-                Packets
-                <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.65rem' }}>
-                  {conversation.packets?.length || 0}
-                </Badge>
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
-                className={`nav-link${activeTab === 'session' ? ' active' : ''}`}
-                onClick={() => setActiveTab('session')}
-              >
-                Session
-              </button>
-            </li>
-          </ul>
+      <div className="cd-packets">
+        <div className="cd-tabs" role="tablist" aria-label="Conversation content">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'packets'}
+            className={`cd-tab${activeTab === 'packets' ? ' active' : ''}`}
+            onClick={() => setActiveTab('packets')}
+          >
+            Packets <span className="cd-tab-count">{conversation.packets?.length || 0}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'session'}
+            className={`cd-tab${activeTab === 'session' ? ' active' : ''}`}
+            onClick={() => setActiveTab('session')}
+          >
+            Session
+          </button>
+          {activeTab === 'packets' && allPackets.some(p => p.payload) && (
+            <span className="cd-tabs-hint">Click a packet to see its bytes</span>
+          )}
         </div>
 
         {activeTab === 'packets' && (
-          <Card.Body className="p-0">
-            <div className="px-3 py-2 border-bottom d-flex justify-content-end">
-              <small className="text-muted">Click a row to view hex payload</small>
-            </div>
-            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-              <table
-                className="table table-sm table-striped mb-0"
-                style={{ tableLayout: 'fixed', width: '100%' }}
-              >
-                <colgroup>
-                  <col style={{ width: '4%' }} /> {/* # */}
-                  <col style={{ width: '3%' }} /> {/* direction */}
-                  <col style={{ width: '14%' }} /> {/* timestamp */}
-                  <col style={{ width: '16%' }} /> {/* source */}
-                  <col style={{ width: '16%' }} /> {/* destination */}
-                  <col style={{ width: '6%' }} /> {/* length */}
-                  <col style={{ width: '8%' }} /> {/* file type */}
-                  <col /> {/* info — takes remaining space */}
-                </colgroup>
-                <thead className="sticky-top bg-light">
+          <div role="tabpanel">
+            <div className="cd-packets-scroll">
+              <table className="cd-packets-table">
+                <thead>
                   <tr>
-                    <th style={thStyle}>#</th>
-                    <th></th>
-                    <th style={thStyle}>Timestamp</th>
-                    <th style={thStyle}>Source</th>
-                    <th style={thStyle}>Destination</th>
-                    <th style={thStyle}>Len</th>
-                    <th style={thStyle}>File Type</th>
-                    <th style={thStyle}>Info</th>
+                    <th scope="col">#</th>
+                    <th scope="col">
+                      <span className="visually-hidden">Direction</span>
+                    </th>
+                    <th scope="col">Time</th>
+                    <th scope="col" className="text-end">
+                      Length
+                    </th>
+                    <th scope="col">Info</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allPackets.length > 0 ? (
-                    visiblePackets.map((packet, index) => (
-                      <>
-                        <tr
-                          key={packet.id}
-                          ref={packet.packetNumber === highlightPacketNumber ? highlightRowRef : undefined}
-                          onClick={() => togglePacket(packet.id)}
-                          style={{ cursor: packet.payload ? 'pointer' : 'default' }}
-                          className={[
-                            packet.packetNumber === highlightPacketNumber ? 'packet-row-highlighted' : '',
-                            expandedPacketId === packet.id ? 'table-active' : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ') || undefined}
-                        >
-                          <td className="text-muted">{(packetPageClamped - 1) * packetPageSize + index + 1}</td>
-                          <td className={getDirectionClass(packet)}>
-                            <strong>{getDirectionIndicator(packet)}</strong>
-                          </td>
-                          <td
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
+                    visiblePackets.map((packet, index) => {
+                      const outgoing = packet.source.ip === source.ip;
+                      return (
+                        <Fragment key={packet.id}>
+                          <tr
+                            ref={packet.packetNumber === highlightPacketNumber ? highlightRowRef : undefined}
+                            onClick={packet.payload ? () => togglePacket(packet.id) : undefined}
+                            className={[
+                              packet.payload ? 'cd-packet-clickable' : '',
+                              packet.packetNumber === highlightPacketNumber ? 'packet-row-highlighted' : '',
+                              expandedPacketId === packet.id ? 'cd-packet-open' : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ') || undefined}
                           >
-                            <small>{formatTimestamp(packet.timestamp)}</small>
-                          </td>
-                          <td
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={formatIpPort(packet.source.ip, packet.source.port)}
-                          >
-                            <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
-                          </td>
-                          <td
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={formatIpPort(packet.destination.ip, packet.destination.port)}
-                          >
-                            <small>
-                              {formatIpPort(packet.destination.ip, packet.destination.port)}
-                            </small>
-                          </td>
-                          <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
-                          <td>
-                            {packet.detectedFileType ? (
-                              <Badge
-                                bg="info"
-                                text="dark"
-                                style={{ fontSize: '0.65rem' }}
-                                title={`Magic bytes match: ${packet.detectedFileType}`}
-                              >
-                                {packet.detectedFileType}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted">—</span>
-                            )}
-                          </td>
-                          <td>
-                            <small className="text-muted">
+                            <td className="cd-packet-n">{(packetPageClamped - 1) * packetPageSize + index + 1}</td>
+                            <td
+                              className={outgoing ? 'cd-dir-out' : 'cd-dir-in'}
+                              aria-label={outgoing ? 'client to server' : 'server to client'}
+                            >
+                              {outgoing ? '→' : '←'}
+                            </td>
+                            <td className="cd-packet-time">
+                              {new Date(packet.timestamp).toLocaleTimeString('en-GB', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                fractionalSecondDigits: 3,
+                              } as Intl.DateTimeFormatOptions)}
+                            </td>
+                            <td className="text-end cd-packet-len">{packet.size} B</td>
+                            <td className="cd-packet-info">
                               {packet.info ?? packet.protocol.name}
-                            </small>
-                            {asciiPacketIds.has(packet.id) && (
-                              <Badge
-                                bg="warning"
-                                text="dark"
-                                className="ms-1"
-                                style={{ fontSize: '0.65rem' }}
-                              >
-                                ASCII
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                        {expandedPacketId === packet.id && (
-                          <tr key={`${packet.id}-hex`}>
-                            <td colSpan={8} className="p-2">
-                              {packet.payload ? (
-                                <HexViewer
-                                  hex={packet.payload}
-                                  truncated={packet.payload.length >= 2048}
-                                />
-                              ) : (
-                                <p className="text-muted small mb-0">No payload data available.</p>
+                              {packet.detectedFileType && (
+                                <span className="cd-packet-tag">{packet.detectedFileType}</span>
                               )}
+                              {asciiPacketIds.has(packet.id) && <span className="cd-packet-tag">ASCII</span>}
                             </td>
                           </tr>
-                        )}
-                      </>
-                    ))
+                          {expandedPacketId === packet.id && (
+                            <tr>
+                              <td colSpan={5} className="cd-packet-hex">
+                                {packet.payload ? (
+                                  <HexViewer hex={packet.payload} truncated={packet.payload.length >= 2048} />
+                                ) : (
+                                  <p className="text-muted small mb-0">No payload in this packet.</p>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="text-center text-muted py-3">
+                      <td colSpan={5} className="text-center text-muted py-3">
                         No packet details available
                       </td>
                     </tr>
@@ -685,33 +624,34 @@ export const ConversationDetail = ({
               </table>
             </div>
             {allPackets.length > 10 && (
-              <div className="p-2 border-top">
+              <div className="cd-packets-foot">
                 <Pagination
                   currentPage={packetPageClamped}
                   totalPages={packetTotalPages}
                   totalItems={allPackets.length}
                   pageSize={packetPageSize}
                   onPageChange={setPacketPage}
-                  onPageSizeChange={size => { setPacketPageSize(size); setPacketPage(1); }}
+                  onPageSizeChange={size => {
+                    setPacketPageSize(size);
+                    setPacketPage(1);
+                  }}
                 />
               </div>
             )}
-          </Card.Body>
+          </div>
         )}
 
         {activeTab === 'session' && (
-          <Card.Body>
+          <div role="tabpanel" className="cd-session">
             <SessionTab conversationId={conversation.id} protocol={conversation.protocol.name} />
-          </Card.Body>
+          </div>
         )}
       </div>
 
       {hostModalIp && fileId && (
-        <EntityDetailModal
-          entityType="IP"
-          entityKey={hostModalIp}
-          displayName={hostModalIp}
+        <HostDetailModal
           fileId={fileId}
+          ip={hostModalIp}
           onClose={() => { setHostModalIp(null); refreshIdentities(); }}
         />
       )}
