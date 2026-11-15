@@ -126,9 +126,12 @@ describe('SystemPage (#915)', () => {
     );
     expect(await screen.findByText(/login is off/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-    for (const tab of ['Personal', 'System', 'Detection rules', 'Address defaults', 'Permissions', 'Audit log', 'Users']) {
-      expect(screen.getByRole('tab', { name: tab })).toBeInTheDocument();
+    // The sections are down the left, like a capture's analysis.
+    const rail = screen.getByRole('navigation', { name: 'Settings sections' });
+    for (const section of ['Personal', 'System', 'Detection rules', 'Address defaults', 'Permissions', 'Audit log', 'Users']) {
+      expect(within(rail).getByRole('button', { name: section })).toBeInTheDocument();
     }
-    expect(screen.getByRole('tab', { name: 'Personal' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(rail).getByRole('button', { name: 'Personal' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('heading', { name: 'Personal' })).toBeInTheDocument();
   });
 });
