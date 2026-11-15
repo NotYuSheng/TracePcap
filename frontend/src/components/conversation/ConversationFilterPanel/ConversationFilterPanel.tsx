@@ -2,7 +2,7 @@ import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Form, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Form, Modal, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import {
   getAppColor,
@@ -49,6 +49,8 @@ interface ConversationFilterPanelProps {
   countryOptions: string[];
   presentDeviceTypes?: string[];
   activeFilterCount: number;
+  /** Conversations matching the current filters, shown on the drawer's close button. */
+  matchCount?: number;
   defaultOpen?: boolean;
 }
 
@@ -99,9 +101,10 @@ export function ConversationFilterPanel({
   countryOptions,
   presentDeviceTypes,
   activeFilterCount,
-  defaultOpen,
+  matchCount,
+  defaultOpen = false,
 }: ConversationFilterPanelProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen ?? activeFilterCount > 0);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [ipInput, setIpInput] = useState(filters.ip);
   const [portInput, setPortInput] = useState(filters.port);
   const [payloadInput, setPayloadInput] = useState(filters.payloadContains);
@@ -204,14 +207,14 @@ export function ConversationFilterPanel({
         <Button
           size="sm"
           variant="outline-secondary"
-          onClick={() => setIsOpen(o => !o)}
+          onClick={() => setIsOpen(true)}
+          aria-haspopup="dialog"
         >
           <i className="bi bi-funnel me-1"></i>
           More filters
           {activeFilterCount > 0 && (
             <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
           )}
-          <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
         </Button>
         {/* Exact src → dst pair (#471). Only deep links set it, and no input in the panel edits it,
             so it's shown here (always visible) with its own remove button. Otherwise it would
@@ -232,10 +235,24 @@ export function ConversationFilterPanel({
         )}
       </div>
 
-      {/* Collapsible panel */}
-      {isOpen && (
-        <div className="card mt-2 filter-panel-body">
-          <Card.Body className="p-3">
+      {/* More filters: a right-side drawer. Filters apply as you pick them; the footer
+          button just closes it, showing how many conversations are left. */}
+      <Modal
+        show={isOpen}
+        onHide={() => setIsOpen(false)}
+        dialogClassName="filter-drawer"
+        contentClassName="filter-drawer-content"
+        aria-labelledby="filter-drawer-title"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title id="filter-drawer-title" as="h2" className="filter-drawer-title">
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
+            )}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="filter-drawer-body">
             <div className="row g-3">
               {/* IP / Hostname */}
               <div className="col-md-4">
@@ -828,20 +845,23 @@ export function ConversationFilterPanel({
 
             </div>
 
-            {activeFilterCount > 0 && (
-              <div className="mt-3 pt-2 border-top">
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={onClearAll}
-                >
-                  <i className="bi bi-x-circle me-1"></i>Clear filters
-                </Button>
-              </div>
-            )}
-          </Card.Body>
-        </div>
-      )}
+        </Modal.Body>
+        <Modal.Footer className="filter-drawer-footer">
+          <Button
+            variant="link"
+            className="filter-drawer-clear"
+            onClick={onClearAll}
+            disabled={activeFilterCount === 0}
+          >
+            Clear all
+          </Button>
+          <Button variant="primary" onClick={() => setIsOpen(false)}>
+            {matchCount === undefined
+              ? 'Done'
+              : `Show ${matchCount.toLocaleString()} conversation${matchCount === 1 ? '' : 's'}`}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

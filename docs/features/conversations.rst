@@ -27,8 +27,13 @@ Above the list, the quick filters stay in view:
   or IDS alerts;
 - a chip for each of the capture's four busiest apps.
 
-**More filters** opens the full set: port, payload, protocols, categories,
-file types, risk types, rules, IDS alerts, device types and countries.
+**More filters** opens a drawer on the right with the full set, one section
+per filter: address, port, payload, protocols, apps, categories, file types,
+risk types, rules, IDS alerts, countries and device types. Filters apply as you
+pick them, and the list behind the drawer updates straight away. The button at
+the foot of the drawer says how many conversations match ("Show 7
+conversations") and closes it; **Clear all** resets everything. Escape or the
+× also closes the drawer. The button keeps a count of the active filters.
 
 How Conversations Are Built
 ----------------------------

@@ -397,6 +397,7 @@ export const ConversationPage = () => {
             countryOptions={countryOptions}
             presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
+            matchCount={totalItems}
           />
         </div>
       </div>
