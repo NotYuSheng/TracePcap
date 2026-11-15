@@ -4,6 +4,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import type { GraphLayoutType, GraphNode } from '@/features/network/types';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
+import { useMapPlayback } from '@/features/network/hooks/useMapPlayback';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { buildHighlightMap } from '@/features/monitor/utils/changeHighlights';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
@@ -19,6 +20,8 @@ interface SnapshotMapProps {
   previous?: NetworkSnapshot | null;
   /** The graph's height in pixels. */
   height?: number;
+  /** The play bar under the graph (time window or packet replay); traffic dots move either way. */
+  controls?: boolean;
 }
 
 interface GoneDevice {
@@ -70,6 +73,7 @@ export function SnapshotMap({
   changeEvents,
   previous = null,
   height = 420,
+  controls = true,
 }: SnapshotMapProps) {
   const navigate = useNavigate();
   const [layoutType, setLayoutType] = useState<GraphLayoutType>('grouped');
@@ -77,6 +81,7 @@ export function SnapshotMap({
   // In this network, so its own detection rules' matches show too (#925 phase 3).
   const { nodes, edges, loading } = useNetworkData(snapshot.fileId, undefined, undefined, networkId);
 
+  const playback = useMapPlayback(snapshot.fileId, nodes, edges, { controls });
   const highlighted = useMemo(() => buildHighlightMap(changeEvents, snapshot.id), [changeEvents, snapshot.id]);
   const legend = useMemo(() => {
     const seen = new Map<string, string>();
@@ -102,6 +107,7 @@ export function SnapshotMap({
             layoutType={layoutType}
             onLayoutChange={setLayoutType}
             onNodeClick={setSelected}
+            {...playback}
           />
         )}
       </div>

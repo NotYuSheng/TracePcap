@@ -36,3 +36,8 @@
 .snapshot-map-dot-gone {
   border: 1.5px dashed #98a2b3;
 }
+
+/* The graph fills the box (it defaults to 70vh), so its play bar sits inside it, not cut off below. */
+.snapshot-map-graph .network-graph-wrapper {
+  height: 100%;
+}

@@ -330,6 +330,7 @@ export const NetworkDetailPage = () => {
                           </button>
                         </div>
                         <SnapshotMap
+                          key={latest.id}
                           networkId={network.id}
                           snapshot={latest}
                           previous={beforeLatest}
