@@ -117,6 +117,14 @@ function isSpecial(ip: string): boolean {
   return /^ff[0-9a-f]{2}:/i.test(ip);
 }
 
+/**
+ * A /24's broadcast address (`10.20.30.255`). It only ever receives: a host that holds a .255
+ * address inside a wider subnet sends too, so it stays a device.
+ */
+function isSubnetBroadcast(n: GraphNode): boolean {
+  return !n.data.isL2 && /^\d+\.\d+\.\d+\.255$/.test(addressOf(n.id)) && !n.data.packetsSent;
+}
+
 /** `192.168.1.0/24` for IPv4, the /64 for IPv6. */
 export function subnetOf(ip: string): string {
   if (ip.includes(':')) {
@@ -305,7 +313,8 @@ function automaticTree(
   const special: GraphNode[] = [];
   for (const n of nodes) {
     const ip = addressOf(n.id);
-    if (n.data.isL2 || isPrivateIp(ip, customRanges)) local.push(n);
+    if (isSubnetBroadcast(n)) special.push(n);
+    else if (n.data.isL2 || isPrivateIp(ip, customRanges)) local.push(n);
     else if (isSpecial(ip)) special.push(n);
     else internet.push(n);
   }

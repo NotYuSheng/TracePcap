@@ -321,6 +321,10 @@ public class PcapParserService {
             final LocalDateTime fTs = timestamp;
 
             String convKey = createConversationKey(srcIp, srcPort, dstIp, dstPort, protocol);
+            // A client with no address yet (a DHCP request from 0.0.0.0) is told apart only by its
+            // MAC. Without it in the key, every such client merged into one conversation credited
+            // to whichever MAC came first, so the map drew one "0.0.0.0" device for all of them.
+            if (srcMac != null && isUnspecified(srcIp)) convKey += "|" + srcMac;
             if (!conversationMap.containsKey(convKey) && conversationMap.size() >= maxConversations) {
               throw new RuntimeException(
                   "Capture exceeds "
@@ -593,6 +597,11 @@ public class PcapParserService {
   private void incrementProtocolCount(PcapAnalysisResult result, String protocol, int packetSize) {
     result.getProtocolCounts().merge(protocol, 1L, Long::sum);
     result.getProtocolBytes().merge(protocol, (long) packetSize, Long::sum);
+  }
+
+  /** The unspecified address: a sender that has no address yet, so its MAC is its identity. */
+  static boolean isUnspecified(String ip) {
+    return "0.0.0.0".equals(ip) || "::".equals(ip);
   }
 
   private String createConversationKey(

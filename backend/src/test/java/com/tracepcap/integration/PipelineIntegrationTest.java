@@ -1934,6 +1934,55 @@ class PipelineIntegrationTest {
     return b.array();
   }
 
+  /**
+   * Clients asking for an address before they have one all send from 0.0.0.0 to the broadcast
+   * address, so the address can't tell them apart: their MACs can. Two clients must stay two
+   * conversations, each with its own MAC, instead of merging into one credited to the first MAC.
+   */
+  @Test
+  void unaddressedClients_areSeparateConversationsByMac() throws Exception {
+    String tag = "unaddressed-" + UUID.randomUUID().toString().substring(0, 8);
+    byte[][] macs = {
+      {0x02, 0x11, 0x11, 0x11, 0x11, 0x01}, {0x02, 0x11, 0x11, 0x11, 0x11, 0x01},
+      {0x02, 0x22, 0x22, 0x22, 0x22, 0x02},
+    };
+    String fileId = uploadBytes(tag + ".pcap", unaddressedPcap(tag, macs)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    var rows =
+        jdbc.queryForList(
+            "SELECT src_mac, packet_count FROM conversations WHERE file_id = ?::uuid AND src_ip = '0.0.0.0'"
+                + " ORDER BY src_mac",
+            fileId);
+    assertThat(rows).hasSize(2);
+    assertThat(rows.get(0).get("src_mac")).isEqualTo("02:11:11:11:11:01");
+    assertThat(((Number) rows.get(0).get("packet_count")).longValue()).isEqualTo(2L);
+    assertThat(rows.get(1).get("src_mac")).isEqualTo("02:22:22:22:22:02");
+    assertThat(((Number) rows.get(1).get("packet_count")).longValue()).isEqualTo(1L);
+  }
+
+  /** One UDP 0.0.0.0:68 → 255.255.255.255:67 frame per MAC, each carrying {@code payload}. */
+  private static byte[] unaddressedPcap(String payload, byte[][] macs) {
+    byte[] data = payload.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    int frame = 14 + 20 + 8 + data.length;
+    java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(24 + macs.length * (16 + frame));
+    b.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    b.putInt(0xa1b2c3d4).putShort((short) 2).putShort((short) 4).putInt(0).putInt(0).putInt(65535).putInt(1);
+    int t = (int) (System.currentTimeMillis() / 1000);
+    for (int i = 0; i < macs.length; i++) {
+      b.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+      b.putInt(t + i).putInt(0).putInt(frame).putInt(frame);
+      b.order(java.nio.ByteOrder.BIG_ENDIAN);
+      b.put(new byte[] {-1, -1, -1, -1, -1, -1}).put(macs[i]).putShort((short) 0x0800);
+      b.put((byte) 0x45).put((byte) 0).putShort((short) (20 + 8 + data.length)).putShort((short) (i + 1)).putShort((short) 0);
+      b.put((byte) 64).put((byte) 17).putShort((short) 0);
+      b.put(new byte[] {0, 0, 0, 0}).put(new byte[] {-1, -1, -1, -1});
+      b.putShort((short) 68).putShort((short) 67).putShort((short) (8 + data.length)).putShort((short) 0);
+      b.put(data);
+    }
+    return b.array();
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

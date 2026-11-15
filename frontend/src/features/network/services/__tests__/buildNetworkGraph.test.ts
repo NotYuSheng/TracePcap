@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Conversation } from '@/types'
-import { buildNetworkGraph } from '../networkService'
+import { buildNetworkGraph, UNANSWERED_COLLAPSE, UNANSWERED_ID } from '../networkService'
 
 function conversation(src: string, dst: string, overrides: Partial<Conversation> = {}): Conversation {
   return {
@@ -222,5 +222,50 @@ describe('buildNetworkGraph: an address used on two networks that share a range 
     const branch = g.nodes.find(n => n.id === '192.168.1.10@1')!
     expect(branch.label).toBe('BR-TILL-01')
     expect(branch.data.occupancy?.key).toBe('192.168.1.10~server:00:1b:21:bb:00:01')
+  })
+})
+
+describe('buildNetworkGraph: clients asking for an address from 0.0.0.0', () => {
+  const request = (id: string, mac: string, startTime: number) => conversation('0.0.0.0', '255.255.255.255', {
+    id, startTime, protocol: { name: 'DHCP', layer: 'application' },
+    endpoints: [{ ip: '0.0.0.0', port: 68, mac }, { ip: '255.255.255.255', port: 67 }],
+  } as never)
+  const from = (id: string, ip: string, mac: string, startTime: number) => conversation(ip, '93.184.216.34', {
+    id, startTime, endpoints: [{ ip, port: 40000, mac }, { ip: '93.184.216.34', port: 443 }],
+  } as never)
+
+  it('draws a request on the device the answer gave an address to, and an unanswered one on its own MAC', () => {
+    const g = buildNetworkGraph([
+      request('req-a', 'f8:bc:12:00:00:01', 0),
+      from('web-a', '10.0.0.21', 'f8:bc:12:00:00:01', 10),
+      request('req-b', '8c:71:f8:00:00:02', 5),
+    ])
+    expect(g.edges.find(e => e.id === 'req-a')!.source).toBe('10.0.0.21')
+    expect(g.edges.find(e => e.id === 'req-b')!.source).toBe('8c:71:f8:00:00:02')
+    expect(g.nodes.find(n => n.id === '8c:71:f8:00:00:02')!.data.isL2).toBe(true)
+    // No shared placeholder: 0.0.0.0 is not a device.
+    expect(g.nodes.some(n => n.id === '0.0.0.0')).toBe(false)
+  })
+
+  it('gives each request of a device that moved to the address it got next', () => {
+    const mac = 'f8:bc:12:00:00:01'
+    const g = buildNetworkGraph([
+      request('first', mac, 0),
+      from('on-21', '10.0.0.21', mac, 10),
+      request('second', mac, 100),
+      from('on-33', '10.0.0.33', mac, 110),
+    ])
+    expect(g.edges.find(e => e.id === 'first')!.source).toBe('10.0.0.21')
+    expect(g.edges.find(e => e.id === 'second')!.source).toBe('10.0.0.33')
+  })
+
+  it('collapses a flood of unanswered clients into one node', () => {
+    const n = UNANSWERED_COLLAPSE + 5
+    const flood = Array.from({ length: n }, (_, i) =>
+      request(`r${i}`, `02:00:00:00:00:${i.toString(16).padStart(2, '0')}`, i))
+    const g = buildNetworkGraph(flood)
+    expect(g.nodes.map(x => x.id)).toEqual(expect.arrayContaining([UNANSWERED_ID]))
+    expect(g.nodes.filter(x => x.data.isL2)).toHaveLength(1)
+    expect(g.nodes.find(x => x.id === UNANSWERED_ID)!.label).toBe(`${n} devices asking for an address`)
   })
 })

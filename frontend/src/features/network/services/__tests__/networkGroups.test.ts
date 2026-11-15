@@ -35,6 +35,17 @@ describe('networkGroups', () => {
     expect(find(tree, 'domain:example.com')?.nodeIds).toEqual(['93.184.216.34'])
   })
 
+  it("puts a subnet's broadcast address with the broadcasts, but keeps a .255 host that sends", () => {
+    const tree = buildGroupTree([
+      node('10.20.30.10', { packetsSent: 4 }),
+      node('10.20.30.255', { packetsSent: 0 }),
+      node('10.20.31.255', { packetsSent: 7 }),
+    ])
+    expect(find(tree, 'special')?.nodeIds).toEqual(['10.20.30.255'])
+    expect(find(tree, 'local')).toBeDefined()
+    expect(find(tree, 'special')?.nodeIds).not.toContain('10.20.31.255')
+  })
+
   it('puts overlapping networks apart: by the device key, else the MAC', () => {
     const segments = [
       seg('vlan:10', 'HQ', [['192.168.1.10', 'aa:00:00:00:00:01']]),

@@ -65,6 +65,55 @@ export function occupancyNodeId(
   return `${ip}@${hit.occ.idx}`;
 }
 
+/** 0.0.0.0 / ::, the address a client sends from before it has one (a DHCP request). */
+export function isUnspecified(ip: string): boolean {
+  return ip === '0.0.0.0' || ip === '::';
+}
+
+/**
+ * Past this many unanswered clients, they are drawn as one node: hundreds of made-up MACs asking
+ * for an address is a DHCP starvation attack, and one node per MAC would bury the map.
+ */
+export const UNANSWERED_COLLAPSE = 20;
+export const UNANSWERED_ID = 'unanswered-dhcp-clients';
+
+/**
+ * Where each MAC that asked for an address from 0.0.0.0 ended up: the addresses it later sent from,
+ * by when it was first seen on each. A request belongs to the next address its MAC used (the one
+ * the server gave it); when the MAC never used one, nothing answered it.
+ */
+export function unaddressedHomes(conversations: Conversation[]) {
+  const firstSeen = new Map<string, Map<string, number>>();
+  const asking = new Set<string>();
+  for (const c of conversations) {
+    for (const e of c.endpoints) {
+      if (!e.mac) continue;
+      const mac = e.mac.toLowerCase();
+      if (isUnspecified(e.ip)) {
+        asking.add(mac);
+        continue;
+      }
+      // Only the sender's own MAC is that host's: a received endpoint's MAC can be the router's.
+      if (e !== c.endpoints[0]) continue;
+      const byIp = firstSeen.get(mac) ?? new Map<string, number>();
+      const prev = byIp.get(e.ip);
+      if (prev == null || c.startTime < prev) byIp.set(e.ip, c.startTime);
+      firstSeen.set(mac, byIp);
+    }
+  }
+  const unanswered = [...asking].filter(m => !firstSeen.has(m));
+  return {
+    unansweredCount: unanswered.length,
+    collapsed: unanswered.length > UNANSWERED_COLLAPSE,
+    homeOf(mac: string, at: number): { ip: string; at: number } | null {
+      const byIp = firstSeen.get(mac);
+      if (!byIp) return null;
+      const seen = [...byIp].map(([ip, t]) => ({ ip, at: t })).sort((a, b) => a.at - b.at);
+      return seen.find(s => s.at >= at) ?? seen[seen.length - 1];
+    },
+  };
+}
+
 /** MAC address regex — identifies nodes that have no IP and are addressed by MAC only */
 const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
@@ -314,8 +363,19 @@ export function buildNetworkGraph(
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const spans = occupancySpans(reusedAddresses);
-  const keyOf = (ip: string, conv: Conversation) =>
-    occupancyNodeId(ip, conv.startTime, spans, conv.endpoints.find(e => e.ip === ip)?.mac);
+  const unaddressed = unaddressedHomes(conversations);
+  const keyOf = (ip: string, conv: Conversation): string => {
+    const mac = conv.endpoints.find(e => e.ip === ip)?.mac;
+    if (isUnspecified(ip)) {
+      // A client asking for an address, known only by its MAC: drawn on the device the address it
+      // was given belongs to, or on its own MAC node when nothing answered it.
+      if (!mac) return ip;
+      const home = unaddressed.homeOf(mac.toLowerCase(), conv.startTime);
+      if (home) return occupancyNodeId(home.ip, home.at, spans, mac);
+      return unaddressed.collapsed ? UNANSWERED_ID : mac.toLowerCase();
+    }
+    return occupancyNodeId(ip, conv.startTime, spans, mac);
+  };
   /** Creates the node for `key`, which is an address or one device's stretch on it. */
   const ensureNode = (key: string, ip: string, hostname?: string, mac?: string) => {
     if (nodeMap[key]) return nodeMap[key];
@@ -360,7 +420,8 @@ export function buildNetworkGraph(
   if (analysisSummary?.uniqueHosts) {
     for (const host of analysisSummary.uniqueHosts) {
       // A reused address gets its per-device nodes from its conversations instead.
-      if (host.ip && !nodeMap[host.ip] && !spans.has(host.ip)) {
+      // An unaddressed sender is drawn on its device or MAC (see keyOf), never as a 0.0.0.0 node.
+      if (host.ip && !nodeMap[host.ip] && !spans.has(host.ip) && !isUnspecified(host.ip)) {
         nodeMap[host.ip] = createNode(host.ip, host.hostname);
       }
     }
@@ -380,8 +441,15 @@ export function buildNetworkGraph(
     const src = { ...srcEp, ip: keyOf(srcEp.ip, conv) };
     const dst = { ...dstEp, ip: keyOf(dstEp.ip, conv) };
 
-    // Create or update source node
-    updateNodeStats(ensureNode(src.ip, srcEp.ip, srcEp.hostname, srcEp.mac), conv, 'sent', protocol);
+    // Create or update source node. An unaddressed sender's key is its device or its MAC, not 0.0.0.0.
+    const srcAddr = isUnspecified(srcEp.ip) && src.ip !== srcEp.ip ? src.ip.split('@')[0] : srcEp.ip;
+    const srcNode = ensureNode(src.ip, srcAddr, srcEp.hostname, srcEp.mac);
+    if (src.ip === UNANSWERED_ID) {
+      srcNode.data.isL2 = true;
+      srcNode.data.nodeType = 'l2-device';
+      srcNode.label = `${unaddressed.unansweredCount} devices asking for an address`;
+    }
+    updateNodeStats(srcNode, conv, 'sent', protocol);
 
     // Create or update destination node
     updateNodeStats(ensureNode(dst.ip, dstEp.ip, dstEp.hostname, dstEp.mac), conv, 'received', protocol);
