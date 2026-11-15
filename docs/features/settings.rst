@@ -1,7 +1,10 @@
 Settings
 ========
 
-TracePcap's settings are grouped by who they affect:
+TracePcap's settings are grouped by who they affect. On the **Settings** page the
+sections run down the left, like a capture's analysis: **Personal** under *You*, and
+the rest under *This install*. The **»** button at the bottom widens the menu to
+the sections' full names.
 
 .. list-table::
    :header-rows: 1
@@ -10,10 +13,10 @@ TracePcap's settings are grouped by who they affect:
    * - Where
      - Affects
      - Notes
-   * - **Settings** page, **Personal** tab
+   * - **Settings** page, **Personal**
      - you (or everyone, with login off)
      - Personal look and layout only. Never changes analysis results.
-   * - **Settings** page, other tabs
+   * - **Settings** page, the other sections
      - everyone using the install
      - Deploy-time settings, custom detection rules, address defaults (subnet labels,
        internal ranges, organisations), who may change what, the audit log, and users.
@@ -39,7 +42,7 @@ Personal
 - **Login on**: saved to your account, so they follow you to any browser, and two
   analysts on one machine keep separate settings.
 - **Login off**: there is no account, so everyone using the install shares **one set**.
-  A change made by one person changes it for everyone, and the tab says so. This is
+  A change made by one person changes it for everyone, and the section says so. This is
   deliberate: a single-analyst laptop or a shared appliance gets the same preferences in
   any browser.
 
@@ -51,8 +54,8 @@ browser: they're history, not a preference.
 For Everyone
 ------------
 
-The **Settings** page's other tabs: **System**, **Detection rules**, **Address defaults**,
-**Permissions**, **Audit log** and **Users**.
+The **Settings** page's other sections, under *This install*: **System**, **Detection
+rules**, **Address defaults**, **Permissions**, **Audit log** and **Users**.
 
 **System.** Every deploy-time setting (each environment variable in :doc:`../configuration/environment-variables`)
 is listed with its **effective value**, including values derived from ``APP_MEMORY_MB``
