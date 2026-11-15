@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { Answer, InvestigationReport, Story } from '@/types';
 
 /** Goal → the standard-question key the panel already has a label and icon for. */
-const GOAL_QUESTION: Record<string, string> = {
+export const GOAL_QUESTION: Record<string, string> = {
   VICTIM: 'victim',
   USER: 'signed-in-user',
   MALWARE: 'malware',
@@ -11,7 +11,7 @@ const GOAL_QUESTION: Record<string, string> = {
 };
 
 /** Answers that indicate an incident (as opposed to context such as who is signed in). */
-const INCIDENT_QUESTIONS = new Set(['victim', 'c2', 'malware']);
+export const INCIDENT_QUESTIONS = new Set(['victim', 'c2', 'malware']);
 
 /** What the Investigation Summary renders: the conclusions, and the goals still unknown. */
 export interface InvestigationSummary {
@@ -59,6 +59,12 @@ export const storyService = {
   getInvestigation: async (fileId: string): Promise<InvestigationSummary> => {
     const response = await apiClient.get<InvestigationReport>(API_ENDPOINTS.INVESTIGATION(fileId));
     return investigationToSummary(response.data);
+  },
+
+  /** The investigation as reported: every standing goal with its outcome, answered or not. */
+  getInvestigationReport: async (fileId: string): Promise<InvestigationReport> => {
+    const response = await apiClient.get<InvestigationReport>(API_ENDPOINTS.INVESTIGATION(fileId));
+    return response.data;
   },
 
   /**

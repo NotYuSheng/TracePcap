@@ -1,1 +1,1 @@
-export { StoryInfoCard } from './StoryInfoCard';
+export { StoryHowItWorks, StoryPromptSettings } from './StoryInfoCard';

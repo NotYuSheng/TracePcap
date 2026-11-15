@@ -1,0 +1,95 @@
+.story-narrative {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.story-narrative-lead {
+  font-size: 0.95rem;
+}
+
+.story-narrative-h {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 20px 0 8px;
+}
+
+.story-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.story-event {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 14px;
+  padding: 8px 0;
+  position: relative;
+}
+
+.story-event + .story-event {
+  border-top: 1px solid var(--tp-border, #eceef3);
+}
+
+.story-event-time {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.76rem;
+  color: var(--tp-text-muted, #525a68);
+  padding-top: 2px;
+}
+
+.story-event-title {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.story-event-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.story-event-critical .story-event-tag {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.story-event-critical {
+  box-shadow: inset 3px 0 0 #dc2626;
+  padding-left: 10px;
+}
+
+.story-event-suspicious {
+  box-shadow: inset 3px 0 0 #f59e0b;
+  padding-left: 10px;
+}
+
+.story-event-text p:last-child,
+.story-narrative-section p:last-child {
+  margin-bottom: 0;
+}
+
+.story-event-text {
+  color: var(--tp-text, #374151);
+}
+
+.story-narrative-anomaly {
+  border-left: 3px solid #f59e0b;
+  padding-left: 12px;
+}
+
+[data-theme='dark'] .story-event-tag {
+  background: rgb(252 211 77 / 15%);
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .story-event-critical .story-event-tag {
+  background: rgb(248 113 113 / 15%);
+  color: #fca5a5;
+}
