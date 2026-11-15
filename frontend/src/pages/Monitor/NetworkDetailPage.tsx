@@ -132,7 +132,12 @@ export const NetworkDetailPage = () => {
       badge: toReview || undefined,
     },
     { key: 'captures', label: 'Captures', short: 'Captures', icon: 'bi-clock-history' },
-    { key: 'inventory', label: 'Devices, addresses and apps', short: 'Inventory', icon: 'bi-pc-display' },
+    {
+      key: 'inventory',
+      label: 'Devices, addresses and apps',
+      short: 'Inventory',
+      icon: 'bi-pc-display',
+    },
     { key: 'insights', label: 'Insights', short: 'Insights', icon: 'bi-stars' },
     {
       key: 'setup',

@@ -54,9 +54,11 @@ export function retentionText(hours: number): string {
 
 /** What the analysis will run with, in a few words: "nDPI and file extraction". */
 export function stagesText(o: AnalysisOptions): string {
-  const on = [o.enableNdpi && 'nDPI', o.enableSuricata && 'Suricata', o.enableFileExtraction && 'file extraction'].filter(
-    (x): x is string => !!x,
-  );
+  const on = [
+    o.enableNdpi && 'nDPI',
+    o.enableSuricata && 'Suricata',
+    o.enableFileExtraction && 'file extraction',
+  ].filter((x): x is string => !!x);
   if (on.length === 0) return 'the basic analysis only';
   return on.length === 1 ? on[0] : `${on.slice(0, -1).join(', ')} and ${on[on.length - 1]}`;
 }
@@ -94,7 +96,7 @@ export function StartPanel({
             : errors.some(e => e.code === 'file-invalid-type')
               ? `Not a capture. Only ${acceptedTypes.join(', ')} files can be analysed.`
               : errors.map(e => e.message).join('; '),
-        })),
+        }))
       );
       if (files.length > 0) onFiles(files);
     },
@@ -107,7 +109,9 @@ export function StartPanel({
 
   return (
     <section
-      {...getRootProps({ className: `${className ?? ''} home-drop-target${isDragActive ? ' drag-active' : ''}` })}
+      {...getRootProps({
+        className: `${className ?? ''} home-drop-target${isDragActive ? ' drag-active' : ''}`,
+      })}
       aria-labelledby={labelledBy}
       aria-label={label}
       data-testid="home-drop"
@@ -116,9 +120,7 @@ export function StartPanel({
       {heading}
       {isDragActive && (
         <div className="home-drop-overlay" aria-hidden="true">
-          <b>
-            Drop to analyse {dragCount > 1 ? `${dragCount} captures` : 'the capture'}
-          </b>
+          <b>Drop to analyse {dragCount > 1 ? `${dragCount} captures` : 'the capture'}</b>
           <span>with {stagesText(options)}</span>
         </div>
       )}
