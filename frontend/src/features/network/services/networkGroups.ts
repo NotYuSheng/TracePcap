@@ -37,6 +37,10 @@ export interface GroupNode {
   autoLabel?: string;
   /** The analyst's note on the group. */
   note?: string;
+  /** Distinct devices in the group, at any depth: nodes known to be one device count once. */
+  devices?: number;
+  /** Its own nodes that belong to another node's device: node id → that device's id. */
+  deviceOf?: Record<string, string>;
 }
 
 export interface GroupBox {
@@ -46,8 +50,10 @@ export interface GroupBox {
   detail?: string;
   level: number;
   tone?: number;
-  /** Members, deep: every device in the box. */
+  /** Distinct devices in the box, deep (nodes known to be one device count once). */
   count: number;
+  /** Each member's device: the same for nodes that are one device; parallel to memberIds. */
+  deviceIds: string[];
   /** An innermost box: it holds devices, and a device can be moved into it. */
   leaf: boolean;
   /** Devices the analyst moved into this box. */
@@ -84,6 +90,8 @@ interface Options {
   names?: Record<string, string>;
   /** Group id → the analyst's note. */
   notes?: Record<string, string>;
+  /** Nodes that are one device that moved address (the map's "same device" links). */
+  deviceLinks?: { from: string; to: string }[];
 }
 
 /**
@@ -232,13 +240,64 @@ const byLabel = (a: GroupNode, b: GroupNode) => a.label.localeCompare(b.label, u
 /** The group tree for a set of nodes. Empty groups are never made. */
 export function buildGroupTree(
   nodes: GraphNode[],
-  { segments = [], customRanges = [], dnsNames, placements, userGroups = [], names = {}, notes = {} }: Options = {},
+  { segments = [], customRanges = [], dnsNames, placements, userGroups = [], names = {}, notes = {}, deviceLinks = [] }: Options = {},
 ): GroupNode[] {
   let tops = automaticTree(nodes, { segments, customRanges, dnsNames });
   if (userGroups.length) addUserGroups(tops, userGroups);
   if (placements && Object.keys(placements).length) tops = applyPlacements(tops, placements);
   if (Object.keys(names).length || Object.keys(notes).length) nameAndNote(tops, names, notes);
+  const same = sameDevice(nodes.map(n => n.id), segments, deviceLinks);
+  const count = (g: GroupNode): Set<string> => {
+    const ids = new Set(g.nodeIds.map(id => same.get(id) ?? id));
+    const merged = g.nodeIds.filter(id => (same.get(id) ?? id) !== id);
+    if (merged.length) g.deviceOf = Object.fromEntries(merged.map(id => [id, same.get(id)!]));
+    for (const c of g.children) count(c).forEach(d => ids.add(d));
+    g.devices = ids.size;
+    return ids;
+  };
+  tops.forEach(count);
   return tops;
+}
+
+/**
+ * Which nodes are one device, from evidence only: a device seen moving to another address (its
+ * two nodes are linked), and one DHCP server's gateway addresses on the networks it serves. Node
+ * id → the id of the device it belongs to; nodes not in the map are their own device.
+ *
+ * Not by MAC alone: hosts on a routed subnet reach the capture with the router's MAC, and a phone
+ * with private addresses changes MAC, so a MAC is not a device.
+ */
+export function sameDevice(
+  nodeIds: string[],
+  segments: NetworkSegment[],
+  links: { from: string; to: string }[] = [],
+): Map<string, string> {
+  const present = new Set(nodeIds);
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
+    return r;
+  };
+  const join = (a: string, b: string) => {
+    if (!present.has(a) || !present.has(b)) return;
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(rb, ra);
+  };
+  for (const l of links) join(l.from, l.to);
+  const gatewaysByServer = new Map<string, string[]>();
+  for (const s of segments) {
+    if (!s.serverMac) continue;
+    const list = gatewaysByServer.get(s.serverMac) ?? [];
+    list.push(...s.routers.filter(r => present.has(r)));
+    gatewaysByServer.set(s.serverMac, list);
+  }
+  for (const list of gatewaysByServer.values()) for (const r of list.slice(1)) join(list[0], r);
+  const out = new Map<string, string>();
+  for (const id of nodeIds) if (parent.has(id)) out.set(id, find(id));
+  for (const root of new Set(out.values())) out.set(root, root);
+  return out;
 }
 
 /** Every group, by id, at any depth. */
@@ -495,10 +554,17 @@ export function layoutGroups(tops: GroupNode[]): GroupedLayout {
 
   const sized = tops.map(size);
   const p = pack(sized, TOP_GAP);
+  const devicesOf = new Map<string, string>();
+  const collect = (g: GroupNode) => {
+    Object.entries(g.deviceOf ?? {}).forEach(([id, d]) => devicesOf.set(id, d));
+    g.children.forEach(collect);
+  };
+  tops.forEach(collect);
 
   const emit = (s: Sized, x: number, y: number, tone?: number) => {
     const t = s.group.tone ?? tone;
     const memberIds = memberIdsOf(s.group);
+    const deviceIds = memberIds.map(id => devicesOf.get(id) ?? id);
     boxes.push({
       id: s.group.id,
       kind: s.group.kind,
@@ -506,7 +572,8 @@ export function layoutGroups(tops: GroupNode[]): GroupedLayout {
       detail: s.group.detail,
       level: s.group.level,
       tone: t,
-      count: memberIds.length,
+      count: s.group.devices ?? new Set(deviceIds).size,
+      deviceIds,
       leaf: s.group.children.length === 0,
       moved: s.group.movedIds?.length ?? 0,
       note: s.group.note,

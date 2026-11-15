@@ -286,14 +286,45 @@ public class ReportService {
   }
 
   private static long localDevices(Facts f) {
-    Set<String> keys = new HashSet<>();
-    for (HostFacts h : f.hosts()) if (h.ip() != null && !f.internet().contains(h.ip())) keys.add(h.mac() != null ? h.mac() : h.ip());
-    for (var r : f.shared()) for (var o : r.occupancies()) if (o.getMac() != null) keys.add(o.getMac());
+    Set<String> local = new java.util.LinkedHashSet<>();
+    for (HostFacts h : f.hosts()) if (h.ip() != null && isHost(h.ip()) && !f.internet().contains(h.ip())) local.add(h.ip());
+    List<String[]> same = new ArrayList<>();
+    for (DeviceMoveDto m : f.moves()) same.add(new String[] {m.fromIp(), m.toIp()});
     if (f.networks() != null) {
-      for (var s : f.networks().segments()) for (var u : s.unanswered()) keys.add(u.mac());
-      for (var u : f.networks().unanswered()) keys.add(u.mac());
+      Map<String, List<String>> gateways = new HashMap<>();
+      for (var s : f.networks().segments())
+        if (s.serverMac() != null && s.routers() != null) gateways.computeIfAbsent(s.serverMac(), k -> new ArrayList<>()).addAll(s.routers());
+      for (List<String> g : gateways.values()) for (String r : g) same.add(new String[] {g.get(0), r});
     }
-    return keys.size();
+    long count = deviceCount(local, same);
+    for (var r : f.shared()) if (local.contains(r.ip())) count += Math.max(0, r.occupancies().size() - 1);
+    if (f.networks() != null) {
+      for (var s : f.networks().segments()) count += s.unanswered().size();
+      count += f.networks().unanswered().size();
+    }
+    return count;
+  }
+
+  /**
+   * Devices among these addresses, merging only addresses known to be one device (a device that
+   * moved; one DHCP server's gateways). Not by MAC: a routed subnet's hosts all carry the router's
+   * MAC, and a phone with private addresses changes MAC.
+   */
+  static long deviceCount(Set<String> addresses, List<String[]> sameDevice) {
+    Map<String, String> parent = new HashMap<>();
+    for (String a : addresses) parent.put(a, a);
+    java.util.function.UnaryOperator<String> find = x -> {
+      String r = x;
+      while (!parent.get(r).equals(r)) r = parent.get(r);
+      return r;
+    };
+    for (String[] p : sameDevice) {
+      if (!parent.containsKey(p[0]) || !parent.containsKey(p[1])) continue;
+      String a = find.apply(p[0]);
+      String b = find.apply(p[1]);
+      if (!a.equals(b)) parent.put(b, a);
+    }
+    return addresses.stream().map(find).distinct().count();
   }
 
   // ── Hosts by network ─────────────────────────────────────────────────────────

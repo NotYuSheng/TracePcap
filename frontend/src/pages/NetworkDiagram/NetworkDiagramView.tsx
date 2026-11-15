@@ -249,7 +249,7 @@ export const NetworkDiagramView = ({
   const nodeLabelConfig = useStore(st => st.nodeLabelConfig);
   const downloadMap = () => {
     const layout = layoutGroups(
-      buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, ...groupingEdits(mapEdits) }),
+      buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, deviceLinks: shownDeviceLinks, ...groupingEdits(mapEdits) }),
     );
     const name = (data?.fileName ?? 'capture').replace(/\.(pcapng|pcap|cap)$/i, '');
     downloadDrawio(toDrawio(layout, filteredNodes, filteredEdges, n => buildNodeLines(n, nodeLabelConfig), `${name} — network map`), `${name}-network-map`);
@@ -937,7 +937,7 @@ export const NetworkDiagramView = ({
 
       {groupsDialog && (
         <NetworkMapGroupsModal
-          tops={buildGroupTree(filteredNodes, { ...baseGrouping, ...groupingEdits(mapEdits) })}
+          tops={buildGroupTree(filteredNodes, { ...baseGrouping, deviceLinks: shownDeviceLinks, ...groupingEdits(mapEdits) })}
           edits={mapEdits}
           focus={groupsDialog.focus}
           canEdit={mapPermission.allowed}

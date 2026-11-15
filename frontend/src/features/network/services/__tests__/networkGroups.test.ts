@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphNode } from '../../types'
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService'
-import { allGroups, buildGroupTree, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
+import { allGroups, buildGroupTree, sameDevice, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
 
 const node = (id: string, data: Partial<GraphNode['data']> = {}): GraphNode =>
   ({ id, label: id, data: { ip: id.split(/[@~]/)[0], deviceType: 'LAPTOP_DESKTOP', ...data } }) as unknown as GraphNode
@@ -22,6 +22,31 @@ const find = (gs: GroupNode[], id: string): GroupNode | undefined => {
 }
 
 describe('networkGroups', () => {
+  it('counts devices, not addresses: one DHCP server on three networks, and a laptop that moved', () => {
+    const staff = seg('vlan:10', 'staff', [['10.20.10.23', 'f8:00:00:00:00:03'], ['10.20.10.33', 'f8:00:00:00:00:03']], '10.20.10')
+    const guest = seg('vlan:20', 'guest', [['10.20.20.51', 'aa:00:00:00:00:51']], '10.20.20')
+    const nodes = [
+      node('10.20.10.1'), node('10.20.20.1'),
+      node('10.20.10.23'), node('10.20.10.33'), node('10.20.20.51'),
+    ]
+    const tree = buildGroupTree(nodes, {
+      segments: [staff, guest],
+      deviceLinks: [{ from: '10.20.10.23', to: '10.20.10.33' }],
+    })
+    // Five addresses, three devices: the gateway (both networks), the laptop, the phone.
+    expect(tree[0].devices).toBe(3)
+    // Each network still counts its own gateway.
+    expect(find(tree, 'seg:vlan:10')?.devices ?? tree[0].children[0].devices).toBe(2)
+    const box = layoutGroups(tree).boxes.find(b => b.id === tree[0].id)!
+    expect(box.count).toBe(3)
+    expect(box.memberIds).toHaveLength(5)
+  })
+
+  it('never merges by MAC alone: a routed subnet shares the router MAC', () => {
+    const same = sameDevice(['10.1.0.5', '10.1.0.6'], [], [])
+    expect(same.size).toBe(0)
+  })
+
   it('splits local, internet and broadcast; nests network ▸ subnet ▸ device type', () => {
     const tree = buildGroupTree([
       node('192.168.1.10', { mac: 'aa:00:00:00:00:01' }),
