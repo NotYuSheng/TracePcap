@@ -54,7 +54,19 @@
 }
 .captures-monitor {
   margin: 0 0 0 auto;
+  padding-left: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.78rem;
+}
+.captures-monitor .form-check-input {
+  float: none;
+  margin: 0;
+}
+.captures-monitor .form-check-label {
+  line-height: 1;
 }
 .captures-table th {
   font-size: 0.75rem;

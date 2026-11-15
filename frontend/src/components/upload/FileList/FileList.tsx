@@ -459,7 +459,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         >
                           <i className="bi bi-three-dots" aria-hidden="true"></i>
                         </Dropdown.Toggle>
-                        <Dropdown.Menu>
+                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
                           <Dropdown.Item as={Link} to={`/analysis/${file.fileId}`}>
                             Open
                           </Dropdown.Item>

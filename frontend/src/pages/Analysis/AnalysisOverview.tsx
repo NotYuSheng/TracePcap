@@ -485,9 +485,9 @@ export const AnalysisOverview = () => {
           {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4). */}
           {answers.length > 0 && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} />}
 
-          {(detectedApps.length > 0 || (data.detectedL7Protocols?.length ?? 0) > 0) && (
+          {(
             <section className="ov-card" aria-labelledby="ov-apps">
-              {detectedApps.length > 0 && (
+              {(
                 <div className="ov-sub ov-sub-first">
                   <div className="ov-head">
                     <h2 id="ov-apps">Applications detected</h2>
@@ -499,7 +499,12 @@ export const AnalysisOverview = () => {
                     <p className="small text-muted mb-2">Showing the top {detectedApps.length}.</p>
                   )}
                   <div className="d-flex flex-wrap gap-2">
-                    {detectedApps.map(app => {
+                    {detectedApps.length === 0 && (
+                    <p className="small text-muted mb-0">
+                      No applications detected.
+                    </p>
+                  )}
+                  {detectedApps.map(app => {
                       const appColor = getAppColor(app.name);
                       return (
                         <button
@@ -522,7 +527,7 @@ export const AnalysisOverview = () => {
                   </div>
                 </div>
               )}
-              {(data.detectedL7Protocols?.length ?? 0) > 0 && (
+              {(
                 <div className="ov-sub">
                   <div className="ov-head">
                     <h3>Dissected protocols</h3>
@@ -531,7 +536,10 @@ export const AnalysisOverview = () => {
                     </SourceTag>
                   </div>
                   <div className="d-flex flex-wrap gap-2">
-                    {(data.detectedL7Protocols ?? []).map(proto => {
+                    {(data.detectedL7Protocols?.length ?? 0) === 0 && (
+                    <p className="small text-muted mb-0">No protocols dissected beyond the transport layer.</p>
+                  )}
+                  {(data.detectedL7Protocols ?? []).map(proto => {
                       const bg = getL7ProtocolColor(proto);
                       return (
                         <button

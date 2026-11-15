@@ -1,6 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Container, Dropdown, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { monitorService } from '@/features/monitor/services/monitorService';
@@ -22,6 +22,7 @@ const FILTERS: { key: NetworkFilter; label: string }[] = [
 ];
 
 export const MonitorPage = () => {
+  const navigate = useNavigate();
   const [networks, setNetworks] = useState<Network[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +39,14 @@ export const MonitorPage = () => {
     if (showSpinner) setLoading(true);
     monitorService
       .listNetworks()
-      .then(nets => { setNetworks(nets); setLastUpdated(new Date()); })
+      .then(nets => {
+        setNetworks(nets);
+        setLastUpdated(new Date());
+      })
       .catch(() => setError('Failed to load networks.'))
-      .finally(() => { if (showSpinner) setLoading(false); });
+      .finally(() => {
+        if (showSpinner) setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -50,7 +56,10 @@ export const MonitorPage = () => {
   }, []);
 
   // Device totals, one small request per network with captures.
-  const withCaptures = networks.filter(n => n.snapshotCount > 0).map(n => n.id).join(',');
+  const withCaptures = networks
+    .filter(n => n.snapshotCount > 0)
+    .map(n => n.id)
+    .join(',');
   useEffect(() => {
     if (!withCaptures) return;
     let alive = true;
@@ -59,11 +68,13 @@ export const MonitorPage = () => {
         apiClient
           .get<{ all: number }>(API_ENDPOINTS.NETWORK_DEVICE_COUNTS(id))
           .then(r => [id, r.data.all] as const)
-          .catch(() => null),
-      ),
+          .catch(() => null)
+      )
     ).then(rows => {
       if (!alive) return;
-      setDeviceCounts(Object.fromEntries(rows.filter((r): r is readonly [string, number] => r != null)));
+      setDeviceCounts(
+        Object.fromEntries(rows.filter((r): r is readonly [string, number] => r != null))
+      );
     });
     return () => {
       alive = false;
@@ -78,7 +89,7 @@ export const MonitorPage = () => {
   const handleUpdate = async (name: string, description: string) => {
     if (!editNetwork) return;
     const updated = await monitorService.updateNetwork(editNetwork.id, name, description);
-    setNetworks(prev => prev.map(n => n.id === updated.id ? updated : n));
+    setNetworks(prev => prev.map(n => (n.id === updated.id ? updated : n)));
     setEditNetwork(null);
   };
 
@@ -96,7 +107,7 @@ export const MonitorPage = () => {
   };
 
   const shown = networks.filter(
-    n => matchesFilter(n, filter) && n.name.toLowerCase().includes(query.trim().toLowerCase()),
+    n => matchesFilter(n, filter) && n.name.toLowerCase().includes(query.trim().toLowerCase())
   );
   const count = (f: NetworkFilter) => networks.filter(n => matchesFilter(n, f)).length;
 
@@ -129,8 +140,8 @@ export const MonitorPage = () => {
           <i className="bi bi-diagram-3 display-4 d-block mb-3" aria-hidden="true"></i>
           <h2 className="h5">No networks yet</h2>
           <p>
-            A network collects captures of the same place over time. TracePcap compares each one with
-            the last and flags what changed.
+            A network collects captures of the same place over time. TracePcap compares each one
+            with the last and flags what changed.
           </p>
           <Button type="button" variant="primary" onClick={() => setShowCreate(true)}>
             <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>Create your first network
@@ -184,7 +195,16 @@ export const MonitorPage = () => {
                     const caps = n.captures ?? [];
                     const last = caps[caps.length - 1];
                     return (
-                      <tr key={n.id}>
+                      <tr
+                        key={n.id}
+                        className="monitor-row"
+                        onClick={e => {
+                          // The whole row opens the network; its own buttons and links still act alone.
+                          if ((e.target as HTMLElement).closest('a, button, .dropdown-menu'))
+                            return;
+                          navigate(`/monitor/${n.id}`);
+                        }}
+                      >
                         <td>
                           <Link to={`/monitor/${n.id}`} className="monitor-name">
                             {n.name}
@@ -198,9 +218,16 @@ export const MonitorPage = () => {
                           {caps.length === 0 ? (
                             <span className="small text-muted">None</span>
                           ) : (
-                            <span className="monitor-track" aria-label={`${caps.length} capture${caps.length === 1 ? '' : 's'}`}>
+                            <span
+                              className="monitor-track"
+                              aria-label={`${caps.length} capture${caps.length === 1 ? '' : 's'}`}
+                            >
                               {caps.slice(-12).map(m => (
-                                <span key={m.snapshotId} className={`monitor-dot monitor-dot-${markTone(m)}`} aria-hidden="true" />
+                                <span
+                                  key={m.snapshotId}
+                                  className={`monitor-dot monitor-dot-${markTone(m)}`}
+                                  aria-hidden="true"
+                                />
                               ))}
                               <span className="small text-muted ms-1">{caps.length}</span>
                             </span>
@@ -209,14 +236,25 @@ export const MonitorPage = () => {
                         <td>
                           {last ? (
                             <>
-                              <div>{last.capturedAt ? new Date(parseDateTime(last.capturedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div>
-                              <div className="small text-muted text-truncate monitor-file">{last.fileName}</div>
+                              <div>
+                                {last.capturedAt
+                                  ? new Date(parseDateTime(last.capturedAt)).toLocaleDateString(
+                                      undefined,
+                                      { day: 'numeric', month: 'short', year: 'numeric' }
+                                    )
+                                  : '—'}
+                              </div>
+                              <div className="small text-muted text-truncate monitor-file">
+                                {last.fileName}
+                              </div>
                             </>
                           ) : (
                             <span className="text-muted">Never</span>
                           )}
                         </td>
-                        <td className="monitor-num">{deviceCounts[n.id] ?? (caps.length === 0 ? 0 : '…')}</td>
+                        <td className="monitor-num">
+                          {deviceCounts[n.id] ?? (caps.length === 0 ? 0 : '…')}
+                        </td>
                         <td className="text-end text-nowrap">
                           <Link
                             to={st.to}
@@ -224,6 +262,14 @@ export const MonitorPage = () => {
                           >
                             {st.action}
                           </Link>
+                          {(st.key === 'review' || st.key === 'critical' || st.key === 'clear') && (
+                            <Link
+                              to={`/monitor/${n.id}?add=1`}
+                              className="btn btn-sm btn-outline-secondary ms-2"
+                            >
+                              Add a capture
+                            </Link>
+                          )}
                           <Dropdown align="end" className="d-inline-block ms-2">
                             <Dropdown.Toggle
                               variant="outline-secondary"
@@ -234,9 +280,14 @@ export const MonitorPage = () => {
                             >
                               <i className="bi bi-three-dots" aria-hidden="true"></i>
                             </Dropdown.Toggle>
-                            <Dropdown.Menu>
-                              <Dropdown.Item onClick={() => setEditNetwork(n)}>Rename</Dropdown.Item>
-                              <Dropdown.Item className="text-danger" onClick={() => setConfirmDeleteId(n.id)}>
+                            <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
+                              <Dropdown.Item onClick={() => setEditNetwork(n)}>
+                                Rename
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                className="text-danger"
+                                onClick={() => setConfirmDeleteId(n.id)}
+                              >
                                 Delete
                               </Dropdown.Item>
                             </Dropdown.Menu>
@@ -257,11 +308,25 @@ export const MonitorPage = () => {
             </div>
           </div>
           <div className="monitor-legend" aria-label="Capture colours">
-            <span><span className="monitor-dot monitor-dot-baseline" aria-hidden="true" />Baseline</span>
-            <span><span className="monitor-dot monitor-dot-none" aria-hidden="true" />No changes</span>
-            <span><span className="monitor-dot monitor-dot-warning" aria-hidden="true" />Changes</span>
-            <span><span className="monitor-dot monitor-dot-critical" aria-hidden="true" />Critical change</span>
-            {lastUpdated && <span className="ms-auto">Updated {lastUpdated.toLocaleTimeString()}</span>}
+            <span>
+              <span className="monitor-dot monitor-dot-baseline" aria-hidden="true" />
+              Baseline
+            </span>
+            <span>
+              <span className="monitor-dot monitor-dot-none" aria-hidden="true" />
+              No changes
+            </span>
+            <span>
+              <span className="monitor-dot monitor-dot-warning" aria-hidden="true" />
+              Changes
+            </span>
+            <span>
+              <span className="monitor-dot monitor-dot-critical" aria-hidden="true" />
+              Critical change
+            </span>
+            {lastUpdated && (
+              <span className="ms-auto">Updated {lastUpdated.toLocaleTimeString()}</span>
+            )}
           </div>
         </>
       )}
@@ -287,8 +352,8 @@ export const MonitorPage = () => {
         <Modal.Body>
           <p className="mb-0">
             Are you sure you want to delete{' '}
-            <strong>{networks.find(n => n.id === confirmDeleteId)?.name}</strong>?{' '}
-            The original PCAP files will not be deleted.
+            <strong>{networks.find(n => n.id === confirmDeleteId)?.name}</strong>? The original PCAP
+            files will not be deleted.
           </p>
         </Modal.Body>
         <Modal.Footer>

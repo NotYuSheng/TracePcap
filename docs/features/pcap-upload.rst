@@ -66,7 +66,8 @@ analysis. This prevents redundant processing and storage.
 Processing Progress
 -------------------
 
-The whole **Analyse a capture** panel is the drop target. While you drag
+The whole **Analyse a capture** panel is the drop target, and the purple drop
+box is also a button: click it to choose files. While you drag
 files over it, it says how many captures will be analysed and with which
 stages.
 
@@ -84,8 +85,8 @@ Problems stay as rows with a plain reason:
   analysis;
 - a file that is **too big** or **not a capture** says so, and what to do.
 
-**Clear these** removes the finished rows. **Add more** picks more files while
-others are still going.
+**Clear these** removes the finished rows. Click the drop box again to add
+more files while others are still going.
 
 A single file opens its analysis as soon as it is uploaded, on a progress view
 that shows each stage. Analysis runs in the background, so you can leave and

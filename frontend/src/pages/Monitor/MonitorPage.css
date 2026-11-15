@@ -124,3 +124,10 @@
     margin-left: 0;
   }
 }
+
+.monitor-row {
+  cursor: pointer;
+}
+.monitor-row:hover td {
+  background: rgba(89, 37, 220, 0.04);
+}

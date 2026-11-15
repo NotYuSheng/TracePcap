@@ -63,3 +63,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* A tab that holds several sections stacks their cards. */
+.network-page .analysis-body > .card + .card {
+  margin-top: 1rem;
+}
