@@ -1,108 +1,81 @@
 PDF Report Export
 =================
 
-TracePcap can generate a self-contained PDF report for any analysed PCAP.
-The report is produced server-side and includes data from all analysis
-stages completed for that file.
+TracePcap writes a PDF report for any analysed capture. It is meant for someone who will never
+open TracePcap: the first page says what needs a look, in sentences that name the devices, and
+the evidence comes after.
 
-Generating a Report
--------------------
+Downloading a Report
+--------------------
 
-Click the **Export PDF** button in the top navigation bar of any analysis
-page. A progress modal tracks the steps:
+On the capture's **Capture** tab (*Capture, rules and report*), click **Download report**. A
+drawer opens on the right:
 
-1. **Rendering network diagrams** — the frontend captures screenshots of
-   the network topology in both Force-directed and Hierarchical layouts,
-   using the currently active filters.
-2. **Building PDF** — the backend assembles the report from stored analysis
-   data and the captured diagram images.
+**How much**
+   - **Briefing**: what needs a look, the hosts by network, and the network map. Usually three
+     pages.
+   - **Full**: the briefing, then traffic, conversations, extracted files and an appendix of every
+     flagged conversation.
 
-The PDF downloads automatically when complete.
+**Include**
+   Each part can be ticked on or off after picking one of the two. A part this capture can't have
+   is greyed out with the reason, e.g. *Story: not written yet* or *Extracted files: extraction
+   was off*, so the PDF never carries an empty section.
 
-Report Sections
----------------
+**Network map**
+   - **As you left it**: the Network tab's map with its filters, which the PDF states under the
+     map. Available once the Network tab has been opened.
+   - **The whole capture**: every host, ignoring the Network tab's filters.
 
-Sections are numbered consecutively. Optional sections are skipped (and
-renumbered) when no data is available.
+**Download PDF** draws the map, then builds the PDF. Progress shows in the drawer's footer.
+
+What the Report Holds
+---------------------
+
+Every page has a running header and "n of N" in its footer, with the capture's name and the start
+and end of its SHA-256.
 
 .. list-table::
    :header-rows: 1
-   :widths: 35 65
+   :widths: 25 75
 
-   * - Section
+   * - Part
      - Contents
-   * - **File Information**
-     - Filename, SHA-256 hash, capture start/end times, duration, file size.
-   * - **Executive Summary**
-     - High-level counts: total conversations, unique hosts, risk alerts,
-       protocols, applications, detected file types.
-   * - **Protocol Distribution**
-     - Bar chart and table of ``_ws.col.Protocol`` values by conversation
-       count and byte volume.
-   * - **Traffic Category Distribution**
-     - nDPI traffic categories (Web, VPN, Media, etc.) by conversation count.
-       Omitted if nDPI was not enabled.
-   * - **Applications Detected**
-     - nDPI application names ranked by conversation count. Omitted if nDPI
-       was not enabled.
-   * - **Detected L7 Protocols**
-     - ``tsharkProtocol`` (deepest Wireshark dissector label) ranked by
-       conversation count.
-   * - **Host Inventory**
-     - Table of all unique IPs with MAC address, vendor, device type,
-       country, ASN, and risk alert count.
-   * - **Risk & Signature Summary**
-     - Counts of nDPI risk flags and custom signature matches.
-   * - **Security Findings**
-     - Up to the top 20 conversations with nDPI risk flags, showing src/dst,
-       protocol, application, and risk names.
-   * - **TLS / HTTPS Analysis**
-     - Encrypted conversations with JA3/JA3S fingerprints, SNI, and
-       certificate subject/issuer/expiry.
-   * - **HTTP User Agents**
-     - Distinct ``User-Agent`` strings observed across all HTTP conversations.
-   * - **Top Conversations by Traffic**
-     - Top conversations ranked by ``totalBytes``, with protocol, application,
-       packet count, and byte volume.
-   * - **Extracted Files**
-     - List of files recovered by the extraction pipeline (filename, MIME
-       type, size, source conversation). Omitted if extraction was not enabled.
-   * - **Network Diagram — Active Filters**
-     - Note of any active filters applied to the topology diagrams below.
-   * - **Network Topology (Force-directed)**
-     - Screenshot of the Sigma.js topology graph in force-directed layout.
-   * - **Network Topology (Hierarchical)**
-     - Screenshot of the Sigma.js topology graph in ELK hierarchical layout.
-   * - **AI Narrative** *(if Story generated)*
-     - The LLM-written narrative from Story Mode.
-   * - **Deterministic Findings** *(if Story generated)*
-     - Typed findings from the 8 detector algorithms (Beacon, TLS Anomaly,
-       Volume, FanOut, etc.) with severity, affected IPs, and metrics.
-   * - **LLM Investigation** *(if Story generated)*
-     - Hypotheses, structured DB queries, and conversation evidence tables
-       from the LLM investigation phase.
+   * - **Summary** *(always)*
+     - The capture's name, when it ran, its packets and size, and which detection rules it was
+       read with. The figures: devices on your networks, networks, conversations, internet hosts.
+       **Where the traffic goes**: the busiest organisations.
+   * - **Needs a look**
+     - What was flagged, most serious first. A flag on a few conversations is told one
+       conversation at a time ("Telnet to CAM-ENTRANCE from Visitors-iPhone … at 17:25:00"),
+       naming the device that held the address *at that moment*. A flag on a large share of the
+       capture is one line, since that is more often a trait of the capture's devices than an
+       attack. Also: an address that two devices held in turn, and devices that asked for an
+       address and got no answer. Sources: nDPI risks, Suricata alerts and your detection rules.
+   * - **Hosts, by network**
+     - Hosts grouped by the network they're on (from DHCP: its domain or VLAN and range), then
+       other local addresses, then the internet by organisation. Name, address, MAC, device type
+       and vendor. A device that moved shows both addresses; an address two devices held shows
+       both, with when; the gateway of each network reads as *Gateway*.
+   * - **Network map**
+     - The grouped map from the Network tab, fitted to the page, with what it shows under it.
+       Then a list of the rest of the report, and what isn't in it and why.
+   * - **Story**
+     - The Story tab's narrative and findings, when written.
+   * - **Traffic**
+     - Every organisation, flows between them, protocols, applications and categories.
+   * - **Conversations**
+     - The 25 busiest conversations, by name, and every internet host with its organisation.
+   * - **Extracted files**
+     - Files carved from the capture, with type, size and SHA-256.
+   * - **Appendix**
+     - Every flagged conversation, grouped by flag (up to 300 per flag), and how each device was
+       classified: its MAC vendor and TTL evidence and the confidence.
 
-If Story Mode has not been run, a notice replaces the three story sections.
-
-Network Diagrams in the Report
--------------------------------
-
-The diagrams embedded in the PDF reflect **exactly what you see on the
-Network Diagram tab** at the time you click Export PDF — including any active
-protocol, IP, port, device type, or risk filters. Active filters are listed
-in the preceding section so the report is self-documenting.
-
-If the Network Diagram tab has not been visited in the current session, the
-report fetches the raw graph and applies whatever filters are currently
-configured in the diagram tab's filter panel.
-
-The frontend temporarily switches to light mode before capturing screenshots,
-so diagrams always render on a white background regardless of the user's
-theme preference.
+The map is a JPEG drawn at twice its printed size, so a report is usually around 1 MB.
 
 Compare View Report
 -------------------
 
-The cross-PCAP comparison view (``/compare``) has its own **Export PDF**
-button that captures the merged topology diagram and includes it in a
-dedicated comparison report.
+The cross-capture comparison view (``/compare``) has its own **Export PDF** button that captures
+the merged topology diagram and includes it in a comparison report.

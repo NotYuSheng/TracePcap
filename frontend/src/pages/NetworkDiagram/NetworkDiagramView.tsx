@@ -687,7 +687,9 @@ export const NetworkDiagramView = ({
       hiddenNodes > 0
         ? `Showing the ${nodeLimit} most significant nodes (${hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.`
         : null;
-    networkGraphStateRef.current = { filteredNodes, filteredEdges, activeFilterLabels: labels, nodeLimitNote };
+    networkGraphStateRef.current = {
+      filteredNodes, filteredEdges, activeFilterLabels: labels, nodeLimitNote, deviceLinks: shownDeviceLinks,
+    };
   });
 
   if (loading) {

@@ -4269,24 +4269,31 @@
       },
       "ReportRequest": {
         "properties": {
-          "activeFilters": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "forceDirectedImage": {
+          "mapCaption": {
             "type": "string"
           },
-          "hierarchicalImage": {
+          "mapImage": {
             "type": "string"
           },
           "networkId": {
             "format": "uuid",
             "type": "string"
           },
-          "nodeLimitNote": {
-            "type": "string"
+          "sections": {
+            "items": {
+              "enum": [
+                "NEEDS_A_LOOK",
+                "HOSTS",
+                "MAP",
+                "STORY",
+                "TRAFFIC",
+                "CONVERSATIONS",
+                "EXTRACTED_FILES",
+                "APPENDIX"
+              ],
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
