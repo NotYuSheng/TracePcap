@@ -13,7 +13,7 @@ import type { GraphNode } from '../../types'
 import { useCompareData } from '../useCompareData'
 
 vi.mock('@/features/conversation/services/conversationService', () => ({
-  conversationService: { getConversations: vi.fn(), getHostClassifications: vi.fn() },
+  conversationService: { getAllConversations: vi.fn(), getHostClassifications: vi.fn() },
 }))
 vi.mock('../../services/networkService', async importOriginal => {
   const actual = await importOriginal<typeof import('../../services/networkService')>()
@@ -56,12 +56,12 @@ describe('useCompareData', () => {
 
     // Empty labels mean the filenames have not loaded yet. Fetching now would build a graph
     // whose per-file series cannot be named.
-    await waitFor(() => expect(convService.getConversations).not.toHaveBeenCalled())
+    await waitFor(() => expect(convService.getAllConversations).not.toHaveBeenCalled())
     expect(result.current.loading).toBe(true)
   })
 
   it('builds every file without a per-file node cap', async () => {
-    convService.getConversations.mockResolvedValue({ data: [] } as never)
+    convService.getAllConversations.mockResolvedValue([] as never)
     convService.getHostClassifications.mockResolvedValue([] as never)
     netService.buildNetworkGraph.mockReturnValue(graph([node('a')]) as never)
 
@@ -76,7 +76,7 @@ describe('useCompareData', () => {
   })
 
   it('reports per-file stats against their labels, in order', async () => {
-    convService.getConversations.mockResolvedValue({ data: [] } as never)
+    convService.getAllConversations.mockResolvedValue([] as never)
     convService.getHostClassifications.mockResolvedValue([] as never)
     netService.buildNetworkGraph
       .mockReturnValueOnce(graph([node('a'), node('b')]) as never)
@@ -95,7 +95,7 @@ describe('useCompareData', () => {
   })
 
   it('applies the node limit after merging and reports what was hidden', async () => {
-    convService.getConversations.mockResolvedValue({ data: [] } as never)
+    convService.getAllConversations.mockResolvedValue([] as never)
     convService.getHostClassifications.mockResolvedValue([] as never)
     netService.buildNetworkGraph.mockReturnValue(
       graph([node('big', 1000), node('mid', 500), node('small', 1)]) as never
@@ -112,7 +112,7 @@ describe('useCompareData', () => {
   })
 
   it('surfaces a fetch failure', async () => {
-    convService.getConversations.mockRejectedValue(new Error('backend down'))
+    convService.getAllConversations.mockRejectedValue(new Error('backend down'))
     convService.getHostClassifications.mockResolvedValue([] as never)
 
     const { result } = renderHook(() => useCompareData(['f1'], ['A'], 50))
@@ -122,7 +122,7 @@ describe('useCompareData', () => {
   })
 
   it('recomputes the visible slice when the limit changes without refetching', async () => {
-    convService.getConversations.mockResolvedValue({ data: [] } as never)
+    convService.getAllConversations.mockResolvedValue([] as never)
     convService.getHostClassifications.mockResolvedValue([] as never)
     netService.buildNetworkGraph.mockReturnValue(
       graph([node('big', 1000), node('mid', 500), node('small', 1)]) as never
@@ -132,13 +132,13 @@ describe('useCompareData', () => {
       initialProps: { limit: 1 },
     })
     await waitFor(() => expect(result.current.mergedNodes).toHaveLength(1))
-    const fetches = convService.getConversations.mock.calls.length
+    const fetches = convService.getAllConversations.mock.calls.length
 
     rerender({ limit: 3 })
 
     // Memoised on the merged graph, so moving the slider re-slices rather than re-downloading
     // every capture.
     await waitFor(() => expect(result.current.mergedNodes).toHaveLength(3))
-    expect(convService.getConversations.mock.calls.length).toBe(fetches)
+    expect(convService.getAllConversations.mock.calls.length).toBe(fetches)
   })
 })

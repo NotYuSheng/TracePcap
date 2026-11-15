@@ -341,14 +341,16 @@ export function selectSignificantNodes(
 }
 
 /**
- * How many hosts the diagram draws by default: all of them up to this many. The WebGL renderer
- * draws a few thousand smoothly; past this the cost is the labels, group boxes and traffic dots
- * drawn on top, and a map that size is read by filtering, so larger captures start at the most
- * significant 1,000 with "All" one click away.
+ * How many hosts the diagram draws by default: all of them. Measured in software rendering, the
+ * renderer draws 19,000 hosts in 1.6s; panning slows past ~10,000 (7fps there, 5fps at 19,000),
+ * and a GPU does several times better. So nothing is capped unless the analyst asks.
  */
-export const DEFAULT_DIAGRAM_NODES = 1000;
-/** The host-count choices offered when a capture has more hosts than the smallest. */
-export const NODE_LIMIT_PRESETS = [100, 500, 1000];
+export const DEFAULT_DIAGRAM_NODES = Number.POSITIVE_INFINITY;
+/**
+ * Optional "top N" choices for decluttering a big capture, offered once it has more hosts than
+ * the smallest.
+ */
+export const NODE_LIMIT_PRESETS = [1000, 5000, 10000];
 
 /**
  * Transform conversations into graph nodes and edges
@@ -715,7 +717,8 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
   const allEdges = edges;
 
   const { significantNodes, hiddenCount, hiddenNodesList, crossEdges } =
-    maxNodes > 0
+    // Only rank when there is something to cut: with every host shown there is nothing to score.
+    maxNodes > 0 && maxNodes < allNodes.length
       ? selectSignificantNodes(allNodes, allEdges, maxNodes)
       : { significantNodes: allNodes, hiddenCount: 0, hiddenNodesList: [], crossEdges: [] };
 

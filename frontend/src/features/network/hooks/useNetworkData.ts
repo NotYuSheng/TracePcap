@@ -119,7 +119,7 @@ export function useNetworkData(
       // Conversations are required; the other three are best-effort enrichments (older analyses
       // may predate their endpoints). All depend only on fileId, so they run concurrently.
       const [response, classificationsRes, identitiesRes, rolesRes, reusedRes, movesRes] = await Promise.allSettled([
-        conversationService.getConversations(fileId, {
+        conversationService.getAllConversations(fileId, {
           networkId,
           ip: '',
           port: '',
@@ -135,10 +135,6 @@ export function useNetworkData(
           suricataAlerts: [],
           deviceTypes: [],
           countries: [],
-          sortBy: '',
-          sortDir: 'asc',
-          page: 1,
-          pageSize: 10000,
         }),
         conversationService.getHostClassifications(fileId),
         conversationService.getHostIdentities(fileId),
@@ -149,7 +145,7 @@ export function useNetworkData(
         occupancyService.moves(fileId),
       ]);
       if (response.status === 'rejected') throw response.reason;
-      const conversations = response.value.data;
+      const conversations = response.value;
 
       const hostClassifications: HostClassification[] | undefined =
         classificationsRes.status === 'fulfilled' ? classificationsRes.value : undefined;

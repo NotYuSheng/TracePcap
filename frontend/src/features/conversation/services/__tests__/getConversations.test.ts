@@ -169,3 +169,26 @@ describe('conversationService.getConversations', () => {
     expect(seen.query?.has('ip')).toBe(false)
   })
 })
+
+describe('getAllConversations', () => {
+  it('pages through every conversation in id order, not just the first 10,000', async () => {
+    const seen: string[] = []
+    server.use(
+      http.get('*/api/v1/conversations/*', ({ request }) => {
+        const url = new URL(request.url)
+        const page = Number(url.searchParams.get('page'))
+        seen.push(`${page}:${url.searchParams.get('sortBy')}:${url.searchParams.get('pageSize')}`)
+        return HttpResponse.json({
+          data: [{ ...row, conversationId: `c${page}` }],
+          page,
+          pageSize: 10000,
+          total: 3,
+          totalPages: 3,
+        })
+      })
+    )
+    const all = await conversationService.getAllConversations(FILE, filters())
+    expect(all.map(c => c.id)).toEqual(['c1', 'c2', 'c3'])
+    expect(seen.sort()).toEqual(['1:id:10000', '2:id:10000', '3:id:10000'])
+  })
+})
