@@ -81,6 +81,11 @@ public class SystemController {
             "fileRetentionHours",
             cleanupEnabled
                 ? Math.max(runtimePolicy.getInt(EditablePolicy.FILE_RETENTION_HOURS), 0)
+                : 0,
+            // Captures of a monitored network; 0 means they're never deleted.
+            "monitorFileRetentionHours",
+            cleanupEnabled
+                ? Math.max(runtimePolicy.getInt(EditablePolicy.MONITOR_FILE_RETENTION_HOURS), 0)
                 : 0));
   }
 }

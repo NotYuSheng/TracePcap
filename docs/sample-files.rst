@@ -29,6 +29,13 @@ Included Files
        own node, classified from its own traffic (see
        :doc:`features/address-reuse`). Regenerate with
        ``python3 sample-files/gen_dhcp_reuse.py``.
+   * - ``office_showcase.pcap``
+     - The small office (four VLANs, ``small_office.pcap``) plus the things the
+       network map is best at showing: one address two phones held in turn, a
+       laptop that moved to a new address, a Raspberry Pi whose requests for an
+       address nobody answers, and a telnet login from the guest network to a
+       camera. The README's hero GIF is recorded on it. Regenerate with
+       ``python3 sample-files/gen_small_office.py --showcase``.
    * - ``private_mac_week1.pcap``, ``private_mac_week2.pcap``
      - Two weekly snapshots: Bob's iPhone changes its private MAC between
        them, keeping its DHCP fingerprint and hostname; Carol's Pixel keeps

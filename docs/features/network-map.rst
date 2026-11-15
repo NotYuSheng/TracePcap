@@ -42,8 +42,29 @@ Each box sits inside the one above it:
   and ``www.example.com`` share ``example.com``). The domain comes from the
   host's name, else from the name clients looked its address up by in the
   capture's DNS traffic; with neither, **No hostname**.
-- **Broadcast and multicast**: ``0.0.0.0``, ``255.255.255.255`` and multicast
-  addresses.
+- **Broadcast and multicast**: ``255.255.255.255``, multicast addresses, and a
+  subnet's own broadcast address (such as ``10.20.30.255``) when it only ever
+  receives. A host that holds a ``.255`` address in a wider subnet sends traffic,
+  so it stays a device.
+
+Each box's count is of **devices**, not addresses. Two addresses count as one
+device only on evidence: a device seen moving to another address, and one DHCP
+server's gateway addresses on the networks it serves (one router, so **Your
+networks** counts it once while each network still counts its own gateway).
+Not by MAC address alone: hosts on a routed subnet all reach the capture with
+the router's MAC, and a phone with private addressing changes its MAC. The
+Overview's *Where the hosts are* and the PDF report count the same way.
+
+A client asking for an address sends from ``0.0.0.0``, before it has one, so its
+MAC is what tells it apart. Its request is drawn on the device the DHCP server
+then gave an address to, so you can follow a client from asking to answered;
+a device that moved address has each request on the address it got next. A
+client nobody answered gets its own node under **No IP address**, named by the
+hostname it asked under (else its MAC), in the network of the VLAN it asked on.
+On an untagged capture with no answer there is nothing to place it by, so it
+sits under **Other local addresses**. Past 20 unanswered clients they are drawn as one node, *N devices
+asking for an address*: hundreds of made-up MACs asking at once is a DHCP
+starvation attack, not hundreds of devices.
 
 Device labels are fitted to their cell, so neighbours never overlap: with the
 whole map in view a device shows its first lines (name and address), cut to fit,
@@ -135,8 +156,8 @@ same drawer as the Conversations tab's **More filters**: one section per filter
 applications, categories, risk types, rules, file types, countries), and each
 chip shows how many it covers: devices for a node identity, connections for
 everything else. Filters apply as you pick them. **Show N connections** at the
-foot closes the drawer; **Clear all** resets every filter. The Network Cluster
-tab and the monitor's snapshot dialog use the same drawer.
+foot closes the drawer; **Clear all** resets every filter. The Conversations
+filters and the Monitor capture map use the same drawer.
 
 Your Own Groups, Names and Notes
 --------------------------------

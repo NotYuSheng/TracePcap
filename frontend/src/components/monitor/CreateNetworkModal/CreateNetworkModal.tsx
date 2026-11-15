@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 
 interface CreateNetworkModalProps {
@@ -41,13 +42,41 @@ export const CreateNetworkModal = ({ show, onHide, onCreate }: CreateNetworkModa
   };
 
   return (
-    <Modal show={show} onHide={handleHide}>
-      <Modal.Header closeButton>
-        <Modal.Title>Create Network</Modal.Title>
-      </Modal.Header>
-      <form onSubmit={handleSubmit}>
-        <Modal.Body>
-          {error && <Alert variant="danger" className="py-2">{error}</Alert>}
+    <SideDrawer
+      show={show}
+      onHide={handleHide}
+      title="New network"
+      titleId="create-network-title"
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleHide} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="create-network-form"
+            variant="primary"
+            disabled={saving || !name.trim()}
+          >
+            {saving ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Creating…
+              </>
+            ) : (
+              'Create network'
+            )}
+          </Button>
+        </>
+      }
+    >
+      <form id="create-network-form" onSubmit={handleSubmit}>
+        <div>
+          {error && (
+            <Alert variant="danger" className="py-2">
+              {error}
+            </Alert>
+          )}
           <Form.Group className="mb-3">
             <Form.Label className="fw-semibold" htmlFor="network-name">
               Name <span className="text-danger">*</span>
@@ -76,23 +105,8 @@ export const CreateNetworkModal = ({ show, onHide, onCreate }: CreateNetworkModa
               onChange={e => setDescription(e.target.value)}
             />
           </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleHide} disabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={saving || !name.trim()}>
-            {saving ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-2" />
-                Creating…
-              </>
-            ) : (
-              'Create Network'
-            )}
-          </Button>
-        </Modal.Footer>
+        </div>
       </form>
-    </Modal>
+    </SideDrawer>
   );
 };

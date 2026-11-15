@@ -1,7 +1,10 @@
 Settings
 ========
 
-TracePcap's settings are grouped by who they affect:
+TracePcap's settings are grouped by who they affect. On the **Settings** page the
+sections run down the left, like a capture's analysis: **Personal** under *You*, and
+the rest under *This install*. The **»** button at the bottom widens the menu to
+the sections' full names.
 
 .. list-table::
    :header-rows: 1
@@ -10,10 +13,10 @@ TracePcap's settings are grouped by who they affect:
    * - Where
      - Affects
      - Notes
-   * - **Settings** page, **Personal** tab
+   * - **Settings** page, **Personal**
      - you (or everyone, with login off)
      - Personal look and layout only. Never changes analysis results.
-   * - **Settings** page, other tabs
+   * - **Settings** page, the other sections
      - everyone using the install
      - Deploy-time settings, custom detection rules, address defaults (subnet labels,
        internal ranges, organisations), who may change what, the audit log, and users.
@@ -39,7 +42,7 @@ Personal
 - **Login on**: saved to your account, so they follow you to any browser, and two
   analysts on one machine keep separate settings.
 - **Login off**: there is no account, so everyone using the install shares **one set**.
-  A change made by one person changes it for everyone, and the tab says so. This is
+  A change made by one person changes it for everyone, and the section says so. This is
   deliberate: a single-analyst laptop or a shared appliance gets the same preferences in
   any browser.
 
@@ -51,25 +54,26 @@ browser: they're history, not a preference.
 For Everyone
 ------------
 
-The **Settings** page's other tabs: **System**, **Detection rules**, **Address defaults**,
-**Permissions**, **Audit log** and **Users**.
+The **Settings** page's other sections, under *This install*: **System**, **Detection
+rules**, **Address defaults**, **Permissions**, **Audit log** and **Users**.
 
 **System.** Every deploy-time setting (each environment variable in :doc:`../configuration/environment-variables`)
 is listed with its **effective value**, including values derived from ``APP_MEMORY_MB``
 such as the upload cap. They are grouped as:
 
 - **Analysis policy**: detection thresholds, retention, display limits.
+- **LLM**: the server Story and Insights use, with **Test connection** (see
+  :doc:`../configuration/llm-setup`).
 - **Memory and capacity**: limits tied to how much memory the backend has.
-- **Infrastructure**: servers, storage, login, and the LLM.
+- **Infrastructure**: servers, storage and login.
 
 Most settings can't be changed in the app: each is greyed out with a lock, and clicking
 it shows why, which variable sets it, its default, and what it does. **Secrets**
 (database password, MinIO keys, LLM API key) only show whether they're set. Their values
 are never sent to the browser.
 
-**Changing policy in the app.** A few analysis-policy settings can be changed here
-without a redeploy, by whoever has the permission for them (see
-:ref:`settings-permissions`):
+**Changing settings in the app.** A few settings can be changed here without a
+redeploy, by whoever has the permission for them (see :ref:`settings-permissions`):
 
 .. list-table::
    :header-rows: 1
@@ -84,11 +88,16 @@ without a redeploy, by whoever has the permission for them (see
      - From the next hourly cleanup run.
    * - ``DNS_NXDOMAIN_SUSPICIOUS_RATIO``, ``DNS_NXDOMAIN_MIN_QUERIES``
      - Analysis policy (analysts)
-     - At once in the network cluster view; host DNS logs use it from the next
-       analysis.
+     - At once in a DNS server's DNS tab (its host details); host DNS logs use
+       it from the next analysis.
    * - ``HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO``, ``HTTP_MIN_REQUESTS``
      - Analysis policy (analysts)
-     - At once in the network cluster view.
+     - At once in a web server's HTTP tab (its host details).
+   * - ``LLM_API_BASE_URL``, ``LLM_API_KEY``, ``LLM_MODEL``, ``LLM_TEMPERATURE``,
+       ``LLM_MAX_TOKENS``, ``LLM_TIMEOUT``, ``LLM_TOOL_CALLING``
+     - LLM connection (admins)
+     - From the next LLM call (tool calling: the next story). The key is never shown
+       again once saved.
 
 Click the setting, then **Change…**. The value from the deployment's ``.env`` stays the
 default: a setting changed in the app is marked *changed in the app*, and **Reset to the
@@ -127,6 +136,8 @@ the defaults favour analysts:
    * - Analysis policy
      - analysts
    * - Retention
+     - admins
+   * - The LLM connection (server, key, model)
      - admins
    * - Which items need an admin (this table)
      - admins, always

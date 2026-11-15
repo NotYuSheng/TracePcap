@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { CaptureRulesCard } from '@/features/detectionRules/CaptureRulesCard';
-import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { RetentionCard } from '@/features/captureKeep/RetentionCard';
+import { Button, Card, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { apiClient } from '@/services/api/client';
@@ -125,6 +127,7 @@ export function FileTabPage() {
       <div className="mb-4">
         <CaptureRulesCard fileId={fileId!} onChanged={() => outlet?.refreshSummary?.()} />
       </div>
+      <RetentionCard fileId={fileId!} />
       {current.version && (
         <Alert variant="info" className="py-2 small">
           This is a re-analysis
@@ -177,7 +180,9 @@ export function FileTabPage() {
           <p className="small text-muted mt-2 mb-0">
             {current.fileName}
             {current.packetCount != null && <> · {current.packetCount.toLocaleString()} packets</>}
-            {current.uploadedAt && <> · analysed {new Date(parseDateTime(current.uploadedAt)).toLocaleString()}</>}
+            {current.uploadedAt && (
+              <> · analysed {new Date(parseDateTime(current.uploadedAt)).toLocaleString()}</>
+            )}
           </p>
         </Card.Body>
       </Card>
@@ -231,54 +236,56 @@ export function FileTabPage() {
         </Card>
       )}
 
-      <Modal show={show} onHide={() => !busy && setShow(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Re-analyse with other options</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="small text-muted">
-            This makes a new version of the capture, analysed with these options. This analysis is
-            kept, along with its labels and notes; the capture's own detection rules are copied to
-            the new version.
-          </p>
-          {submitError && (
-            <Alert variant="danger" className="py-2 small">
-              {submitError}
-            </Alert>
-          )}
-          {OPTIONS.map(o => (
-            <Form.Check
-              key={o.key}
-              type="switch"
-              id={`reanalyse-${o.key}`}
-              className="mb-2"
-              label={
-                <>
-                  {o.label}
-                  <div className="small text-muted">{o.help}</div>
-                </>
-              }
-              checked={opts[o.key]}
-              onChange={e => setOpts(p => ({ ...p, [o.key]: e.target.checked }))}
-              disabled={busy}
-            />
-          ))}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShow(false)} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={reanalyse} disabled={busy}>
-            {busy ? (
-              <Spinner animation="border" size="sm" />
-            ) : unchanged ? (
-              'Re-analyse with the same options'
-            ) : (
-              'Re-analyse'
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <SideDrawer
+        show={show}
+        onHide={() => !busy && setShow(false)}
+        title="Re-analyse with other options"
+        titleId="reanalyse-title"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShow(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={reanalyse} disabled={busy}>
+              {busy ? (
+                <Spinner animation="border" size="sm" />
+              ) : unchanged ? (
+                'Re-analyse with the same options'
+              ) : (
+                'Re-analyse'
+              )}
+            </Button>
+          </>
+        }
+      >
+        <p className="small text-muted">
+          This makes a new version of the capture, analysed with these options. This analysis is
+          kept, along with its labels and notes; the capture's own detection rules are copied to the
+          new version.
+        </p>
+        {submitError && (
+          <Alert variant="danger" className="py-2 small">
+            {submitError}
+          </Alert>
+        )}
+        {OPTIONS.map(o => (
+          <Form.Check
+            key={o.key}
+            type="switch"
+            id={`reanalyse-${o.key}`}
+            className="mb-2"
+            label={
+              <>
+                {o.label}
+                <div className="small text-muted">{o.help}</div>
+              </>
+            }
+            checked={opts[o.key]}
+            onChange={e => setOpts(p => ({ ...p, [o.key]: e.target.checked }))}
+            disabled={busy}
+          />
+        ))}
+      </SideDrawer>
     </div>
   );
 }

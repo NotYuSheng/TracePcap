@@ -3,6 +3,7 @@ import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { settingsService, type SystemSetting } from '@/features/settings';
+import { LlmTestPanel } from './LlmTestPanel';
 
 interface EditSystemSettingModalProps {
   setting: SystemSetting | null;
@@ -26,7 +27,8 @@ export function EditSystemSettingModal({ setting, onHide, onSaved }: EditSystemS
 
   useEffect(() => {
     if (setting) {
-      setValue(setting.value ?? '');
+      // A secret is never sent to the page: its field starts empty, for a new value.
+      setValue(setting.secret ? '' : (setting.value ?? ''));
       setError(null);
     }
   }, [setting]);
@@ -48,7 +50,16 @@ export function EditSystemSettingModal({ setting, onHide, onSaved }: EditSystemS
   };
 
   const inputId = `edit-setting-${setting.key}`;
-  const unchanged = value.trim() === (setting.value ?? '');
+  const unchanged = !setting.secret && value.trim() === (setting.value ?? '');
+  // The LLM connection's own fields can be tested with the typed value before saving it.
+  const candidate =
+    setting.key === 'LLM_API_BASE_URL'
+      ? { baseUrl: value }
+      : setting.key === 'LLM_API_KEY'
+        ? { apiKey: value }
+        : setting.key === 'LLM_MODEL'
+          ? { model: value }
+          : null;
 
   return (
     <Modal show onHide={() => !saving && onHide()}>
@@ -70,22 +81,47 @@ export function EditSystemSettingModal({ setting, onHide, onSaved }: EditSystemS
           {setting.description && <p className="small text-muted">{setting.description}</p>}
           <Form.Group className="mb-3">
             <Form.Label htmlFor={inputId}>Value</Form.Label>
-            <Form.Control
-              id={inputId}
-              value={value}
-              inputMode="decimal"
-              onChange={e => setValue(e.target.value)}
-              disabled={saving}
-              autoFocus
-            />
+            {setting.type === 'CHOICE' ? (
+              <Form.Select id={inputId} value={value} onChange={e => setValue(e.target.value)} disabled={saving}>
+                {(setting.choices ?? []).map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Form.Select>
+            ) : (
+              <Form.Control
+                id={inputId}
+                value={value}
+                type={setting.secret ? 'password' : setting.type === 'URL' ? 'url' : 'text'}
+                autoComplete={setting.secret ? 'new-password' : 'off'}
+                placeholder={setting.secret ? (setting.set ? 'Enter a new key to replace the current one' : 'Enter the key') : undefined}
+                inputMode={setting.type === 'INT' || setting.type === 'RATIO' || setting.type === 'DECIMAL' ? 'decimal' : undefined}
+                onChange={e => setValue(e.target.value)}
+                disabled={saving}
+                autoFocus
+              />
+            )}
             <Form.Text muted>
-              The deployment sets <span className="font-monospace">{setting.deployValue}</span> (
-              <span className="font-monospace">{setting.key}</span>).
+              {setting.secret ? (
+                <>A secret: it's never shown again once saved. </>
+              ) : (
+                <>
+                  The deployment sets <span className="font-monospace">{setting.deployValue}</span>{' '}
+                </>
+              )}
+              (<span className="font-monospace">{setting.key}</span>).
               {setting.takesEffect && <> Takes effect: {setting.takesEffect}</>}
             </Form.Text>
           </Form.Group>
+          {candidate && value.trim() !== '' && (
+            <div className="mb-3">
+              <LlmTestPanel candidate={candidate} label="Test this value" />
+            </div>
+          )}
           <p className="small mb-0">
-            Applies to everyone using this install, and is recorded in the audit log.
+            Applies to everyone using this install, and is recorded in the audit log
+            {setting.secret ? ' (that it changed, not the key)' : ''}.
           </p>
         </Modal.Body>
         <Modal.Footer>

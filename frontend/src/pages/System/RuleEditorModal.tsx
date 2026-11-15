@@ -1,6 +1,7 @@
 import { RulePreviewPanel } from '@/features/detectionRules/RulePreviewPanel';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Col, Form, Modal, Row } from '@govtechsg/sgds-react';
+import { Button, Col, Form, Row } from '@govtechsg/sgds-react';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import {
@@ -164,21 +165,54 @@ export function RuleEditorModal({
 
   const payloadCount = draft.payloadContains.length + draft.payloadRegex.length;
 
+  const formId = 'rule-editor-form';
+  const title = rule
+    ? `${readOnly ? 'Rule' : 'Edit rule'}: ${rule.name}`
+    : scope === 'NETWORK'
+      ? 'New rule for this network'
+      : captureScope
+        ? 'New rule for this capture'
+        : 'New detection rule';
+
+  // A side drawer: the form scrolls in the body, Save stays in view at the foot.
   return (
-    <Modal show={show} onHide={() => !saving && onHide()} size="lg" scrollable>
-      <Modal.Header closeButton>
-        <Modal.Title>
-          {rule
-            ? `${readOnly ? 'Rule' : 'Edit rule'}: ${rule.name}`
-            : scope === 'NETWORK'
-              ? 'New rule for this network'
-              : captureScope
-                ? 'New rule for this capture'
-                : 'New detection rule'}
-        </Modal.Title>
-      </Modal.Header>
-      <form onSubmit={save} noValidate>
-        <Modal.Body>
+    <SideDrawer
+      show={show}
+      onHide={() => !saving && onHide()}
+      title={title}
+      titleId="rule-editor-title"
+      className="side-drawer-wide"
+      footer={
+        <>
+          {rule && (
+            <span className="small text-muted me-auto">
+              Version {rule.version} · last changed by {rule.updatedBy}
+            </span>
+          )}
+          <Button type="button" variant="secondary" onClick={onHide} disabled={saving}>
+            {readOnly ? 'Close' : 'Cancel'}
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            variant="primary"
+            hidden={readOnly}
+            disabled={readOnly || saving || (touched && Object.keys(local).length > 0)}
+          >
+            {saving ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Saving…
+              </>
+            ) : (
+              'Save'
+            )}
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={save} noValidate>
+        <div>
           {error && (
             <Alert variant="danger" className="py-2">
               {error}
@@ -444,9 +478,9 @@ export function RuleEditorModal({
           </p>
           <p className="small text-muted mb-2" data-testid="rule-hint-timing">
             Global and capture rules vote (a network rule's hint doesn't). After a change,
-            <strong> Re-apply</strong> re-scores captures already analysed: an automatic device type can
-            change, and is listed in Re-apply's result; an analyst's label is never changed, but is
-            marked stale if the evidence now points elsewhere.
+            <strong> Re-apply</strong> re-scores captures already analysed: an automatic device type
+            can change, and is listed in Re-apply's result; an analyst's label is never changed, but
+            is marked stale if the evidence now points elsewhere.
           </p>
           <Row className="g-2 mb-2">
             <Col md={8}>
@@ -504,33 +538,8 @@ export function RuleEditorModal({
               </Form.Control.Feedback>
             </Col>
           </Row>
-        </Modal.Body>
-        <Modal.Footer>
-          {rule && (
-            <span className="small text-muted me-auto">
-              Version {rule.version} · last changed by {rule.updatedBy}
-            </span>
-          )}
-          <Button type="button" variant="secondary" onClick={onHide} disabled={saving}>
-            {readOnly ? 'Close' : 'Cancel'}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            hidden={readOnly}
-            disabled={readOnly || saving || (touched && Object.keys(local).length > 0)}
-          >
-            {saving ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-2" />
-                Saving…
-              </>
-            ) : (
-              'Save'
-            )}
-          </Button>
-        </Modal.Footer>
+        </div>
       </form>
-    </Modal>
+    </SideDrawer>
   );
 }

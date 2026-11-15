@@ -24,7 +24,10 @@ public enum PermissionAction {
   ANALYSIS_POLICY(PermissionLevel.ANALYST, "Edit analysis policy",
       "Which analysis tools run and how, for new analyses."),
   RETENTION(PermissionLevel.ADMIN, "Edit retention",
-      "How long captures and extracted data are kept before they are deleted.");
+      "How long captures and extracted data are kept before they are deleted."),
+  LLM_CONNECTION(PermissionLevel.ADMIN, "Edit the LLM connection",
+      "Which LLM server, key and model Story and Insights use, and testing the connection. The"
+          + " server receives captures' details, so admin by default.");
 
   private final PermissionLevel defaultLevel;
   private final String label;

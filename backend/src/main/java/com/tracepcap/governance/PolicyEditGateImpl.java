@@ -13,9 +13,11 @@ class PolicyEditGateImpl implements PolicyEditGate {
   private final PermissionService permissionService;
 
   static PermissionAction actionFor(EditablePolicy.Kind kind) {
-    return kind == EditablePolicy.Kind.RETENTION
-        ? PermissionAction.RETENTION
-        : PermissionAction.ANALYSIS_POLICY;
+    return switch (kind) {
+      case RETENTION -> PermissionAction.RETENTION;
+      case LLM -> PermissionAction.LLM_CONNECTION;
+      case DETECTION -> PermissionAction.ANALYSIS_POLICY;
+    };
   }
 
   @Override

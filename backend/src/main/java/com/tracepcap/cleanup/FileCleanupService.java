@@ -81,8 +81,11 @@ public class FileCleanupService {
             .forEach(expiredFiles::add);
       }
 
-      // Kept at upload ("expires" unticked): never swept, whatever the retention says.
+      // Kept forever (at upload, or later): never swept, whatever the retention says. Extended past
+      // the window: swept only once its own time has passed.
+      LocalDateTime now = LocalDateTime.now();
       expiredFiles.removeIf(FileEntity::isKeepForever);
+      expiredFiles.removeIf(f -> f.getExpiresAt() != null && f.getExpiresAt().isAfter(now));
 
       if (expiredFiles.isEmpty()) {
         log.info("No expired files found");

@@ -1934,6 +1934,174 @@ class PipelineIntegrationTest {
     return b.array();
   }
 
+  /**
+   * Clients asking for an address before they have one all send from 0.0.0.0 to the broadcast
+   * address, so the address can't tell them apart: their MACs can. Two clients must stay two
+   * conversations, each with its own MAC, instead of merging into one credited to the first MAC.
+   */
+  @Test
+  void unaddressedClients_areSeparateConversationsByMac() throws Exception {
+    String tag = "unaddressed-" + UUID.randomUUID().toString().substring(0, 8);
+    byte[][] macs = {
+      {0x02, 0x11, 0x11, 0x11, 0x11, 0x01}, {0x02, 0x11, 0x11, 0x11, 0x11, 0x01},
+      {0x02, 0x22, 0x22, 0x22, 0x22, 0x02},
+    };
+    String fileId = uploadBytes(tag + ".pcap", unaddressedPcap(tag, macs)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    var rows =
+        jdbc.queryForList(
+            "SELECT src_mac, packet_count FROM conversations WHERE file_id = ?::uuid AND src_ip = '0.0.0.0'"
+                + " ORDER BY src_mac",
+            fileId);
+    assertThat(rows).hasSize(2);
+    assertThat(rows.get(0).get("src_mac")).isEqualTo("02:11:11:11:11:01");
+    assertThat(((Number) rows.get(0).get("packet_count")).longValue()).isEqualTo(2L);
+    assertThat(rows.get(1).get("src_mac")).isEqualTo("02:22:22:22:22:02");
+    assertThat(((Number) rows.get(1).get("packet_count")).longValue()).isEqualTo(1L);
+  }
+
+  /** One UDP 0.0.0.0:68 → 255.255.255.255:67 frame per MAC, each carrying {@code payload}. */
+  private static byte[] unaddressedPcap(String payload, byte[][] macs) {
+    byte[] data = payload.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    int frame = 14 + 20 + 8 + data.length;
+    java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(24 + macs.length * (16 + frame));
+    b.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    b.putInt(0xa1b2c3d4).putShort((short) 2).putShort((short) 4).putInt(0).putInt(0).putInt(65535).putInt(1);
+    int t = (int) (System.currentTimeMillis() / 1000);
+    for (int i = 0; i < macs.length; i++) {
+      b.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+      b.putInt(t + i).putInt(0).putInt(frame).putInt(frame);
+      b.order(java.nio.ByteOrder.BIG_ENDIAN);
+      b.put(new byte[] {-1, -1, -1, -1, -1, -1}).put(macs[i]).putShort((short) 0x0800);
+      b.put((byte) 0x45).put((byte) 0).putShort((short) (20 + 8 + data.length)).putShort((short) (i + 1)).putShort((short) 0);
+      b.put((byte) 64).put((byte) 17).putShort((short) 0);
+      b.put(new byte[] {0, 0, 0, 0}).put(new byte[] {-1, -1, -1, -1});
+      b.putShort((short) 68).putShort((short) 67).putShort((short) (8 + data.length)).putShort((short) 0);
+      b.put(data);
+    }
+    return b.array();
+  }
+
+  /**
+   * A client nobody answered is listed under the network on the VLAN it asked on; one whose VLAN
+   * no network handed a lease out on is listed at the top, unplaced.
+   */
+  @Test
+  void networkSegments_listUnansweredClientsUnderTheirVlan() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("dhcp-unanswered.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    JsonNode body = rest.getForEntity("/api/v1/files/" + fileId + "/network-segments", JsonNode.class).getBody();
+    JsonNode vlan10 = null;
+    for (JsonNode s : body.get("segments")) if (s.path("vlanId").asInt() == 10) vlan10 = s;
+    assertThat(vlan10).as("the VLAN 10 network").isNotNull();
+    assertThat(vlan10.get("unanswered")).hasSize(1);
+    assertThat(vlan10.get("unanswered").get(0).get("hostname").asText()).isEqualTo("raspberrypi");
+    assertThat(vlan10.get("unanswered").get(0).get("requests").asInt()).isEqualTo(3);
+    assertThat(body.get("unanswered")).hasSize(1);
+    assertThat(body.get("unanswered").get(0).get("mac").asText()).isEqualTo("44:19:b6:c0:00:09");
+  }
+
+  /**
+   * The Overview's organisation grouping honours the analyst's network labels before the ASN: a
+   * labelled range shows as that organisation, which is how your own public range stops looking
+   * like your ISP's.
+   */
+  @Test
+  void organisationGrouping_prefersANetworkLabelOverTheAsn() throws Exception {
+    long ruleId =
+        rest.postForEntity("/api/v1/ip-org-rules", json("{\"cidr\":\"10.99.0.0/24\",\"label\":\"Lab\"}"), JsonNode.class)
+            .getBody().get("id").asLong();
+    try {
+      String tag = "orglabel-" + UUID.randomUUID().toString().substring(0, 8);
+      String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+      assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+      JsonNode graph = rest.getForEntity("/api/v1/clusters/" + fileId + "/graph?groupBy=asn", JsonNode.class).getBody();
+      JsonNode lab = null;
+      for (JsonNode c : graph.get("clusters")) if ("Lab".equals(c.get("label").asText())) lab = c;
+      assertThat(lab).as("a cluster named after the label").isNotNull();
+      assertThat(lab.get("id").asText()).isEqualTo("org:Lab");
+      assertThat(lab.get("hostCount").asInt()).isEqualTo(2);
+    } finally {
+      rest.delete("/api/v1/ip-org-rules/" + ruleId);
+    }
+  }
+
+  /** Favourites: marked and unmarked idempotently, flagged on the capture, and a list filter. */
+  @Test
+  void favourites_markFilterAndUnmark() throws Exception {
+    String tag = "fav-" + UUID.randomUUID().toString().substring(0, 8);
+    String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    String url = "/api/v1/files/" + fileId + "/favourite";
+
+    assertThat(rest.exchange(url, HttpMethod.PUT, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(rest.exchange(url, HttpMethod.PUT, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(rest.getForEntity("/api/v1/files/" + fileId, JsonNode.class).getBody().get("favourite").asBoolean()).isTrue();
+
+    JsonNode favs = rest.getForEntity("/api/v1/files?favourite=true&search=" + tag, JsonNode.class).getBody();
+    assertThat(favs.get("total").asInt()).isEqualTo(1);
+    assertThat(favs.get("data").get(0).get("favourite").asBoolean()).isTrue();
+
+    assertThat(rest.exchange(url, HttpMethod.DELETE, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(rest.getForEntity("/api/v1/files?favourite=true&search=" + tag, JsonNode.class).getBody().get("total").asInt())
+        .isZero();
+    assertThat(rest.exchange("/api/v1/files/" + UUID.randomUUID() + "/favourite", HttpMethod.PUT, null, JsonNode.class)
+            .getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  /**
+   * Expiry: extended past the retention window it leaves "expiring soon"; kept forever it never
+   * expires; null goes back to the window; a past or far-off date is refused.
+   */
+  @Test
+  void expiry_extendKeepForeverAndBack() throws Exception {
+    String tag = "exp-" + UUID.randomUUID().toString().substring(0, 8);
+    String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    String url = "/api/v1/files/" + fileId + "/expiry";
+    long now = System.currentTimeMillis();
+    // Far enough ahead that anything uploaded now counts as "expiring" by then, whatever the window.
+    long horizon = now + 3L * 365 * 24 * 3600_000L;
+    String expiring = "/api/v1/files?search=" + tag + "&expiringBefore=";
+
+    assertThat(rest.getForEntity(expiring + horizon, JsonNode.class).getBody().get("total").asInt()).isEqualTo(1);
+
+    long in30Days = now + 30L * 24 * 3600_000L;
+    ResponseEntity<JsonNode> ext =
+        rest.exchange(url, HttpMethod.PUT, json("{\"keepForever\":false,\"expiresAt\":" + in30Days + "}"), JsonNode.class);
+    assertThat(ext.getStatusCode()).as("PUT expiry: %s", ext.getBody()).isEqualTo(HttpStatus.OK);
+    JsonNode extended = ext.getBody();
+    // Serialised like uploadedAt: [year, month, day, hour, minute, …].
+    java.time.LocalDateTime want =
+        java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(in30Days), java.time.ZoneId.systemDefault());
+    JsonNode at = extended.get("expiresAt");
+    assertThat(at.isArray()).as("expiresAt %s", at).isTrue();
+    assertThat(java.util.List.of(at.get(0).asInt(), at.get(1).asInt(), at.get(2).asInt()))
+        .containsExactly(want.getYear(), want.getMonthValue(), want.getDayOfMonth());
+    // Expiring before tomorrow: not any more.
+    assertThat(rest.getForEntity(expiring + (now + 24 * 3600_000L), JsonNode.class).getBody().get("total").asInt()).isZero();
+
+    JsonNode forever = rest.exchange(url, HttpMethod.PUT, json("{\"keepForever\":true}"), JsonNode.class).getBody();
+    assertThat(forever.get("keepForever").asBoolean()).isTrue();
+    assertThat(forever.get("expiresAt") == null || forever.get("expiresAt").isNull()).isTrue();
+    assertThat(rest.getForEntity(expiring + horizon, JsonNode.class).getBody().get("total").asInt()).isZero();
+
+    JsonNode back = rest.exchange(url, HttpMethod.PUT, json("{\"keepForever\":false}"), JsonNode.class).getBody();
+    assertThat(back.get("keepForever").asBoolean()).isFalse();
+    assertThat(rest.getForEntity(expiring + horizon, JsonNode.class).getBody().get("total").asInt()).isEqualTo(1);
+
+    assertThat(rest.exchange(url, HttpMethod.PUT, json("{\"expiresAt\":" + (now - 60_000) + "}"), JsonNode.class).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(rest.exchange(url, HttpMethod.PUT, json("{\"expiresAt\":" + (now + 400L * 24 * 3600_000L) + "}"), JsonNode.class)
+            .getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

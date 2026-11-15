@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphNode } from '../../types'
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService'
-import { allGroups, buildGroupTree, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
+import { allGroups, buildGroupTree, sameDevice, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
 
 const node = (id: string, data: Partial<GraphNode['data']> = {}): GraphNode =>
   ({ id, label: id, data: { ip: id.split(/[@~]/)[0], deviceType: 'LAPTOP_DESKTOP', ...data } }) as unknown as GraphNode
@@ -10,6 +10,8 @@ const seg = (key: string, label: string, clients: [string, string][], net = '192
   key, label, serverIds: [`${net}.1`], routers: [`${net}.1`], domains: [], leaseSeconds: [],
   cidr: `${net}.0/24`, serverMac: '00:1b:21:c0:00:01', clients: clients.map(([ip, mac]) => ({ ip, mac })),
 })
+
+const allNodeIds = (g: GroupNode): string[] => [...g.nodeIds, ...g.children.flatMap(allNodeIds)]
 
 const find = (gs: GroupNode[], id: string): GroupNode | undefined => {
   for (const g of gs) {
@@ -20,6 +22,31 @@ const find = (gs: GroupNode[], id: string): GroupNode | undefined => {
 }
 
 describe('networkGroups', () => {
+  it('counts devices, not addresses: one DHCP server on three networks, and a laptop that moved', () => {
+    const staff = seg('vlan:10', 'staff', [['10.20.10.23', 'f8:00:00:00:00:03'], ['10.20.10.33', 'f8:00:00:00:00:03']], '10.20.10')
+    const guest = seg('vlan:20', 'guest', [['10.20.20.51', 'aa:00:00:00:00:51']], '10.20.20')
+    const nodes = [
+      node('10.20.10.1'), node('10.20.20.1'),
+      node('10.20.10.23'), node('10.20.10.33'), node('10.20.20.51'),
+    ]
+    const tree = buildGroupTree(nodes, {
+      segments: [staff, guest],
+      deviceLinks: [{ from: '10.20.10.23', to: '10.20.10.33' }],
+    })
+    // Five addresses, three devices: the gateway (both networks), the laptop, the phone.
+    expect(tree[0].devices).toBe(3)
+    // Each network still counts its own gateway.
+    expect(find(tree, 'seg:vlan:10')?.devices ?? tree[0].children[0].devices).toBe(2)
+    const box = layoutGroups(tree).boxes.find(b => b.id === tree[0].id)!
+    expect(box.count).toBe(3)
+    expect(box.memberIds).toHaveLength(5)
+  })
+
+  it('never merges by MAC alone: a routed subnet shares the router MAC', () => {
+    const same = sameDevice(['10.1.0.5', '10.1.0.6'], [], [])
+    expect(same.size).toBe(0)
+  })
+
   it('splits local, internet and broadcast; nests network ▸ subnet ▸ device type', () => {
     const tree = buildGroupTree([
       node('192.168.1.10', { mac: 'aa:00:00:00:00:01' }),
@@ -33,6 +60,29 @@ describe('networkGroups', () => {
     expect(net.children[0].label).toBe('192.168.1.0/24')
     expect(net.children[0].children.map(g => g.label)).toEqual(['Laptops and desktops', 'Printer'])
     expect(find(tree, 'domain:example.com')?.nodeIds).toEqual(['93.184.216.34'])
+  })
+
+  it("puts a subnet's broadcast address with the broadcasts, but keeps a .255 host that sends", () => {
+    const tree = buildGroupTree([
+      node('10.20.30.10', { packetsSent: 4 }),
+      node('10.20.30.255', { packetsSent: 0 }),
+      node('10.20.31.255', { packetsSent: 7 }),
+    ])
+    expect(find(tree, 'special')?.nodeIds).toEqual(['10.20.30.255'])
+    expect(find(tree, 'local')).toBeDefined()
+    expect(find(tree, 'special')?.nodeIds).not.toContain('10.20.31.255')
+  })
+
+  it('puts a client nobody answered in the network on the VLAN it asked on', () => {
+    const devices = { ...seg('vlan:30', 'devices.office.example', [['10.20.30.31', 'aa:00:00:00:00:31']], '10.20.30'),
+      unanswered: [{ mac: 'b8:27:eb:5e:00:01', hostname: 'raspberrypi', vlanId: 30, requests: 6 }] }
+    const tree = buildGroupTree(
+      [node('10.20.30.31', { mac: 'aa:00:00:00:00:31' }), node('b8:27:eb:5e:00:01', { mac: 'b8:27:eb:5e:00:01', isL2: true })],
+      { segments: [devices] },
+    )
+    const net = tree[0].children.find(g => g.label.startsWith('devices.office.example'))
+    expect(net).toBeDefined()
+    expect(allNodeIds(net!)).toContain('b8:27:eb:5e:00:01')
   })
 
   it('puts overlapping networks apart: by the device key, else the MAC', () => {

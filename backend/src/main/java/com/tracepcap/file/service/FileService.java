@@ -70,6 +70,14 @@ public interface FileService {
   Page<FileMetadataDto> getAllFiles(Pageable pageable, com.tracepcap.file.repository.FileListFilter filter);
 
   /**
+   * Changes when a capture is deleted: kept forever, kept until {@code expiresAt}, or (both off)
+   * back to the retention window.
+   *
+   * @throws IllegalArgumentException when {@code expiresAt} is in the past or more than a year out
+   */
+  FileMetadataDto setExpiry(UUID fileId, boolean keepForever, java.time.LocalDateTime expiresAt);
+
+  /**
    * Download a file
    *
    * @param fileId the file ID

@@ -15,7 +15,12 @@ import org.springframework.data.jpa.domain.Specification;
 /**
  * Narrows the captures list. Every field is optional; an empty filter lists everything. The home
  * page's chips are built from these: "Kept with a network" is {@code fileIds}, "Expiring soon" is
- * an uploaded-before cut-off with the kept ones excluded, "Failed" is a status.
+ * {@code expiringBefore} with the kept ones excluded, "Failed" is a status, "Favourites" is
+ * {@code fileIds} narrowed to the caller's favourites.
+ *
+ * <p>{@code expiringBefore}: deleted before then. A capture's deletion time is its own
+ * {@code expiresAt} when someone extended it, else its upload plus {@code retentionHours}; one kept
+ * forever never matches.
  */
 public record FileListFilter(
     FileSource source,
@@ -23,7 +28,19 @@ public record FileListFilter(
     Collection<FileStatus> statuses,
     Collection<UUID> fileIds,
     Collection<UUID> excludeFileIds,
-    LocalDateTime uploadedBefore) {
+    LocalDateTime uploadedBefore,
+    LocalDateTime expiringBefore,
+    Integer retentionHours) {
+
+  public FileListFilter(
+      FileSource source,
+      String search,
+      Collection<FileStatus> statuses,
+      Collection<UUID> fileIds,
+      Collection<UUID> excludeFileIds,
+      LocalDateTime uploadedBefore) {
+    this(source, search, statuses, fileIds, excludeFileIds, uploadedBefore, null, null);
+  }
 
   public static FileListFilter ofSource(FileSource source) {
     return new FileListFilter(source, null, null, null, null, null);
@@ -46,6 +63,18 @@ public record FileListFilter(
         where.add(cb.not(root.get("id").in(excludeFileIds)));
       }
       if (uploadedBefore != null) where.add(cb.lessThan(root.get("uploadedAt"), uploadedBefore));
+      if (expiringBefore != null) {
+        if (retentionHours == null || retentionHours <= 0) {
+          where.add(cb.disjunction()); // nothing is deleted on a timer
+        } else {
+          where.add(cb.isFalse(root.get("keepForever")));
+          LocalDateTime uploadCutoff = expiringBefore.minusHours(retentionHours);
+          where.add(
+              cb.or(
+                  cb.and(cb.isNull(root.get("expiresAt")), cb.lessThan(root.get("uploadedAt"), uploadCutoff)),
+                  cb.lessThan(root.<LocalDateTime>get("expiresAt"), expiringBefore)));
+        }
+      }
       return cb.and(where.toArray(Predicate[]::new));
     };
   }

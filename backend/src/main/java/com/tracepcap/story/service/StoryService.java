@@ -143,7 +143,7 @@ public class StoryService {
         StoryEntity story = StoryEntity.builder()
             .id(storyId).fileId(fileId).generatedAt(generatedAt)
             .status(StoryEntity.StoryStatus.COMPLETED)
-            .modelUsed(llmConfig.getApi().getModel())
+            .modelUsed(llmClient.currentModel())
             .content(objectMapper.writeValueAsString(storyResponse))
             .build();
         storyRepository.save(story);
@@ -208,7 +208,7 @@ public class StoryService {
               .fileId(fileId)
               .generatedAt(generatedAt)
               .status(StoryEntity.StoryStatus.COMPLETED)
-              .modelUsed(llmConfig.getApi().getModel())
+              .modelUsed(llmClient.currentModel())
               .content(objectMapper.writeValueAsString(storyResponse))
               .build();
 
@@ -227,7 +227,7 @@ public class StoryService {
               .fileId(fileId)
               .generatedAt(generatedAt)
               .status(StoryEntity.StoryStatus.FAILED)
-              .modelUsed(llmConfig.getApi().getModel())
+              .modelUsed(llmClient.currentModel())
               .errorMessage(e.getMessage())
               .content("{}") // Empty JSON to satisfy NOT NULL constraint
               .build();

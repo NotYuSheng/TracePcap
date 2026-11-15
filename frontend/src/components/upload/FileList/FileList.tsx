@@ -10,7 +10,14 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import { formatBytes } from '@/utils/formatters';
 import { actionOf, EXPIRING_WITHIN_MS, expiresAt, notesOf, statusOf } from './fileStatus';
+import {
+  captureKeepService,
+  EXTEND_DAYS,
+  extendedTo,
+  ownExpiry,
+} from '@/features/captureKeep/captureKeepService';
 import './FileList.css';
+import '@/features/captureKeep/captureKeep.css';
 
 // Exported so contractConformance.test-d.ts can check it against the backend's
 // FileMetadataDto. It is a deliberate subset — this list renders only these fields.
@@ -26,10 +33,15 @@ export interface FileMetadata {
   enableFileExtraction?: boolean;
   packetCount?: number | null;
   packetsRemoved?: boolean;
+  keepForever?: boolean;
+  /** Its own deletion time, when someone extended it (the API's date form). */
+  expiresAt?: string | number[] | null;
+  /** One of the caller's favourites. */
+  favourite?: boolean;
 }
 
 type Membership = { networkId: string; networkName: string };
-export type CaptureFilter = 'all' | 'expiring' | 'kept' | 'failed';
+export type CaptureFilter = 'all' | 'favourites' | 'expiring' | 'kept' | 'failed';
 
 const SEARCH_DELAY_MS = 300;
 
@@ -61,6 +73,8 @@ export function filterParams(
   switch (filter) {
     case 'all':
       return {};
+    case 'favourites':
+      return { favourite: true };
     case 'kept':
       return {
         fileIds: ctx.keptIds.length ? ctx.keptIds : ['00000000-0000-0000-0000-000000000000'],
@@ -69,17 +83,20 @@ export function filterParams(
       return { status: ['FAILED'] };
     case 'expiring':
       if (!ctx.retentionHours) return null;
+      // Deleted within the next two hours, by its own deletion time or the retention window; the
+      // server leaves out the ones kept forever.
       return {
         source: 'ANALYSIS',
         status: ['COMPLETED'],
         excludeFileIds: ctx.keptIds,
-        uploadedBefore: ctx.now - ctx.retentionHours * 3600_000 + EXPIRING_WITHIN_MS,
+        expiringBefore: ctx.now + EXPIRING_WITHIN_MS,
       };
   }
 }
 
 const FILTER_LABELS: Record<CaptureFilter, string> = {
   all: 'All',
+  favourites: 'Favourites',
   expiring: 'Expiring soon',
   kept: 'Kept with a network',
   failed: 'Failed',
@@ -150,6 +167,10 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
   }, []);
 
   const keptIds = useMemo(() => [...memberships.keys()], [memberships]);
+  const pageSizeOptions = useMemo(
+    () => [...new Set([defaultPageSize, 10, 25, 50, 100])].sort((a, b) => a - b),
+    [defaultPageSize]
+  );
 
   // The shared part of every query: name search and the monitor-uploads toggle.
   const baseParams = useCallback(
@@ -197,7 +218,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
   // How many each chip would show, with the same search and toggle.
   useEffect(() => {
     let alive = true;
-    const keys: CaptureFilter[] = ['all', 'expiring', 'kept', 'failed'];
+    const keys: CaptureFilter[] = ['all', 'favourites', 'expiring', 'kept', 'failed'];
     Promise.all(
       keys.map(async k => {
         const params = baseParams(k);
@@ -227,6 +248,31 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
       else next.set(f.fileId, f.fileName);
       return next;
     });
+  const [keepError, setKeepError] = useState<string | null>(null);
+  // Star or unstar, shown at once and undone if the server says no.
+  const setFavourite = async (f: FileMetadata, on: boolean) => {
+    setFiles(prev => prev.map(x => (x.fileId === f.fileId ? { ...x, favourite: on } : x)));
+    try {
+      await captureKeepService.setFavourite(f.fileId, on);
+      if (filter === 'favourites' && !on) fetchFiles();
+      else setCounts(c => ({ ...c, favourites: (c.favourites ?? 0) + (on ? 1 : -1) }));
+    } catch {
+      setFiles(prev => prev.map(x => (x.fileId === f.fileId ? { ...x, favourite: !on } : x)));
+      setKeepError(`Couldn't ${on ? 'favourite' : 'unfavourite'} ${f.fileName}.`);
+    }
+  };
+  const changeExpiry = async (
+    f: FileMetadata,
+    change: { keepForever: boolean; expiresAt?: number | null }
+  ) => {
+    setKeepError(null);
+    try {
+      await captureKeepService.setExpiry(f.fileId, change);
+      fetchFiles();
+    } catch {
+      setKeepError(`Couldn't change when ${f.fileName} is deleted.`);
+    }
+  };
   const pageIds = files.map(f => f.fileId);
   const allOnPage = pageIds.length > 0 && pageIds.every(id => selected.has(id));
   const toggleAllOnPage = () =>
@@ -332,6 +378,12 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
         />
       </div>
 
+      {keepError && (
+        <Alert variant="warning" className="py-2 small" onClose={() => setKeepError(null)} dismissible>
+          {keepError}
+        </Alert>
+      )}
+
       {loading ? (
         <div className="text-center text-muted py-4">
           <Spinner animation="border" size="sm" className="me-2" />
@@ -374,7 +426,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                   rulesChanged: staleIds.has(file.fileId),
                   now,
                 };
-                const sf = { ...file, uploadedAt: uploaded };
+                const sf = { ...file, uploadedAt: uploaded, expiresAt: ownExpiry(file.expiresAt) };
                 const status = statusOf(sf, ctx);
                 const notes = notesOf(sf, ctx);
                 const expiry = expiresAt(sf, ctx);
@@ -390,6 +442,15 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                       />
                     </td>
                     <td>
+                      <button
+                        type="button"
+                        className={`captures-star${file.favourite ? ' on' : ''}`}
+                        aria-pressed={!!file.favourite}
+                        aria-label={`${file.favourite ? 'Unfavourite' : 'Favourite'} ${file.fileName}`}
+                        onClick={() => setFavourite(file, !file.favourite)}
+                      >
+                        <i className={`bi ${file.favourite ? 'bi-star-fill' : 'bi-star'}`} aria-hidden="true" />
+                      </button>
                       <Link to={`/analysis/${file.fileId}`} className="captures-name">
                         {file.fileName}
                       </Link>
@@ -438,9 +499,13 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                     </td>
                     <td className="text-end text-nowrap">
                       {status.key === 'expiring' ? (
-                        <Link to="/monitor" className="btn btn-outline-warning btn-sm">
-                          Keep it
-                        </Link>
+                        <Button
+                          variant="outline-warning"
+                          size="sm"
+                          onClick={() => changeExpiry(file, { keepForever: false, expiresAt: extendedTo(expiry, 7, now) })}
+                        >
+                          Keep 7 days longer
+                        </Button>
                       ) : (
                         <Link
                           to={`/analysis/${file.fileId}`}
@@ -466,6 +531,35 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                           <Dropdown.Item as={Link} to={`/analysis/${file.fileId}/file`}>
                             Re-analyse…
                           </Dropdown.Item>
+                          {file.source !== 'MONITOR' &&
+                            (memberships.get(file.fileId) ?? []).length === 0 &&
+                            retentionHours != null &&
+                            retentionHours > 0 && (
+                              <>
+                                <Dropdown.Divider />
+                                {file.keepForever ? (
+                                  <Dropdown.Item onClick={() => changeExpiry(file, { keepForever: false })}>
+                                    Let it expire
+                                  </Dropdown.Item>
+                                ) : (
+                                  <>
+                                    {EXTEND_DAYS.map(d => (
+                                      <Dropdown.Item
+                                        key={d}
+                                        onClick={() =>
+                                          changeExpiry(file, { keepForever: false, expiresAt: extendedTo(expiry, d, now) })
+                                        }
+                                      >
+                                        Keep {d} {d === 1 ? 'day' : 'days'} longer
+                                      </Dropdown.Item>
+                                    ))}
+                                    <Dropdown.Item onClick={() => changeExpiry(file, { keepForever: true })}>
+                                      Keep forever
+                                    </Dropdown.Item>
+                                  </>
+                                )}
+                              </>
+                            )}
                           <Dropdown.Divider />
                           <Dropdown.Item
                             className="text-danger"
@@ -529,14 +623,16 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
         </div>
       )}
 
-      {totalItems > pageSize && (
+      {/* Shown while any page size would split the list, not just the current one: picking 100 for
+          60 captures must still leave the menu to pick a smaller size again. */}
+      {totalItems > Math.min(...pageSizeOptions) && (
         <div className="captures-foot">
           <Pagination
             currentPage={page}
             totalPages={totalPages}
             totalItems={totalItems}
             pageSize={pageSize}
-            pageSizeOptions={[...new Set([defaultPageSize, 10, 25, 50, 100])].sort((a, b) => a - b)}
+            pageSizeOptions={pageSizeOptions}
             onPageChange={setPage}
             onPageSizeChange={size => {
               setPageSize(size);

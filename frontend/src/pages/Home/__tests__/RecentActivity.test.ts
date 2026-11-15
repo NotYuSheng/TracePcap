@@ -45,7 +45,23 @@ describe('buildActivity', () => {
 
   it('warns about a capture that will be deleted soon, at the top', () => {
     const events = buildActivity([file('old', 10)], [], 12, NOW);
-    expect(events[0]).toMatchObject({ tone: 'warn', text: 'Deleted in 2 hours:', whenText: '' });
+    expect(events[0]).toMatchObject({
+      tone: 'warn',
+      text: 'Deleting in 2 hours:',
+      whenText: '',
+      meta: 'Open it to extend the time or keep it',
+      link: { to: '/analysis/old/file' },
+    });
+  });
+
+  it("uses a capture's own expiry, and never warns about one kept forever", () => {
+    const at = (h: number) => new Date(NOW + h * 3600_000).toISOString();
+    const warns = (f: ActivityFile) => buildActivity([f], [], 12, NOW).some(e => e.tone === 'warn');
+    // New, but set to go in 2 hours.
+    expect(warns(file('soon', 1, 'COMPLETED', { expiresAt: at(2) }))).toBe(true);
+    // Its window ends in 2 hours, but it was extended by two days.
+    expect(warns(file('extended', 10, 'COMPLETED', { expiresAt: at(48) }))).toBe(false);
+    expect(warns(file('kept', 10, 'COMPLETED', { keepForever: true }))).toBe(false);
   });
 
   it('does not warn when retention is off or the capture is a monitor snapshot', () => {

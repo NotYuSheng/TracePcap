@@ -36,7 +36,7 @@ const KINDS: KindConfig[] = [
     kind: 'ip-org-rules',
     title: 'Organisations',
     valueLabel: 'Organisation',
-    intro: 'Network labels: which organisation owns a range, used to group hosts in the Network Cluster view (Network Labels grouping).',
+    intro: 'Network labels: which organisation owns a range. A labelled range shows as that organisation in the Overview’s “Where the traffic goes”, ahead of its ISP.',
   },
 ];
 

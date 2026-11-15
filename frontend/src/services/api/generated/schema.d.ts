@@ -727,7 +727,7 @@ export interface paths {
         };
         /**
          * Get all files
-         * @description Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).
+         * @description Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms), expiringBefore (epoch ms: deleted before then, by its own expiry or the retention window), favourite (only the caller's favourites).
          */
         get: operations["getAllFiles"];
         put?: never;
@@ -933,6 +933,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change when a capture is deleted
+         * @description keepForever: never. Else expiresAt (epoch ms, in the future, at most a year away) keeps it until then; null puts it back on the retention window.
+         */
+        put: operations["setExpiry"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/extractions": {
         parameters: {
             query?: never;
@@ -996,6 +1016,30 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/favourite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark a capture as a favourite
+         * @description Personal: the caller's account, or the shared profile when login is off. Idempotent.
+         */
+        put: operations["addFavourite"];
+        post?: never;
+        /**
+         * Unmark a favourite capture
+         * @description Idempotent.
+         */
+        delete: operations["removeFavourite"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1229,7 +1273,7 @@ export interface paths {
         };
         /**
          * The networks a capture holds
-         * @description Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.
+         * @description Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network. Clients that asked for an address and got none are listed under the network on their VLAN, else at the top.
          */
         get: operations["segments"];
         put?: never;
@@ -2527,6 +2571,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test the LLM connection
+         * @description Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Testing other values than the current ones requires the permission to edit the LLM connection.
+         */
+        post: operations["test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/settings": {
         parameters: {
             query?: never;
@@ -3346,6 +3410,11 @@ export interface components {
             /** Format: int32 */
             weight?: number;
         };
+        ExpiryRequest: {
+            /** Format: int64 */
+            expiresAt?: number;
+            keepForever?: boolean;
+        };
         ExtractedFileResponse: {
             /** Format: uuid */
             conversationId?: string;
@@ -3385,6 +3454,9 @@ export interface components {
             endTime?: string;
             /** Format: int32 */
             estimatedAnalysisSeconds?: number;
+            /** Format: date-time */
+            expiresAt?: string;
+            favourite?: boolean;
             fileId?: string;
             fileName?: string;
             /** Format: int64 */
@@ -3714,6 +3786,18 @@ export interface components {
             macB?: string;
             reason?: string;
         };
+        LlmTestRequest: {
+            apiKey?: string;
+            baseUrl?: string;
+            model?: string;
+        };
+        LlmTestResult: {
+            baseUrl?: string;
+            model?: string;
+            models?: string[];
+            ok?: boolean;
+            steps?: components["schemas"]["Step"][];
+        };
         Match: {
             app?: string;
             cidr?: string;
@@ -3883,6 +3967,7 @@ export interface components {
         NetworkSegmentsResponse: {
             overlaps?: components["schemas"]["Overlap"][];
             segments?: components["schemas"]["Segment"][];
+            unanswered?: components["schemas"]["UnansweredClient"][];
         };
         NetworkSettingsDto: {
             /** @enum {string} */
@@ -4109,7 +4194,7 @@ export interface components {
         };
         PermissionDto: {
             /** @enum {string} */
-            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION" | "LLM_CONNECTION";
             allowed?: boolean;
             /** @enum {string} */
             defaultLevel?: "ANALYST" | "ADMIN";
@@ -4200,12 +4285,11 @@ export interface components {
             timestamp?: string;
         };
         ReportRequest: {
-            activeFilters?: string[];
-            forceDirectedImage?: string;
-            hierarchicalImage?: string;
+            mapCaption?: string;
+            mapImage?: string;
             /** Format: uuid */
             networkId?: string;
-            nodeLimitNote?: string;
+            sections?: ("NEEDS_A_LOOK" | "HOSTS" | "MAP" | "STORY" | "TRAFFIC" | "CONVERSATIONS" | "EXTRACTED_FILES" | "APPENDIX")[];
         };
         ReusedAddress: {
             ip?: string;
@@ -4314,6 +4398,7 @@ export interface components {
             routers?: string[];
             serverIds?: string[];
             serverMac?: string;
+            unanswered?: components["schemas"]["UnansweredClient"][];
             /** Format: int32 */
             vlanId?: number;
         };
@@ -4367,6 +4452,14 @@ export interface components {
         StartReapplyRequest: {
             /** Format: uuid */
             fileId?: string;
+        };
+        Step: {
+            detail?: string;
+            key?: string;
+            label?: string;
+            /** Format: int64 */
+            ms?: number;
+            status?: string;
         };
         StepExplanation: {
             explanation?: string;
@@ -4487,6 +4580,7 @@ export interface components {
             kind?: string;
         };
         SystemSettingDto: {
+            choices?: string[];
             defaultValue?: string;
             deployValue?: string;
             description?: string;
@@ -4500,6 +4594,7 @@ export interface components {
             secret?: boolean;
             set?: boolean;
             takesEffect?: string;
+            type?: string;
             value?: string;
         };
         TimelineDataDto: {
@@ -4583,6 +4678,14 @@ export interface components {
             /** Format: int32 */
             srcPort?: number;
             steps?: components["schemas"]["TracerStep"][];
+        };
+        UnansweredClient: {
+            hostname?: string;
+            mac?: string;
+            /** Format: int32 */
+            requests?: number;
+            /** Format: int32 */
+            vlanId?: number;
         };
         UniqueHost: {
             hostname?: string;
@@ -5816,6 +5919,8 @@ export interface operations {
                 fileIds?: string[];
                 excludeFileIds?: string[];
                 uploadedBefore?: number;
+                expiringBefore?: number;
+                favourite?: boolean;
             };
             header?: never;
             path?: never;
@@ -6263,6 +6368,32 @@ export interface operations {
             };
         };
     };
+    setExpiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpiryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FileMetadataDto"];
+                };
+            };
+        };
+    };
     listExtractions: {
         parameters: {
             query?: {
@@ -6352,6 +6483,46 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["StreamingResponseBody"];
                 };
+            };
+        };
+    };
+    addFavourite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    removeFavourite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -8361,7 +8532,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION" | "LLM_CONNECTION";
             };
             cookie?: never;
         };
@@ -8842,6 +9013,30 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LlmTestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LlmTestResult"];
                 };
             };
         };

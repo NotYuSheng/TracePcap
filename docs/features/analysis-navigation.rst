@@ -12,15 +12,13 @@ header as you scroll:
    * - On the rail
      - Section
    * - Overview
-     - The summary: what's in the capture, findings, risks.
+     - The summary: what's in the capture, where the traffic goes, findings, risks.
    * - Conversations
      - Every conversation, with filters (see :doc:`conversations`).
    * - Story
      - A written account of the capture (see :doc:`story-mode`).
    * - Network
      - The network graph: map, circular or hierarchical (see :doc:`network-visualization`).
-   * - Cluster
-     - Hosts grouped by country, organisation and more (see :doc:`network-cluster`).
    * - Files
      - Files carried in the traffic.
    * - Filters

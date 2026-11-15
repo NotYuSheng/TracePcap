@@ -14,7 +14,8 @@ import { ErrorMessage } from '@components/common/ErrorMessage';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { SideDrawer, FilterDrawerFooter, FilterPillCount } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import { formatBytes } from '@/utils/formatters';
 import '@components/conversation/ConversationFilterPanel/ConversationFilterPanel.css';
@@ -144,6 +145,16 @@ const ConvLinks = ({
   );
 };
 
+type StoredKey = 'stored' | 'skipped';
+/** Stored, or detected but too large to keep. */
+function storedOf(f: ExtractedFile): StoredKey {
+  return f.skippedReason != null ? 'skipped' : 'stored';
+}
+const METHOD_LABEL: Record<string, string> = { tshark_http: 'HTTP', magic_bytes: 'Raw stream' };
+function toggleIn<T>(list: T[], v: T): T[] {
+  return list.includes(v) ? list.filter(x => x !== v) : [...list, v];
+}
+
 /** Renders a colored badge for the extraction method (HTTP vs raw stream). */
 function methodBadge(method: string | null) {
   if (method === 'tshark_http') return <Badge bg="primary">HTTP</Badge>;
@@ -210,6 +221,9 @@ export const ExtractedFilesPage = () => {
   const [sortBy, setSortBy] = useState<SortField | ''>('');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [mimeTypeFilter, setMimeTypeFilter] = useState<string[]>([]);
+  const [methodFilter, setMethodFilter] = useState<string[]>([]);
+  const [storedFilter, setStoredFilter] = useState<StoredKey[]>([]);
+  const [query, setQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -224,7 +238,7 @@ export const ExtractedFilesPage = () => {
   // page can't fall out of range when the list shrinks.
   useEffect(() => {
     setPage(1);
-  }, [mimeTypeFilter, sortBy, sortDir, pageSize, fileId]);
+  }, [mimeTypeFilter, methodFilter, storedFilter, query, sortBy, sortDir, pageSize, fileId]);
 
   useEffect(() => {
     setLoading(true);
@@ -288,11 +302,35 @@ export const ExtractedFilesPage = () => {
   if (loading) return <LoadingSpinner message="Loading extracted files…" />;
   if (error) return <ErrorMessage title="Failed to load extracted files" message={error} />;
 
-  const filtered =
-    mimeTypeFilter.length > 0
-      ? files.filter(f => f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))
-      : files;
+  // Each drawer section narrows by its own field; the search box by name or hash.
+  const q = query.trim().toLowerCase();
+  const passes = (f: ExtractedFile, skip?: 'mime' | 'method' | 'stored') =>
+    (skip === 'mime' || mimeTypeFilter.length === 0 || (f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))) &&
+    (skip === 'method' || methodFilter.length === 0 || methodFilter.includes(f.extractionMethod ?? '')) &&
+    (skip === 'stored' || storedFilter.length === 0 || storedFilter.includes(storedOf(f))) &&
+    (!q || (f.filename ?? '').toLowerCase().includes(q) || (f.sha256 ?? '').toLowerCase().includes(q));
+  const filtered = files.filter(f => passes(f));
   const sorted = sortFiles(filtered, sortBy, sortDir);
+  const activeFilterCount = mimeTypeFilter.length + methodFilter.length + storedFilter.length;
+  // A chip's count: the files it would add, with every other section's choice applied.
+  const countBy = <K extends string>(skip: 'mime' | 'method' | 'stored', key: (f: ExtractedFile) => K | null) => {
+    const m = new Map<K, number>();
+    for (const f of files) {
+      if (!passes(f, skip)) continue;
+      const k = key(f);
+      if (k != null) m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  };
+  const mimeCounts = countBy('mime', f => f.mimeType);
+  const methodCounts = countBy('method', f => f.extractionMethod);
+  const storedCounts = countBy('stored', storedOf);
+  const allMethods = [...new Set(files.map(f => f.extractionMethod).filter((m): m is string => !!m))].sort();
+  const clearFilters = () => {
+    setMimeTypeFilter([]);
+    setMethodFilter([]);
+    setStoredFilter([]);
+  };
 
   const totalPages = Math.ceil(sorted.length / pageSize);
   // Clamp during render so a shrunk list (e.g. after applying a filter) can't leave `page`
@@ -313,7 +351,7 @@ export const ExtractedFilesPage = () => {
           </small>
         </div>
         <Badge bg="secondary" className="fs-6">
-          {mimeTypeFilter.length > 0
+          {activeFilterCount > 0 || q
             ? `${sorted.length} / ${files.length}`
             : files.length}{' '}
           file{files.length !== 1 ? 's' : ''}
@@ -413,81 +451,40 @@ export const ExtractedFilesPage = () => {
 
       <ExtractionInfoCard maxFileSizeMb={warnings?.maxFileSizeMb} />
 
-      {/* Filter panel */}
-      {allMimeTypes.length > 0 && (
-        <div className="conversation-filter-panel mb-3">
-          <div className="d-flex align-items-center gap-2">
-            <Button
-              type="button"
-              variant="outline-secondary"
-              size="sm"
-              onClick={() => setFilterOpen(o => !o)}
-            >
-              <i className="bi bi-funnel me-1"></i>
-              Filters
-              {mimeTypeFilter.length > 0 && (
-                <Badge bg="primary" className="ms-2">{mimeTypeFilter.length}</Badge>
-              )}
-              <i className={`bi ms-2 ${filterOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
-            </Button>
-          </div>
-          {filterOpen && (
-            <Card className="mt-2 filter-panel-body">
-              <Card.Body className="p-3">
-                <PillSectionHeader
-                  label="MIME Type"
-                  onSelectAll={() => setMimeTypeFilter(allMimeTypes)}
-                  onDeselectAll={() => setMimeTypeFilter([])}
-                />
-                <div className="d-flex flex-wrap gap-1">
-                  {allMimeTypes.map(mt => {
-                    const isActive = mimeTypeFilter.includes(mt);
-                    return (
-                      <button
-                        key={mt}
-                        type="button"
-                        className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                        onClick={() =>
-                          setMimeTypeFilter(prev =>
-                            prev.includes(mt) ? prev.filter(v => v !== mt) : [...prev, mt]
-                          )
-                        }
-                      >
-                        <i className={`bi ${mimeIcon(mt)} me-1`}></i>
-                        {mt}
-                      </button>
-                    );
-                  })}
-                </div>
-                {mimeTypeFilter.length > 0 && (
-                  <div className="mt-3 pt-2 border-top">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline-secondary"
-                      onClick={() => setMimeTypeFilter([])}
-                    >
-                      <i className="bi bi-x-circle me-1"></i>Clear filters
-                    </Button>
-                  </div>
-                )}
-              </Card.Body>
-            </Card>
-          )}
-        </div>
-      )}
-
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h6 className="mb-0">Files</h6>
-          <small className="text-muted">Click a column header to sort</small>
+        <Card.Header className="d-flex flex-wrap gap-2 align-items-center">
+          <h6 className="mb-0 me-auto">Files</h6>
+          <div className="input-group input-group-sm tp-compact-search" style={{ width: 260 }}>
+            <span className="input-group-text">
+              <i className="bi bi-search" aria-hidden="true"></i>
+            </span>
+            <Form.Control
+              type="search"
+              placeholder="Search name or SHA-256"
+              aria-label="Search files by name or SHA-256"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+          {files.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => setFilterOpen(true)}
+              aria-haspopup="dialog"
+            >
+              <i className="bi bi-funnel me-1" aria-hidden="true"></i>
+              Filters
+              {activeFilterCount > 0 && <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>}
+            </Button>
+          )}
         </Card.Header>
         <Card.Body className="p-0" style={{ position: 'relative' }}>
           {sorted.length === 0 ? (
             <div className="text-center py-5 text-muted">
               <i className="bi bi-inbox fs-1 d-block mb-2"></i>
-              {mimeTypeFilter.length > 0
-                ? 'No files match the selected MIME type filter.'
+              {activeFilterCount > 0 || q
+                ? 'No files match.'
                 : 'No files were extracted from this capture.'}
             </div>
           ) : (
@@ -619,6 +616,92 @@ export const ExtractedFilesPage = () => {
       </Card>
 
       {/* Inline media preview modal */}
+      <SideDrawer
+        show={filterOpen}
+        onHide={() => setFilterOpen(false)}
+        title="Filters"
+        titleId="files-filter-drawer-title"
+        badge={activeFilterCount}
+        className="filter-drawer"
+        footer={
+          <FilterDrawerFooter
+            onClearAll={clearFilters}
+            canClear={activeFilterCount > 0}
+            onDone={() => setFilterOpen(false)}
+            doneLabel={`Show ${sorted.length.toLocaleString()} file${sorted.length === 1 ? '' : 's'}`}
+          />
+        }
+      >
+        <div className="mb-4">
+          <PillSectionHeader
+            label="MIME type"
+            onSelectAll={() => setMimeTypeFilter(allMimeTypes)}
+            onDeselectAll={() => setMimeTypeFilter([])}
+          />
+          <div className="d-flex flex-wrap gap-1">
+            {allMimeTypes.map(mt => (
+              <button
+                key={mt}
+                type="button"
+                className={`badge rounded-pill border-0 filter-pill ${mimeTypeFilter.includes(mt) ? 'active' : ''}`}
+                aria-pressed={mimeTypeFilter.includes(mt)}
+                onClick={() => setMimeTypeFilter(prev => toggleIn(prev, mt))}
+              >
+                <i className={`bi ${mimeIcon(mt)} me-1`} aria-hidden="true"></i>
+                {mt}
+                <FilterPillCount n={mimeCounts.get(mt) ?? 0} />
+              </button>
+            ))}
+          </div>
+        </div>
+        {allMethods.length > 1 && (
+          <div className="mb-4">
+            <PillSectionHeader
+              label="Extracted from"
+              onSelectAll={() => setMethodFilter(allMethods)}
+              onDeselectAll={() => setMethodFilter([])}
+            />
+            <div className="d-flex flex-wrap gap-1">
+              {allMethods.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`badge rounded-pill border-0 filter-pill ${methodFilter.includes(m) ? 'active' : ''}`}
+                  aria-pressed={methodFilter.includes(m)}
+                  onClick={() => setMethodFilter(prev => toggleIn(prev, m))}
+                >
+                  {METHOD_LABEL[m] ?? m}
+                  <FilterPillCount n={methodCounts.get(m) ?? 0} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {(storedCounts.get('skipped') ?? 0) + (storedFilter.includes('skipped') ? 1 : 0) > 0 && (
+          <div className="mb-2">
+            <PillSectionHeader
+              label="Stored"
+              onSelectAll={() => setStoredFilter(['stored', 'skipped'])}
+              onDeselectAll={() => setStoredFilter([])}
+            />
+            <div className="d-flex flex-wrap gap-1">
+              {(['stored', 'skipped'] as StoredKey[]).map(k => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`badge rounded-pill border-0 filter-pill ${storedFilter.includes(k) ? 'active' : ''}`}
+                  aria-pressed={storedFilter.includes(k)}
+                  onClick={() => setStoredFilter(prev => toggleIn(prev, k))}
+                >
+                  {k === 'stored' ? 'Stored' : 'Too large, not stored'}
+                  <FilterPillCount n={storedCounts.get(k) ?? 0} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </SideDrawer>
+
       <Modal show={previewFile !== null} onHide={() => setPreviewFile(null)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>

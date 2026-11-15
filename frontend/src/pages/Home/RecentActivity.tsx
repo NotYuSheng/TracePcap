@@ -5,6 +5,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { meService, type AuditLogEntry } from '@/features/me/meService';
 import { kindOf, summarize } from '@/features/me/auditDiff';
 import { parseDateTime } from '@/utils/dateUtils';
+import { ownExpiry } from '@/features/captureKeep/captureKeepService';
 import { Spinner } from '@components/common/Spinner/Spinner';
 
 /** How many events the feed shows. */
@@ -25,6 +26,10 @@ export interface ActivityFile {
   status: string;
   source?: string;
   packetCount?: number | null;
+  /** Kept until deleted by hand (#1139): never warned about. */
+  keepForever?: boolean;
+  /** Its own deletion time (#1139), which replaces the retention window. */
+  expiresAt?: string | number[] | null;
 }
 
 export type Tone = 'done' | 'busy' | 'failed' | 'warn' | 'change';
@@ -83,17 +88,22 @@ export function buildActivity(
         link: { label: f.fileName, to },
         meta: f.packetCount != null ? `${f.packetCount.toLocaleString()} packets` : undefined,
       });
-      if (retentionHours && f.source !== 'MONITOR' && !keptIds.has(f.fileId)) {
-        const left = at + retentionHours * 3600_000 - now;
+      // Its own expiry if it has one, else the install's retention window from upload.
+      const own = ownExpiry(f.expiresAt);
+      const deadline =
+        own ?? (retentionHours && f.source !== 'MONITOR' ? at + retentionHours * 3600_000 : null);
+      if (deadline != null && !f.keepForever && !keptIds.has(f.fileId)) {
+        const left = deadline - now;
         if (left > 0 && left <= EXPIRY_WARN_MS) {
           events.push({
             key: `x-${f.fileId}`,
             // Sorted as if it happened now: it needs attention now.
             at: now,
             tone: 'warn',
-            text: `Deleted in ${inWords(left)}:`,
-            link: { label: f.fileName, to },
-            meta: 'Add it to a monitored network to keep it',
+            text: `Deleting in ${inWords(left)}:`,
+            // The capture page's Retention card extends it or keeps it.
+            link: { label: f.fileName, to: `${to}/file` },
+            meta: 'Open it to extend the time or keep it',
             whenText: '',
           });
         }

@@ -3,6 +3,8 @@ export const API_ENDPOINTS = {
   UPLOAD_PCAP: '/files',
   FILES_LIST: '/files',
   FILE_METADATA: (fileId: string) => `/files/${fileId}`,
+  FILE_FAVOURITE: (fileId: string) => `/files/${fileId}/favourite`,
+  FILE_EXPIRY: (fileId: string) => `/files/${fileId}/expiry`,
   FILE_REANALYSES: (fileId: string) => `/files/${fileId}/reanalyses`,
   FILE_VERSIONS: (fileId: string) => `/files/${fileId}/versions`,
   FILE_DELETE: (fileId: string) => `/files/${fileId}`,
@@ -135,6 +137,7 @@ export const API_ENDPOINTS = {
   // System
   SYSTEM_TIME: '/system/time',
   SYSTEM_LIMITS: '/system/limits',
+  LLM_TEST: '/system/llm/test',
   SYSTEM_SETTINGS: '/system/settings',
   SYSTEM_SETTING: (key: string) => `/system/settings/${key}`,
   PREFERENCES: '/preferences',

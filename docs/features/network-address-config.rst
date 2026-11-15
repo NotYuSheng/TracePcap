@@ -7,10 +7,11 @@ Three lists describe your address space:
   views and used to notice when a subnet's make-up changes.
 - **Internal / external ranges**: ranges forced to count as internal or
   external, overriding the usual private-address rules. They decide what is
-  "internal" in change detection, the subnet view, Story and the Network
-  Cluster.
-- **Organisations**: which organisation owns a range, used to group hosts in
-  the Network Cluster view.
+  "internal" in change detection, the subnet view, Story and the Overview's
+  traffic groups.
+- **Organisations**: which organisation owns a range. In the Overview's
+  **Where the traffic goes**, a labelled range shows as that organisation ahead
+  of its ISP (see :doc:`traffic-groups`).
 
 Each list has a **shared default** that applies everywhere, and every monitored
 network can adjust it for itself.
@@ -65,8 +66,8 @@ Where Each Applies
 - **Monitor views** (a network's snapshots, change detection, subnets): that
   network's lists.
 - **Analysis page**: the default, or a network's lists when it's picked in the
-  **Custom detection rules** picker at the top of the page. The Network Cluster view
-  follows the picker; Story still uses the default.
+  **Custom detection rules** picker at the top of the page. The Overview's traffic
+  groups follow the picker; Story still uses the default.
 - **Captures in no network**: the default.
 
 A snapshot's own subnet overrides (set when adding or editing a snapshot) still

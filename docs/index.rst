@@ -40,7 +40,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/network-map
    features/packet-replay
    features/device-moves
-   features/network-cluster
+   features/traffic-groups
    features/comparison
    features/ndpi-analysis
    features/ids-threat-detection

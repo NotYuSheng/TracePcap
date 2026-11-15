@@ -31,7 +31,7 @@ export interface UseCompareDataReturn {
 
 async function fetchGraphForFile(fileId: string) {
   const [response, hostClassifications] = await Promise.all([
-    conversationService.getConversations(fileId, {
+    conversationService.getAllConversations(fileId, {
       ip: '',
       port: '',
       payloadContains: '',
@@ -46,16 +46,12 @@ async function fetchGraphForFile(fileId: string) {
       suricataAlerts: [],
       deviceTypes: [],
       countries: [],
-      sortBy: '',
-      sortDir: 'asc',
-      page: 1,
-      pageSize: 10000,
     }),
     conversationService.getHostClassifications(fileId).catch(() => undefined),
   ]);
 
   return networkService.buildNetworkGraph(
-    response.data,
+    response,
     undefined,
     MAX_CONVERSATIONS,
     hostClassifications,

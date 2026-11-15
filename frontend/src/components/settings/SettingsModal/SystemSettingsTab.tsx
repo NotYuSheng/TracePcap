@@ -3,12 +3,19 @@ import { Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { settingsService, type SystemSetting } from '@/features/settings';
 import { EditSystemSettingModal } from './EditSystemSettingModal';
+import { LlmTestPanel } from './LlmTestPanel';
 
 const GROUPS: { key: SystemSetting['group']; title: string; blurb: string }[] = [
   {
     key: 'POLICY',
     title: 'Analysis policy',
     blurb: 'How captures are analysed and kept: detection thresholds, retention, display limits.',
+  },
+  {
+    key: 'LLM',
+    title: 'LLM',
+    blurb:
+      'The server Story and Insights send captures\' details to. Changes apply to the next call; test them first.',
   },
   {
     key: 'MEMORY',
@@ -135,8 +142,8 @@ export function SystemSettingsTab() {
     <div>
       <p className="small text-muted">
         These apply to everyone using this install. Most are set when TracePcap is deployed;
-        retention and detection thresholds can also be changed here, if you have permission. Click
-        any setting to see more.
+        retention, detection thresholds and the LLM connection can also be changed here, if you
+        have permission. Click any setting to see more.
       </p>
       <Form.Control
         type="search"
@@ -154,6 +161,21 @@ export function SystemSettingsTab() {
           <section key={g.key} className="mb-3">
             <h6 className="mb-0">{g.title}</h6>
             <p className="small text-muted mb-1">{g.blurb}</p>
+            {g.key === 'LLM' && (
+              <div className="mb-2">
+                <LlmTestPanel
+                  onPickModel={
+                    rows.find(s => s.key === 'LLM_MODEL')?.editable
+                      ? model =>
+                          settingsService
+                            .setSystemSetting('LLM_MODEL', model)
+                            .then(() => setReload(n => n + 1))
+                            .catch(() => {})
+                      : null
+                  }
+                />
+              </div>
+            )}
             <ul className="list-unstyled mb-0">
               {rows.map(s => (
                 <SettingRow key={s.key} setting={s} onEdit={setEditing} />

@@ -15,13 +15,18 @@ describe('filterParams', () => {
     expect(filterParams('kept', { keptIds: [], retentionHours: 12, now: NOW })?.fileIds).toHaveLength(1)
   })
 
-  it('finds expiring captures: analysis uploads within two hours of deletion, not kept', () => {
+  it('finds expiring captures: analysis uploads deleted within two hours, not kept', () => {
+    // The server works out each one's deletion time: its own, or the retention window.
     expect(filterParams('expiring', { keptIds: ['k'], retentionHours: 12, now: NOW })).toEqual({
       source: 'ANALYSIS',
       status: ['COMPLETED'],
       excludeFileIds: ['k'],
-      uploadedBefore: NOW - 10 * 3600_000,
+      expiringBefore: NOW + 2 * 3600_000,
     })
+  })
+
+  it('asks for the caller\'s favourites', () => {
+    expect(filterParams('favourites', { keptIds: [], retentionHours: 12, now: NOW })).toEqual({ favourite: true })
   })
 
   it('has nothing expiring when captures are kept forever', () => {

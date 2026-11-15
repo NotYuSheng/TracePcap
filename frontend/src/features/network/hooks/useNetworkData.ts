@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
-import { networkService } from '../services/networkService';
+import { networkService, DEFAULT_DIAGRAM_NODES } from '../services/networkService';
 import type { DeviceLink, GraphNode, GraphEdge, NetworkStats } from '../types';
 import type { Conversation, HostClassification, HostIdentity } from '@/types';
 import type { NodeRole } from '@/features/insights/types/insights.types';
@@ -9,7 +9,7 @@ import { insightsService } from '@/features/insights/services/insightsService';
 import type { AnalysisSummary } from '@/types';
 import { env } from '@/config/env';
 
-export const MAX_DIAGRAM_NODES = 50;
+export { DEFAULT_DIAGRAM_NODES, NODE_LIMIT_PRESETS } from '../services/networkService';
 
 interface UseNetworkDataReturn {
   nodes: GraphNode[];
@@ -39,7 +39,7 @@ const MAX_CONVERSATIONS = 500;
 export function useNetworkData(
   fileId: string,
   analysisSummary?: AnalysisSummary,
-  maxNodes: number = MAX_DIAGRAM_NODES,
+  maxNodes: number = DEFAULT_DIAGRAM_NODES,
   /** View in this network: its own detection rules' matches show on the edges (#925 phase 3). */
   networkId?: string
 ): UseNetworkDataReturn {
@@ -119,7 +119,7 @@ export function useNetworkData(
       // Conversations are required; the other three are best-effort enrichments (older analyses
       // may predate their endpoints). All depend only on fileId, so they run concurrently.
       const [response, classificationsRes, identitiesRes, rolesRes, reusedRes, movesRes] = await Promise.allSettled([
-        conversationService.getConversations(fileId, {
+        conversationService.getAllConversations(fileId, {
           networkId,
           ip: '',
           port: '',
@@ -135,10 +135,6 @@ export function useNetworkData(
           suricataAlerts: [],
           deviceTypes: [],
           countries: [],
-          sortBy: '',
-          sortDir: 'asc',
-          page: 1,
-          pageSize: 10000,
         }),
         conversationService.getHostClassifications(fileId),
         conversationService.getHostIdentities(fileId),
@@ -149,7 +145,7 @@ export function useNetworkData(
         occupancyService.moves(fileId),
       ]);
       if (response.status === 'rejected') throw response.reason;
-      const conversations = response.value.data;
+      const conversations = response.value;
 
       const hostClassifications: HostClassification[] | undefined =
         classificationsRes.status === 'fulfilled' ? classificationsRes.value : undefined;

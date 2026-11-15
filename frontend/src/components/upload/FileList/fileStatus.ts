@@ -29,8 +29,10 @@ export interface StatusFile {
   enableSuricata?: boolean;
   enableFileExtraction?: boolean;
   packetsRemoved?: boolean;
-  /** Uploaded with "expires" unticked: the retention cleanup skips it. */
+  /** Kept until deleted (at upload, or later): the retention cleanup skips it. */
   keepForever?: boolean;
+  /** Its own deletion time (epoch ms) when someone extended it; null: the retention window. */
+  expiresAt?: number | null;
   /** The story asked for at upload: QUEUED, WRITING, READY or FAILED. */
   storyStatus?: string | null;
 }
@@ -68,6 +70,7 @@ const LABELS: Record<StatusKey, string> = {
 export function expiresAt(file: StatusFile, ctx: StatusContext): number | null {
   if (!ctx.retentionHours || file.source === 'MONITOR' || ctx.keptWith.length > 0) return null;
   if (file.keepForever) return null;
+  if (file.expiresAt != null) return file.expiresAt;
   return file.uploadedAt + ctx.retentionHours * 3600_000;
 }
 
@@ -94,6 +97,9 @@ export function notesOf(file: StatusFile, ctx: StatusContext): CaptureNote[] {
   }));
   if (file.keepForever && ctx.keptWith.length === 0 && file.source !== 'MONITOR') {
     notes.push({ key: 'forever', label: 'Kept until deleted', tone: 'kept' });
+  } else if (file.expiresAt != null && ctx.keptWith.length === 0 && file.source !== 'MONITOR') {
+    const day = new Date(file.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    notes.push({ key: 'until', label: `Kept until ${day}`, tone: 'kept' });
   }
   if (file.source === 'MONITOR' && ctx.keptWith.length === 0) {
     notes.push({ key: 'monitor', label: 'Monitor upload' });

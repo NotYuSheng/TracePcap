@@ -135,7 +135,7 @@ export function drawGroupBoxes(
     const padX = Math.max(6, 18 * scale);
     const room = bw - padX * 2;
     if (room < 30) continue;
-    const n = active ? b.memberIds.filter(id => active.has(id)).length : b.count;
+    const n = active ? new Set(b.deviceIds.filter((_, i) => active.has(b.memberIds[i]))).size : b.count;
     const count =
       (active ? `${n} of ${b.count} active` : `${b.count} ${b.count === 1 ? 'device' : 'devices'}`) +
       (b.moved ? ` · ${b.moved} moved here` : '');

@@ -94,7 +94,8 @@ export const MainLayout = () => {
   const isSystemActive = location.pathname.startsWith('/settings') || location.pathname.startsWith('/system');
   // Pages with a section rail (a capture's analysis, a monitored network) run edge to edge: the
   // rail sits flush against the window's left side, under the header.
-  const isFlush = /^\/(analysis|monitor)\/[^/]+/.test(location.pathname);
+  const isFlush =
+    /^\/(analysis|monitor)\/[^/]+/.test(location.pathname) || location.pathname.startsWith('/settings');
 
   // The header's height, so a sticky rail can sit right under it whatever the header wraps to.
   const headerRef = useRef<HTMLElement>(null);
