@@ -68,3 +68,82 @@
 .network-page .analysis-body > .card + .card {
   margin-top: 1rem;
 }
+
+/* Overview: the latest capture's map beside the insights. */
+.network-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1199.98px) {
+  .network-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Inventory: one card, three tabs. */
+.network-inventory {
+  border-radius: 14px;
+}
+
+.network-inventory-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+
+.network-inventory-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--tp-text-muted, #525a68);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.network-inventory-tab.active {
+  border-bottom-color: #5925dc;
+  color: #3b1891;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .network-inventory-tab.active {
+  color: #c9b8ff;
+  border-bottom-color: #a993ff;
+}
+
+.network-inventory-count {
+  font-size: 0.72rem;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--tp-bg-subtle, #f3f4f6);
+}
+
+/* Settings drawer: expected state and subnets have tables, so it is wider than a filter drawer. */
+.modal-dialog.side-drawer.network-settings-drawer {
+  width: 760px;
+}
+
+.network-settings-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--tp-border, #eceef3);
+}
+
+.network-settings-section:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.network-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

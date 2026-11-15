@@ -23,7 +23,7 @@ import { insightsService } from '@/features/insights/services/insightsService';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NetworkInsight, InsightOptions } from '@/features/insights/types/insights.types';
 import type { GraphNode } from '@/features/network/types';
-import type { NodeHighlight, EdgeColorMode } from '@/components/network/NetworkGraph/NetworkGraph';
+import type { EdgeColorMode } from '@/components/network/NetworkGraph/NetworkGraph';
 import { edgeBytesRange } from '@/components/network/NetworkGraph/NetworkGraph';
 import { VolumeHeatmap } from '@/components/network/VolumeHeatmap';
 import type { VolumePair } from '@/components/network/VolumeHeatmap';
@@ -31,75 +31,12 @@ import { VolumeLegend } from '@/components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
 import { nodeIdentityKey } from '@/utils/deviceType';
+import { buildHighlightMap } from '@/features/monitor/utils/changeHighlights';
 import { severityHex } from '@/utils/severityColors';
 import { useEscapeLayer } from '@/utils/useEscapeLayer';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
-
-function labelForChange(changeType: string, oldValue: Record<string, unknown> | null, newValue: Record<string, unknown> | null): string {
-  switch (changeType) {
-    case 'MAC_ADDED':      return 'New device';
-    case 'IP_MAC_DRIFT':   return (oldValue?.['mac'] && newValue?.['mac'] && oldValue['mac'] !== newValue['mac']) ? 'Potential ARP spoof' : 'IP reassignment';
-    case 'GATEWAY_CHANGE': return 'Gateway changed';
-    case 'ASN_CHANGE':     return 'New ISP';
-    case 'PROTOCOL_ADDED': return 'New protocol';
-    case 'APP_ADDED':      return 'New app';
-    case 'VPN_DRIFT':      return newValue?.['riskType'] ? 'VPN detected' : 'VPN stopped';
-    case 'SECURITY_ALERT_ADDED':   return 'Security alert';
-    case 'SECURITY_ALERT_REMOVED': return 'Security alert cleared';
-    default:               return changeType;
-  }
-}
-
-function severityRank(s: string): number {
-  return s === 'CRITICAL' ? 3 : s === 'WARNING' ? 2 : 1;
-}
-
-function buildHighlightMap(events: ChangeEvent[], toSnapshotId: string): Map<string, NodeHighlight> {
-  const map = new Map<string, NodeHighlight>();
-  for (const e of events.filter(ev => ev.toSnapshotId === toSnapshotId)) {
-    const color = severityHex(e.severity);
-    const label = labelForChange(e.changeType, e.oldValue, e.newValue);
-    const addHl = (key: string, description?: string) => {
-      const existing = map.get(key);
-      if (!existing || severityRank(e.severity) > severityRank(existing.label)) {
-        map.set(key, { color, label, description });
-      }
-    };
-    switch (e.changeType) {
-      case 'MAC_ADDED': {
-        const ip = e.newValue?.['ip'] as string | undefined;
-        addHl(e.entityKey, `New device appeared${ip ? ` at ${ip}` : ''}`);
-        if (ip) addHl(ip, `New device with MAC ${e.entityKey}`);
-        break;
-      }
-      case 'IP_MAC_DRIFT': {
-        const oldMac = e.oldValue?.['mac'] as string | undefined;
-        const newMac = e.newValue?.['mac'] as string | undefined;
-        const oldIp  = e.oldValue?.['ip']  as string | undefined;
-        const newIp  = e.newValue?.['ip']  as string | undefined;
-        if (oldMac && newMac && oldMac !== newMac) {
-          addHl(e.entityKey, `MAC changed from ${oldMac} to ${newMac}`);
-          addHl(newMac, `Now claiming IP ${e.entityKey} (was ${oldMac})`);
-        } else {
-          addHl(e.entityKey, `IP changed from ${oldIp ?? '?'} to ${newIp ?? '?'}`);
-          if (newIp) addHl(newIp, `MAC ${e.entityKey} moved here from ${oldIp ?? '?'}`);
-        }
-        break;
-      }
-      case 'GATEWAY_CHANGE': {
-        const newIp = e.newValue?.['ip'] as string | undefined;
-        const oldIp = e.oldValue?.['ip'] as string | undefined;
-        if (newIp) addHl(newIp, `New gateway (was ${oldIp ?? '?'})`);
-        if (oldIp) addHl(oldIp, `Previous gateway (replaced by ${newIp ?? '?'})`);
-        break;
-      }
-      default: break;
-    }
-  }
-  return map;
-}
 
 function formatSnapLabel(snap: NetworkSnapshot): string {
   if (snap.startTime) {

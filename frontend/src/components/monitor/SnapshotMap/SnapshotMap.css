@@ -1,0 +1,38 @@
+.snapshot-map-graph {
+  position: relative;
+  border: 1px solid var(--tp-border, #eceef3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.snapshot-map-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tp-text-muted, #525a68);
+  font-size: 0.85rem;
+}
+
+.snapshot-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+.snapshot-map-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+.snapshot-map-dot-gone {
+  border: 1.5px dashed #98a2b3;
+}

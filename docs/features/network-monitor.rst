@@ -91,19 +91,32 @@ A network's page has the same layout as a capture's analysis (see
 - **The bar on top** shows the network's name and its captures' date range.
   It also has how many changes are waiting (click it to open them), a refresh
   button, **Settings** and **Add a capture**.
-- **Settings** holds the inactivity rule, the network's detection rules,
-  address and device labels, and how often the page refreshes.
-- **The rail down the left** has the results first: **Overview**, **Changes**
-  (with the count to review), **Captures**, **Inventory** (devices, addresses
-  and apps together) and **Insights**. Below a *Set up* divider are the things
-  you maintain: **Set up** (expected state, i.e. baseline definitions, and
-  subnets) and **Notes** (your notes and outside events).
+- **Settings** opens a drawer with what you maintain: **Expected state**
+  (baseline definitions), **Subnets**, and buttons for when a device counts as
+  gone (the inactivity rule), the network's detection rules, and address and
+  device labels, plus how often the page refreshes.
+- **The rail down the left** has three tabs: **Overview**, **Timeline** (with
+  the count to review) and **Inventory**.
 - **Overview** puts it together: capture, device and to-review counts, what
-  changed in the latest capture (mark items reviewed there), the capture
-  timeline and the traffic chart.
+  changed in the latest capture (mark items reviewed there), the **network map
+  of the latest capture** with its changes marked, **Insights**, and the traffic
+  chart.
+- **Timeline** is everything that happened to the network on one time axis,
+  newest first: each capture with the changes it brought (review them in
+  place) and any notes attached to it, plus outside events and notes where they
+  fall. Chips narrow it to changes, captures, or notes and events; **Note** and
+  **Outside event** add one, and **Manage captures** removes them. Beside the
+  list is **the network map at the picked capture**, compared with the capture
+  before: the changes it brought are highlighted, and devices that left since
+  are listed under it. Pick a capture in the list or step with the arrows.
+  **Details** on a capture opens its full detail (security, subnets, insights).
+- **Inventory** is one card with three tabs: **Devices**, **Addresses**, and
+  **Apps and protocols**.
 
-The section is in the address (``?section=changes``), so a link can open a
-network straight on its changes.
+The section is in the address (``?section=timeline``), so a link can open a
+network straight on its timeline. Older links still work: ``changes``,
+``captures`` and ``notes`` open the Timeline, ``insights`` the Overview, and
+``setup``, ``expected`` and ``subnets`` open Settings.
 
 .. note::
    Only files with status **COMPLETED** can be added as snapshots. Upload and
@@ -328,27 +341,11 @@ Click the checkbox on any event to mark it as reviewed. Add a note to record
 the reason (e.g. "Known DHCP lease renewal — expected"). The network's
 status on the networks page updates on its next refresh.
 
-Capture Timeline
-----------------
+Capture Details
+---------------
 
-The Capture Timeline table lists all snapshots in order. A mode toggle in the
-header switches between two views:
-
-- **By PCAP** (default) — one row per snapshot.
-- **By Time** — snapshots are bucketed into a selectable interval
-  (``1m`` / ``5m`` / ``30m`` / ``1h`` / ``1d`` / ``1mo``), aggregating captures,
-  packets, and change counts per bucket. The ``1mo`` interval buckets by
-  calendar month. Each bucket row expands to list the individual PCAPs within
-  the interval, and each PCAP still opens its snapshot detail modal. The By Time
-  view is computed entirely client-side from existing snapshot data — no
-  re-analysis is triggered.
-
-The Changes indicator is rendered as the same badge pill in all three places
-(By PCAP rows, the By Time bucket aggregate, and the nested per-PCAP rows);
-clickable badges show a pointer cursor.
-
-Clicking any snapshot row opens the **Snapshot Detail** modal, which contains
-five tabs:
+**Details** on a capture in the Timeline opens the **Snapshot Detail** modal,
+which contains five tabs:
 
 - **Network Diagram** — topology graph for that snapshot with change highlights
   overlaid. Navigate between snapshots with the prev/next arrows or dropdown;
@@ -361,8 +358,6 @@ five tabs:
 - **Insights** — AI-generated analysis scoped to this single snapshot (see
   `Network Insights`_ below).
 
-The Changes column on the timeline row shows a badge with the count and highest
-severity. Click the badge directly to jump straight to the Changes tab.
 
 Drift Panels
 ------------
@@ -560,7 +555,7 @@ without overrides fall back to the global config unchanged.
 To set overrides for a snapshot:
 
 1. Open the snapshot via the Capture Timeline.
-2. Go to the **Subnets** tab.
+2. Open **Settings**; the **Subnets** section is in the drawer.
 3. If no overrides exist, click **Customize for this snapshot** — the current
    global definitions are pre-populated as *Inherited* rows.
 4. Add, edit, or remove rows. Inherited rows carry a grey *Inherited* badge;
