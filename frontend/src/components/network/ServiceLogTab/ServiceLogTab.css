@@ -1,0 +1,81 @@
+/* A service role's entries (DNS queries, web endpoints) as a stacked list: long names wrap
+   instead of pushing a wide table sideways inside the node dialog. */
+.svc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--tp-border, #d5d9e1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.svc-item {
+  padding: 8px 12px;
+  border-top: 1px solid var(--tp-border, #eceef3);
+  font-size: 0.82rem;
+}
+
+.svc-item:first-child {
+  border-top: 0;
+}
+
+.svc-item-danger {
+  box-shadow: inset 3px 0 0 #dc2626;
+  background: rgb(220 38 38 / 5%);
+}
+
+.svc-item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.svc-lead {
+  flex-shrink: 0;
+}
+
+.svc-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.svc-aside {
+  flex-shrink: 0;
+  color: var(--tp-text-muted, #525a68);
+  font-variant-numeric: tabular-nums;
+}
+
+.svc-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 3px;
+  font-size: 0.76rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+.svc-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.svc-meta-label {
+  font-weight: 600;
+  color: var(--tp-text-muted, #8a93a3);
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+}
+
+.svc-meta .btn-link {
+  padding: 0;
+  border: 0;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.svc-meta .btn-link .bi {
+  font-size: 0.85em;
+}

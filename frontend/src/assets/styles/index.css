@@ -355,3 +355,10 @@ body {
   padding-inline: 0.55rem;
   line-height: 1;
 }
+
+/* A table inside a bordered, rounded box: the box draws the bottom edge, so the last row's own
+   bottom border would double it into a thick line. */
+.border > .table > tbody > tr:last-child > *,
+.border > .table > tfoot > tr:last-child > * {
+  border-bottom-width: 0;
+}
