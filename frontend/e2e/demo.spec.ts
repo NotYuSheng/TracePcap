@@ -438,12 +438,13 @@ test('README demo walkthrough', async ({ page }) => {
   // First row of the filtered set. Targeted positionally, not by address: the
   // demo capture's default sort order is data, not contract, and hardcoding
   // "91.108.16.1:527" broke the moment the ordering shifted.
-  const firstRow = page.locator('tbody tr').first();
+  const firstRow = page.locator('.ccl-row').first();
   await expect(firstRow).toBeVisible({ timeout: 15_000 });
   await expect(firstRow).toContainText('192.168.1.77');
   await showClick(page, firstRow);
 
-  const convModal = page.getByRole('dialog');
+  // The conversation opens in the pane beside the list (Conversations B), not a dialog.
+  const convModal = page.locator('.conv-pane');
   await expect(convModal).toBeVisible({ timeout: 15_000 });
   await beat(page, FEATURE);
 
@@ -490,12 +491,13 @@ test('README demo walkthrough', async ({ page }) => {
   // though the right thing happened.
   await page.keyboard.press('Escape');
   await expect(page.locator('#entity-detail-title')).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await beat(page, HOLD);
 
 
-  const convBody = convModal.locator('.modal-body');
-  const packetTabs = convModal.locator('ul.card-header-tabs');
+  // The pane scrolls with the page.
+  const convBody = page.locator('html');
+  const packetTabs = convModal.locator('.cd-tabs');
 
   // Packet list + session reconstruction live below the modal's fold. Scroll to
   // frame that card rather than to the bottom of the modal: the tabs sit at the
@@ -509,7 +511,7 @@ test('README demo walkthrough', async ({ page }) => {
   // Both views of the same flow: the packet-by-packet table, then the
   // reassembled session.
   for (const tab of [/^Packets/, /^Session/]) {
-    await showClick(page, packetTabs.getByRole('button', { name: tab }).first());
+    await showClick(page, packetTabs.getByRole('tab', { name: tab }).first());
     // Session reconstruction is fetched on demand, so the tab opens on a
     // "Reconstructing session…" spinner. Hold until the real content is there —
     // otherwise the demo films the spinner and moves on before it resolves.
@@ -536,7 +538,7 @@ test('README demo walkthrough', async ({ page }) => {
       await page.waitForTimeout(150);
     }
     await convBody.evaluate(el => {
-      const strip = el.querySelector('ul.card-header-tabs');
+      const strip = el.querySelector('.cd-tabs');
       if (strip) {
         el.scrollBy(0, strip.getBoundingClientRect().top - el.getBoundingClientRect().top - 40);
       }

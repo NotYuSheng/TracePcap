@@ -4,8 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Badge, Button, Card, Form, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
-import { COLUMN_DEFS } from '@/features/conversation/constants';
-import type { ColumnKey } from '@/features/conversation/constants';
 import {
   getAppColor,
   getCategoryColor,
@@ -51,10 +49,6 @@ interface ConversationFilterPanelProps {
   countryOptions: string[];
   presentDeviceTypes?: string[];
   activeFilterCount: number;
-  visibleColumns: Set<ColumnKey>;
-  onToggleColumn: (key: ColumnKey) => void;
-  onResetColumns?: () => void;
-  hideColumnToggle?: boolean;
   defaultOpen?: boolean;
 }
 
@@ -105,10 +99,6 @@ export function ConversationFilterPanel({
   countryOptions,
   presentDeviceTypes,
   activeFilterCount,
-  visibleColumns,
-  onToggleColumn,
-  onResetColumns,
-  hideColumnToggle = false,
   defaultOpen,
 }: ConversationFilterPanelProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen ?? activeFilterCount > 0);
@@ -836,43 +826,6 @@ export function ConversationFilterPanel({
               </div>
               )}
 
-              {/* Column visibility */}
-              {!hideColumnToggle && (
-                <div className="col-12 pt-1 border-top mt-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <label className="filter-section-label d-block mb-0">
-                      <i className="bi bi-layout-three-columns me-1"></i>Columns
-                    </label>
-                    {onResetColumns && (
-                      <Button
-                        size="sm"
-                        variant="link"
-                        className="p-0 text-decoration-none"
-                        onClick={onResetColumns}
-                        title="Restore the default set of visible columns"
-                      >
-                        <i className="bi bi-arrow-counterclockwise me-1"></i>Reset to default
-                      </Button>
-                    )}
-                  </div>
-                  <div className="d-flex flex-wrap gap-2">
-                    {COLUMN_DEFS.map(({ key, label }) => (
-                      <div key={key} className="form-check form-check-inline mb-0">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id={`col-${key}`}
-                          checked={visibleColumns.has(key)}
-                          onChange={() => onToggleColumn(key)}
-                        />
-                        <label className="form-check-label" htmlFor={`col-${key}`}>
-                          {label}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {activeFilterCount > 0 && (
