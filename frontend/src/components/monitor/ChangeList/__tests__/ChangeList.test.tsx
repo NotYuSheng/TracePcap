@@ -46,4 +46,16 @@ describe('ChangeList', () => {
     render(<ChangeList events={many.slice(0, 3)} snapshots={[]} onPatch={vi.fn()} pageSize={8} />);
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   });
+
+  it('filters by severity, kind and reviewed state', async () => {
+    const events = [...many, ev(50, { reviewed: true })];
+    render(<ChangeList events={events} snapshots={[]} onPatch={vi.fn()} pageSize={50} />);
+    await userEvent.click(screen.getByRole('button', { name: /Critical/ }));
+    expect(screen.getAllByText(/^New device:|^Gateway changed:/)).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: /^All/ }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Kind of change' }), 'new device');
+    expect(screen.getAllByText(/^New device:/)).toHaveLength(21);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Reviewed' }), 'REVIEWED');
+    expect(screen.getAllByText(/^New device:/)).toHaveLength(1);
+  });
 });

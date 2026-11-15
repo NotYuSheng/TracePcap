@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
+import { IconTooltip } from '@components/common/IconTooltip';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
 import { severityHex, severityIcon } from '@/utils/severityColors';
@@ -84,25 +85,29 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch, compact = false }:
 
       <div className="d-flex align-items-center gap-2 flex-shrink-0">
         {!compact && <small className="text-muted text-nowrap">{formattedTime}</small>}
-        <Button
-          size="sm"
-          variant="link"
-          className="p-0 text-muted"
-          aria-label={showNotes ? 'Hide notes' : (localNotes ? 'Edit notes' : 'Add notes')}
-          onClick={() => { setShowNotes(v => !v); setDraftNotes(localNotes); }}
-        >
-          <i className={`bi bi-chat-left-text${localNotes ? '-fill' : ''}`}></i>
-        </Button>
-        <Button
-          size="sm"
-          variant="link"
-          className={`p-0 ${localReviewed ? 'text-success' : 'text-muted'}`}
-          aria-label={localReviewed ? 'Mark as unreviewed' : 'Mark as reviewed'}
-          onClick={handleReviewToggle}
-          disabled={saving}
-        >
-          <i className={`bi bi-check-circle${localReviewed ? '-fill' : ''}`}></i>
-        </Button>
+        <IconTooltip text={showNotes ? 'Hide notes' : (localNotes ? 'Edit notes' : 'Add notes')}>
+          <Button
+            size="sm"
+            variant="link"
+            className="p-0 text-muted"
+            aria-label={showNotes ? 'Hide notes' : (localNotes ? 'Edit notes' : 'Add notes')}
+            onClick={() => { setShowNotes(v => !v); setDraftNotes(localNotes); }}
+          >
+            <i className={`bi bi-chat-left-text${localNotes ? '-fill' : ''}`}></i>
+          </Button>
+        </IconTooltip>
+        <IconTooltip text={localReviewed ? 'Mark as unreviewed' : 'Mark as reviewed'}>
+          <Button
+            size="sm"
+            variant="link"
+            className={`p-0 ${localReviewed ? 'text-success' : 'text-muted'}`}
+            aria-label={localReviewed ? 'Mark as unreviewed' : 'Mark as reviewed'}
+            onClick={handleReviewToggle}
+            disabled={saving}
+          >
+            <i className={`bi bi-check-circle${localReviewed ? '-fill' : ''}`}></i>
+          </Button>
+        </IconTooltip>
       </div>
     </div>
     {/* The notes editor gets the row's full width, not the text column beside the buttons. */}
