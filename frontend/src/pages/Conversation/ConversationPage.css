@@ -1,0 +1,77 @@
+/* Conversations B: the list and the selected conversation side by side. */
+.conv-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.conv-list-card,
+.conv-pane {
+  background: var(--tp-surface, #fff);
+  border: 1px solid var(--tp-border, #d5d9e1);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  overflow: hidden;
+}
+.conv-list-card {
+  position: sticky;
+  top: calc(var(--tp-header-h, 64px) + 12px);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--tp-header-h, 64px) - 24px);
+}
+.conv-list-scroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  transition: opacity 0.15s;
+}
+.conv-list-foot {
+  border-top: 1px solid var(--tp-border, #eceef3);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+.conv-pane-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+.conv-pane-title {
+  margin: 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.conv-pane-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.conv-pane-actions .ms-2 {
+  margin-left: 0 !important;
+}
+.conv-pane-body {
+  padding: 16px;
+}
+@media (max-width: 991.98px) {
+  .conv-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .conv-list-card {
+    position: static;
+    max-height: 420px;
+  }
+}
+/* Docked in the pane: the detail's own outer card goes, the pane is the frame. */
+.conv-pane .cd-bare {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.conv-pane .cd-bare > .card-body {
+  padding: 0;
+}

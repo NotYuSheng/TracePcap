@@ -4,6 +4,26 @@ Conversations
 The Conversations tab lists every network flow (conversation) extracted from
 the PCAP file — one row per unique bidirectional flow.
 
+Two Views
+---------
+
+The buttons beside the export buttons switch between two views. The tab
+remembers your choice.
+
+- **List and detail** (the default): a compact list on the left and the
+  selected conversation on the right, with no dialog.
+
+  - Each row shows the endpoints, the app, whether the conversation is
+    flagged, its size and its start time.
+  - The first conversation is selected when the list loads.
+  - **↑**/**↓** (or **←**/**→**) move through the list, and the selected row
+    stays in view.
+  - The right pane holds the conversation's hosts, signals, timing,
+    geolocation, packets and session, with **Trace**, **CSV** and **PCAP**.
+
+- **Table**: every column, sortable, with a column chooser. Click a row to
+  open the conversation in a dialog.
+
 How Conversations Are Built
 ----------------------------
 
