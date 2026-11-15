@@ -26,7 +26,7 @@ import { SnapshotTrafficChart } from '@/components/monitor/SnapshotTrafficChart/
 import { useNetworkDetailData } from './hooks/useNetworkDetailData';
 import { MonitorInfoCard } from './components/MonitorInfoCard';
 import { AnalysisRail, type RailItem } from '@pages/Analysis/AnalysisRail';
-import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEventBadge';
+import { ChangeList } from '@/components/monitor/ChangeList';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import './NetworkDetailPage.css';
@@ -302,14 +302,12 @@ export const NetworkDetailPage = () => {
                         Nothing new to review from this capture.
                       </p>
                     ) : (
-                      latestChanges.map(event => (
-                        <ChangeEventBadge
-                          key={event.id}
-                          event={event}
-                          snapshots={snapshots}
-                          onPatch={data.handlePatchChange}
-                        />
-                      ))
+                      <ChangeList
+                        events={latestChanges}
+                        snapshots={snapshots}
+                        onPatch={data.handlePatchChange}
+                        reviewFilter={false}
+                      />
                     )}
                   </Card.Body>
                 </Card>

@@ -49,7 +49,12 @@ RUN VITE_APP_VERSION="${VITE_APP_VERSION:-$(tr -d '[:space:]' < /tmp/APP_VERSION
 FROM nginx:alpine
 
 # Install gettext for envsubst (used in entrypoint script) and tzdata for timezone
-RUN apk add --no-cache gettext tzdata
+# Retried: a CI runner's TLS fetch of the Alpine index fails now and then (#956), and one bad
+# fetch otherwise fails the whole stack build.
+RUN for i in 1 2 3 4 5; do \
+      apk add --no-cache gettext tzdata && exit 0; \
+      echo "apk add failed (attempt $i), retrying"; sleep $((i * 5)); \
+    done; exit 1
 
 # Set timezone to Singapore
 ENV TZ=Asia/Singapore
