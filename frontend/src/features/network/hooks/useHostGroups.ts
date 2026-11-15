@@ -16,9 +16,9 @@ import { customPrivateRangeService } from '@/features/cluster/services/customPri
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 import { clusterApi } from '@/features/cluster/services/clusterApi';
 
-/** Devices in a group, at any depth. */
+/** Devices in a group, at any depth: nodes known to be one device count once. */
 export function groupSize(g: GroupNode): number {
-  return g.nodeIds.length + g.children.reduce((n, c) => n + groupSize(c), 0);
+  return g.devices ?? g.nodeIds.length + g.children.reduce((n, c) => n + groupSize(c), 0);
 }
 
 /**
@@ -29,7 +29,7 @@ export function useHostGroups(
   fileId: string,
   summary?: AnalysisSummary
 ): { tops: GroupNode[]; loading: boolean } {
-  const { nodes, loading } = useNetworkData(fileId, summary);
+  const { nodes, loading, deviceLinks } = useNetworkData(fileId, summary);
   const [segments, setSegments] = useState<NetworkSegment[]>([]);
   const [ranges, setRanges] = useState<CustomPrivateRange[]>([]);
   const [dnsNames, setDnsNames] = useState<Map<string, string> | undefined>(undefined);
@@ -59,8 +59,8 @@ export function useHostGroups(
   }, [fileId]);
   const tops = useMemo(
     () =>
-      buildGroupTree(nodes, { segments, customRanges: ranges, dnsNames, ...groupingEdits(edits) }),
-    [nodes, segments, ranges, dnsNames, edits]
+      buildGroupTree(nodes, { segments, customRanges: ranges, dnsNames, deviceLinks, ...groupingEdits(edits) }),
+    [nodes, segments, ranges, dnsNames, edits, deviceLinks]
   );
   return { tops, loading };
 }

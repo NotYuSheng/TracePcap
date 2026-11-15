@@ -601,7 +601,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   // Legend highlight: click a node type or an edge colour to pick out its nodes and edges.
   const [legendFocus, setLegendFocus] = useState<LegendFocus | null>(null);
   const legendMatchRef = useRef<{ nodes: Set<string>; edges: Set<string> } | null>(null);
-  const grouping = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, ...(mapEdits ? groupingEdits(mapEdits) : {}) };
+  const grouping = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, deviceLinks, ...(mapEdits ? groupingEdits(mapEdits) : {}) };
   const groupingRef = useRef(grouping);
   groupingRef.current = grouping;
   const onGroupClickRef = useRef(onGroupClick);

@@ -122,6 +122,17 @@ class ReportFindingsTest {
   }
 
   @Test
+  void devicesMergeOnEvidenceNotOnMac() {
+    var addrs = new java.util.LinkedHashSet<>(List.of("10.20.10.1", "10.20.20.1", "10.20.30.1", "10.20.10.23", "10.20.10.33", "10.20.10.21"));
+    // One DHCP server's three gateways, and a laptop that moved: six addresses, three devices.
+    List<String[]> same = List.of(
+        new String[] {"10.20.10.1", "10.20.20.1"}, new String[] {"10.20.10.1", "10.20.30.1"},
+        new String[] {"10.20.10.23", "10.20.10.33"});
+    assertThat(ReportService.deviceCount(addrs, same)).isEqualTo(3);
+    assertThat(ReportService.deviceCount(addrs, List.of())).isEqualTo(6);
+  }
+
+  @Test
   void longCapturesReadInDays() {
     assertThat(ReportService.duration(27 * 60_000L)).isEqualTo("27 min");
     assertThat(ReportService.duration(26 * 3_600_000L)).isEqualTo("26 h 0 min");

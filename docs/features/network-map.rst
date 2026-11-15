@@ -47,6 +47,14 @@ Each box sits inside the one above it:
   receives. A host that holds a ``.255`` address in a wider subnet sends traffic,
   so it stays a device.
 
+Each box's count is of **devices**, not addresses. Two addresses count as one
+device only on evidence: a device seen moving to another address, and one DHCP
+server's gateway addresses on the networks it serves (one router, so **Your
+networks** counts it once while each network still counts its own gateway).
+Not by MAC address alone: hosts on a routed subnet all reach the capture with
+the router's MAC, and a phone with private addressing changes its MAC. The
+Overview's *Where the hosts are* and the PDF report count the same way.
+
 A client asking for an address sends from ``0.0.0.0``, before it has one, so its
 MAC is what tells it apart. Its request is drawn on the device the DHCP server
 then gave an address to, so you can follow a client from asking to answered;
