@@ -127,7 +127,7 @@ export function GraphNodeIdentityCard({
             <dd>{d.manufacturer}</dd>
           </>
         )}
-        {d.hostname && (
+        {d.hostname && d.hostnameSource && (
           <>
             <dt>Name from</dt>
             <dd>

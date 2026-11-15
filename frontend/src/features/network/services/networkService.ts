@@ -395,6 +395,8 @@ export function buildNetworkGraph(
         // This device's own MAC and DHCP name, not whichever the address's conversations carried first.
         node.data.mac = span.occ.mac ?? undefined;
         node.data.hostname = span.occ.hostname ?? undefined;
+        // An occupant's name only ever comes from its DHCP lease (HostOccupancyService).
+        node.data.hostnameSource = span.occ.hostname ? 'dhcp' : undefined;
         node.label =
           span.occ.hostname || (span.occ.network ? `${ip} · ${span.occ.network}` : `${ip} · ${span.occ.idx + 1}/${list.length}`);
       }
