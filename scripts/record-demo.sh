@@ -42,8 +42,16 @@ WIDTH="${DEMO_WIDTH:-640}"
 START="${DEMO_START:-0}"
 FPS="${DEMO_FPS:-6}"
 MAX_COLORS="${DEMO_COLORS:-128}"
+# Optional gifsicle lossy pass (0 = off). GitHub caps README images and GIFs at
+# 10MB, and the lossy pass is what lets a native-resolution (1280px) clip fit:
+# the hero at 1280px/8fps/128c is 13MB plain, 7.2MB at DEMO_LOSSY=60, with no
+# visible damage to text or the graph. Needs gifsicle (sudo apt install gifsicle).
+LOSSY="${DEMO_LOSSY:-0}"
 
 command -v ffmpeg >/dev/null || { echo "error: ffmpeg not found. sudo apt install ffmpeg" >&2; exit 1; }
+if [ "$LOSSY" != "0" ]; then
+  command -v gifsicle >/dev/null || { echo "error: DEMO_LOSSY needs gifsicle. sudo apt install gifsicle" >&2; exit 1; }
+fi
 
 if ! curl -fsS -o /dev/null "$BASE_URL/" 2>/dev/null; then
   echo "error: app not reachable at $BASE_URL — run 'docker compose up -d' first." >&2
@@ -125,5 +133,10 @@ ffmpeg -v error -y -ss "$START" -i "$SOURCE" \
 ffmpeg -v error -y -ss "$START" -i "$SOURCE" -i "$PALETTE" \
   -lavfi "${FILTERS}[x];[x][1:v]paletteuse=dither=none:diff_mode=rectangle" \
   -loop 0 "$OUT"
+
+if [ "$LOSSY" != "0" ]; then
+  echo "==> gifsicle -O3 --lossy=${LOSSY}"
+  gifsicle -O3 --lossy="$LOSSY" -b "$OUT"
+fi
 
 echo "==> Wrote $OUT ($(du -h "$OUT" | cut -f1))"
