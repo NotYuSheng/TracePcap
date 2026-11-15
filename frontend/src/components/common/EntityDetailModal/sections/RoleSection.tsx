@@ -48,7 +48,7 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
   }
   return (
     <div className="mb-4">
-      <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center justify-content-between">
+      <h6 className="border-bottom pb-1 mb-2 role-heading">
         <span>
           Role <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· analyst-assigned name</span>
           <button
@@ -62,46 +62,43 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
           </button>
         </span>
         {!r.roleEditing && !r.roleLoading && (
-          <div className="d-flex gap-1">
+          <div className="role-actions">
             <Button
               variant="outline-secondary"
               size="sm"
-              className="py-0"
-              style={{ fontSize: '0.75rem' }}
+              className="role-action-btn"
               onClick={r.openEdit}
             >
-              <i className="bi bi-pencil me-1" />Edit
+              <i className="bi bi-pencil" aria-hidden="true" />Edit
             </Button>
             {/* Removal for a confirmed role — AI suggestions already have their own Discard. */}
             {r.role?.confirmedByHuman && (
               <Button
                 variant="outline-danger"
                 size="sm"
-                className="py-0"
-                style={{ fontSize: '0.75rem' }}
+                className="role-action-btn"
                 onClick={r.discard}
                 disabled={r.roleSaving}
                 title="Delete this role label and description"
               >
-                <i className="bi bi-trash me-1" />Remove
+                <i className="bi bi-trash" aria-hidden="true" />Remove
               </Button>
             )}
             {fileId && (
-              <div className="d-flex align-items-center gap-1">
+              <>
                 <Button
                   variant="outline-secondary"
                   size="sm"
-                  className="py-0"
-                  style={{ fontSize: '0.75rem' }}
+                  className="role-action-btn"
                   onClick={r.suggest}
                   disabled={r.roleSuggesting}
                 >
                   {r.roleSuggesting
-                    ? <><Spinner size="sm" className="me-1" />Suggesting…</>
-                    : <><i className="bi bi-stars me-1" />Suggest with AI</>
+                    ? <><Spinner size="sm" />Suggesting…</>
+                    : <><i className="bi bi-stars" aria-hidden="true" />Suggest with AI</>
                   }
                 </Button>
-              </div>
+              </>
             )}
           </div>
         )}

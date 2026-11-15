@@ -15,6 +15,7 @@ import { NotesTab } from './sections/NotesTab';
 import { GraphNodeDetailsSection } from './sections/GraphNodeDetailsSection';
 import { GraphHistoryTab } from './sections/GraphHistoryTab';
 import { GraphNodeIdentityCard } from './sections/GraphNodeIdentityCard';
+import { HostDetailModal } from './HostDetailModal';
 import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
 import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { EntityDetailModalProps, Tab } from './types';
@@ -136,15 +137,20 @@ export function EntityDetailModal({
             </Alert>
           );
 
-  const nested = nestedIp && (
-    <EntityDetailModal
-      entityType="IP"
-      entityKey={nestedIp}
-      displayName={nestedIp}
-      fileId={fileId}
-      onClose={() => setNestedIp(null)}
-    />
-  );
+  // A peer opened from this host: the same identity-card view when the capture is known.
+  const nested =
+    nestedIp &&
+    (fileId ? (
+      <HostDetailModal fileId={fileId} ip={nestedIp} onNavigate={onNavigate} onClose={() => setNestedIp(null)} />
+    ) : (
+      <EntityDetailModal
+        entityType="IP"
+        entityKey={nestedIp}
+        displayName={nestedIp}
+        fileId={fileId}
+        onClose={() => setNestedIp(null)}
+      />
+    ));
 
   // ── Graph node: an identity card on the left, tabbed detail on the right ────────────────────────
   if (isGraph) {
