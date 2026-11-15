@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Form } from '@govtechsg/sgds-react';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import type { GraphLayoutType, GraphNode } from '@/features/network/types';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
@@ -8,7 +9,6 @@ import { useMapPlayback } from '@/features/network/hooks/useMapPlayback';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { buildHighlightMap } from '@/features/monitor/utils/changeHighlights';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
-import { conversationService } from '@/features/conversation/services/conversationService';
 import { isPrivateIp } from '@/utils/ipClassification';
 import './SnapshotMap.css';
 
@@ -22,44 +22,6 @@ interface SnapshotMapProps {
   height?: number;
   /** The play bar under the graph (time window or packet replay); traffic dots move either way. */
   controls?: boolean;
-}
-
-interface GoneDevice {
-  ip: string;
-  mac: string | null;
-}
-
-/** Local devices in the capture before that this capture no longer has, by MAC (or IP without one). */
-function useGoneDevices(fileId: string, previousFileId: string | null): GoneDevice[] {
-  // Keyed by the pair it was worked out for, so a stale answer is never shown for another capture.
-  const [result, setResult] = useState<{ key: string; gone: GoneDevice[] } | null>(null);
-  const key = `${previousFileId}>${fileId}`;
-  useEffect(() => {
-    if (!previousFileId) return;
-    let alive = true;
-    Promise.all([
-      conversationService.getHostClassifications(previousFileId),
-      conversationService.getHostClassifications(fileId),
-    ])
-      .then(([before, now]) => {
-        if (!alive) return;
-        const id = (h: { ip: string; mac?: string | null }) => h.mac || h.ip;
-        const present = new Set(now.map(id));
-        setResult({
-          key: `${previousFileId}>${fileId}`,
-          gone: before
-            .filter(h => isPrivateIp(h.ip) && !present.has(id(h)))
-            .map(h => ({ ip: h.ip, mac: h.mac ?? null })),
-        });
-      })
-      .catch(() => {
-        if (alive) setResult({ key: `${previousFileId}>${fileId}`, gone: [] });
-      });
-    return () => {
-      alive = false;
-    };
-  }, [fileId, previousFileId]);
-  return previousFileId && result?.key === key ? result.gone : [];
 }
 
 /**
@@ -78,18 +40,62 @@ export function SnapshotMap({
   const navigate = useNavigate();
   const [layoutType, setLayoutType] = useState<GraphLayoutType>('grouped');
   const [selected, setSelected] = useState<GraphNode | null>(null);
-  const [showGone, setShowGone] = useState(false);
+  // Draw the devices that left since the capture before, faded, where they were.
+  const [ghosts, setGhosts] = useState(false);
+  // The gone device being hovered in the list: drawn and ringed on the map.
+  const [hoverGone, setHoverGone] = useState<string | null>(null);
   // In this network, so its own detection rules' matches show too (#925 phase 3).
-  const { nodes, edges, loading } = useNetworkData(snapshot.fileId, undefined, undefined, networkId);
+  const { nodes, edges, loading, hiddenNodesList } = useNetworkData(snapshot.fileId, undefined, undefined, networkId);
 
   const playback = useMapPlayback(snapshot.fileId, nodes, edges, { controls });
-  const highlighted = useMemo(() => buildHighlightMap(changeEvents, snapshot.id), [changeEvents, snapshot.id]);
+  // The capture before, to find the local devices this one no longer has (the backend records no
+  // removal events). Its nodes are what the faded "gone" devices are drawn from.
+  const before = useNetworkData(previous?.fileId ?? '', undefined, undefined, networkId);
+  const goneNodes = useMemo(() => {
+    if (!previous) return [];
+    // Still here if either its MAC or its address still is: one capture can know a device's MAC
+    // where the other only saw its IP, and a device that only changed address hasn't left.
+    // Every device of both captures, not just the ones drawn: the map shows at most 50, and a device
+    // past that cap is hidden, not gone.
+    const all = [...nodes, ...hiddenNodesList];
+    const macs = new Set(all.map(n => n.data.mac).filter(Boolean));
+    const ips = new Set(all.map(n => n.data.ip).filter(Boolean));
+    const ids = new Set(all.map(n => n.id));
+    return [...before.nodes, ...before.hiddenNodesList].filter(
+      n =>
+        (n.data.isL2 || isPrivateIp(n.data.ip)) &&
+        !(n.data.mac && macs.has(n.data.mac)) &&
+        !(n.data.ip && ips.has(n.data.ip)) &&
+        !ids.has(n.id)
+    );
+  }, [previous, before.nodes, before.hiddenNodesList, nodes, hiddenNodesList]);
+  const drawn = useMemo(
+    () => (ghosts ? goneNodes : goneNodes.filter(n => n.id === hoverGone)),
+    [ghosts, goneNodes, hoverGone]
+  );
+  const shownNodes = useMemo(() => (drawn.length ? [...nodes, ...drawn] : nodes), [nodes, drawn]);
+  // Faded through the time axis's "not seen" styling, merged with whatever the play bar is showing.
+  const activeInWindow = useMemo(() => {
+    if (drawn.length === 0) return playback.activeInWindow;
+    const already = playback.activeInWindow && 'faintNodeIds' in playback.activeInWindow ? playback.activeInWindow.faintNodeIds : undefined;
+    const faint = new Set([...(already ?? []), ...drawn.map(n => n.id)]);
+    if (playback.activeInWindow) return { ...playback.activeInWindow, faintNodeIds: faint };
+    return { nodeIds: new Set(shownNodes.map(n => n.id)), edgeIds: new Set(edges.map(e => e.id)), faintNodeIds: faint };
+  }, [drawn, playback.activeInWindow, shownNodes, edges]);
+  const changeHighlights = useMemo(() => buildHighlightMap(changeEvents, snapshot.id), [changeEvents, snapshot.id]);
+  const hovered = goneNodes.find(n => n.id === hoverGone);
+  const highlighted = useMemo(() => {
+    if (!hovered) return changeHighlights;
+    const m = new Map(changeHighlights);
+    m.set(hovered.label ?? hovered.data.ip, { color: '#5925dc', label: 'Gone since the capture before' });
+    return m;
+  }, [changeHighlights, hovered]);
   const legend = useMemo(() => {
     const seen = new Map<string, string>();
     for (const h of highlighted.values()) if (!seen.has(h.label)) seen.set(h.label, h.color);
     return [...seen.entries()];
   }, [highlighted]);
-  const gone = useGoneDevices(snapshot.fileId, previous?.fileId ?? null);
+  const gone = goneNodes;
 
   return (
     <div className="snapshot-map">
@@ -102,13 +108,14 @@ export function SnapshotMap({
         ) : (
           <NetworkGraph
             key={snapshot.id}
-            nodes={nodes}
+            nodes={shownNodes}
             edges={edges}
             highlightedNodes={highlighted}
             layoutType={layoutType}
             onLayoutChange={setLayoutType}
             onNodeClick={setSelected}
             {...playback}
+            activeInWindow={activeInWindow}
           />
         )}
       </div>
@@ -123,25 +130,37 @@ export function SnapshotMap({
           {gone.length > 0 && (
             <span>
               <span className="snapshot-map-dot snapshot-map-dot-gone" aria-hidden="true" />
-              {gone.length.toLocaleString()} {gone.length === 1 ? 'device' : 'devices'} gone since the capture before{' '}
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 align-baseline"
-                aria-expanded={showGone}
-                onClick={() => setShowGone(v => !v)}
-              >
-                {showGone ? 'Hide' : 'Show'}
-              </button>
+              {gone.length.toLocaleString()} {gone.length === 1 ? 'device' : 'devices'} gone since the capture before
             </span>
+          )}
+          {gone.length > 0 && (
+            <Form.Check
+              id={`ghosts-${snapshot.id}`}
+              type="switch"
+              className="snapshot-map-ghosts"
+              label="Show them on the map, faded"
+              checked={ghosts}
+              onChange={e => setGhosts(e.target.checked)}
+            />
           )}
         </div>
       )}
-      {showGone && gone.length > 0 && (
+      {gone.length > 0 && (
         <ul className="snapshot-map-gone" aria-label="Devices gone since the capture before">
           {gone.map(g => (
-            <li key={g.mac ?? g.ip}>
-              <span className="font-monospace">{g.ip}</span>
-              {g.mac && <span className="snapshot-map-gone-mac font-monospace">{g.mac}</span>}
+            <li key={g.id}>
+              <button
+                type="button"
+                className={`snapshot-map-gone-item${hoverGone === g.id ? ' active' : ''}`}
+                aria-label={`Point out ${g.data.ip}${g.data.mac ? ` (${g.data.mac})` : ''} on the map`}
+                onMouseEnter={() => setHoverGone(g.id)}
+                onMouseLeave={() => setHoverGone(h => (h === g.id ? null : h))}
+                onFocus={() => setHoverGone(g.id)}
+                onBlur={() => setHoverGone(h => (h === g.id ? null : h))}
+              >
+                <span className="font-monospace">{g.data.ip}</span>
+                {g.data.mac && <span className="snapshot-map-gone-mac font-monospace">{g.data.mac}</span>}
+              </button>
             </li>
           ))}
         </ul>

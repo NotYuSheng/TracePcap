@@ -13,13 +13,50 @@
 }
 
 .change-list-tools .form-control {
-  flex: 1 1 220px;
-  max-width: 340px;
+  flex: 1 1 200px;
+  max-width: 320px;
 }
 
-.change-list-tools .form-check {
-  margin: 0;
-  font-size: 0.82rem;
+.change-list-tools .form-select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.change-list-severity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.change-list-chip {
+  height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 14px;
+  border: 1px solid var(--tp-border, #d5d9e1);
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #374151);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.change-list-chip.active {
+  border-color: #c4b5fd;
+  background: #ede9fe;
+  color: #3b1891;
+}
+
+[data-theme='dark'] .change-list-chip.active {
+  border-color: rgb(155 125 255 / 50%);
+  background: rgb(155 125 255 / 18%);
+  color: #c9b8ff;
+}
+
+.change-list-chip-count {
+  color: var(--tp-text-muted, #8a93a3);
+  font-weight: 400;
 }
 
 .change-list-compact {

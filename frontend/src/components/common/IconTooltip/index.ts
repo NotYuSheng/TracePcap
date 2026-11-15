@@ -1,0 +1,1 @@
+export { IconTooltip } from './IconTooltip';
