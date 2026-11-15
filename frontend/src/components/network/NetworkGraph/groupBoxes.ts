@@ -108,6 +108,25 @@ export function drawGroupBoxes(
       ctx.stroke();
     }
 
+    // An empty group of the analyst's: its name and what it's for, centred and sized from the
+    // whole box. The header band of a box this small is unreadable at most zooms, and a blank box
+    // says nothing about where the group just added went.
+    if (b.leaf && b.count === 0) {
+      const sz = Math.min(13, bh * 0.24, bw / 9);
+      if (sz < 6) continue;
+      const room = bw - 12;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `600 ${sz}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = s.text;
+      ctx.fillText(fitText(ctx, b.label, room), left + bw / 2, top + bh / 2 - sz * 0.7);
+      ctx.font = `400 ${sz * 0.9}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = s.muted;
+      ctx.fillText(fitText(ctx, 'Drop devices here', room), left + bw / 2, top + bh / 2 + sz * 0.7);
+      ctx.textAlign = 'left';
+      continue;
+    }
+
     // The name, in the header band the layout left for it; shrinks with zoom, gone when unreadable.
     const band = (b.header ?? headerFor(b.level)) * scale;
     const max = b.level === 1 ? 16 : b.level === 2 ? 15 : 13;
@@ -140,14 +159,6 @@ export function drawGroupBoxes(
       ctx.font = `italic 400 ${size * 0.82}px Inter, system-ui, sans-serif`;
       ctx.fillStyle = s.text;
       ctx.fillText(fitText(ctx, b.note, room), left + padX, nextY);
-    }
-    // An empty group of the analyst's: say what it's for.
-    if (b.leaf && b.count === 0) {
-      ctx.font = `400 ${Math.min(13, size)}px Inter, system-ui, sans-serif`;
-      ctx.fillStyle = s.muted;
-      ctx.textAlign = 'center';
-      ctx.fillText('Drop devices here', left + bw / 2, top + band + (bh - band) / 2);
-      ctx.textAlign = 'left';
     }
   }
   ctx.restore();
