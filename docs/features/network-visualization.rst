@@ -85,8 +85,10 @@ a page at a time rather than stopping at the first page.
 Traffic Card
 ------------
 
-Above the diagram, the **Traffic** card shows the diagram's totals (hosts,
-connections, packets, bytes) and how many are shown after filters. It has two
+Above the diagram, the **Traffic** card shows the diagram's totals (addresses,
+connections, packets, bytes) and how many are shown after filters. It counts
+addresses, one per node; the map's boxes count devices, so a router serving three
+networks is three addresses but one device (see :doc:`network-map`). It has two
 tabs, both collapsed until you open one; the open tab is remembered:
 
 - **Busiest pairs**: the eight host pairs carrying the most bytes, both

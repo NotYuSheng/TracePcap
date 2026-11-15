@@ -121,7 +121,9 @@ export function TrafficCard({
         {!compact && <h2 className="traffic-title">Traffic</h2>}
         <div className="traffic-totals">
           <div>
-            <b>{totals.nodes.toLocaleString()}</b> hosts
+            {/* Addresses, not devices: the map's boxes count devices (one router on three
+                networks is one device but three addresses). */}
+            <b>{totals.nodes.toLocaleString()}</b> {totals.nodes === 1 ? 'address' : 'addresses'}
           </div>
           <div>
             <b>{totals.edges.toLocaleString()}</b> connections
@@ -134,7 +136,7 @@ export function TrafficCard({
           </div>
           <span className="traffic-shown">
             {filtered
-              ? `${shown.nodes} hosts · ${shown.edges} connections shown (filtered)`
+              ? `${shown.nodes} ${shown.nodes === 1 ? 'address' : 'addresses'} · ${shown.edges} connections shown (filtered)`
               : `All ${shown.nodes} shown`}
           </span>
         </div>
