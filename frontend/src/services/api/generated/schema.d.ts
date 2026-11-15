@@ -2582,7 +2582,7 @@ export interface paths {
         put?: never;
         /**
          * Test the LLM connection
-         * @description Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Requires the permission to edit the LLM connection.
+         * @description Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Testing other values than the current ones requires the permission to edit the LLM connection.
          */
         post: operations["test"];
         delete?: never;
