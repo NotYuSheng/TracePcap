@@ -11,6 +11,8 @@ const seg = (key: string, label: string, clients: [string, string][], net = '192
   cidr: `${net}.0/24`, serverMac: '00:1b:21:c0:00:01', clients: clients.map(([ip, mac]) => ({ ip, mac })),
 })
 
+const allNodeIds = (g: GroupNode): string[] => [...g.nodeIds, ...g.children.flatMap(allNodeIds)]
+
 const find = (gs: GroupNode[], id: string): GroupNode | undefined => {
   for (const g of gs) {
     if (g.id === id) return g
@@ -44,6 +46,18 @@ describe('networkGroups', () => {
     expect(find(tree, 'special')?.nodeIds).toEqual(['10.20.30.255'])
     expect(find(tree, 'local')).toBeDefined()
     expect(find(tree, 'special')?.nodeIds).not.toContain('10.20.31.255')
+  })
+
+  it('puts a client nobody answered in the network on the VLAN it asked on', () => {
+    const devices = { ...seg('vlan:30', 'devices.office.example', [['10.20.30.31', 'aa:00:00:00:00:31']], '10.20.30'),
+      unanswered: [{ mac: 'b8:27:eb:5e:00:01', hostname: 'raspberrypi', vlanId: 30, requests: 6 }] }
+    const tree = buildGroupTree(
+      [node('10.20.30.31', { mac: 'aa:00:00:00:00:31' }), node('b8:27:eb:5e:00:01', { mac: 'b8:27:eb:5e:00:01', isL2: true })],
+      { segments: [devices] },
+    )
+    const net = tree[0].children.find(g => g.label.startsWith('devices.office.example'))
+    expect(net).toBeDefined()
+    expect(allNodeIds(net!)).toContain('b8:27:eb:5e:00:01')
   })
 
   it('puts overlapping networks apart: by the device key, else the MAC', () => {

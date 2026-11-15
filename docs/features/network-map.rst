@@ -51,8 +51,10 @@ A client asking for an address sends from ``0.0.0.0``, before it has one, so its
 MAC is what tells it apart. Its request is drawn on the device the DHCP server
 then gave an address to, so you can follow a client from asking to answered;
 a device that moved address has each request on the address it got next. A
-client nobody answered gets its own node, named by its MAC, under **No IP
-address**. Past 20 unanswered clients they are drawn as one node, *N devices
+client nobody answered gets its own node under **No IP address**, named by the
+hostname it asked under (else its MAC), in the network of the VLAN it asked on.
+On an untagged capture with no answer there is nothing to place it by, so it
+sits under **Other local addresses**. Past 20 unanswered clients they are drawn as one node, *N devices
 asking for an address*: hundreds of made-up MACs asking at once is a DHCP
 starvation attack, not hundreds of devices.
 

@@ -66,15 +66,43 @@ public class DhcpLeaseResolverService {
       String serverMac, String serverId, String router, String domain, Long leaseSeconds,
       String subnetMask, Integer vlanId) {}
 
+  /**
+   * A client that asked for an address (DISCOVER or REQUEST) and was never answered with an ACK:
+   * it has no address, so its MAC, the name it asked under and the VLAN it asked on identify it.
+   */
+  public record Unanswered(
+      String mac, String hostname, String vendorClass, Integer vlanId, int requests,
+      LocalDateTime firstSeen, LocalDateTime lastSeen) {}
+
+  /** Everything one pass over the capture's DHCP finds. */
+  public record Resolution(List<Lease> leases, List<Unanswered> unanswered) {}
+
+  /** What one MAC's requests have shown so far, while the pass runs. */
+  static final class Asking {
+    String hostname;
+    String vendorClass;
+    Integer vlanId;
+    int requests;
+    LocalDateTime first;
+    LocalDateTime last;
+  }
+
   public List<Lease> resolve(File pcapFile) {
+    return resolveAll(pcapFile).leases();
+  }
+
+  public Resolution resolveAll(File pcapFile) {
     Map<String, Lease> leases = new LinkedHashMap<>();
+    Map<String, Asking> asking = new LinkedHashMap<>();
+    java.util.Set<String> acked = new java.util.HashSet<>();
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
             "-Y",
-            "dhcp.option.dhcp == 3 || dhcp.option.dhcp == 5",
+            // DISCOVER too: a client nobody answers may never get past it.
+            "dhcp.option.dhcp == 1 || dhcp.option.dhcp == 3 || dhcp.option.dhcp == 5",
             "-T",
             "fields",
             "-E",
@@ -148,7 +176,7 @@ public class DhcpLeaseResolverService {
                   String line;
                   while ((line = reader.readLine()) != null) {
                     synchronized (leases) {
-                      parseRow(line.split("\\|", -1), leases);
+                      parseRow(line.split("\\|", -1), leases, asking, acked);
                     }
                   }
                 } catch (Exception ignored) {
@@ -175,8 +203,24 @@ public class DhcpLeaseResolverService {
     }
     synchronized (leases) {
       if (!leases.isEmpty()) log.info("Found {} DHCP lease(s)", leases.size());
-      return new ArrayList<>(leases.values());
+      List<Unanswered> unanswered = unanswered(asking, acked, leases);
+      if (!unanswered.isEmpty()) log.info("Found {} unanswered DHCP client(s)", unanswered.size());
+      return new Resolution(new ArrayList<>(leases.values()), unanswered);
     }
+  }
+
+  /** The MACs that asked but were never ACKed and hold no lease (not even from a lone REQUEST). */
+  static List<Unanswered> unanswered(
+      Map<String, Asking> asking, java.util.Set<String> acked, Map<String, Lease> leases) {
+    java.util.Set<String> leased = new java.util.HashSet<>();
+    for (Lease l : leases.values()) leased.add(l.mac());
+    List<Unanswered> out = new ArrayList<>();
+    asking.forEach(
+        (mac, a) -> {
+          if (acked.contains(mac) || leased.contains(mac)) return;
+          out.add(new Unanswered(mac, a.hostname, a.vendorClass, a.vlanId, a.requests, a.first, a.last));
+        });
+    return out;
   }
 
   /**
@@ -184,6 +228,15 @@ public class DhcpLeaseResolverService {
    * requested address, chaddr, hostname.
    */
   static void parseRow(String[] f, Map<String, Lease> leases) {
+    parseRow(f, leases, new LinkedHashMap<>(), new java.util.HashSet<>());
+  }
+
+  /**
+   * As {@link #parseRow(String[], Map)}, also noting each client's requests in {@code asking} and
+   * each MAC an ACK went to in {@code acked}, which together give the clients nobody answered.
+   */
+  static void parseRow(
+      String[] f, Map<String, Lease> leases, Map<String, Asking> asking, java.util.Set<String> acked) {
     if (f.length < 7) return;
     // Fields 0–6 hold one value each; with every occurrence on, keep the first.
     String fingerprint = f.length > 7 && !f[7].isBlank() ? f[7].trim().replace(';', ',') : null;
@@ -201,6 +254,7 @@ public class DhcpLeaseResolverService {
       return;
     }
     String type = f[1].trim();
+    noteAsking(f, type, at, vendorClass, asking, acked);
     String ip =
         switch (type) {
           case "5" -> usable(f[2]) ? f[2].trim() : usable(f[3]) ? f[3].trim() : null;
@@ -229,6 +283,32 @@ public class DhcpLeaseResolverService {
               fingerprint != null ? fingerprint : prev.fingerprint(),
               vendorClass != null ? vendorClass : prev.vendorClass(),
               network != null ? network : prev.network()));
+    }
+  }
+
+  private static void noteAsking(
+      String[] f, String type, LocalDateTime at, String vendorClass,
+      Map<String, Asking> asking, java.util.Set<String> acked) {
+    String mac = f[5].trim().toLowerCase();
+    if (mac.isEmpty() || mac.length() > 50) return;
+    if ("5".equals(type)) {
+      acked.add(mac);
+      return;
+    }
+    if (!"1".equals(type) && !"3".equals(type)) return;
+    Asking a = asking.computeIfAbsent(mac, k -> new Asking());
+    a.requests++;
+    if (a.first == null || at.isBefore(a.first)) a.first = at;
+    if (a.last == null || at.isAfter(a.last)) a.last = at;
+    String hostname = f[6].trim();
+    if (!hostname.isEmpty()) a.hostname = hostname.length() > 255 ? hostname.substring(0, 255) : hostname;
+    if (vendorClass != null) a.vendorClass = vendorClass;
+    if (f.length > 15 && !blank(f[15])) {
+      try {
+        a.vlanId = Integer.parseInt(f[15].trim());
+      } catch (NumberFormatException ignored) {
+        // not a VLAN id
+      }
     }
   }
 

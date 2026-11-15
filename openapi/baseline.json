@@ -3340,6 +3340,12 @@
               "$ref": "#/components/schemas/Segment"
             },
             "type": "array"
+          },
+          "unanswered": {
+            "items": {
+              "$ref": "#/components/schemas/UnansweredClient"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -4527,6 +4533,12 @@
           "serverMac": {
             "type": "string"
           },
+          "unanswered": {
+            "items": {
+              "$ref": "#/components/schemas/UnansweredClient"
+            },
+            "type": "array"
+          },
           "vlanId": {
             "format": "int32",
             "type": "integer"
@@ -5281,6 +5293,25 @@
               "$ref": "#/components/schemas/TracerStep"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "UnansweredClient": {
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "mac": {
+            "type": "string"
+          },
+          "requests": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "vlanId": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -9348,7 +9379,7 @@
     },
     "/api/v1/files/{fileId}/network-segments": {
       "get": {
-        "description": "Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.",
+        "description": "Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network. Clients that asked for an address and got none are listed under the network on their VLAN, else at the top.",
         "operationId": "segments",
         "parameters": [
           {

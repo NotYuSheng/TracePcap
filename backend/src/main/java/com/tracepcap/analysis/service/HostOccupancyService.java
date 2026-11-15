@@ -54,6 +54,7 @@ public class HostOccupancyService {
 
   private final IpMacObservationRepository observations;
   private final DhcpLeaseRepository leases;
+  private final com.tracepcap.analysis.repository.DhcpUnansweredClientRepository unanswered;
   private final OccupancyDecisionRepository decisions;
   private final IpOccupancyRepository occupancies;
   private final ConversationRepository conversations;
@@ -97,6 +98,28 @@ public class HostOccupancyService {
               .build());
     }
     leases.saveAll(rows);
+  }
+
+  /** Stores the clients that asked for an address and were never answered. Like {@link #saveLeases}. */
+  @Transactional(noRollbackFor = RuntimeException.class)
+  public void saveUnanswered(UUID fileId, List<DhcpLeaseResolverService.Unanswered> found) {
+    unanswered.deleteAll(unanswered.findByFileId(fileId));
+    if (found == null || found.isEmpty()) return;
+    unanswered.saveAll(
+        found.stream()
+            .map(
+                u ->
+                    com.tracepcap.analysis.entity.DhcpUnansweredClientEntity.builder()
+                        .fileId(fileId)
+                        .mac(u.mac())
+                        .hostname(u.hostname())
+                        .vendorClass(u.vendorClass())
+                        .vlanId(u.vlanId())
+                        .requests(u.requests())
+                        .firstSeen(u.firstSeen())
+                        .lastSeen(u.lastSeen())
+                        .build())
+            .toList());
   }
 
   /**

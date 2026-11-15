@@ -200,6 +200,11 @@ function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment
   if (mac) {
     const s = inRange.find(x => x.clients.some(c => c.mac.toLowerCase() === mac));
     if (s) return s;
+    // A client nobody answered has no address: the VLAN it asked on is what places it.
+    if (node.data.isL2) {
+      const asked = segments.find(x => x.unanswered?.some(c => c.mac.toLowerCase() === mac));
+      if (asked) return asked;
+    }
   }
   const infra = inRange.filter(x => x.routers.includes(ip) || x.serverIds.includes(ip));
   if (infra.length === 1) return infra[0];

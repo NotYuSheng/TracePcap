@@ -1229,7 +1229,7 @@ export interface paths {
         };
         /**
          * The networks a capture holds
-         * @description Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.
+         * @description Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network. Clients that asked for an address and got none are listed under the network on their VLAN, else at the top.
          */
         get: operations["segments"];
         put?: never;
@@ -3883,6 +3883,7 @@ export interface components {
         NetworkSegmentsResponse: {
             overlaps?: components["schemas"]["Overlap"][];
             segments?: components["schemas"]["Segment"][];
+            unanswered?: components["schemas"]["UnansweredClient"][];
         };
         NetworkSettingsDto: {
             /** @enum {string} */
@@ -4314,6 +4315,7 @@ export interface components {
             routers?: string[];
             serverIds?: string[];
             serverMac?: string;
+            unanswered?: components["schemas"]["UnansweredClient"][];
             /** Format: int32 */
             vlanId?: number;
         };
@@ -4583,6 +4585,14 @@ export interface components {
             /** Format: int32 */
             srcPort?: number;
             steps?: components["schemas"]["TracerStep"][];
+        };
+        UnansweredClient: {
+            hostname?: string;
+            mac?: string;
+            /** Format: int32 */
+            requests?: number;
+            /** Format: int32 */
+            vlanId?: number;
         };
         UniqueHost: {
             hostname?: string;

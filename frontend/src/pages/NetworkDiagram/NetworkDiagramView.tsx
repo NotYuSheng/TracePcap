@@ -12,7 +12,7 @@ import { flightsFor, type ConversationEnds } from '@/features/network/services/p
 import { getProtocolColor } from '@/features/network/constants';
 import { clusterApi } from '@/features/cluster/services/clusterApi';
 import { dnsNamesByIp } from '@/features/network/services/networkGroups';
-import { networkSegmentService, type NetworkSegment } from '@/features/networkSegments/networkSegmentService';
+import { networkSegmentService, unansweredNames, type NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 import type { GraphLayoutType } from '@/features/network/types';
@@ -133,10 +133,17 @@ export const NetworkDiagramView = ({
   } = useNetworkData(fileId, data, nodeLimit, networkContext);
   // A Monitor capture can add the devices gone since the capture before, drawn faint.
   const ghostNodes = monitor?.ghostNodes;
-  const nodes = useMemo(
-    () => (ghostNodes?.length ? [...capturedNodes, ...ghostNodes] : capturedNodes),
-    [capturedNodes, ghostNodes]
-  );
+  // The names clients nobody answered asked under: their MAC-only nodes are drawn by that name.
+  const [askedNames, setAskedNames] = useState<Map<string, string>>(() => new Map());
+  const nodes = useMemo(() => {
+    const all = ghostNodes?.length ? [...capturedNodes, ...ghostNodes] : capturedNodes;
+    if (askedNames.size === 0) return all;
+    return all.map(n => {
+      const name = n.data.isL2 ? askedNames.get(n.id.toLowerCase()) : undefined;
+      if (!name || n.data.hostname) return n;
+      return { ...n, label: name, data: { ...n.data, hostname: name, hostnameSource: 'dhcp' as const } };
+    });
+  }, [capturedNodes, ghostNodes, askedNames]);
 
   // The network map layout's grouping: networks from DHCP/VLANs, and what counts as local.
   const [networkSegments, setNetworkSegments] = useState<NetworkSegment[]>([]);
@@ -146,8 +153,16 @@ export const NetworkDiagramView = ({
     let live = true;
     networkSegmentService
       .get(fileId)
-      .then(r => live && setNetworkSegments(r.segments))
-      .catch(() => live && setNetworkSegments([]));
+      .then(r => {
+        if (!live) return;
+        setNetworkSegments(r.segments);
+        setAskedNames(unansweredNames(r));
+      })
+      .catch(() => {
+        if (!live) return;
+        setNetworkSegments([]);
+        setAskedNames(new Map());
+      });
     customPrivateRangeService
       .list()
       .then(r => live && setCustomPrivateRanges(r))
