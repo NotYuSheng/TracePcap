@@ -20,6 +20,12 @@
   <img src="https://img.shields.io/badge/Java-21-007396?style=flat&logo=openjdk&logoColor=white" alt="Java 21"/>
 </p>
 
+<div align="center">
+
+![TracePcap network diagram: a capture's devices grouped by network, the traffic played back over time, edges coloured by application, and a device's identity card](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
+
+</div>
+
 ---
 
 **TracePcap** is a self-hosted PCAP analysis workbench for **black-box network analysis** — situations where you work from the **traffic itself**, with no documentation or prior knowledge of the network. Upload one or more packet captures and TracePcap characterises devices, maps topology, reconstructs sessions, detects threats, tracks changes over time, and generates AI-powered narratives — all derived purely from observed traffic. It runs fully **offline / air-gapped** and keeps packet data on your own infrastructure.
@@ -30,12 +36,6 @@ This makes it well-suited for:
 - **Incident response & network forensics** — incomplete records; reconstruct what happened from packet evidence
 - **Penetration test reconnaissance** — map an unknown or scarcely-documented network from captured traffic
 - **Research and education** — explore any capture without needing context about the environment
-
-<div align="center">
-
-![TracePcap network diagram: a capture's devices grouped by network, the traffic played back over time, edges coloured by application, and a device's identity card](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
-
-</div>
 
 ## Features
 
