@@ -241,6 +241,7 @@ export function NetworkTimeline({
                 </div>
               </div>
               <SnapshotMap
+                key={picked.id}
                 networkId={networkId}
                 snapshot={picked}
                 previous={previous}
