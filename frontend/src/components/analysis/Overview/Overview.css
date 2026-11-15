@@ -90,6 +90,7 @@
 }
 .ov-activity span {
   flex: 1;
+  max-width: 28px;
   background: #a78bfa;
   border-radius: 2px 2px 0 0;
   min-width: 2px;
