@@ -2,8 +2,9 @@ import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Form, Modal, Popover } from '@govtechsg/sgds-react';
-import type { ConversationFilters } from '@/features/conversation/types';
+import { Badge, Button, Form, Popover } from '@govtechsg/sgds-react';
+import { SideDrawer, FilterDrawerFooter, FilterPillCount } from '@components/common/SideDrawer';
+import type { ConversationFacetCounts, ConversationFilters } from '@/features/conversation/types';
 import {
   getAppColor,
   getCategoryColor,
@@ -51,8 +52,11 @@ interface ConversationFilterPanelProps {
   activeFilterCount: number;
   /** Conversations matching the current filters, shown on the drawer's close button. */
   matchCount?: number;
+  /** Conversations per filter value, shown on each chip. */
+  facetCounts?: ConversationFacetCounts | null;
   defaultOpen?: boolean;
 }
+
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: React.ReactNode }) {
   const popover = (
@@ -102,8 +106,11 @@ export function ConversationFilterPanel({
   presentDeviceTypes,
   activeFilterCount,
   matchCount,
+  facetCounts,
   defaultOpen = false,
 }: ConversationFilterPanelProps) {
+  const countOf = (facet: keyof ConversationFacetCounts, key: string) =>
+    facetCounts?.[facet]?.[key];
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [ipInput, setIpInput] = useState(filters.ip);
   const [portInput, setPortInput] = useState(filters.port);
@@ -237,22 +244,26 @@ export function ConversationFilterPanel({
 
       {/* More filters: a right-side drawer. Filters apply as you pick them; the footer
           button just closes it, showing how many conversations are left. */}
-      <Modal
+      <SideDrawer
         show={isOpen}
         onHide={() => setIsOpen(false)}
-        dialogClassName="filter-drawer"
-        contentClassName="filter-drawer-content"
-        aria-labelledby="filter-drawer-title"
+        title="Filters"
+        titleId="filter-drawer-title"
+        badge={activeFilterCount}
+        className="filter-drawer"
+        footer={
+          <FilterDrawerFooter
+            onClearAll={onClearAll}
+            canClear={activeFilterCount > 0}
+            onDone={() => setIsOpen(false)}
+            doneLabel={
+              matchCount === undefined
+                ? 'Done'
+                : `Show ${matchCount.toLocaleString()} conversation${matchCount === 1 ? '' : 's'}`
+            }
+          />
+        }
       >
-        <Modal.Header closeButton>
-          <Modal.Title id="filter-drawer-title" as="h2" className="filter-drawer-title">
-            Filters
-            {activeFilterCount > 0 && (
-              <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
-            )}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="filter-drawer-body">
             <div className="row g-3">
               {/* IP / Hostname */}
               <div className="col-md-4">
@@ -409,6 +420,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('protocols', protocol, filters.protocols)}
                         >
                           {protocol}
+                          <FilterPillCount n={countOf('protocols', protocol)} />
                         </button>
                       );
                     })}
@@ -446,6 +458,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('l7Protocols', proto, filters.l7Protocols)}
                         >
                           {proto}
+                          <FilterPillCount n={countOf('l7Protocols', proto.toUpperCase())} />
                         </button>
                       );
                     })}
@@ -498,6 +511,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('apps', name, filters.apps)}
                         >
                           {name}
+                          <FilterPillCount n={countOf('apps', name)} />
                         </button>
                       );
                     })}
@@ -537,6 +551,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('categories', category, filters.categories)}
                         >
                           {category}
+                          <FilterPillCount n={countOf('categories', category)} />
                         </button>
                       );
                     })}
@@ -574,6 +589,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('fileTypes', ft, filters.fileTypes)}
                         >
                           {ft}
+                          <FilterPillCount n={countOf('fileTypes', ft)} />
                         </button>
                       );
                     })}
@@ -612,6 +628,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('riskTypes', rt, filters.riskTypes)}
                         >
                           {rt.replace(/_/g, ' ')}
+                          <FilterPillCount n={countOf('riskTypes', rt)} />
                         </button>
                       );
                     })}
@@ -650,6 +667,7 @@ export function ConversationFilterPanel({
                         >
                           {rule.replace(/_/g, ' ')}
                           <RuleScopeTag scope={signatureScopes[rule]} />
+                          <FilterPillCount n={countOf('customSignatures', rule)} />
                         </button>
                       );
                     })}
@@ -757,6 +775,7 @@ export function ConversationFilterPanel({
                               }
                             />
                             <span>{alert}</span>
+                            <FilterPillCount n={countOf('suricataAlerts', alert)} />
                           </label>
                         );
                       })}
@@ -799,6 +818,7 @@ export function ConversationFilterPanel({
                             onClick={() => toggle('countries', code, filters.countries ?? [])}
                           >
                             {countryFlag(code)} {code}
+                            <FilterPillCount n={countOf('countries', code)} />
                           </button>
                         );
                       })}
@@ -836,6 +856,7 @@ export function ConversationFilterPanel({
                         onClick={() => toggle('deviceTypes', dt, filters.deviceTypes ?? [])}
                       >
                         {deviceTypeLabel(dt)}
+                        <FilterPillCount n={countOf('deviceTypes', dt)} />
                       </button>
                     );
                   })}
@@ -845,23 +866,7 @@ export function ConversationFilterPanel({
 
             </div>
 
-        </Modal.Body>
-        <Modal.Footer className="filter-drawer-footer">
-          <Button
-            variant="link"
-            className="filter-drawer-clear"
-            onClick={onClearAll}
-            disabled={activeFilterCount === 0}
-          >
-            Clear all
-          </Button>
-          <Button variant="primary" onClick={() => setIsOpen(false)}>
-            {matchCount === undefined
-              ? 'Done'
-              : `Show ${matchCount.toLocaleString()} conversation${matchCount === 1 ? '' : 's'}`}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      </SideDrawer>
     </div>
   );
 }

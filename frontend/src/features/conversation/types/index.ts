@@ -2,6 +2,21 @@ export type SortField = 'srcIp' | 'dstIp' | 'packets' | 'bytes' | 'duration' | '
 
 export type SortDir = 'asc' | 'desc';
 
+/** Conversations per filter value for one file (GET /conversations/{fileId}/facet-counts).
+ *  Whole-file counts; l7Protocols keys are upper-cased. */
+export interface ConversationFacetCounts {
+  protocols: Record<string, number>;
+  l7Protocols: Record<string, number>;
+  apps: Record<string, number>;
+  categories: Record<string, number>;
+  fileTypes: Record<string, number>;
+  riskTypes: Record<string, number>;
+  customSignatures: Record<string, number>;
+  suricataAlerts: Record<string, number>;
+  countries: Record<string, number>;
+  deviceTypes: Record<string, number>;
+}
+
 export interface ConversationFilters {
   /**
    * View in this network (#925 phase 3): its own detection rules' matches are added to

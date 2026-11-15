@@ -149,6 +149,13 @@ public class ConversationQueryService {
     return new java.util.ArrayList<>(all);
   }
 
+  /** Conversations per filter value, for the counts on the filter chips. */
+  @Transactional(readOnly = true)
+  public com.tracepcap.analysis.dto.ConversationFacetCountsResponse getFacetCounts(UUID fileId) {
+    return com.tracepcap.analysis.dto.ConversationFacetCountsResponse.from(
+        conversationLookup.facetCounts(fileId));
+  }
+
   /** Returns distinct detected file types found in packets for the given file. */
   @Transactional(readOnly = true)
   public List<String> getDistinctFileTypes(UUID fileId) {

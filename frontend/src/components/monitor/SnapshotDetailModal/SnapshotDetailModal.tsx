@@ -13,6 +13,7 @@ import { SnapshotSecurityTab } from '@/components/monitor/SnapshotSecurityTab/Sn
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { NetworkControls } from '@/components/network/NetworkControls';
+import { SideDrawer, FilterDrawerFooter } from '@components/common/SideDrawer';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@/components/network/NodeLabelSettingsModal';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
@@ -963,12 +964,24 @@ export const SnapshotDetailModal = ({
     )}
 
     {/* Filter modal — rendered outside the main modal so it stacks on top */}
-    <Modal show={showFilterModal} onHide={() => setShowFilterModal(false)} size="lg">
-      <Modal.Header closeButton>
-        <Modal.Title>Filters</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
+    <SideDrawer
+      show={showFilterModal}
+      onHide={() => setShowFilterModal(false)}
+      title="Filters"
+      titleId="snapshot-filter-drawer-title"
+      badge={activeFilterCount}
+      className="filter-drawer"
+      footer={
+        <FilterDrawerFooter
+          onClearAll={clearAllFilters}
+          canClear={activeFilterCount > 0}
+          onDone={() => setShowFilterModal(false)}
+          doneLabel={`Show ${filteredEdges.length.toLocaleString()} connection${filteredEdges.length === 1 ? '' : 's'}`}
+        />
+      }
+    >
         <NetworkControls
+          embedded
           activeLegendProtocols={activeLegendProtocols}
           onLegendProtocolClick={toggleLegendProtocol}
           onLegendProtocolClear={() => setActiveLegendProtocols([])}
@@ -1015,11 +1028,7 @@ export const SnapshotDetailModal = ({
           onClearAllFilters={clearAllFilters}
           defaultCollapsed={false}
         />
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={() => setShowFilterModal(false)}>Close</Button>
-      </Modal.Footer>
-    </Modal>
+    </SideDrawer>
 
     {/* Node-label settings — separate modal so it stacks above the diagram */}
     <NodeLabelSettingsModal show={showLabelModal} onHide={() => setShowLabelModal(false)} />

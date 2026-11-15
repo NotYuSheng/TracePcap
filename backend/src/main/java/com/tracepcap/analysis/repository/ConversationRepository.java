@@ -729,4 +729,86 @@ public interface ConversationRepository
     }
     return sb.toString();
   }
+
+  // ── Facet counts: conversations per filter value, for the counts on the filter chips. ──
+  // Each returns (value, conversation count) rows. Array facets count DISTINCT ids so a
+  // conversation listing the same risk twice is counted once.
+
+  @Query(
+      value =
+          "SELECT protocol, count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND protocol IS NOT NULL GROUP BY protocol",
+      nativeQuery = true)
+  List<Object[]> countByProtocol(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT upper(tshark_protocol), count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND tshark_protocol IS NOT NULL AND tshark_protocol <> ''"
+              + " GROUP BY upper(tshark_protocol)",
+      nativeQuery = true)
+  List<Object[]> countByL7ProtocolUpper(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT app_name, count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND app_name IS NOT NULL AND app_name <> '' GROUP BY app_name",
+      nativeQuery = true)
+  List<Object[]> countByAppName(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT category, count(*) FROM conversations WHERE file_id = :fileId"
+              + " AND category IS NOT NULL AND category <> '' GROUP BY category",
+      nativeQuery = true)
+  List<Object[]> countByCategory(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.flow_risks) r"
+              + " WHERE c.file_id = :fileId GROUP BY r",
+      nativeQuery = true)
+  List<Object[]> countByRiskType(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.custom_signatures) r"
+              + " WHERE c.file_id = :fileId GROUP BY r",
+      nativeQuery = true)
+  List<Object[]> countByCustomSignature(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.suricata_alerts) r"
+              + " WHERE c.file_id = :fileId GROUP BY r",
+      nativeQuery = true)
+  List<Object[]> countBySuricataAlert(@Param("fileId") UUID fileId);
+
+  /** Same semantics as the country filter: either end resolves to the country. */
+  @Query(
+      value =
+          "SELECT g.country_code, count(DISTINCT c.id) FROM conversations c"
+              + " JOIN ip_geo_cache g ON g.ip = c.src_ip OR g.ip = c.dst_ip"
+              + " WHERE c.file_id = :fileId AND g.country_code IS NOT NULL"
+              + " GROUP BY g.country_code",
+      nativeQuery = true)
+  List<Object[]> countByCountry(@Param("fileId") UUID fileId);
+
+  /** Same semantics as the device-type filter: either end is classified as the type. */
+  @Query(
+      value =
+          "SELECT h.device_type, count(DISTINCT c.id) FROM conversations c"
+              + " JOIN host_classifications h ON h.file_id = c.file_id"
+              + " AND (h.ip = c.src_ip OR h.ip = c.dst_ip)"
+              + " WHERE c.file_id = :fileId GROUP BY h.device_type",
+      nativeQuery = true)
+  List<Object[]> countByDeviceType(@Param("fileId") UUID fileId);
+
+  @Query(
+      value =
+          "SELECT detected_file_type, count(DISTINCT conversation_id) FROM packets"
+              + " WHERE file_id = :fileId AND detected_file_type IS NOT NULL"
+              + " AND conversation_id IS NOT NULL GROUP BY detected_file_type",
+      nativeQuery = true)
+  List<Object[]> countByFileType(@Param("fileId") UUID fileId);
 }

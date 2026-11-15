@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation, HostClassification } from '@/types';
-import type { SortField } from '@/features/conversation/types';
+import type { ConversationFacetCounts, SortField } from '@/features/conversation/types';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { clusterApi } from '@/features/cluster/services/clusterApi';
@@ -45,6 +45,7 @@ export const ConversationPage = () => {
   const [customSignatureOptions, setCustomSignatureOptions] = useState<string[]>([]);
   const [suricataAlertOptions, setSuricataAlertOptions] = useState<string[]>([]);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
+  const [facetCounts, setFacetCounts] = useState<ConversationFacetCounts | null>(null);
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [signatureScopes, setSignatureScopes] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
@@ -87,6 +88,7 @@ export const ConversationPage = () => {
       .then(list => setHostClassMap(new Map(list.map(c => [c.ip, c]))))
       .catch(console.error);
     conversationService.getCountries(fileId).then(setCountryOptions).catch(console.error);
+    conversationService.getFacetCounts(fileId).then(setFacetCounts).catch(console.error);
   }, [fileId, filters.networkId]);
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
@@ -398,6 +400,7 @@ export const ConversationPage = () => {
             presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
             matchCount={totalItems}
+            facetCounts={facetCounts}
           />
         </div>
       </div>

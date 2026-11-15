@@ -97,10 +97,10 @@ Clicking a cluster opens a panel on the right showing:
 Filters
 -------
 
-The Network Cluster tab exposes the full conversation filter panel
-(IP, port, protocol, application, country, device type, risk, custom
-signatures, etc.), identical to the Conversations tab. Filters apply to
-both the cluster graph and the side-panel conversation list.
+The funnel button opens the filter drawer on the right (IP, port, protocol,
+application, country, device type, risk, custom signatures, etc.), the same
+drawer as the network map's. Filters apply to both the cluster graph and the
+side-panel conversation list as you pick them; **Done** closes the drawer.
 
 Country Map View
 ----------------

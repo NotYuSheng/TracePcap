@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import type { GroupNode } from '../services/networkGroups';
 import type { NetworkMapEdits } from '../services/networkMapEdits';
@@ -112,11 +113,18 @@ export function NetworkMapGroupsModal({ tops, edits, focus, canEdit, cannotEditR
   }
 
   return (
-    <Modal show onHide={onHide} size="lg" scrollable aria-labelledby="nm-groups-title">
-      <Modal.Header closeButton>
-        <Modal.Title id="nm-groups-title">Network map groups</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
+    <SideDrawer
+      show
+      onHide={onHide}
+      title="Network map groups"
+      titleId="nm-groups-title"
+      className="nm-groups-drawer"
+      footer={
+        <Button variant="outline-secondary" className="side-drawer-primary" onClick={onHide}>
+          Close
+        </Button>
+      }
+    >
         {!canEdit && (
           <Alert variant="info" className="mb-3">
             {cannotEditReason ?? "You can't edit this network map."}
@@ -234,12 +242,6 @@ export function NetworkMapGroupsModal({ tops, edits, focus, canEdit, cannotEditR
             );
           })}
         </ul>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="outline-secondary" onClick={onHide}>
-          Close
-        </Button>
-      </Modal.Footer>
-    </Modal>
+    </SideDrawer>
   );
 }

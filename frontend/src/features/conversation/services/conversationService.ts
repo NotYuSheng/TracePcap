@@ -14,7 +14,7 @@ import type {
   HostIdentity,
   HostIdentityEvidence,
 } from '@/types';
-import type { ConversationFilters, WindowsLogon } from '../types';
+import type { ConversationFacetCounts, ConversationFilters, WindowsLogon } from '../types';
 
 // Backend response types
 interface ConversationApiResponse {
@@ -382,6 +382,14 @@ export const conversationService = {
     }));
   },
 
+
+  /** Conversations per filter value, for the counts on the filter chips. */
+  getFacetCounts: async (fileId: string): Promise<ConversationFacetCounts> => {
+    const response = await apiClient.get<ConversationFacetCounts>(
+      `/conversations/${fileId}/facet-counts`
+    );
+    return response.data;
+  },
 
   /**
    * Returns distinct country codes seen in external IPs for this file, as "CC|Country" strings.

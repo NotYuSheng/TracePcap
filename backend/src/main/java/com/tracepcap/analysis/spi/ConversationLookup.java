@@ -202,6 +202,26 @@ public interface ConversationLookup {
    */
   List<String> distinctValues(UUID fileId, Facet facet);
 
+  /**
+   * How many of a file's conversations carry each value of every filter facet — the counts beside
+   * the filter chips. Whole-file counts, not narrowed by any active filter. Keys are the values the
+   * filters take, except L7 protocols, which are upper-cased (their stored spelling varies).
+   */
+  record FacetCounts(
+      Map<String, Long> protocols,
+      Map<String, Long> l7Protocols,
+      Map<String, Long> apps,
+      Map<String, Long> categories,
+      Map<String, Long> fileTypes,
+      Map<String, Long> riskTypes,
+      Map<String, Long> customSignatures,
+      Map<String, Long> suricataAlerts,
+      Map<String, Long> countries,
+      Map<String, Long> deviceTypes) {}
+
+  /** Per-value conversation counts for every filter facet, aggregated in the database. */
+  FacetCounts facetCounts(UUID fileId);
+
   /** One peer and the bytes exchanged with it. */
   record PeerBytes(String ip, long bytes) {}
 

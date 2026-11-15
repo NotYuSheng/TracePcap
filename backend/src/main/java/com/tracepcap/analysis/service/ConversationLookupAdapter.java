@@ -117,6 +117,31 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public FacetCounts facetCounts(UUID fileId) {
+    return new FacetCounts(
+        counts(repository.countByProtocol(fileId)),
+        counts(repository.countByL7ProtocolUpper(fileId)),
+        counts(repository.countByAppName(fileId)),
+        counts(repository.countByCategory(fileId)),
+        counts(repository.countByFileType(fileId)),
+        counts(repository.countByRiskType(fileId)),
+        counts(repository.countByCustomSignature(fileId)),
+        counts(repository.countBySuricataAlert(fileId)),
+        counts(repository.countByCountry(fileId)),
+        counts(repository.countByDeviceType(fileId)));
+  }
+
+  /** (value, count) rows into a map; null or blank values dropped. */
+  private static Map<String, Long> counts(List<Object[]> rows) {
+    Map<String, Long> out = new HashMap<>();
+    for (Object[] r : rows) {
+      if (r[0] == null || r[0].toString().isBlank()) continue;
+      out.put(r[0].toString(), asLong(r[1]));
+    }
+    return out;
+  }
+
+  @Override
   public EntityStats statsForApp(UUID fileId, String appName, int topPeerLimit) {
     return stats(
         repository.aggregateStatsByApp(fileId, appName),
