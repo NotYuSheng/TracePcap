@@ -110,16 +110,21 @@ Managing Uploads
 ----------------
 
 **Your captures**, on the home page under Recent activity, lists each capture.
-Each row has its name (a link to its analysis), its size, packet count and
-upload time, its status, and a **⋯** menu with **Open**, **Re-analyse…** and
+Each row has a **star**, its name (a link to its analysis), its size, packet
+count and upload time, its status, and a **⋯** menu with **Open**,
+**Re-analyse…**, the retention choices (see :ref:`capture-retention`) and
 **Delete**. Deleting removes both the database metadata and the object from
 MinIO.
+
+The star marks a capture as a **favourite**. Favourites are personal: your
+account's own when login is on, or the one shared profile when it's off. The
+same star sits beside the capture's name on every tab of its analysis.
 
 Above the list:
 
 - **Search** matches capture names.
-- **Chips** narrow it to **Expiring soon**, **Kept with a network** or
-  **Failed**, each with its count.
+- **Chips** narrow it to **Favourites**, **Expiring soon**, **Kept with a
+  network** or **Failed**, each with its count.
 - **Show monitor uploads** adds captures uploaded straight into a monitored
   network. They are hidden by default.
 
@@ -152,7 +157,7 @@ Each capture has exactly one **status**, in its own column:
    * - Expiring soon
      - Ready, but deleted within two hours by file retention. The row says
        how long is left.
-     - Open, Keep it
+     - Open, Keep 7 days longer
    * - Failed
      - Analysis stopped. Open it to see why.
      - See why
@@ -161,8 +166,10 @@ Anything else is a grey **note** under the name, only when it applies:
 
 - **Kept with <network>**: the capture is a snapshot of that monitored network,
   so file retention never deletes it. The note links to the network.
-- **Kept until deleted**: uploaded with *Delete after* unticked, so file
-  retention never deletes it.
+- **Kept until deleted**: kept forever (*Delete after* unticked at upload, or
+  **Keep forever** later), so file retention never deletes it.
+- **Kept until <date>**: someone kept it past the retention window; it's
+  deleted then.
 - **Without Suricata** (or nDPI, or file extraction): that tool was switched
   off at upload. This is a choice, not a fault.
 - **Story queued**, **Writing story**, **Story ready** or **Story failed**: the
@@ -173,6 +180,8 @@ Anything else is a grey **note** under the name, only when it applies:
 - **Packets removed**: packet retention deleted the raw packets. The
   conversations and results remain.
 
+.. _capture-retention:
+
 File Retention
 ~~~~~~~~~~~~~~
 
@@ -181,6 +190,18 @@ This window is configurable via the ``FILE_RETENTION_HOURS`` environment
 variable. Set ``FILE_RETENTION_ENABLED=false`` to disable automatic deletion
 entirely (see :doc:`../configuration/environment-variables`). A capture uploaded
 with *Delete after* unticked is never deleted by retention, whatever the window.
+
+Each capture's retention can be changed after upload, from its row's **⋯** menu
+or the **Retention** card on its **Capture** tab. The card says when the capture
+is deleted and why (the retention window, a date someone set, or kept forever):
+
+- **Keep 1 day / 7 days / 30 days longer**: moves its deletion that far past
+  whichever is later, now or when it would have been deleted, so choosing twice
+  adds up. A capture can be kept at most a year by date.
+- **Keep forever**: never deleted by retention.
+- **Let it expire** (for a capture kept forever) or **Back to the retention
+  window** (for one kept to a date): it goes back to being deleted the retention
+  window after upload. If that time has passed, the next cleanup deletes it.
 
 .. note::
 
