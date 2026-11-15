@@ -27,6 +27,7 @@ import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { buildActiveFilterLabels } from '@/features/network/constants';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import type { AnalysisData } from '@/types';
+import { formatSpan } from '@/utils/formatters';
 
 export interface NetworkGraphState {
   filteredNodes: GraphNode[];
@@ -148,14 +149,7 @@ function captureFacts(d: { totalPackets?: number; timeRange?: [number, number] }
   const parts: string[] = [];
   if (d.totalPackets != null) parts.push(`${d.totalPackets.toLocaleString()} packets`);
   if (d.timeRange && d.timeRange[1] > d.timeRange[0]) {
-    const s = Math.round((d.timeRange[1] - d.timeRange[0]) / 1000);
-    parts.push(
-      s < 90
-        ? `${s} s`
-        : s < 5400
-          ? `${Math.round(s / 60)} min`
-          : `${Math.round((s / 3600) * 10) / 10} h`
-    );
+    parts.push(formatSpan(d.timeRange[1] - d.timeRange[0]));
   }
   return parts.join(' · ');
 }

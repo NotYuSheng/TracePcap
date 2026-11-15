@@ -3,6 +3,7 @@ import { Popover } from '@govtechsg/sgds-react';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import type { GraphEdge } from '../types';
 import { bytesHistogram, clampWindow, type TimeWindow } from '../services/timeWindow';
+import { formatSpan } from '@/utils/formatters';
 import { PlayByControl, type AxisMode } from './PlayByControl';
 import './TimeScrubber.css';
 
@@ -40,13 +41,7 @@ function clock(ms: number, withDate: boolean, seconds = false): string {
   return withDate ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', ...opts }) : d.toLocaleTimeString(undefined, opts);
 }
 
-function duration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 90) return `${s} s`;
-  const m = Math.round(s / 60);
-  if (m < 90) return `${m} min`;
-  return `${Math.round((m / 60) * 10) / 10} h`;
-}
+const duration = formatSpan;
 
 type Drag = { mode: 'move' | 'from' | 'to'; startX: number; start: TimeWindow };
 
