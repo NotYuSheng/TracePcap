@@ -62,6 +62,8 @@ interface Props {
   selectedPair: VolumePair | null;
   onSelectPair: (p: VolumePair | null) => void;
   onHostClick: (n: GraphNode) => void;
+  /** One row: no title, smaller totals, the tabs beside them (for a narrower pane). */
+  compact?: boolean;
 }
 
 /**
@@ -78,6 +80,7 @@ export function TrafficCard({
   selectedPair,
   onSelectPair,
   onHostClick,
+  compact = false,
 }: Props) {
   const [view, setView] = useState<View>(readView);
   const [fullscreen, setFullscreen] = useState(false);
@@ -113,9 +116,9 @@ export function TrafficCard({
   );
 
   return (
-    <Card className="mb-3 traffic-card">
+    <Card className={`mb-3 traffic-card${compact ? ' traffic-card-compact' : ''}`}>
       <Card.Body className="pb-0">
-        <h2 className="traffic-title">Traffic</h2>
+        {!compact && <h2 className="traffic-title">Traffic</h2>}
         <div className="traffic-totals">
           <div>
             <b>{totals.nodes.toLocaleString()}</b> hosts

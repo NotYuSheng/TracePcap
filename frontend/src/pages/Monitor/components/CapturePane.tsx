@@ -201,6 +201,7 @@ export function CapturePane({
             networkId={networkId}
             networkDiagramFilters={filters}
             showTitle={false}
+            compact
             monitor={{ highlights, ghostNodes, belowGraph }}
           />
         )}
