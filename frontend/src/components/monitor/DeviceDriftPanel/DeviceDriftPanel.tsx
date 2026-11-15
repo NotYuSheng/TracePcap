@@ -5,7 +5,7 @@ import { useState, useEffect, type CSSProperties } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
-import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { HostDetailModal } from '@components/common/EntityDetailModal/HostDetailModal';
 import { Pagination } from '@components/common/Pagination/Pagination';
 
 /** Deterministic hue (0–360) from any string. */
@@ -44,6 +44,9 @@ type SelectedMac =
 export const DeviceDriftPanel = ({ snapshots, settings }: DeviceDriftPanelProps) => {
   const [selectedAbsent, setSelectedAbsent] = useState<AbsentEntity | null>(null);
   const [selectedMac, setSelectedMac] = useState<SelectedMac>(null);
+  // Each capture's MAC → address, from its host classifications: which host a device is, so its
+  // card opens on that host rather than on another the same (router) MAC appeared on.
+  const [ipByMac, setIpByMac] = useState<Map<string, Map<string, string>>>(new Map());
   const [activeMacs, setActiveMacs] = useState<string[]>([]);
   const [absentMacs, setAbsentMacs] = useState<AbsentEntity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,8 +69,14 @@ export const DeviceDriftPanel = ({ snapshots, settings }: DeviceDriftPanelProps)
       sorted.map(snap =>
         apiClient
           .get<HostClassification[]>(`/files/${snap.fileId}/host-classifications`)
-          .then(r => ({ snap, macs: r.data.map(h => h.mac).filter((m): m is string => !!m) }))
-          .catch(() => ({ snap, macs: [] as string[] }))
+          .then(r => ({
+            snap,
+            macs: r.data.map(h => h.mac).filter((m): m is string => !!m),
+            ips: new Map<string, string>(
+              r.data.filter(h => h.mac && h.ip).map(h => [h.mac!, h.ip as string])
+            ),
+          }))
+          .catch(() => ({ snap, macs: [] as string[], ips: new Map<string, string>() }))
       )
     ).then(results => {
       const latestMacs = new Set(results[results.length - 1]?.macs ?? []);
@@ -92,6 +101,7 @@ export const DeviceDriftPanel = ({ snapshots, settings }: DeviceDriftPanelProps)
       }
       absent.sort((a, b) => a.key.localeCompare(b.key));
 
+      setIpByMac(new Map(results.map(r => [r.snap.fileId, r.ips])));
       setActiveMacs(active);
       setAbsentMacs(absent);
       setLoading(false);
@@ -180,27 +190,26 @@ export const DeviceDriftPanel = ({ snapshots, settings }: DeviceDriftPanelProps)
       )}
 
       {selectedAbsent && (
-        <EntityDetailModal
-          entityType="DEVICE"
-          entityKey={selectedAbsent.key}
-          displayName={selectedAbsent.key}
+        // Gone: the host card from the capture it was last seen in.
+        <HostDetailModal
+          mac={selectedAbsent.key}
+          ip={ipByMac.get(selectedAbsent.lastSeenFileId ?? '')?.get(selectedAbsent.key)}
           fileId={selectedAbsent.lastSeenFileId ?? ''}
-          isActive={false}
-          lastSeenTime={selectedAbsent.lastSeenStartTime}
-          lastSeenFileName={selectedAbsent.lastSeenFileName}
-          snapshots={snapshots}
+          monitor={{
+            isActive: false,
+            lastSeenTime: selectedAbsent.lastSeenStartTime,
+            lastSeenFileName: selectedAbsent.lastSeenFileName,
+            snapshots,
+          }}
           onClose={() => setSelectedAbsent(null)}
         />
       )}
       {selectedMac && (
-        <EntityDetailModal
-          entityType="DEVICE"
-          entityKey={selectedMac.mac}
-          displayName={selectedMac.mac}
+        <HostDetailModal
+          mac={selectedMac.mac}
+          ip={ipByMac.get(selectedMac.fileId)?.get(selectedMac.mac)}
           fileId={selectedMac.fileId}
-          isActive={selectedMac.isActive}
-          lastSeenTime={selectedMac.lastSeenTime}
-          snapshots={snapshots}
+          monitor={{ isActive: selectedMac.isActive, lastSeenTime: selectedMac.lastSeenTime, snapshots }}
           onClose={() => setSelectedMac(null)}
         />
       )}

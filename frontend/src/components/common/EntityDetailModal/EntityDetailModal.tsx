@@ -155,7 +155,10 @@ export function EntityDetailModal({
   // ── Graph node: an identity card on the left, tabbed detail on the right ────────────────────────
   if (isGraph) {
     const node = graphNode!;
-    const canIdentify = entityType === 'IP' && !!fileId;
+    // A device opened by its MAC (Monitor's inventory) still has a host behind it: its evidence is
+    // the host's address's.
+    const canIdentify =
+      !!fileId && (entityType === 'IP' || (entityType === 'DEVICE' && !node.data.isL2 && !!node.data.ip));
     const tabs: { id: Tab; label: string; icon: string }[] = [
       { id: 'details', label: 'Traffic', icon: 'bi-bar-chart' },
       ...(canIdentify ? [{ id: 'identity' as Tab, label: 'Identity evidence', icon: 'bi-fingerprint' }] : []),
@@ -241,16 +244,26 @@ export function EntityDetailModal({
                 {activeTab === 'identity' && canIdentify && (
                   <HostIdentitySection
                     fileId={fileId}
-                    ip={entityKey}
+                    ip={entityType === 'IP' ? entityKey : node.data.ip}
                     occupancyIdx={nodeDevice?.idx}
                     deviceKey={nodeDevice?.key}
                     fromGraphNode={!!nodeDevice}
                     onSelectDevice={(idx, key) => setDevice({ idx, key })}
                   />
                 )}
-                {activeTab === 'history' && (
-                  <GraphHistoryTab entityType={entityType} entityKey={entityKey} fileId={fileId} onNavigate={navigateAndClose} />
-                )}
+                {activeTab === 'history' &&
+                  // Opened from a monitored network: its history across the network's captures.
+                  (showSnapshotHistory ? (
+                    <SnapshotHistoryTable
+                      entityType={entityType}
+                      entityKey={entityKey}
+                      ipSnapHistory={ipSnapHistory}
+                      ipHistoryLoading={ipHistoryLoading}
+                      onRoleChanged={() => { reloadIpHistory(); role.reload(); }}
+                    />
+                  ) : (
+                    <GraphHistoryTab entityType={entityType} entityKey={entityKey} fileId={fileId} onNavigate={navigateAndClose} />
+                  ))}
                 {activeServiceTab && (
                   <ServiceLogTab fileId={fileId} ip={node.data.ip} config={activeServiceTab} />
                 )}

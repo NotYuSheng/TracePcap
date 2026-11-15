@@ -11,7 +11,7 @@ import { networkAddressService, type AddressEntry } from '@/features/networkAddr
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
 import type { CustomPrivateRange, IpClassification } from '@/features/cluster/types/customPrivateRange.types';
 import { isPrivateIp, ipInCidr, ipToInt } from '@/utils/ipClassification';
-import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { HostDetailModal } from '@components/common/EntityDetailModal/HostDetailModal';
 import { Pagination } from '@components/common/Pagination/Pagination';
 
 interface IpDriftPanelProps {
@@ -533,27 +533,24 @@ export const IpDriftPanel = ({ networkId, snapshots, subnets = [], settings }: I
         onChanged={() => setRangesKey(k => k + 1)}
       />
       {selectedAbsent && (
-        <EntityDetailModal
-          entityType="IP"
-          entityKey={selectedAbsent.key}
-          displayName={selectedAbsent.key}
+        // Gone: the host card from the capture it was last seen in.
+        <HostDetailModal
+          ip={selectedAbsent.key}
           fileId={selectedAbsent.lastSeenFileId ?? ''}
-          isActive={false}
-          lastSeenTime={selectedAbsent.lastSeenStartTime}
-          lastSeenFileName={selectedAbsent.lastSeenFileName}
-          snapshots={snapshots}
+          monitor={{
+            isActive: false,
+            lastSeenTime: selectedAbsent.lastSeenStartTime,
+            lastSeenFileName: selectedAbsent.lastSeenFileName,
+            snapshots,
+          }}
           onClose={() => setSelectedAbsent(null)}
         />
       )}
       {selectedIp && (
-        <EntityDetailModal
-          entityType="IP"
-          entityKey={selectedIp.ip}
-          displayName={selectedIp.ip}
+        <HostDetailModal
+          ip={selectedIp.ip}
           fileId={selectedIp.fileId}
-          isActive={selectedIp.isActive}
-          lastSeenTime={selectedIp.lastSeenTime}
-          snapshots={snapshots}
+          monitor={{ isActive: selectedIp.isActive, lastSeenTime: selectedIp.lastSeenTime, snapshots }}
           onClose={() => setSelectedIp(null)}
         />
       )}
