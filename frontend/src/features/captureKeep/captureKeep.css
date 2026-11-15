@@ -1,0 +1,19 @@
+/* Favourite: a star before the name, gold when on. */
+.captures-star {
+  border: 0;
+  background: none;
+  padding: 0 6px 0 0;
+  color: var(--tp-text-muted, #6c757d);
+  line-height: 1;
+  vertical-align: baseline;
+}
+.captures-star:hover,
+.captures-star:focus-visible {
+  color: #b45309;
+}
+.captures-star.on {
+  color: #d97706;
+}
+[data-theme='dark'] .captures-star.on {
+  color: #fbbf24;
+}

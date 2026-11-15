@@ -44,6 +44,16 @@ public class FileMetadataDto {
   /** Kept until deleted: the retention cleanup skips it. */
   private boolean keepForever;
 
+  /**
+   * When it is deleted, if someone extended it past the retention window (serialised like
+   * uploadedAt); null means the retention window applies.
+   */
+  @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+  private LocalDateTime expiresAt;
+
+  /** The caller marked it as a favourite. Personal: per account, or the shared profile. */
+  private boolean favourite;
+
   /** The background story asked for at upload: null, QUEUED, WRITING, READY or FAILED. */
   private String storyStatus;
 

@@ -2032,6 +2032,76 @@ class PipelineIntegrationTest {
     }
   }
 
+  /** Favourites: marked and unmarked idempotently, flagged on the capture, and a list filter. */
+  @Test
+  void favourites_markFilterAndUnmark() throws Exception {
+    String tag = "fav-" + UUID.randomUUID().toString().substring(0, 8);
+    String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    String url = "/api/v1/files/" + fileId + "/favourite";
+
+    assertThat(rest.exchange(url, HttpMethod.PUT, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(rest.exchange(url, HttpMethod.PUT, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(rest.getForEntity("/api/v1/files/" + fileId, JsonNode.class).getBody().get("favourite").asBoolean()).isTrue();
+
+    JsonNode favs = rest.getForEntity("/api/v1/files?favourite=true&search=" + tag, JsonNode.class).getBody();
+    assertThat(favs.get("total").asInt()).isEqualTo(1);
+    assertThat(favs.get("data").get(0).get("favourite").asBoolean()).isTrue();
+
+    assertThat(rest.exchange(url, HttpMethod.DELETE, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(rest.getForEntity("/api/v1/files?favourite=true&search=" + tag, JsonNode.class).getBody().get("total").asInt())
+        .isZero();
+    assertThat(rest.exchange("/api/v1/files/" + UUID.randomUUID() + "/favourite", HttpMethod.PUT, null, JsonNode.class)
+            .getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  /**
+   * Expiry: extended past the retention window it leaves "expiring soon"; kept forever it never
+   * expires; null goes back to the window; a past or far-off date is refused.
+   */
+  @Test
+  void expiry_extendKeepForeverAndBack() throws Exception {
+    String tag = "exp-" + UUID.randomUUID().toString().substring(0, 8);
+    String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    String url = "/api/v1/files/" + fileId + "/expiry";
+    long now = System.currentTimeMillis();
+    // Far enough ahead that anything uploaded now counts as "expiring" by then, whatever the window.
+    long horizon = now + 3L * 365 * 24 * 3600_000L;
+    String expiring = "/api/v1/files?search=" + tag + "&expiringBefore=";
+
+    assertThat(rest.getForEntity(expiring + horizon, JsonNode.class).getBody().get("total").asInt()).isEqualTo(1);
+
+    long in30Days = now + 30L * 24 * 3600_000L;
+    ResponseEntity<JsonNode> ext =
+        rest.exchange(url, HttpMethod.PUT, json("{\"keepForever\":false,\"expiresAt\":" + in30Days + "}"), JsonNode.class);
+    assertThat(ext.getStatusCode()).as("PUT expiry: %s", ext.getBody()).isEqualTo(HttpStatus.OK);
+    JsonNode extended = ext.getBody();
+    // Serialised like uploadedAt: [year, month, day, hour, minute, …].
+    java.time.LocalDateTime want =
+        java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(in30Days), java.time.ZoneId.systemDefault());
+    JsonNode at = extended.get("expiresAt");
+    assertThat(at.isArray()).as("expiresAt %s", at).isTrue();
+    assertThat(java.util.List.of(at.get(0).asInt(), at.get(1).asInt(), at.get(2).asInt()))
+        .containsExactly(want.getYear(), want.getMonthValue(), want.getDayOfMonth());
+    // Expiring before tomorrow: not any more.
+    assertThat(rest.getForEntity(expiring + (now + 24 * 3600_000L), JsonNode.class).getBody().get("total").asInt()).isZero();
+
+    JsonNode forever = rest.exchange(url, HttpMethod.PUT, json("{\"keepForever\":true}"), JsonNode.class).getBody();
+    assertThat(forever.get("keepForever").asBoolean()).isTrue();
+    assertThat(forever.get("expiresAt") == null || forever.get("expiresAt").isNull()).isTrue();
+    assertThat(rest.getForEntity(expiring + horizon, JsonNode.class).getBody().get("total").asInt()).isZero();
+
+    JsonNode back = rest.exchange(url, HttpMethod.PUT, json("{\"keepForever\":false}"), JsonNode.class).getBody();
+    assertThat(back.get("keepForever").asBoolean()).isFalse();
+    assertThat(rest.getForEntity(expiring + horizon, JsonNode.class).getBody().get("total").asInt()).isEqualTo(1);
+
+    assertThat(rest.exchange(url, HttpMethod.PUT, json("{\"expiresAt\":" + (now - 60_000) + "}"), JsonNode.class).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(rest.exchange(url, HttpMethod.PUT, json("{\"expiresAt\":" + (now + 400L * 24 * 3600_000L) + "}"), JsonNode.class)
+            .getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

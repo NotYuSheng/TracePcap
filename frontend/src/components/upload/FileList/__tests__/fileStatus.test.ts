@@ -74,6 +74,16 @@ describe('upload options', () => {
     expect(notesOf(kept, ctx())).toEqual([{ key: 'forever', label: 'Kept until deleted', tone: 'kept' }])
   })
 
+  it('uses a capture\'s own deletion time once someone extended it, and says until when', () => {
+    const until = NOW + 5 * 24 * H
+    const extended = file({ uploadedAt: NOW - 11 * H, expiresAt: until })
+    expect(expiresAt(extended, ctx())).toBe(until)
+    expect(statusOf(extended, ctx()).key).toBe('ready')
+    expect(notesOf(extended, ctx())[0]).toMatchObject({ key: 'until', tone: 'kept' })
+    // Kept forever wins over a date.
+    expect(expiresAt({ ...extended, keepForever: true }, ctx())).toBeNull()
+  })
+
   it('follows the background story, linking to it once ready', () => {
     expect(notesOf(file({ storyStatus: 'WRITING' }), ctx()).map(n => n.label)).toEqual(['Writing story'])
     expect(notesOf(file({ storyStatus: 'READY' }), ctx())[0]).toMatchObject({

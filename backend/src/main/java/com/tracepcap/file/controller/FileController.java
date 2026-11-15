@@ -7,7 +7,11 @@ import com.tracepcap.file.dto.MergeFilesRequest;
 import com.tracepcap.file.entity.FileEntity.FileSource;
 import com.tracepcap.file.entity.FileEntity.FileStatus;
 import com.tracepcap.file.repository.FileListFilter;
+import com.tracepcap.file.dto.ExpiryRequest;
+import com.tracepcap.file.service.FileFavouriteService;
 import com.tracepcap.file.service.FileService;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -40,6 +44,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class FileController {
 
   private final FileService fileService;
+  private final FileFavouriteService favouriteService;
+  private final RuntimePolicy runtimePolicy;
 
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(summary = "Upload PCAP file", description = "Upload a PCAP file for analysis")
@@ -75,7 +81,9 @@ public class FileController {
       summary = "Get all files",
       description =
           "Get all uploaded files with pagination. Optional filters: search (name contains),"
-              + " status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).")
+              + " status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms),"
+              + " expiringBefore (epoch ms: deleted before then, by its own expiry or the retention"
+              + " window), favourite (only the caller's favourites).")
   public ResponseEntity<PagedResponse<FileMetadataDto>> getAllFiles(
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "20") int pageSize,
@@ -85,7 +93,9 @@ public class FileController {
       @RequestParam(required = false) List<FileStatus> status,
       @RequestParam(required = false) List<UUID> fileIds,
       @RequestParam(required = false) List<UUID> excludeFileIds,
-      @RequestParam(required = false) Long uploadedBefore) {
+      @RequestParam(required = false) Long uploadedBefore,
+      @RequestParam(required = false) Long expiringBefore,
+      @RequestParam(required = false) Boolean favourite) {
 
     if (page < 1) page = 1;
     if (pageSize < 1) pageSize = 20;
@@ -103,17 +113,28 @@ public class FileController {
     // PageRequest is 0-indexed; the public API is 1-indexed (matches PagedResponse).
     Pageable pageable = PageRequest.of(page - 1, pageSize, Sort.by(direction, sortField));
 
+    java.util.Set<UUID> favourites = favouriteService.favouriteIds();
+    // Favourites only: the given ids narrowed to the caller's favourites (all of them when none given).
+    List<UUID> ids = fileIds;
+    if (Boolean.TRUE.equals(favourite)) {
+      ids = (fileIds == null ? favourites.stream() : fileIds.stream().filter(favourites::contains)).toList();
+    }
     FileListFilter filter =
         new FileListFilter(
             source,
             search,
             status,
-            fileIds,
+            ids,
             excludeFileIds,
             uploadedBefore == null
                 ? null
-                : LocalDateTime.ofInstant(Instant.ofEpochMilli(uploadedBefore), ZoneId.systemDefault()));
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(uploadedBefore), ZoneId.systemDefault()),
+            expiringBefore == null
+                ? null
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(expiringBefore), ZoneId.systemDefault()),
+            expiringBefore == null ? null : runtimePolicy.getInt(EditablePolicy.FILE_RETENTION_HOURS));
     Page<FileMetadataDto> files = fileService.getAllFiles(pageable, filter);
+    files.getContent().forEach(f -> f.setFavourite(favourites.contains(UUID.fromString(f.getFileId()))));
 
     return ResponseEntity.ok(
         PagedResponse.of(files.getContent(), files.getTotalElements(), page, pageSize));
@@ -124,8 +145,41 @@ public class FileController {
   public ResponseEntity<FileMetadataDto> getFileMetadata(@PathVariable String fileId) {
 
     FileMetadataDto metadata = fileService.getFileMetadata(UUID.fromString(fileId));
+    metadata.setFavourite(favouriteService.favouriteIds().contains(UUID.fromString(fileId)));
 
     return ResponseEntity.ok(metadata);
+  }
+
+  @PutMapping("/{fileId}/favourite")
+  @Operation(
+      summary = "Mark a capture as a favourite",
+      description = "Personal: the caller's account, or the shared profile when login is off. Idempotent.")
+  public ResponseEntity<Void> addFavourite(@PathVariable UUID fileId) {
+    favouriteService.add(fileId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @DeleteMapping("/{fileId}/favourite")
+  @Operation(summary = "Unmark a favourite capture", description = "Idempotent.")
+  public ResponseEntity<Void> removeFavourite(@PathVariable UUID fileId) {
+    favouriteService.remove(fileId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PutMapping("/{fileId}/expiry")
+  @Operation(
+      summary = "Change when a capture is deleted",
+      description =
+          "keepForever: never. Else expiresAt (epoch ms, in the future, at most a year away) keeps it"
+              + " until then; null puts it back on the retention window.")
+  public FileMetadataDto setExpiry(@PathVariable UUID fileId, @RequestBody ExpiryRequest request) {
+    LocalDateTime at =
+        request.getExpiresAt() == null
+            ? null
+            : LocalDateTime.ofInstant(Instant.ofEpochMilli(request.getExpiresAt()), ZoneId.systemDefault());
+    FileMetadataDto dto = fileService.setExpiry(fileId, request.isKeepForever(), at);
+    dto.setFavourite(favouriteService.favouriteIds().contains(fileId));
+    return dto;
   }
 
   @PostMapping("/{fileId}/reanalyses")

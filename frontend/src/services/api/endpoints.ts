@@ -3,6 +3,8 @@ export const API_ENDPOINTS = {
   UPLOAD_PCAP: '/files',
   FILES_LIST: '/files',
   FILE_METADATA: (fileId: string) => `/files/${fileId}`,
+  FILE_FAVOURITE: (fileId: string) => `/files/${fileId}/favourite`,
+  FILE_EXPIRY: (fileId: string) => `/files/${fileId}/expiry`,
   FILE_REANALYSES: (fileId: string) => `/files/${fileId}/reanalyses`,
   FILE_VERSIONS: (fileId: string) => `/files/${fileId}/versions`,
   FILE_DELETE: (fileId: string) => `/files/${fileId}`,
