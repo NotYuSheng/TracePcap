@@ -12,23 +12,20 @@ vi.mock('@/features/timeline/services/timelineService', () => ({
 }));
 vi.mock('@/features/story/services/storyService', () => ({
   storyService: {
-    getInvestigation: vi.fn().mockResolvedValue({ answers: [], unknowns: [] }),
+    getInvestigationReport: vi.fn().mockResolvedValue({ goals: [], additional: [], unknowns: [], coverage: [] }),
   },
 }));
-vi.mock('@components/story/NarrativeView', () => ({
-  NarrativeView: () => <div>narrative</div>,
+vi.mock('@components/story/StoryNarrative', () => ({
+  StoryNarrative: () => <div>narrative</div>,
 }));
-vi.mock('@components/story/StoryTimeline', () => ({ StoryTimeline: () => null }));
-vi.mock('@components/story/StorySectionNav/StorySectionNav', () => ({
-  StorySectionNav: () => null,
-}));
+vi.mock('@components/story/StoryGoals', () => ({ StoryGoals: () => null }));
 vi.mock('@components/story/StoryProgress/StoryProgress', () => ({
   StoryProgress: () => <div>generating</div>,
 }));
-vi.mock('@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel', () => ({
-  ConfirmedFindingsPanel: () => null,
+vi.mock('@components/story/StoryInfoCard', () => ({
+  StoryHowItWorks: () => null,
+  StoryPromptSettings: () => null,
 }));
-vi.mock('@components/story/StoryInfoCard', () => ({ StoryInfoCard: () => null }));
 vi.mock('@components/story/StoryChat', () => ({ StoryChat: () => null }));
 vi.mock('@components/story/AggregatesPanel', () => ({ AggregatesPanel: () => null }));
 vi.mock('@components/story/FindingsPanel', () => ({ FindingsPanel: () => null }));

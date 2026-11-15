@@ -1,9 +1,8 @@
-import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Card, Form, Popover } from '@govtechsg/sgds-react';
+import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
-import type { Answer, TimelineDataPoint } from '@/types';
+import type { Answer, GoalOutcome, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { storyService } from '@/features/story/services/storyService';
@@ -11,55 +10,28 @@ import {
   AUTO_GRANULARITY_INTERVAL,
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
-import { NarrativeView } from '@components/story/NarrativeView';
-import { StoryTimeline } from '@components/story/StoryTimeline';
-import { StorySectionNav, type StorySection } from '@components/story/StorySectionNav/StorySectionNav';
 import { StoryProgress } from '@components/story/StoryProgress/StoryProgress';
-import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
-import { StoryInfoCard } from '@components/story/StoryInfoCard';
+import { StoryGoals } from '@components/story/StoryGoals';
+import { StoryNarrative } from '@components/story/StoryNarrative';
+import { StoryHowItWorks, StoryPromptSettings } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
 import { AggregatesPanel } from '@components/story/AggregatesPanel';
 import { FindingsPanel } from '@components/story/FindingsPanel';
 import { InvestigationPanel } from '@components/story/InvestigationPanel';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
 import { ErrorMessage } from '@components/common/ErrorMessage';
+import './StoryPage.css';
 
-function NarrativeInfoPopover() {
-  const popover = (
-    <Popover id="info-narrative" style={{ maxWidth: '340px' }}>
-      <Popover.Header>Narrative — How it works</Popover.Header>
-      <Popover.Body className="small">
-        <p className="mb-2">
-          The narrative is written by the LLM using deterministic findings computed from the full
-          dataset — it writes prose, not analysis. Every CRITICAL and HIGH finding is guaranteed to
-          appear in at least one highlight and timeline event.
-        </p>
-        <p className="mb-2">
-          <strong>Not included:</strong> packet payloads, HTTP bodies, DNS query names, TLS SNI, or
-          raw conversation lists (replaced by structured findings).
-        </p>
-        <p className="mb-0">
-          <strong>Limitations:</strong> Treat this as a starting point for investigation. The LLM
-          cannot invent findings not listed in the Deterministic Findings panel above.
-        </p>
-      </Popover.Body>
-    </Popover>
-  );
-  return (
-    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
-      <Button
-        type="button"
-        variant="link"
-        className="p-0 text-muted ms-2"
-        style={{ lineHeight: 1 }}
-        aria-label="About Narrative"
-      >
-        <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </Button>
-    </EscapableOverlayTrigger>
-  );
-}
+type EvidenceTab = 'findings' | 'aggregates' | 'investigation' | 'traffic';
 
+const written = (ms: number) =>
+  new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Story mode, laid out as an investigation (design B): the four standing questions first, the
+ * narrative told as a timeline, Q&A open beside it, and the evidence the story rests on in tabs
+ * underneath. Settings live in the Regenerate dialog rather than on the page.
+ */
 export const StoryPage = () => {
   const { fileId, storyState } = useOutletContext<AnalysisOutletContext>();
   const {
@@ -78,24 +50,25 @@ export const StoryPage = () => {
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [loadingTimeline, setLoadingTimeline] = useState(true);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [unknowns, setUnknowns] = useState<string[]>([]);
-  const [answersLoaded, setAnswersLoaded] = useState(false);
+  const [goals, setGoals] = useState<GoalOutcome[]>([]);
+  const [additional, setAdditional] = useState<Answer[]>([]);
+  const [goalsLoaded, setGoalsLoaded] = useState(false);
+  const [showRegenerate, setShowRegenerate] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [evidenceTab, setEvidenceTab] = useState<EvidenceTab | null>(null);
 
-  // The investigation (producers + pivots), not the producer-only /answers — so a conclusion reached
-  // by following a lead (a beacon classified as a C2 with no IDS rule) shows up here too, and the
-  // panel matches the ground truth the narrative is built from.
+  // The investigation as reported — every goal with its outcome — so a conclusion reached by
+  // following a lead (a beacon classified as a C2 with no IDS rule) shows on its card too.
   useEffect(() => {
     let alive = true;
-    setAnswersLoaded(false);
+    setGoalsLoaded(false);
     storyService
-      .getInvestigation(fileId)
-      .then(s => { if (alive) { setAnswers(s.answers); setUnknowns(s.unknowns); } })
-      .catch(() => { if (alive) { setAnswers([]); setUnknowns([]); } })
-      .finally(() => { if (alive) setAnswersLoaded(true); });
+      .getInvestigationReport(fileId)
+      .then(r => { if (alive) { setGoals(r.goals); setAdditional(r.additional); } })
+      .catch(() => { if (alive) { setGoals([]); setAdditional([]); } })
+      .finally(() => { if (alive) setGoalsLoaded(true); });
     return () => { alive = false; };
   }, [fileId]);
-
 
   useEffect(() => {
     const fetchTimeline = async () => {
@@ -103,11 +76,7 @@ export const StoryPage = () => {
         setLoadingTimeline(true);
         const data =
           granularity === 'auto'
-            ? await timelineService.getTimelineData(
-                fileId,
-                AUTO_GRANULARITY_INTERVAL,
-                AUTO_GRANULARITY_MAX_DATAPOINTS
-              )
+            ? await timelineService.getTimelineData(fileId, AUTO_GRANULARITY_INTERVAL, AUTO_GRANULARITY_MAX_DATAPOINTS)
             : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {
@@ -116,32 +85,44 @@ export const StoryPage = () => {
         setLoadingTimeline(false);
       }
     };
-
-    if (fileId) {
-      fetchTimeline();
-    }
+    if (fileId) fetchTimeline();
   }, [fileId, granularity]);
 
-  // Build the in-page nav from the sections actually rendered below, so it never lists a section
-  // the page conditionally hid (no timeline data, no findings, etc.). This stays above the early
-  // returns: story is null until generation finishes, and a hook that first runs on that render
-  // crashes the page (React error #310).
-  const hasTraffic = !loadingTimeline && timelineData.length > 0;
-  const hasAggregates = !!story?.aggregates;
-  const hasFindings = !!story?.findings && story.findings.length > 0;
-  const hasInvestigation = !!story?.investigationSteps && story.investigationSteps.length > 0;
-  // Memoized so StorySectionNav's IntersectionObserver isn't torn down and rebuilt on every
-  // StoryPage re-render (answers/timeline/granularity state) — which would flicker the active id.
-  const navSections: StorySection[] = useMemo(() => [
-    { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
-    { id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' },
-    { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
-    ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
-    ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
-    ...(hasFindings ? [{ id: 'story-findings', label: 'Deterministic findings', icon: 'bi-shield-check' }] : []),
-    ...(hasInvestigation ? [{ id: 'story-investigation', label: 'LLM investigation', icon: 'bi-search' }] : []),
-    { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
-  ], [hasTraffic, hasAggregates, hasFindings, hasInvestigation]);
+  // The evidence tabs that have something in them (above the early returns: hooks can't follow them).
+  const tabs = useMemo(() => {
+    const t: { id: EvidenceTab; label: string; count?: number }[] = [];
+    if (story?.findings?.length) t.push({ id: 'findings', label: 'Findings', count: story.findings.length });
+    if (story?.aggregates) t.push({ id: 'aggregates', label: 'Traffic intelligence' });
+    if (story?.investigationSteps?.length)
+      t.push({ id: 'investigation', label: 'LLM investigation', count: story.investigationSteps.length });
+    if (!loadingTimeline && timelineData.length > 0) t.push({ id: 'traffic', label: 'Traffic over time' });
+    return t;
+  }, [story, loadingTimeline, timelineData.length]);
+  const activeTab = tabs.find(t => t.id === evidenceTab)?.id ?? tabs[0]?.id;
+
+  const settings = (
+    <StoryPromptSettings
+      additionalContext={additionalContext}
+      onAdditionalContextChange={setAdditionalContext}
+      maxFindings={maxFindings}
+      onMaxFindingsChange={setMaxFindings}
+      totalFindings={totalFindings}
+      maxRiskMatrix={maxRiskMatrix}
+      onMaxRiskMatrixChange={setMaxRiskMatrix}
+      totalRiskMatrix={totalRiskMatrix}
+    />
+  );
+
+  const howItWorks = (
+    <Modal show={showHowItWorks} onHide={() => setShowHowItWorks(false)} size="lg" scrollable>
+      <Modal.Header closeButton>
+        <Modal.Title>How the story is written</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <StoryHowItWorks />
+      </Modal.Body>
+    </Modal>
+  );
 
   if (generating && !story) {
     const timeoutSec = Math.round(llmTimeoutMs / 1000);
@@ -210,189 +191,132 @@ export const StoryPage = () => {
 
   if (!story) {
     return (
-      <div className="py-4">
-        <div className="mb-4">
-          <StoryInfoCard
-            additionalContext={additionalContext}
-            onAdditionalContextChange={setAdditionalContext}
-            maxFindings={maxFindings}
-            onMaxFindingsChange={setMaxFindings}
-            totalFindings={totalFindings}
-            maxRiskMatrix={maxRiskMatrix}
-            onMaxRiskMatrixChange={setMaxRiskMatrix}
-            totalRiskMatrix={totalRiskMatrix}
-          />
-        </div>
-
-        <div className="text-center">
-          <h4>No Story Generated Yet</h4>
-          <p className="text-muted mb-4">
-            Generate an AI-powered narrative analysis of this network capture
-          </p>
-          <Button variant="primary" onClick={() => handleGenerateStory()}>
-            <i className="bi bi-magic me-2"></i>
-            Generate Story
-          </Button>
-        </div>
+      <div className="story-start">
+        <Card className="story-start-card">
+          <Card.Body>
+            <span className="story-pill">No story yet</span>
+            <h1 className="story-start-title">Have the LLM write this capture's story</h1>
+            <p className="text-muted">
+              It reads the findings TracePcap measured (not raw packets) and tells you what happened, in
+              order, with what to look at next. A few minutes on a local model.{' '}
+              <Button variant="link" className="p-0 align-baseline" onClick={() => setShowHowItWorks(true)}>
+                How it works
+              </Button>
+            </p>
+            {settings}
+            <Button variant="primary" className="mt-3" onClick={() => handleGenerateStory()}>
+              <i className="bi bi-stars me-2" aria-hidden="true"></i>
+              Write the story
+            </Button>
+          </Card.Body>
+        </Card>
+        {howItWorks}
       </div>
     );
   }
 
-  // Clear the sticky app header (~112px) so a jumped-to section and the sticky sidebar aren't
-  // hidden underneath it.
-  const sectionAnchor = { scrollMarginTop: '124px' } as const;
-
   return (
     <div className="story-page">
-      {/* Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="d-flex align-items-center justify-content-between">
-            <div>
-              <h4 className="mb-0">Network Traffic Story</h4>
-              <small className="text-muted" data-testid="story-rules-scope">
-                {story.networkId
-                  ? <>Uses the shared detection rules and <strong>{story.networkName ?? 'a network'}</strong>'s own.</>
-                  : <>Uses the shared detection rules. Pick a network under “Custom detection rules” and regenerate to include its rules.</>}
-              </small>
-            </div>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => handleGenerateStory()}
-              disabled={generating}
-              title={generating ? 'Generating...' : 'Regenerate'}
-            >
-              <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`}></i>
-              {generating ? 'Generating...' : 'Regenerate'}
-            </Button>
-          </div>
+      <div className="story-head">
+        <div className="story-head-text">
+          <h1 className="story-title">Story</h1>
+          <small className="text-muted" data-testid="story-rules-scope">
+            Written {written(story.generatedAt)} ·{' '}
+            {story.networkId
+              ? <>uses the shared detection rules and <strong>{story.networkName ?? 'a network'}</strong>'s own.</>
+              : <>Uses the shared detection rules. Pick a network under “Custom detection rules” and regenerate to include its rules.</>}
+          </small>
         </div>
+        <Button variant="link" size="sm" onClick={() => setShowHowItWorks(true)}>
+          How it works
+        </Button>
+        <Button variant="outline-primary" size="sm" onClick={() => setShowRegenerate(true)} disabled={generating}>
+          <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`} aria-hidden="true"></i>
+          {generating ? 'Writing…' : 'Regenerate…'}
+        </Button>
       </div>
 
-      {/* Regeneration error banner */}
       {error && (
-        <div className="row mb-3">
-          <div className="col-12">
-            <Alert variant="danger" className="py-2 mb-0">
-              <i className="bi bi-exclamation-triangle-fill me-2"></i>
-              {error}
-            </Alert>
-          </div>
-        </div>
+        <Alert variant="danger" className="py-2 mb-3">
+          <i className="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+          {error}
+        </Alert>
       )}
 
-      <div className="row">
-        {/* In-page section navigation (sticky below the app header) */}
-        <div className="col-lg-3 col-xl-2 d-none d-lg-block">
-          <div className="sticky-top" style={{ top: '124px' }}>
-            <StorySectionNav sections={navSections} />
-          </div>
-        </div>
+      <div className="story-grid">
+        <div className="story-main">
+          <StoryGoals goals={goals} additional={additional} loading={!goalsLoaded} />
 
-        {/* Story content */}
-        <div className="col-lg-9 col-xl-10">
-      {/* How stories are generated */}
-      <div className="row mb-4" id="story-info" style={sectionAnchor}>
-        <div className="col-12">
-          <StoryInfoCard
-            additionalContext={additionalContext}
-            onAdditionalContextChange={setAdditionalContext}
-            maxFindings={maxFindings}
-            onMaxFindingsChange={setMaxFindings}
-            totalFindings={totalFindings}
-            maxRiskMatrix={maxRiskMatrix}
-            onMaxRiskMatrixChange={setMaxRiskMatrix}
-            totalRiskMatrix={totalRiskMatrix}
-          />
-        </div>
-      </div>
-
-      {/* Investigation summary — deterministic answers (#813) */}
-      <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
-        <div className="col-12">
-          <ConfirmedFindingsPanel answers={answers} loading={!answersLoaded} unknowns={unknowns} />
-        </div>
-      </div>
-
-      {/* Story Q&A */}
-      <div className="row mb-4" id="story-chat" style={sectionAnchor}>
-        <div className="col-12">
-          <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} />
-        </div>
-      </div>
-
-      {/* Traffic Timeline Visualization */}
-      {hasTraffic && (
-        <div className="row mb-4" id="story-traffic" style={sectionAnchor}>
-          <div className="col-12">
-            <Card>
-              <Card.Body>
-                <TrafficTimeline
-                  data={timelineData}
-                  granularity={granularity}
-                  onGranularityChange={setGranularity}
-                />
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Aggregates Panel — pre-computed full-dataset analytics */}
-      {story.aggregates && (
-        <div className="row mb-4" id="story-aggregates" style={sectionAnchor}>
-          <div className="col-12">
-            <AggregatesPanel aggregates={story.aggregates} />
-          </div>
-        </div>
-      )}
-
-      {/* Findings Panel — deterministic detector output */}
-      {story.findings && story.findings.length > 0 && (
-        <div className="row mb-4" id="story-findings" style={sectionAnchor}>
-          <div className="col-12">
-            <FindingsPanel findings={story.findings} />
-          </div>
-        </div>
-      )}
-
-      {/* Investigation Panel — LLM-directed retrieval results */}
-      {story.investigationSteps && story.investigationSteps.length > 0 && (
-        <div className="row mb-4" id="story-investigation" style={sectionAnchor}>
-          <div className="col-12">
-            <InvestigationPanel steps={story.investigationSteps} />
-          </div>
-        </div>
-      )}
-
-      {/* Narrative and Event Timeline */}
-      <div className="row" id="story-narrative" style={sectionAnchor}>
-        {/* Narrative Section */}
-        <div className="col-lg-8">
-          <h5 className="mb-3 d-flex align-items-center">
-            Narrative
-            <NarrativeInfoPopover />
-          </h5>
-          <NarrativeView sections={story.narrative} />
-        </div>
-
-        {/* Story Event Timeline Section */}
-        <div className="col-lg-4">
-          <Card className="sticky-top" style={{ top: '20px', zIndex: 10 }}>
+          <Card className="story-card">
             <Card.Body>
-              <h5 className="mb-3">Key Events</h5>
-              {story.timeline && story.timeline.length > 0 ? (
-                <StoryTimeline events={story.timeline} />
-              ) : (
-                <p className="text-muted small">No key events identified in this capture.</p>
-              )}
+              <h2 className="story-card-title">The story</h2>
+              <StoryNarrative sections={story.narrative} events={story.timeline ?? []} />
             </Card.Body>
           </Card>
+
+          {tabs.length > 0 && activeTab && (
+            <Card className="story-card">
+              <div className="story-tabs" role="tablist" aria-label="What the story rests on">
+                {tabs.map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === t.id}
+                    className={`story-tab${activeTab === t.id ? ' active' : ''}`}
+                    onClick={() => setEvidenceTab(t.id)}
+                  >
+                    {t.label}
+                    {t.count !== undefined && <span className="story-tab-count">{t.count}</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="story-tab-body" role="tabpanel">
+                {activeTab === 'findings' && story.findings && <FindingsPanel findings={story.findings} />}
+                {activeTab === 'aggregates' && story.aggregates && <AggregatesPanel aggregates={story.aggregates} />}
+                {activeTab === 'investigation' && story.investigationSteps && (
+                  <InvestigationPanel steps={story.investigationSteps} />
+                )}
+                {activeTab === 'traffic' && (
+                  <TrafficTimeline data={timelineData} granularity={granularity} onGranularityChange={setGranularity} />
+                )}
+              </div>
+            </Card>
+          )}
         </div>
+
+        <aside className="story-aside">
+          <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} variant="panel" />
+        </aside>
       </div>
-        </div>{/* /col-lg-10 story content */}
-      </div>{/* /row two-column layout */}
+
+      <Modal show={showRegenerate} onHide={() => setShowRegenerate(false)} size="lg" scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>Regenerate the story</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-0">
+            The LLM writes the story again from the current findings. Tell it anything it can't see, or
+            lower the limits if the last attempt ran out of context.
+          </p>
+          {settings}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowRegenerate(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setShowRegenerate(false);
+              handleGenerateStory();
+            }}
+          >
+            Regenerate
+          </Button>
+        </Modal.Footer>
+      </Modal>
+      {howItWorks}
     </div>
   );
 };

@@ -560,12 +560,12 @@ test('README demo walkthrough', async ({ page }) => {
 
   // ── 5. Story ───────────────────────────────────────────────────────────
   await openTab(page, /Story/i);
-  // Not end-anchored: these buttons wrap their label in decorative <i> icons,
-  // which pad the computed accessible name — /^Generate Story$/ never matches.
-  const generateStory = page.getByRole('button', { name: /Generate Story/i }).first();
-  await expect(generateStory, 'Generate Story button not found').toBeVisible({ timeout: 15_000 });
-  // No hold before this click: the tab has nothing to read yet — it is an empty
-  // "No Story Generated Yet" prompt — so pausing here reads as hesitation.
+  // Not end-anchored: the button wraps its label in a decorative <i> icon, which
+  // pads the computed accessible name.
+  const generateStory = page.getByRole('button', { name: /Write the story/i }).first();
+  await expect(generateStory, 'Write the story button not found').toBeVisible({ timeout: 15_000 });
+  // No hold before this click: the tab has nothing to read yet — it is the
+  // "No story yet" prompt — so pausing here reads as hesitation.
   // showClick's own cursor travel is the only beat it needs.
   await showClick(page, generateStory);
 
@@ -574,11 +574,11 @@ test('README demo walkthrough', async ({ page }) => {
   // Wait for the finished story to render, not for the spinner to disappear:
   // the loading view unmounts a beat before the story paints, and cutting on the
   // spinner filmed the demo tabbing away from a blank Story page while the LLM
-  // was still working. "Network Traffic Story" is the heading of the rendered
-  // story, so it only exists once there is one.
+  // was still working. "Story" is the heading of the rendered story (the empty
+  // state's heading says something else), so it only exists once there is one.
   await beat(page, HOLD);
   await timeline.fastForward('Generate Story (LLM)', 2, async () => {
-    await expect(page.getByRole('heading', { name: /Network Traffic Story/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /^Story$/ })).toBeVisible({
       timeout: 300_000,
     });
   });
@@ -598,15 +598,15 @@ test('README demo walkthrough', async ({ page }) => {
   // A suggested question rather than typed prose: it is one click, it is
   // guaranteed answerable against this story, and it puts the affordance itself
   // on camera.
-  const chatCard = page.locator('.card').filter({ hasText: 'Ask the LLM' }).first();
-  await expect(chatCard, 'Ask the LLM card not found').toBeVisible({ timeout: 15_000 });
+  const chatCard = page.locator('.story-chat-panel').first();
+  await expect(chatCard, 'Ask about this capture panel not found').toBeVisible({ timeout: 15_000 });
   await frameCardTop(chatCard);
   await beat(page, FEATURE);
 
   // A suggested question only *fills* the box — it does not send. So click one
   // to show the affordance, hold while the text lands in the input, then send.
   const suggestion = chatCard.getByRole('button').filter({ hasText: /\?/ }).first();
-  const chatInput = chatCard.getByPlaceholder(/Ask a question about this story/i);
+  const chatInput = chatCard.getByPlaceholder(/Ask a question/i);
   await expect(suggestion, 'no suggested question to click').toBeVisible({ timeout: 10_000 });
   await showClick(page, suggestion);
   await beat(page, HOLD);
@@ -641,46 +641,34 @@ test('README demo walkthrough', async ({ page }) => {
   await frameCardTop(chatCard);
   await beat(page, READ_HOLD);
 
-  // The rest of the Story page is stacked panels, not one blob of prose, and the
-  // point of the tab is how they relate: deterministic findings and full-dataset
-  // aggregates are computed, the LLM only writes prose over them. A single
-  // scrollBy past the lot showed none of it, so stop on each in page order with
-  // its header at the top of the screen.
-  //
-  // Anchored on each panel's own heading rather than by scroll distance — the
-  // panels are conditional (aggregates, findings, and investigation each render
-  // only when the story has them), so any fixed offset lands somewhere different
-  // depending on what this capture produced.
-  for (const [label, heading] of [
-    // The narrative itself, with its Key Events rail alongside.
-    ['narrative', /^Narrative/],
-    // What the LLM was given and what it's allowed to do with it.
-    ['generation settings', /How stories are generated/i],
-    // Pre-computed analytics over the whole capture, not a sample.
-    ['traffic intelligence', /Traffic Intelligence/i],
-    // The detector output the narrative is required to cover.
-    ['deterministic findings', /Deterministic Findings/i],
-    // What the LLM went back and looked up while writing.
-    ['investigation steps', /Investigation/i],
-  ] as const) {
-    const panelHeading = page.getByText(heading).first();
-    if (!(await panelHeading.isVisible().catch(() => false))) continue;
-    // Frame the enclosing card, not the heading: scrolling the heading itself to
-    // the top clips the card's own header padding and border, so the panel reads
-    // as starting mid-way through.
-    const card = cardOf(panelHeading);
-    await frameCardTop((await card.count()) ? card.first() : panelHeading);
-    // A brief stop, not a reading pause: these panels are dense enough that
-    // nobody reads them off a GIF, so the job here is to show that they exist
-    // and what shape they are. The Ask-the-LLM answer above is the one thing on
-    // this tab that has to be read, and it keeps its long hold.
+  // Then the rest of the page, in reading order: the four investigation
+  // questions, the story told as a timeline, and the evidence it rests on.
+  const goalsSection = page.getByRole('region', { name: 'Investigation questions' });
+  if (await goalsSection.isVisible().catch(() => false)) {
+    await frameCardTop(goalsSection);
     await beat(page, FEATURE);
-    // Findings is the exception worth an extra look — it is the evidence the
-    // narrative is accountable to, and the densest panel on the page.
-    if (label === 'deterministic findings') await beat(page, HOLD);
+  }
+  const storyCard = cardOf(page.getByRole('heading', { name: 'The story' }));
+  if (await storyCard.count()) {
+    await frameCardTop(storyCard.first());
+    await beat(page, HOLD);
   }
 
-  
+  // The evidence sits in tabs under the story; show each one the story produced.
+  // Conditional like the panels they replaced — a capture without findings has
+  // no Findings tab — so walk whichever tabs exist rather than a fixed list.
+  const evidence = page.getByRole('tablist', { name: 'What the story rests on' });
+  if (await evidence.isVisible().catch(() => false)) {
+    await frameCardTop(cardOf(evidence).first());
+    for (const tab of await evidence.getByRole('tab').all()) {
+      await showClick(page, tab);
+      await beat(page, FEATURE);
+      // Findings is worth an extra look: it is the evidence the narrative is
+      // accountable to, and the densest panel on the page.
+      if (/Findings/.test(await tab.innerText())) await beat(page, HOLD);
+    }
+  }
+
   await page.evaluate(() => window.scrollTo(0, 0));
 
   // ── 6. Filter generator ────────────────────────────────────────────────

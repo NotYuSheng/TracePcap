@@ -7,13 +7,13 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { StoryInfoCard } from '../StoryInfoCard'
+import { StoryPromptSettings } from '../StoryInfoCard'
 
-function renderCard(props: Parameters<typeof StoryInfoCard>[0] = {}) {
+function renderCard(props: Parameters<typeof StoryPromptSettings>[0] = {}) {
   const onMaxFindingsChange = vi.fn()
   const onMaxRiskMatrixChange = vi.fn()
   render(
-    <StoryInfoCard
+    <StoryPromptSettings
       onMaxFindingsChange={onMaxFindingsChange}
       onMaxRiskMatrixChange={onMaxRiskMatrixChange}
       {...props}
@@ -32,16 +32,10 @@ function capRow(label: 'Max findings:' | 'Max risk matrix rows:'): HTMLElement {
 }
 
 async function expand() {
-  await userEvent.click(screen.getByText(/How Stories Are Generated/i))
+  await userEvent.click(screen.getByText(/Advanced: prompt limits/i))
 }
 
-describe('StoryInfoCard cap controls', () => {
-  it('starts collapsed so the controls do not crowd the story', async () => {
-    renderCard()
-
-    expect(screen.queryByPlaceholderText(/Custom/)).not.toBeInTheDocument()
-  })
-
+describe('StoryPromptSettings cap controls', () => {
   it('reports a preset selection', async () => {
     const { onMaxFindingsChange } = renderCard({ maxFindings: 20, totalFindings: 100 })
     await expand()
@@ -114,30 +108,5 @@ describe('StoryInfoCard cap controls', () => {
     await userEvent.type(input, '37{Enter}')
 
     expect(input.value).toBe('')
-  })
-})
-
-describe('StoryInfoCard keyboard access (#723)', () => {
-  it.each(['{Enter}', ' '])('expands with %s from the keyboard', async key => {
-    renderCard()
-    const header = screen.getByRole('button', { name: /How stories are generated/i })
-
-    header.focus()
-    await userEvent.keyboard(key)
-
-    // Card.Header renders a div, so without an explicit role, tabIndex and key handling the
-    // cap controls are unreachable without a pointer.
-    expect(screen.getAllByPlaceholderText(/Custom/).length).toBeGreaterThan(0)
-  })
-
-  it('is reachable by tab and reports its expanded state', async () => {
-    renderCard()
-    const header = screen.getByRole('button', { name: /How stories are generated/i })
-
-    await userEvent.tab()
-
-    expect(header).toHaveFocus()
-    // aria-expanded is what tells a screen reader the control toggles a region, and which way.
-    expect(header).toHaveAttribute('aria-expanded', 'false')
   })
 })

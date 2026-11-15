@@ -130,6 +130,34 @@ The LLM is explicitly told the following constraints at generation time:
 
 These limitations also bound what the LLM can reliably state in its output.
 
+The Story Page
+--------------
+
+The Story tab is laid out as an investigation, read top to bottom, with the
+questions and answers beside it:
+
+- **The four questions** come first, as cards: *Victim* (which host was
+  attacked?), *User* (who was signed in?), *Malware* (what ran on it?) and *C2*
+  (where did it call home?). A card is **Answered** with the headline, its grade,
+  confidence and how many reasons back it; **Not established** when an incident
+  was found but nothing settled that part of it; or **No lead** when nothing in
+  the capture pointed there, which on a benign capture is the expected outcome.
+  Answers that aren't one of the four (a bulk transfer to review, say) are listed
+  under the cards as *Also found*.
+- **The story** follows: the summary, then *What happened* as a timeline of
+  events (suspicious and critical ones marked with an amber or red edge), then
+  the rest of the narrative (anomalies, the conclusion) under its own headings.
+- **Ask about this capture** stays open in a column on the right, with the
+  model's suggested questions; on a narrow screen it moves below the story.
+- **The evidence the story rests on** sits in tabs under it: *Findings*,
+  *Traffic intelligence*, *LLM investigation* and *Traffic over time*, each shown
+  only when the story produced it.
+
+**Regenerate…** opens a dialog for writing the story again, with the optional
+additional context and, under *Advanced*, the prompt limits. **How it works**
+explains what is sent to the LLM and what is not. Before a story exists the tab
+shows those same settings with a **Write the story** button.
+
 What Story Mode Produces
 ------------------------
 
@@ -138,7 +166,7 @@ Story Mode returns a response containing several components:
 Investigation Summary
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The **Investigation Summary** panel surfaces the deterministic answers to the
+The **Investigation Summary** (the question cards at the top of the Story tab) surfaces the deterministic answers to the
 standard investigation questions — **victim**, **command-and-control**,
 **malware**, and **signed-in user** — from the :doc:`../architecture/knowledge-layer`,
 each labelled with its :ref:`grade <knowledge-grade>` (measured, reported, or
@@ -252,8 +280,8 @@ investigation evidence. The output structure is enforced by the system prompt:
 Story Timeline
 ~~~~~~~~~~~~~~
 
-A visual timeline is derived from the narrative output, showing key events
-in chronological order.
+The timeline events are told in order inside the story, under *What
+happened*, each with its time and a marker for suspicious or critical events.
 
 Aggregates Panel
 ~~~~~~~~~~~~~~~~
@@ -295,8 +323,8 @@ The ⓘ icon in the panel header reveals important caveats:
 Interactive LLM Q&A Chat
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After the narrative is generated, a **chat panel** allows follow-up questions
-about the PCAP. The LLM answers using the full story JSON **and** the
+After the narrative is generated, the **Ask about this capture** panel beside
+the story allows follow-up questions about the PCAP. The LLM answers using the full story JSON **and** the
 Investigation Summary's deterministic answers as context — the answers are the
 authoritative ground truth it must prefer and must not contradict — and returns 3
 suggested follow-up questions with each answer.
