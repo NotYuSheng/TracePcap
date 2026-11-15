@@ -1,6 +1,7 @@
 import {
   formatBytes,
   formatDuration,
+  formatSpan,
   formatNumber,
   formatProtocol,
   formatIpPort,
@@ -135,5 +136,32 @@ describe('formatPercentage', () => {
 
   it('handles zero', () => {
     expect(formatPercentage(0)).toBe('0.0%');
+  });
+});
+
+describe('formatSpan', () => {
+  const H = 3_600_000;
+  it.each([
+    [45_000, '45 s'],
+    [26 * 60_000, '26 min'],
+    [5.2 * H, '5.2 h'],
+    [17 * 24 * H, '17 days'],
+    [150 * 24 * H, '5 months'],
+    [147438.8 * H, '16.8 years'],
+    [3 * 365.25 * 24 * H, '3 years'],
+  ])('%d ms → %s', (ms, text) => {
+    expect(formatSpan(ms)).toBe(text);
+  });
+
+  it('says "1 day" and "1 year", not "1 days"', () => {
+    expect(formatSpan(24 * H * 1.2)).toBe('28.8 h');
+    expect(formatSpan(24 * H * 50)).toBe('50 days');
+    expect(formatSpan(365.25 * 24 * H * 2)).toBe('2 years');
+  });
+});
+
+describe('formatDuration past two days', () => {
+  it('switches to days instead of thousands of hours', () => {
+    expect(formatDuration(6 * 24 * 3_600_000)).toBe('6 days');
   });
 });

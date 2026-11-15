@@ -23,6 +23,28 @@ export const formatBytes = (bytes: number): string => {
   return `${bytes < 0 ? '-' : ''}${rendered} ${BYTE_UNITS[i]}`;
 };
 
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
+const MONTH_MS = 30.44 * DAY_MS;
+const YEAR_MS = 365.25 * DAY_MS;
+
+const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+const oneDecimal = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * A length of time in the one unit that reads best: "45 s", "26 min", "5.2 h", "17 days",
+ * "5 months", "16.8 years". For a capture's span, where "147438.8 h" would mean nothing.
+ */
+export const formatSpan = (ms: number): string => {
+  const s = Math.round(ms / 1000);
+  if (s < 90) return `${s} s`;
+  if (s < 90 * 60) return `${Math.round(s / 60)} min`;
+  if (ms < 48 * HOUR_MS) return `${oneDecimal(ms / HOUR_MS)} h`;
+  if (ms < 60 * DAY_MS) return plural(Math.round(ms / DAY_MS), 'day');
+  if (ms < 2 * YEAR_MS) return plural(Math.round(ms / MONTH_MS), 'month');
+  return plural(oneDecimal(ms / YEAR_MS), 'year');
+};
+
 /**
  * Format duration in milliseconds to human-readable format
  * @param ms - Duration in milliseconds
@@ -30,6 +52,8 @@ export const formatBytes = (bytes: number): string => {
  */
 export const formatDuration = (ms: number): string => {
   if (ms < 1000) return `${ms}ms`;
+  // Past two days, "6143h 12m" stops meaning anything: switch to days, months, years.
+  if (ms >= 48 * HOUR_MS) return formatSpan(ms);
 
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
