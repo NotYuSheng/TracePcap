@@ -9,6 +9,7 @@
 #   - ffmpeg on PATH:             sudo apt install ffmpeg
 #
 # Usage: scripts/record-demo.sh [output.gif]
+#        DEMO_SPEC=hero scripts/record-demo.sh sample-files/TracePcap-Hero.gif   (the short hero)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,6 +37,9 @@ BASE_URL="${E2E_BASE_URL:-http://localhost:8888}"
 # correctly — and saves ~2MB. Below 96 the graph visibly posterises. Raise it
 # with DEMO_COLORS=256 if the gradients matter more than the download.
 WIDTH="${DEMO_WIDTH:-640}"
+# Seconds to skip at the start of the (fast-forwarded) video, e.g. a sliver of a loading spinner.
+# The first frame is what many sites use as the GIF's preview.
+START="${DEMO_START:-0}"
 FPS="${DEMO_FPS:-6}"
 MAX_COLORS="${DEMO_COLORS:-128}"
 
@@ -63,7 +67,12 @@ fi
 echo "==> Recording walkthrough (Playwright)"
 # Clear stale videos so the newest-file pick below can't grab a previous run's.
 rm -rf "$VIDEO_DIR"
-(cd "$REPO_ROOT/frontend" && npm run demo:record)
+# DEMO_SPEC=hero records the short network-diagram GIF instead of the full walkthrough.
+if [ "${DEMO_SPEC:-demo}" = "hero" ]; then
+  (cd "$REPO_ROOT/frontend" && npm run demo:hero)
+else
+  (cd "$REPO_ROOT/frontend" && npm run demo:record)
+fi
 
 WEBM="$(find "$VIDEO_DIR" -name '*.webm' -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)"
 [ -n "$WEBM" ] || { echo "error: no video produced under $VIDEO_DIR" >&2; exit 1; }
@@ -105,7 +114,7 @@ FILTERS="fps=${FPS},scale=${WIDTH}:-1:flags=lanczos"
 # whatever was on screen longest. Measured across a moving clip, `full` tracks
 # the source more closely (mean error 1.58 vs 1.69 per channel) for ~12% more
 # bytes — worth it, since colour drift is the thing viewers notice.
-ffmpeg -v error -y -i "$SOURCE" \
+ffmpeg -v error -y -ss "$START" -i "$SOURCE" \
   -vf "${FILTERS},palettegen=max_colors=${MAX_COLORS}:stats_mode=full" "$PALETTE"
 
 # dither=none is both smaller and sharper here (measured: ~700KB cheaper than
@@ -113,7 +122,7 @@ ffmpeg -v error -y -i "$SOURCE" \
 # pattern perturbs pixels across otherwise-identical frames, which defeats GIF
 # inter-frame compression. diff_mode=rectangle then skips the unchanged region
 # between held frames.
-ffmpeg -v error -y -i "$SOURCE" -i "$PALETTE" \
+ffmpeg -v error -y -ss "$START" -i "$SOURCE" -i "$PALETTE" \
   -lavfi "${FILTERS}[x];[x][1:v]paletteuse=dither=none:diff_mode=rectangle" \
   -loop 0 "$OUT"
 

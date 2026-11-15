@@ -28,6 +28,24 @@ route interception, so they do not require a (un)reachable LLM.
 - `llm-error.spec.ts` — Story and Filter Generator show a visible error alert
   (not a blank container) when generation returns `502`.
 
+## Hero recording
+
+`hero.spec.ts` drives the short GIF at the top of the README
+(`sample-files/TracePcap-Hero.gif`): ~17 seconds on the network diagram, the most
+striking view, so it gets screen time first. It uses `sample-files/small_office.pcap`
+(uploaded once, kept, then reused by name), needs **no LLM**, and works on any stack:
+
+```bash
+DEMO_SPEC=hero DEMO_WIDTH=640 DEMO_FPS=8 DEMO_COLORS=128 DEMO_START=0.5 \
+  scripts/record-demo.sh sample-files/TracePcap-Hero.gif
+```
+
+It opens the map full screen (the load is fast-forwarded and `DEMO_START` skips the
+last sliver of spinner, since the first frame is what many sites show as the
+preview), plays the capture through, recolours the edges by application, and opens
+the busiest device. A drawn pointer follows the mouse, since headless video doesn't
+show one. These settings give ~3MB.
+
 ## Demo recording
 
 `demo.spec.ts` is not a test — it drives the walkthrough recorded for the README
@@ -68,8 +86,9 @@ npm run demo:record
 The spec deletes any existing copy of the fixture first, so each run records a
 genuine first upload rather than the dedup ("Open existing") path.
 
-Tuning knobs on `record-demo.sh`: `DEMO_WIDTH` (default 800), `DEMO_FPS` (10),
-`DEMO_COLORS` (96) — these produce ~3MB, roughly GitHub's comfortable ceiling.
+Tuning knobs on `record-demo.sh`: `DEMO_WIDTH` (default 640), `DEMO_FPS` (6),
+`DEMO_COLORS` (128), and `DEMO_START` (seconds to skip at the start, default 0).
+`DEMO_SPEC=hero` records the hero instead of this walkthrough.
 Pacing lives in the `BEAT`/`READ` constants in the spec, and it dominates size:
 the GIF costs ~100KB per second of runtime, so trimming holds beats tuning the
 encoder. Raising width/fps/colors grows the file fast — check the printed size.

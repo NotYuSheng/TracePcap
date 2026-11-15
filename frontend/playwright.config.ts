@@ -31,7 +31,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /demo\.spec\.ts/,
+      testIgnore: /(demo|hero)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: { args: ['--no-sandbox'] },
@@ -50,6 +50,18 @@ export default defineConfig({
             // not a performance assertion, and a recording that dies at minute
             // eight wastes everything before it.
             timeout: 20 * 60_000,
+            use: {
+              ...devices['Desktop Chrome'],
+              launchOptions: { args: ['--no-sandbox'] },
+              viewport: DEMO_SIZE,
+              video: { mode: 'on' as const, size: DEMO_SIZE },
+            },
+          },
+          {
+            // The README's short hero GIF (network diagram only, no LLM).
+            name: 'hero' as const,
+            testMatch: /hero\.spec\.ts/,
+            timeout: 5 * 60_000,
             use: {
               ...devices['Desktop Chrome'],
               launchOptions: { args: ['--no-sandbox'] },
