@@ -6,13 +6,16 @@ import { Timeline } from './demo-timeline';
 
 /**
  * The README's short hero GIF: the network diagram, which is the most striking thing TracePcap
- * shows. ~15 seconds on one capture, no LLM: the map full screen, the capture played through
- * (traffic flowing, the activity bar sweeping), the edges recoloured by application, and one
- * device opened. Recorded with `DEMO_SPEC=hero scripts/record-demo.sh sample-files/TracePcap-Hero.gif`.
+ * shows. ~20 seconds on one capture, no LLM: the map full screen and the capture played through,
+ * then a zoom onto one address that two devices held in turn, one of them opened, and the map
+ * filtered down to the flagged flow (a telnet login to a camera). The capture is
+ * `office_showcase.pcap` (`python3 sample-files/gen_small_office.py --showcase`), the small office
+ * plus the things the map is best at showing. Recorded with
+ * `DEMO_SPEC=hero scripts/record-demo.sh sample-files/TracePcap-Hero.gif`.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const CAPTURE = 'small_office.pcap';
+const CAPTURE = 'office_showcase.pcap';
 const CAPTURE_PATH = path.resolve(here, '../../sample-files', CAPTURE);
 
 const timeline = new Timeline();
@@ -76,29 +79,28 @@ async function showClick(page: Page, target: Locator) {
   await target.click({ timeout: 10_000 });
 }
 
-/** The most connected nodes on screen, from the graph's own layout. */
-async function biggestNode(page: Page) {
-  return page.evaluate(() => {
+/** Where a node is on screen, by its label (the last one, when two share it). */
+async function nodeOnScreen(page: Page, label: string) {
+  return page.evaluate(l => {
     type S = {
       getContainer(): HTMLElement;
-      getGraph(): { forEachNode(cb: (n: string) => void): void };
-      getNodeDisplayData(n: string): { x: number; y: number; size: number } | null;
+      getGraph(): { forEachNode(cb: (n: string, a: { label?: string }) => void): void };
+      getNodeDisplayData(n: string): { x: number; y: number } | null;
       framedGraphToViewport(c: { x: number; y: number }): { x: number; y: number };
     };
     const s = (window as unknown as { __sigma?: S }).__sigma;
     if (!s) return null;
     const rect = s.getContainer().getBoundingClientRect();
-    let best: { x: number; y: number; size: number } | null = null;
-    s.getGraph().forEachNode(n => {
+    let at: { x: number; y: number } | null = null;
+    s.getGraph().forEachNode((n, a) => {
+      if (a.label !== l) return;
       const d = s.getNodeDisplayData(n);
       if (!d) return;
       const v = s.framedGraphToViewport({ x: d.x, y: d.y });
-      const p = { x: rect.left + v.x, y: rect.top + v.y, size: d.size };
-      if (p.x < rect.left + 200 || p.y > rect.bottom - 120) return; // clear of the legend and play bar
-      if (!best || p.size > best.size) best = p;
+      at = { x: rect.left + v.x, y: rect.top + v.y };
     });
-    return best;
-  });
+    return at;
+  }, label);
 }
 
 test('README hero: the network diagram', async ({ page, request }) => {
@@ -124,25 +126,41 @@ test('README hero: the network diagram', async ({ page, request }) => {
   await showClick(page, page.getByRole('button', { name: 'Show the whole capture' }));
   await page.waitForTimeout(900);
 
-  // Recolour the edges by application.
-  const colour = card.locator('select').filter({ has: page.locator('option[value="application"]') });
-  const box = await colour.boundingBox();
-  if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 14 });
-  await colour.selectOption('application');
-  await page.waitForTimeout(2000);
+  // Zoom onto the guest network: one address, 10.20.20.51, held by two devices in turn.
+  const phone = await nodeOnScreen(page, 'Visitors-iPhone');
+  const other = await nodeOnScreen(page, 'Galaxy-A55');
+  expect(phone && other, 'the two devices on 10.20.20.51 are not on the map').toBeTruthy();
+  const mid = { x: (phone!.x + other!.x) / 2, y: (phone!.y + other!.y) / 2 - 60 };
+  await page.mouse.move(mid.x, mid.y, { steps: 14 });
+  for (let i = 0; i < 2; i++) {
+    await page.mouse.wheel(0, -120);
+    await page.waitForTimeout(160);
+  }
+  await page.waitForTimeout(2200);
 
-  // Open the busiest device.
-  const node = await biggestNode(page);
-  expect(node, 'no node on screen to open').not.toBeNull();
-  await page.mouse.move(node!.x, node!.y, { steps: 16 });
-  await page.waitForTimeout(400);
-  await page.mouse.click(node!.x, node!.y);
+  // Open the visitor's phone: the second device on that address.
+  const target = await nodeOnScreen(page, 'Visitors-iPhone');
+  await page.mouse.move(target!.x, target!.y, { steps: 16 });
+  await page.waitForTimeout(500);
+  await page.mouse.click(target!.x, target!.y);
   await expect(page.getByRole('dialog').last()).toBeVisible({ timeout: 10_000 });
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(2800);
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+
+  // Only the flagged traffic: the phone's telnet login to the entrance camera, framed.
+  await showClick(page, page.locator('.ng-ctrl-btn', { has: page.locator('.bi-funnel') }));
+  const unsafe = page.getByRole('button', { name: /^unsafe protocol/i });
+  await expect(unsafe).toBeVisible({ timeout: 10_000 });
+  await showClick(page, unsafe);
+  await page.waitForTimeout(700);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
+  await showClick(page, page.getByRole('button', { name: 'Fit view' }));
+  await page.waitForTimeout(3000);
   // Off the map, so the last frame isn't one hovered device with the rest faded.
   await page.mouse.move(1240, 60, { steps: 10 });
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(1200);
 
   timeline.write();
 });

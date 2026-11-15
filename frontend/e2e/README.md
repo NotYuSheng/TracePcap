@@ -31,22 +31,28 @@ route interception, so they do not require a (un)reachable LLM.
 ## Hero recording
 
 `hero.spec.ts` drives the short GIF at the top of the README
-(`sample-files/TracePcap-Hero.gif`): ~17 seconds on the network diagram, the most
-striking view, so it gets screen time first. It uses `sample-files/small_office.pcap`
-(uploaded once, kept, then reused by name), needs **no LLM**, and works on any stack:
+(`sample-files/TracePcap-Hero.gif`): ~24 seconds on the network diagram, the most
+striking view, so it gets screen time first. It uses `sample-files/office_showcase.pcap`
+(`python3 sample-files/gen_small_office.py --showcase`: the small office plus one address two
+devices held in turn, a laptop that moved address, a client nobody answered, and a telnet
+login to a camera). The capture is uploaded once, kept, then reused by name. It needs
+**no LLM** and works on any stack:
 
 ```bash
-DEMO_SPEC=hero DEMO_WIDTH=1280 DEMO_FPS=8 DEMO_COLORS=128 DEMO_LOSSY=60 DEMO_START=0.5 \
+DEMO_SPEC=hero DEMO_WIDTH=1280 DEMO_FPS=7 DEMO_COLORS=128 DEMO_LOSSY=80 DEMO_START=0.5 \
   scripts/record-demo.sh sample-files/TracePcap-Hero.gif
 ```
 
 It opens the map full screen (the load is fast-forwarded and `DEMO_START` skips the
 last sliver of spinner, since the first frame is what many sites show as the
-preview), plays the capture through, recolours the edges by application, and opens
-the busiest device. A drawn pointer follows the mouse, since headless video doesn't
-show one. These settings keep the recording's native 1280px and give ~7MB; GitHub
-won't render a README image over 10MB, so check the printed size after any change.
-`DEMO_LOSSY` needs `gifsicle`; without it the same clip is ~13MB.
+preview) and plays the capture through. Then it zooms onto 10.20.20.51, the address two
+phones held in turn, opens the second one, and filters the map to the `unsafe protocol`
+flag, which leaves the telnet login framed. A drawn pointer follows the mouse, since
+headless video doesn't show one.
+
+These settings keep the recording's native 1280px and give ~8MB; GitHub won't render a
+README image over 10MB, so check the printed size after any change. `DEMO_LOSSY` needs
+`gifsicle`; without it the same clip is well over 10MB.
 
 ## Demo recording
 
