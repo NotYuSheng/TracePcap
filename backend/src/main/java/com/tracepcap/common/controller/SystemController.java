@@ -32,6 +32,10 @@ public class SystemController {
   @Value("${llm.api.timeout-seconds:300}")
   private int llmTimeoutSeconds;
 
+  // Whether an LLM is set up at all, so the upload panel can offer to write the story.
+  @Value("${llm.api.base-url:}")
+  private String llmBaseUrl;
+
   // How long an analysis capture is kept, so the home page can say when one will be deleted. Read
   // per request: retention is editable in the app (#915 phase 5).
   private final RuntimePolicy runtimePolicy;
@@ -71,6 +75,8 @@ public class SystemController {
             (long) analysisTimeoutSeconds * 1000,
             "llmTimeoutMs",
             (long) llmTimeoutSeconds * 1000,
+            "llmConfigured",
+            llmBaseUrl != null && !llmBaseUrl.isBlank(),
             // 0 means captures are never deleted.
             "fileRetentionHours",
             cleanupEnabled

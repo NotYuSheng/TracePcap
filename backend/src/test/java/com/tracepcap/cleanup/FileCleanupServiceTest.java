@@ -70,4 +70,16 @@ class FileCleanupServiceTest {
     service.cleanupExpiredFiles();
     verify(fileService).deleteFile(kept.getId());
   }
+
+  @Test
+  void aCaptureUploadedNotToExpire_isNeverSwept() {
+    FileEntity forever = file();
+    forever.setKeepForever(true);
+    when(files.findBySourceAndUploadedAtBefore(eq(FileSource.ANALYSIS), any()))
+        .thenReturn(List.of(loose, forever));
+    when(policy.getInt(EditablePolicy.MONITOR_FILE_RETENTION_HOURS)).thenReturn(0);
+    service.cleanupExpiredFiles();
+    verify(fileService).deleteFile(loose.getId());
+    verify(fileService, never()).deleteFile(forever.getId());
+  }
 }

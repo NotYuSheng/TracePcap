@@ -92,6 +92,8 @@ export interface StoryGenerationState {
   setTotalFindings: Dispatch<SetStateAction<number | undefined>>;
   totalRiskMatrix: number | undefined;
   setTotalRiskMatrix: Dispatch<SetStateAction<number | undefined>>;
+  /** The story asked for at upload, while it is on its way (or if it failed). */
+  background: { status: 'QUEUED' | 'WRITING' | 'FAILED'; error?: string | null } | null;
 }
 
 export interface AnalysisOutletContext {
@@ -276,10 +278,48 @@ export const AnalysisPage = () => {
       .catch(err => console.error('Failed to load existing story:', err));
   }, [fileId]);
 
+  // The story asked for at upload ("write the story when analysis finishes"): while it is queued or
+  // being written, check every 15 s and show it the moment it lands.
+  const [background, setBackground] = useState<StoryGenerationState['background']>(null);
+  useEffect(() => {
+    if (!fileId) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = async () => {
+      try {
+        const { data: meta } = await apiClient.get<{ storyStatus?: string | null; storyError?: string | null }>(
+          API_ENDPOINTS.FILE_METADATA(fileId)
+        );
+        if (!alive) return;
+        const status = meta.storyStatus;
+        if (status === 'QUEUED' || status === 'WRITING') {
+          setBackground({ status });
+          timer = setTimeout(check, 15_000);
+        } else if (status === 'READY') {
+          setBackground(null);
+          const existing = await storyService.getStoryByFileId(fileId);
+          if (alive && existing) setStory(prev => prev ?? existing);
+        } else if (status === 'FAILED') {
+          setBackground({ status, error: meta.storyError });
+        } else {
+          setBackground(null);
+        }
+      } catch {
+        // No background story to follow; the page works as before.
+      }
+    };
+    check();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [fileId]);
+
   const storyState: StoryGenerationState = useMemo(
     () => ({
       story,
       setStory,
+      background: story ? null : background,
       generating: storyGenerating,
       generateStory,
       error: storyError,
@@ -304,6 +344,7 @@ export const AnalysisPage = () => {
     }),
     [
       story,
+      background,
       storyGenerating,
       generateStory,
       storyError,

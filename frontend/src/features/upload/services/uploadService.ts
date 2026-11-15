@@ -9,6 +9,10 @@ export interface AnalysisOptions {
   enableSuricata: boolean;
   enableFileExtraction: boolean;
   source?: FileSource;
+  /** Write the story in the background once analysis finishes. */
+  generateStory?: boolean;
+  /** Delete with the retention cleanup (the default); false keeps it until someone deletes it. */
+  expires?: boolean;
 }
 
 export const uploadService = {
@@ -30,6 +34,8 @@ export const uploadService = {
     formData.append('enableSuricata', String(options.enableSuricata));
     formData.append('enableFileExtraction', String(options.enableFileExtraction));
     formData.append('source', options.source ?? 'ANALYSIS');
+    formData.append('generateStory', String(options.generateStory ?? false));
+    formData.append('expires', String(options.expires ?? true));
 
     const response = await apiClient.post<UploadResponse>(API_ENDPOINTS.UPLOAD_PCAP, formData, {
       onUploadProgress: progressEvent => {

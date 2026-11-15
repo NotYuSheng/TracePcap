@@ -37,17 +37,27 @@ export const HomePage = () => {
     // Suricata is opt-in: it is the slowest stage, so it starts off and the box says what it costs.
     enableSuricata: false,
     enableFileExtraction: true,
+    // Opt-in: minutes of local-model time per capture, so a batch shouldn't queue stories by default.
+    generateStory: false,
+    expires: true,
   });
+  const [llmConfigured, setLlmConfigured] = useState(false);
 
   useEffect(() => {
     apiClient
-      .get<{ maxUploadBytes?: number; maxUploadPackets?: number; fileRetentionHours?: number }>(
+      .get<{
+        maxUploadBytes?: number;
+        maxUploadPackets?: number;
+        fileRetentionHours?: number;
+        llmConfigured?: boolean;
+      }>(
         API_ENDPOINTS.SYSTEM_LIMITS
       )
       .then(({ data }) => {
         if (data.maxUploadBytes) setMaxBytes(data.maxUploadBytes);
         if (typeof data.maxUploadPackets === 'number') setMaxPackets(data.maxUploadPackets);
         if (typeof data.fileRetentionHours === 'number') setRetentionHours(data.fileRetentionHours);
+        setLlmConfigured(data.llmConfigured === true);
       })
       .catch(() => {
         // Defaults stand; the server enforces the real limits.
@@ -72,6 +82,7 @@ export const HomePage = () => {
     maxBytes,
     maxPackets,
     retentionHours,
+    llmConfigured,
     acceptedTypes: env.SUPPORTED_FILE_TYPES,
     uploads,
     onClearUploads: clearFinished,

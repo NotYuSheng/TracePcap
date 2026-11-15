@@ -35,6 +35,8 @@ interface Props {
   maxPackets: number;
   /** Hours a capture is kept; 0 means forever. */
   retentionHours: number | null;
+  /** An LLM is set up, so the story can be written after analysis. */
+  llmConfigured?: boolean;
   acceptedTypes: string[];
   /** The files on their way, shown as rows in the panel. */
   uploads: UploadEntry[];
@@ -74,6 +76,7 @@ export function StartPanel({
   maxBytes,
   maxPackets,
   retentionHours,
+  llmConfigured = false,
   acceptedTypes,
   uploads,
   onClearUploads,
@@ -166,20 +169,46 @@ export function StartPanel({
             </span>
           </label>
         ))}
+        {llmConfigured && (
+          <label className="home-stage home-stage-story">
+            <input
+              type="checkbox"
+              className="form-check-input"
+              checked={options.generateStory ?? false}
+              onChange={e => onOptionsChange({ ...options, generateStory: e.target.checked })}
+            />
+            <span>
+              <span className="fw-semibold">Write the story when analysis finishes</span>
+              <br />
+              <span className="text-muted">
+                The LLM writes it in the background, one capture at a time, so it is ready when you open Story.
+              </span>
+            </span>
+          </label>
+        )}
       </fieldset>
 
-      {retentionHours != null && (
-        <p className="home-retention">
-          {retentionHours > 0 ? (
-            <>
-              Captures are kept {retentionText(retentionHours)}. Add one to a{' '}
-              <Link to="/monitor">monitored network</Link> to keep it.
-            </>
-          ) : (
-            'Captures are kept until you delete them.'
-          )}
-        </p>
-      )}
+      {retentionHours != null &&
+        (retentionHours > 0 ? (
+          <label className="home-stage home-retention-option">
+            <input
+              type="checkbox"
+              className="form-check-input"
+              checked={options.expires ?? true}
+              onChange={e => onOptionsChange({ ...options, expires: e.target.checked })}
+            />
+            <span>
+              <span className="fw-semibold">Delete after {retentionText(retentionHours)}</span>
+              <br />
+              <span className="text-muted">
+                Untick to keep it until you delete it. Adding it to a{' '}
+                <Link to="/monitor">monitored network</Link> also keeps it.
+              </span>
+            </span>
+          </label>
+        ) : (
+          <p className="home-retention">Captures are kept until you delete them.</p>
+        ))}
     </section>
   );
 }
