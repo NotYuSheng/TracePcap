@@ -325,13 +325,12 @@ The ⓘ icon in the panel header reveals important caveats:
   reflect recent IP address reassignments.
 
 Interactive LLM Q&A Chat
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-After the narrative is generated, the **Ask about this capture** panel beside
-the story allows follow-up questions about the PCAP. The LLM answers using the full story JSON **and** the
-Investigation Summary's deterministic answers as context — the answers are the
-authoritative ground truth it must prefer and must not contradict — and returns 3
-suggested follow-up questions with each answer.
+The **Ask about this capture** panel beside the story answers follow-up questions, looking things
+up with read-only tools (findings, conversations, hosts, address history, DNS lookups, traffic
+destinations and over time) and writing Wireshark filters it has checked on the capture. It is
+there before the story is written, too. See :doc:`capture-chat`.
 
 Investigation Panel
 ~~~~~~~~~~~~~~~~~~~

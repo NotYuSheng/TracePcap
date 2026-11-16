@@ -1,7 +1,7 @@
 LLM Setup
 =========
 
-TracePcap's AI features (Story Mode and AI Filter Generator) require an
+TracePcap's AI features (Story Mode and its chat, which also writes filters) require an
 OpenAI-compatible inference server. Any server that implements the
 ``/v1/chat/completions`` endpoint works.
 

@@ -297,6 +297,21 @@ public class StoryService {
     }
   }
 
+  /** A capture's deterministic ground truth (confirmed findings and the board), as prompt text. */
+  public String knowledgeContext(UUID fileId) {
+    StringBuilder sb = new StringBuilder();
+    appendKnowledgeContext(sb, fileId);
+    return sb.toString();
+  }
+
+  /** The latest completed story's JSON for a capture, if it has one. */
+  public Optional<String> storyContent(UUID fileId) {
+    return storyRepository
+        .findFirstByFileIdOrderByGeneratedAtDesc(fileId)
+        .filter(story -> story.getStatus() == StoryEntity.StoryStatus.COMPLETED)
+        .map(StoryEntity::getContent);
+  }
+
   /**
    * Get the latest completed story for a file, if one exists
    *
