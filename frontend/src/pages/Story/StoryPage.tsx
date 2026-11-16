@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
@@ -37,6 +38,7 @@ const STICKY_TOP = 96;
 
 export const StoryPage = () => {
   const { fileId, storyState } = useOutletContext<AnalysisOutletContext>();
+  const [networkContext] = useNetworkContext();
   const {
     story, generating, error,
     contextError, setContextError,
@@ -245,8 +247,21 @@ export const StoryPage = () => {
     );
   }
 
+  // The chat is there before a story is: it answers from the findings and its tools (#1161).
+  const chat = (
+    <aside className="story-aside" ref={asideRef}>
+      <StoryChat
+        fileId={fileId}
+        networkId={networkContext}
+        suggestedQuestions={story?.suggestedQuestions}
+        hasStory={!!story}
+      />
+    </aside>
+  );
+
   if (!story) {
     return (
+      <div className="story-grid">
       <div className="story-start">
         {background?.status === 'FAILED' && (
           <Alert variant="warning" className="mb-3">
@@ -273,6 +288,8 @@ export const StoryPage = () => {
           </Card.Body>
         </Card>
         {howItWorks}
+      </div>
+      {chat}
       </div>
     );
   }
@@ -347,9 +364,7 @@ export const StoryPage = () => {
           )}
         </div>
 
-        <aside className="story-aside" ref={asideRef}>
-          <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} variant="panel" />
-        </aside>
+        {chat}
       </div>
 
       <Modal show={showRegenerate} onHide={() => setShowRegenerate(false)} size="lg" scrollable>

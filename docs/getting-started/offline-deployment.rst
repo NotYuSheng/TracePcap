@@ -139,7 +139,7 @@ admin account has no default — ``KEYCLOAK_ADMIN`` and
 LLM Configuration for Offline Use
 ----------------------------------
 
-AI features (Story Mode, AI Filter Generator) require an OpenAI-compatible
+AI features (Story Mode and its chat) require an OpenAI-compatible
 inference server. The offline compose file defaults to:
 
 .. code-block:: ini
@@ -153,4 +153,4 @@ before starting. See :doc:`../configuration/llm-setup` for details.
 .. note::
 
    If no LLM server is available, TracePcap works fully without AI features —
-   only Story Mode and AI Filter Generator will be non-functional.
+   only Story Mode and its chat will be non-functional.

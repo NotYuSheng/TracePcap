@@ -436,6 +436,119 @@ public class LlmClient {
     checkReachable();
   }
 
+  // ── Multi-turn conversation with tools (the capture chat) ──────────────────────────────────
+
+  /** A tool the model asked to run, with the id its result must carry back. */
+  public record CallRequest(String id, String name, String argumentsJson) {}
+
+  /**
+   * One message of a tool-using conversation: system, user, assistant (with the calls it made, if
+   * any) or tool (one call's result).
+   */
+  public record Turn(String role, String content, List<CallRequest> calls, String toolCallId) {
+    public static Turn system(String content) {
+      return new Turn("system", content, null, null);
+    }
+
+    public static Turn user(String content) {
+      return new Turn("user", content, null, null);
+    }
+
+    public static Turn assistant(String content, List<CallRequest> calls) {
+      return new Turn("assistant", content, calls, null);
+    }
+
+    public static Turn tool(String toolCallId, String content) {
+      return new Turn("tool", content, null, toolCallId);
+    }
+  }
+
+  /**
+   * The model's reply: tools to run, or its answer. {@code toolsOffered} is false when the request
+   * went without tools (tool calling off, or the server doesn't support it), so the caller knows
+   * the answer came from the context alone.
+   */
+  public record Reply(String content, List<CallRequest> calls, boolean toolsOffered) {}
+
+  /**
+   * One step of a conversation the caller keeps: send every turn so far, get the next reply. Tools
+   * are offered with {@code tool_choice=auto}, so answering without one is a normal reply and says
+   * nothing about the server's support; only a server rejecting the tools field marks it unsupported.
+   */
+  public Reply converse(List<Turn> turns, List<LlmToolSpec> tools) {
+    String all = turns.stream().map(t -> t.content() == null ? "" : t.content()).reduce("", String::concat);
+    preflight("", all);
+    boolean offer = tools != null && !tools.isEmpty() && toolCallingEnabled();
+    if (offer) {
+      try {
+        Message m = post(conversation(turns, tools.stream().map(Tool::of).toList()), "", all);
+        List<CallRequest> calls = callsOf(m);
+        if (!calls.isEmpty()) toolCallingSupported = Boolean.TRUE;
+        return new Reply(m.getContent(), calls, true);
+      } catch (RuntimeException e) {
+        if (!isAutoToolCalling() || !looksLikeToolsUnsupported(e)) throw e;
+        log.warn("LLM server rejected tools in the chat ({}) — answering without them", e.getMessage());
+        toolCallingSupported = Boolean.FALSE;
+      }
+    }
+    // Without tools, tool turns from earlier steps can't be sent; keep only the plain messages.
+    List<Turn> plain = turns.stream().filter(t -> !"tool".equals(t.role()) && (t.calls() == null || t.calls().isEmpty())).toList();
+    return new Reply(requireContent(post(conversation(plain, null), "", all)), List.of(), false);
+  }
+
+  /** "on", "off", or for auto: "supported", "unsupported" or "unknown" (not tried yet). */
+  public String toolCallingStatus() {
+    String mode = toolCallingMode();
+    if (TOOL_CALLING_ON.equals(mode)) return "on";
+    if (TOOL_CALLING_OFF.equals(mode)) return "off";
+    if (toolCallingSupported == null) return "unknown";
+    return toolCallingSupported ? "supported" : "unsupported";
+  }
+
+  private ChatCompletionRequest conversation(List<Turn> turns, List<Tool> tools) {
+    List<Message> messages = new java.util.ArrayList<>();
+    for (Turn t : turns) {
+      Message m = new Message(t.role(), t.content());
+      if (t.calls() != null && !t.calls().isEmpty()) {
+        // Some servers require content on every message; an empty string satisfies them all.
+        if (m.getContent() == null) m.setContent("");
+        m.setToolCalls(t.calls().stream().map(c -> {
+          ToolCall w = new ToolCall();
+          w.setId(c.id());
+          w.setType("function");
+          FunctionCall f = new FunctionCall();
+          f.setName(c.name());
+          f.setArguments(c.argumentsJson());
+          w.setFunction(f);
+          return w;
+        }).toList());
+      }
+      m.setToolCallId(t.toolCallId());
+      messages.add(m);
+    }
+    return ChatCompletionRequest.builder()
+        .model(settings.model())
+        .messages(messages)
+        .temperature(settings.temperature())
+        .maxTokens(getEffectiveMaxTokens())
+        .tools(tools)
+        .toolChoice(tools == null ? null : "auto")
+        .build();
+  }
+
+  private static List<CallRequest> callsOf(Message message) {
+    if (message.getToolCalls() == null) return List.of();
+    List<CallRequest> out = new java.util.ArrayList<>();
+    int i = 0;
+    for (ToolCall c : message.getToolCalls()) {
+      if (c.getFunction() == null || c.getFunction().getName() == null) continue;
+      String id = c.getId() != null && !c.getId().isBlank() ? c.getId() : "call_" + (i++);
+      out.add(new CallRequest(id, c.getFunction().getName(),
+          c.getFunction().getArguments() != null ? c.getFunction().getArguments() : "{}"));
+    }
+    return out;
+  }
+
   private ChatCompletionRequest buildRequest(
       String systemPrompt, String userPrompt, List<Tool> tools, String toolChoice) {
     return ChatCompletionRequest.builder()
@@ -587,6 +700,9 @@ public class LlmClient {
 
     @JsonProperty("tool_calls")
     private List<ToolCall> toolCalls;
+
+    @JsonProperty("tool_call_id")
+    private String toolCallId;
 
     Message(String role, String content) {
       this.role = role;

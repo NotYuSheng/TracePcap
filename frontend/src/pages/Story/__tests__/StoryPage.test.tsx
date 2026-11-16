@@ -27,6 +27,7 @@ vi.mock('@components/story/StoryInfoCard', () => ({
   StoryPromptSettings: () => null,
 }));
 vi.mock('@components/story/StoryChat', () => ({ StoryChat: () => null }));
+vi.mock('@/features/detectionRules/useNetworkContext', () => ({ useNetworkContext: () => [null, () => {}] }));
 vi.mock('@components/story/AggregatesPanel', () => ({ AggregatesPanel: () => null }));
 vi.mock('@components/story/FindingsPanel', () => ({ FindingsPanel: () => null }));
 vi.mock('@components/story/InvestigationPanel', () => ({ InvestigationPanel: () => null }));

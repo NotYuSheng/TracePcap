@@ -16,13 +16,12 @@ header as you scroll:
    * - Conversations
      - Every conversation, with filters (see :doc:`conversations`).
    * - Story
-     - A written account of the capture (see :doc:`story-mode`).
+     - A written account of the capture (see :doc:`story-mode`), and the chat that answers
+       questions and writes Wireshark filters (see :doc:`capture-chat`).
    * - Network
      - The network graph: map, circular or hierarchical (see :doc:`network-visualization`).
    * - Files
      - Files carried in the traffic.
-   * - Filters
-     - Wireshark display filters from plain English.
    * - Capture
      - The capture file itself: details, re-analysis, versions.
 

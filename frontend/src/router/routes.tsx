@@ -6,7 +6,6 @@ import { AnalysisPage } from '@pages/Analysis';
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
 import { ConversationPage } from '@pages/Conversation';
 import { StoryPage } from '@pages/Story';
-import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
 import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { ComparePage } from '@pages/Compare/ComparePage';
@@ -55,8 +54,10 @@ export const router = createBrowserRouter([
             errorElement: <RouteErrorBoundary />,
           },
           {
+            // The Filter Generator is folded into Story's chat (#1161): it writes a filter and checks
+            // it on the capture. Old links land on Story.
             path: 'filter-generator',
-            element: <FilterGeneratorPage />,
+            element: <Navigate to="../story" replace />,
             errorElement: <RouteErrorBoundary />,
           },
           {
