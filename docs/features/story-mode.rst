@@ -147,11 +147,15 @@ questions and answers beside it:
 - **The story** follows: the summary, then *What happened* as a timeline of
   events (suspicious and critical ones marked with an amber or red edge), then
   the rest of the narrative (anomalies, the conclusion) under its own headings.
-- **Ask about this capture** stays open in a column on the right, with the
-  model's suggested questions; on a narrow screen it moves below the story.
+- **Ask about this capture** stays open in a column on the right, as tall as the
+  window allows: the conversation scrolls inside it, and the model's suggested
+  questions sit as chips just above the question box. On a narrow screen it moves
+  below the story.
 - **The evidence the story rests on** sits in tabs under it: *Findings*,
   *Traffic intelligence*, *LLM investigation* and *Traffic over time*, each shown
-  only when the story produced it.
+  only when the story produced it. *Findings* lists the most serious first, ten to
+  a page, with a search box (a host, a finding type, a word) and a chip per
+  severity.
 
 **Regenerate…** opens a dialog for writing the story again, with the optional
 additional context and, under *Advanced*, the prompt limits. **How it works**

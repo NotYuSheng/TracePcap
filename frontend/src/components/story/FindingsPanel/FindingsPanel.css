@@ -1,0 +1,17 @@
+/* Story's findings list: search and severity above, pages below. */
+.findings-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.findings-tools input[type='search'] {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+.findings-severity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
