@@ -29,7 +29,10 @@ A bar along the bottom of the graph, inside it, so it stays there in fullscreen:
   - from the keyboard (it's a slider): ← and → move the window, Shift moves it
     further, Home and End jump to the ends, Escape shows the whole capture.
 
-- **Play** slides the window from where it is to the end of the capture.
+- **Play** slides the window from where it is to the end of the capture. It plays only the
+  stretches with traffic: a gap over an hour and over a quarter of the capture (a capture
+  merged from two days years apart) is left out, so Play goes from one burst straight to the
+  next instead of crossing an empty map. Quiet minutes in an ordinary capture play as they are.
   **Pause** stops it.
 - The **readout** gives the window's times and how many conversations were
   active in it. **×** next to it shows the whole capture again.

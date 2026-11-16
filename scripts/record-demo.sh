@@ -10,6 +10,17 @@
 #
 # Usage: scripts/record-demo.sh [output.gif]
 #        DEMO_SPEC=hero scripts/record-demo.sh sample-files/TracePcap-Hero.gif   (the short hero)
+#
+# The README walkthrough (2026-11-16) is the STRRAT incident from docs/demos/strrat-you-dirty-rat.rst,
+# which isn't committed (real malware traffic). Download it as that page says, convert it to pcapng
+# (a new hash, so it doesn't clash with an existing upload), then:
+#   DEMO_CAPTURE=/path/strrat-you-dirty-rat.pcapng \
+#   DEMO_QUESTION="Which host is the victim, and what is it talking to? Give me a Wireshark filter for the C2 traffic." \
+#   E2E_BASE_URL=http://localhost DEMO_WIDTH=960 DEMO_FPS=6 DEMO_COLORS=128 DEMO_LOSSY=80 \
+#   scripts/record-demo.sh sample-files/TracePcap-Demo.gif
+# The story's wait was then re-encoded at 120x (edit its span's speed in
+# frontend/test-results/demo-timeline.json) with DEMO_ENCODE_ONLY=1, which re-encodes the last
+# recording without recording again. 960px, 100s, 7.8 MB.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -72,14 +83,22 @@ if [ "${NETWORK_COUNT:-0}" -gt 1 ]; then
   echo "         (this destroys all uploaded pcaps and monitor data)" >&2
 fi
 
-echo "==> Recording walkthrough (Playwright)"
-# Clear stale videos so the newest-file pick below can't grab a previous run's.
-rm -rf "$VIDEO_DIR"
-# DEMO_SPEC=hero records the short network-diagram GIF instead of the full walkthrough.
-if [ "${DEMO_SPEC:-demo}" = "hero" ]; then
-  (cd "$REPO_ROOT/frontend" && npm run demo:hero)
+if [ "${DEMO_ENCODE_ONLY:-0}" = "1" ]; then
+  # Re-encode the last recording (and its timeline) without recording again.
+  echo "==> Encoding the existing recording under $VIDEO_DIR"
 else
-  (cd "$REPO_ROOT/frontend" && npm run demo:record)
+  # A recording runs a video-recording browser while the stack analyses a capture: it needs headroom.
+  "$REPO_ROOT/scripts/mem-guard.sh" "the demo recording" 5
+
+  echo "==> Recording walkthrough (Playwright)"
+  # Clear stale videos so the newest-file pick below can't grab a previous run's.
+  rm -rf "$VIDEO_DIR"
+  # DEMO_SPEC=hero records the short network-diagram GIF instead of the full walkthrough.
+  if [ "${DEMO_SPEC:-demo}" = "hero" ]; then
+    (cd "$REPO_ROOT/frontend" && npm run demo:hero)
+  else
+    (cd "$REPO_ROOT/frontend" && npm run demo:record)
+  fi
 fi
 
 WEBM="$(find "$VIDEO_DIR" -name '*.webm' -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)"
@@ -104,7 +123,20 @@ if [ -n "$FF_FILTER" ]; then
       console.log(`      ${s.label}: ${(s.end-s.start).toFixed(1)}s at ${s.speed}x`);
     }
   ' "$TIMELINE"
-  ffmpeg -v error -y -i "$WEBM" -filter_complex "$FF_FILTER" -map "[ff]" "$TRIMMED"
+  # One segment at a time, each from a seek: a single filter graph with one trim per segment makes
+  # ffmpeg queue the later segments' decoded frames in memory (a 9-minute recording filled a 15 GB
+  # machine). Each part is encoded on its own, then the parts are joined without re-encoding.
+  PARTS_DIR="$(mktemp -d)"
+  trap 'rm -rf "$PALETTE" "$TRIMMED" "$PARTS_DIR"' EXIT
+  i=0
+  while read -r from to speed; do
+    part="$PARTS_DIR/part$(printf %03d $i).mp4"
+    ffmpeg -nostdin -v error -y -ss "$from" -to "$to" -i "$WEBM" -an \
+      -vf "setpts=(PTS-STARTPTS)/${speed}" -r 25 -c:v libx264 -preset veryfast -crf 18 "$part"
+    echo "file '$part'" >> "$PARTS_DIR/list.txt"
+    i=$((i + 1))
+  done < <(node "$REPO_ROOT/scripts/build-ff-filter.mjs" "$TIMELINE" "$DURATION" --parts)
+  ffmpeg -v error -y -f concat -safe 0 -i "$PARTS_DIR/list.txt" -c copy "$TRIMMED"
   SOURCE="$TRIMMED"
   echo "==> Runtime ${DURATION}s -> $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$SOURCE")s"
 else

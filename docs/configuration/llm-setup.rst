@@ -1,7 +1,7 @@
 LLM Setup
 =========
 
-TracePcap's AI features (Story Mode and AI Filter Generator) require an
+TracePcap's AI features (Story Mode and its chat, which also writes filters) require an
 OpenAI-compatible inference server. Any server that implements the
 ``/v1/chat/completions`` endpoint works.
 
@@ -67,14 +67,15 @@ never shown again once saved, and the audit log records only that it changed.
 Testing the Connection
 -----------------------
 
-**Settings › System › LLM › Test connection** checks the connection in four steps,
-and says which one fails:
+**Settings › System › LLM › Test connection** checks the connection step by step,
+and says which one fails, or warns:
 
 1. **Reach the server**: ``LLM_API_BASE_URL/models`` answers, and how fast.
 2. **Key accepted**: the server doesn't refuse the key (401 or 403).
-3. **Model available**: the model is among the server's models. The server's models
-   are listed, and clicking one makes it the model.
-4. **Model replies**: a one-token chat completion comes back.
+3. **Model available**: the model is among the server's models, and can chat. The
+   server's models are listed, and clicking one makes it the model.
+4. **Model replies**: a short chat completion comes back, from that model.
+5. **Takes tools** (when the server says): whether the chat can look things up.
 
 Anyone can test what's in effect. When changing the URL, key or model, **Test this
 value** tests the typed value before saving it (that needs the permission, since it
@@ -85,6 +86,43 @@ sends requests to the typed address). If a step fails, check:
    network (use the host's LAN IP, not ``localhost``, if the LLM runs on the
    same machine but outside Docker).
 3. The model name in ``LLM_MODEL`` matches a loaded model on the server.
+
+Model Types
+-----------
+
+TracePcap needs a model that chats. What it does with the other kinds:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Model
+     - What happens
+   * - **Chat** (instruct)
+     - Works. Story, the chat and its tools.
+   * - **Vision** (VLM)
+     - Works; it chats too. The test says it's a vision model.
+   * - **Reasoning** (thinks before it answers: DeepSeek-R1, Qwen3 thinking, …)
+     - Works. Its thinking is dropped before the answer is read, whether the server sends
+       it apart or inline as ``<think>…</think>``. The test says it's a reasoning model:
+       give it ``LLM_MAX_TOKENS`` of 24000 or more and a long ``LLM_TIMEOUT``, or it can
+       spend the whole reply thinking. If it does, the error says so and what to raise.
+   * - **Embedding** (``text-embedding-…``, ``bge-…``)
+     - Refused, with a clear message: it turns text into numbers for search and can't
+       write answers. The test stops at *Model available*; Story and the chat fail at
+       once, before calling the server.
+   * - **No tool support**
+     - Works; the chat answers from the findings and the story, and says it answered
+       without tools. Servers that say which models take tools (LM Studio) let TracePcap
+       skip offering them; others are found out on the first question.
+
+TracePcap learns a model's kind from LM Studio's ``/api/v0/models`` when the server is
+LM Studio, and otherwise from its name.
+
+**Another model answering.** Some servers answer with whatever model they have loaded,
+whatever name the request gives. The test then warns *Replied, but as …*, the chat notes
+*Answered by …, not …* under the answer, and a story records the model that actually
+wrote it. Load the configured model on the server, or set the model to the loaded one.
 
 .. note::
 

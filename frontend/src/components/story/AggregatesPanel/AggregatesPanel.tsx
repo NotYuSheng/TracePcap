@@ -1,17 +1,16 @@
+import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState } from 'react';
-import { Badge, Button, Card, Form, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import type { StoryAggregates, AsnEntry, ProtocolRiskEntry, BeaconCandidate } from '@/types';
 
 // A row per protocol, so a capture with many unknown ethertypes can produce hundreds of rows.
 const PROTOCOL_RISK_PAGE_SIZE = 10;
 
-function InfoPopover() {
+function AggregatesInfo() {
   const popover = (
-    <Popover id="info-aggregates" style={{ maxWidth: '340px' }}>
-      <Popover.Header>Traffic Intelligence — How it works</Popover.Header>
-      <Popover.Body className="small">
+    <InfoPopover id="info-aggregates" kind="How it works" title="Traffic Intelligence" source="every conversation" docs="features/story-mode" docsAnchor="aggregates-panel">
         <p className="mb-2">
           These figures are computed deterministically from <strong>all conversations</strong> in
           the dataset — not just the LLM evidence sample — so they accurately reflect the full
@@ -32,8 +31,7 @@ function InfoPopover() {
           <strong>ASN / geo data</strong> is enriched via an external API at analysis time and may
           not reflect recent IP reassignments.
         </p>
-      </Popover.Body>
-    </Popover>
+      </InfoPopover>
   );
   return (
     <EscapableOverlayTrigger trigger="click" placement="left" overlay={popover}>
@@ -321,7 +319,7 @@ export const AggregatesPanel = ({ aggregates }: Props) => {
         <i className="bi bi-bar-chart-line text-primary" />
         <h6 className="mb-0 d-flex align-items-center">
           Traffic Intelligence — Full Dataset
-          <InfoPopover />
+          <AggregatesInfo />
         </h6>
         {(hasBeacons || hasTlsAnomalies) && (
           <Badge bg="danger" className="ms-auto">Findings</Badge>

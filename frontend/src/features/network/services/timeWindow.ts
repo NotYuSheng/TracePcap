@@ -100,3 +100,51 @@ export function unseenByWindowEnd(edges: GraphEdge[], w: TimeWindow): Set<string
   for (const n of all) if (!seen.has(n)) out.add(n);
   return out;
 }
+
+/** A gap is left out of playing only when it is this share of the capture and at least an hour. */
+const GAP_SHARE = 0.25;
+const GAP_MIN_MS = 3_600_000;
+
+/**
+ * The stretches of a capture that have traffic, with long idle gaps left out: a capture merged
+ * from two days six years apart has two. Playing walks these back to back, so it plays the bursts
+ * instead of years of empty map. A gap counts only when it is over a quarter of the capture and
+ * over an hour, so an ordinary capture's quiet minutes play as they are.
+ */
+export function activeSegments(edges: GraphEdge[], bounds: TimeWindow): TimeWindow[] {
+  const spans: TimeWindow[] = [];
+  for (const e of edges) {
+    const s = startOf(e);
+    if (s == null || !Number.isFinite(s) || s <= 0) continue;
+    const t = endOf(e);
+    spans.push({ from: s, to: t != null && Number.isFinite(t) ? Math.max(t, s) : s });
+  }
+  if (spans.length === 0) return [bounds];
+  spans.sort((a, b) => a.from - b.from);
+  const gap = Math.max(GAP_MIN_MS, (bounds.to - bounds.from) * GAP_SHARE);
+  const out: TimeWindow[] = [{ ...spans[0] }];
+  for (const sp of spans.slice(1)) {
+    const last = out[out.length - 1];
+    if (sp.from - last.to <= gap) last.to = Math.max(last.to, sp.to);
+    else out.push({ ...sp });
+  }
+  return out;
+}
+
+/**
+ * The real window for a position on the played (active) time: `at` and `width` are measured along
+ * the segments laid end to end. The window stays inside one segment, so it never shows a gap.
+ */
+export function playWindow(segments: TimeWindow[], at: number, width: number): TimeWindow {
+  let offset = 0;
+  for (const seg of segments) {
+    const len = Math.max(1, seg.to - seg.from);
+    if (at < offset + len) {
+      const from = seg.from + (at - offset);
+      return { from, to: Math.min(seg.to, from + width) };
+    }
+    offset += len;
+  }
+  const last = segments[segments.length - 1];
+  return { from: Math.max(last.from, last.to - width), to: last.to };
+}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Popover } from '@govtechsg/sgds-react';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import type { GraphEdge } from '../types';
-import { bytesHistogram, clampWindow, type TimeWindow } from '../services/timeWindow';
+import { activeSegments, bytesHistogram, clampWindow, playWindow, type TimeWindow } from '../services/timeWindow';
 import { formatSpan } from '@/utils/formatters';
 import { PlayByControl, type AxisMode } from './PlayByControl';
 import './TimeScrubber.css';
@@ -79,27 +79,35 @@ export function TimeScrubber({
   const chartRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
 
+  // Playing walks only the stretches with traffic, back to back, so idle gaps don't play.
+  const segments = useMemo(() => activeSegments(edges, bounds), [edges, bounds]);
+  const played = Math.max(1, segments.reduce((n, s) => n + Math.max(1, s.to - s.from), 0));
+  const atRef = useRef(0);
   const winRef = useRef(win);
   winRef.current = win;
   const onChangeRef = useRef(onWindowChange);
   onChangeRef.current = onWindowChange;
 
-  // Playback: slide the window along from the last tick's window; stop at the end.
+  // Playback: slide the window along the active time from the last tick; stop at the end. With
+  // one segment (no long gaps) this is the plain capture time, as before.
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
-      const step = (span / ((PLAY_SECONDS_AT_1X * 1000) / TICK_MS)) * speed;
-      const cur = winRef.current ?? clampWindow(bounds.from, span * widthShare, bounds);
-      if (cur.to >= bounds.to) {
+      const step = (played / ((PLAY_SECONDS_AT_1X * 1000) / TICK_MS)) * speed;
+      const width = Math.max(1, played * widthShare);
+      if (atRef.current + width >= played) {
         setPlaying(false);
         return;
       }
-      const next = clampWindow(cur.from + step, cur.to - cur.from, bounds);
+      atRef.current = Math.min(atRef.current + step, played - width);
+      const next = segments.length > 1
+        ? playWindow(segments, atRef.current, width)
+        : clampWindow(bounds.from + atRef.current, width, bounds);
       winRef.current = next;
       onChangeRef.current(next);
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [playing, speed, span, widthShare, bounds]);
+  }, [playing, speed, played, widthShare, bounds, segments]);
 
   const set = (w: TimeWindow | null) => {
     winRef.current = w;
@@ -107,7 +115,11 @@ export function TimeScrubber({
   };
 
   const play = () => {
-    if (!win || win.to >= bounds.to) set(clampWindow(bounds.from, span * widthShare, bounds));
+    const width = Math.max(1, played * widthShare);
+    if (!win || win.to >= bounds.to || atRef.current + width >= played) {
+      atRef.current = 0;
+      set(segments.length > 1 ? playWindow(segments, 0, width) : clampWindow(bounds.from, width, bounds));
+    }
     setPlaying(true);
   };
 

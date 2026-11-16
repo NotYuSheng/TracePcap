@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
@@ -32,8 +33,12 @@ const written = (ms: number) =>
  * narrative told as a timeline, Q&A open beside it, and the evidence the story rests on in tabs
  * underneath. Settings live in the Regenerate dialog rather than on the page.
  */
+/** Where the chat column sticks: just under the top bar (matches .story-aside's top). */
+const STICKY_TOP = 96;
+
 export const StoryPage = () => {
   const { fileId, storyState } = useOutletContext<AnalysisOutletContext>();
+  const [networkContext] = useNetworkContext();
   const {
     story, generating, error,
     contextError, setContextError,
@@ -57,6 +62,34 @@ export const StoryPage = () => {
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab | null>(null);
+
+  // The chat column fills the visible part of the story grid: from the grid's top (or the sticky
+  // line under the header, once scrolled past it) to the window's bottom (or the grid's end, near
+  // the footer). Both move while the page scrolls, so it is measured rather than set in CSS.
+  const asideRef = useRef<HTMLElement>(null);
+  const hasStory = !!story;
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const grid = (el.parentElement ?? el).getBoundingClientRect();
+        const start = Math.max(grid.top, STICKY_TOP);
+        const end = Math.min(window.innerHeight - 16, grid.bottom);
+        el.style.setProperty('--story-chat-h', `${Math.max(360, end - start)}px`);
+      });
+    };
+    fit();
+    window.addEventListener('scroll', fit, { passive: true });
+    window.addEventListener('resize', fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', fit);
+      window.removeEventListener('resize', fit);
+    };
+  }, [hasStory]);
 
   // The investigation as reported — every goal with its outcome — so a conclusion reached by
   // following a lead (a beacon classified as a C2 with no IDS rule) shows on its card too.
@@ -214,8 +247,21 @@ export const StoryPage = () => {
     );
   }
 
+  // The chat is there before a story is: it answers from the findings and its tools (#1161).
+  const chat = (
+    <aside className="story-aside" ref={asideRef}>
+      <StoryChat
+        fileId={fileId}
+        networkId={networkContext}
+        suggestedQuestions={story?.suggestedQuestions}
+        hasStory={!!story}
+      />
+    </aside>
+  );
+
   if (!story) {
     return (
+      <div className="story-grid">
       <div className="story-start">
         {background?.status === 'FAILED' && (
           <Alert variant="warning" className="mb-3">
@@ -242,6 +288,8 @@ export const StoryPage = () => {
           </Card.Body>
         </Card>
         {howItWorks}
+      </div>
+      {chat}
       </div>
     );
   }
@@ -316,9 +364,7 @@ export const StoryPage = () => {
           )}
         </div>
 
-        <aside className="story-aside">
-          <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} variant="panel" />
-        </aside>
+        {chat}
       </div>
 
       <Modal show={showRegenerate} onHide={() => setShowRegenerate(false)} size="lg" scrollable>

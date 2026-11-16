@@ -57,7 +57,7 @@ Key Endpoint Groups
   :doc:`features/ids-threat-detection`).
 - **Signatures** — read and update the custom signature rule set.
 - **Story** — generate and retrieve AI narrative summaries.
-- **Filters** — generate Wireshark/tcpdump filters from natural language.
+- **Capture chat** — ask about a capture; the LLM looks things up with read-only tools, and checks Wireshark filters (`/chat-tools`, `/files/{fileId}/chat-turns`).
 - **Monitor** — networks, snapshots, change events, baselines, subnets, node
   roles, and insights (see :doc:`features/network-monitor`).
 - **Health** — liveness and readiness probes.

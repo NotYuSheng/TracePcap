@@ -131,7 +131,6 @@ const RAIL_ITEMS: RailItem[] = [
     short: 'Files',
     icon: 'bi-file-earmark-arrow-down',
   },
-  { key: 'filter-generator', label: 'Filter Generator', short: 'Filters', icon: 'bi-funnel' },
   {
     key: 'file',
     label: 'Capture, rules and report',
@@ -363,7 +362,6 @@ export const AnalysisPage = () => {
     const path = location.pathname;
     if (path.includes('/conversations')) setActiveTab('conversations');
     else if (path.includes('/story')) setActiveTab('story');
-    else if (path.includes('/filter-generator')) setActiveTab('filter-generator');
     else if (path.includes('/network-diagram')) setActiveTab('network-diagram');
     else if (path.includes('/extracted-files')) setActiveTab('extracted-files');
     else if (path.endsWith('/file')) setActiveTab('file');

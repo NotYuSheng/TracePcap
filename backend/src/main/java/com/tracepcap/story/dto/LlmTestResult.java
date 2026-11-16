@@ -8,7 +8,7 @@ import lombok.Value;
 @Value
 @Builder
 public class LlmTestResult {
-  /** Every step passed. */
+  /** Nothing failed (warnings allowed). */
   boolean ok;
 
   List<Step> steps;
@@ -19,13 +19,13 @@ public class LlmTestResult {
 
   String model;
 
-  /** One check: reach, key, model or reply. */
+  /** One check: reach, key, model, reply, and tools when the server says. */
   @Value
   @Builder
   public static class Step {
     String key;
     String label;
-    /** OK, FAIL or SKIPPED (an earlier step failed). */
+    /** OK, WARN (works, but not as set: another model answered, no tools), FAIL or SKIPPED. */
     String status;
     /** What happened, in words the person can act on. */
     String detail;

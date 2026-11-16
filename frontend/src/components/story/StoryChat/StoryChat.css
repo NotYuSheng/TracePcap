@@ -1,0 +1,178 @@
+/* The capture chat's messages, tool steps, filter cards and tools list (#1161). Panel sizing is in
+   StoryPage.css. */
+.story-chat-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.chat-msg {
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.chat-msg-user {
+  margin-left: auto;
+  max-width: 85%;
+  width: fit-content;
+  background: var(--sgds-primary, #5925dc);
+  color: #fff;
+  border-radius: 12px;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+}
+
+.chat-msg-ai {
+  max-width: 96%;
+  background: var(--tp-surface-muted, #f6f7f9);
+  border: 1px solid var(--tp-border, #e4e7ec);
+  border-radius: 12px;
+  padding: 9px 12px;
+}
+
+.chat-msg-text {
+  white-space: pre-wrap;
+}
+
+.chat-msg-note {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+.chat-steps {
+  margin-bottom: 8px;
+}
+
+.chat-steps-toggle {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+.chat-steps-toggle:disabled {
+  cursor: default;
+}
+
+.chat-steps-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 2px 10px;
+  background: var(--tp-surface, #fff);
+  border: 1px solid var(--tp-border, #eef0f3);
+  border-radius: 8px;
+}
+
+.chat-step {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.78rem;
+  border-top: 1px dashed var(--tp-border, #e4e7ec);
+}
+
+.chat-step:first-child {
+  border-top: 0;
+}
+
+.chat-step-mark {
+  width: 14px;
+  flex: none;
+  text-align: center;
+}
+
+.chat-step.is-done .chat-step-mark {
+  color: #15803d;
+}
+
+.chat-step.is-failed .chat-step-mark {
+  color: #b42318;
+}
+
+.chat-step-args {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  word-break: break-word;
+}
+
+.chat-filter {
+  margin: 8px 0 2px;
+  border: 1px solid #ddd6fe;
+  background: color-mix(in srgb, var(--sgds-primary, #5925dc) 5%, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.chat-filter-expr {
+  font-size: 0.78rem;
+  color: #3b1891;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-filter-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chat-filter-foot > :first-child {
+  flex: 1;
+}
+
+.chat-tools-popover {
+  max-width: 340px;
+}
+
+/* Taller than the screen otherwise: the list scrolls inside the popover. */
+.chat-tools-popover .popover-body {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+
+.chat-packets-table th,
+.chat-packets-table td {
+  white-space: nowrap;
+}
+
+.chat-tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-tools-list li {
+  padding: 6px 0;
+  border-top: 1px solid var(--tp-border, #eef0f3);
+}
+
+.chat-tools-list li:first-child {
+  border-top: 0;
+}
+
+.chat-tools-example {
+  font-size: 0.75rem;
+}
+
+.chat-tools-button {
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .chat-filter-expr {
+  color: #c4b5fd;
+}
+
+.chat-msg-text code {
+  font-size: 0.78rem;
+  background: color-mix(in srgb, var(--sgds-primary, #5925dc) 9%, transparent);
+  color: inherit;
+  padding: 1px 4px;
+  border-radius: 4px;
+  word-break: break-word;
+}

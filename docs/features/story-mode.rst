@@ -147,11 +147,15 @@ questions and answers beside it:
 - **The story** follows: the summary, then *What happened* as a timeline of
   events (suspicious and critical ones marked with an amber or red edge), then
   the rest of the narrative (anomalies, the conclusion) under its own headings.
-- **Ask about this capture** stays open in a column on the right, with the
-  model's suggested questions; on a narrow screen it moves below the story.
+- **Ask about this capture** stays open in a column on the right, as tall as the
+  window allows: the conversation scrolls inside it, and the model's suggested
+  questions sit as chips just above the question box. On a narrow screen it moves
+  below the story.
 - **The evidence the story rests on** sits in tabs under it: *Findings*,
   *Traffic intelligence*, *LLM investigation* and *Traffic over time*, each shown
-  only when the story produced it.
+  only when the story produced it. *Findings* lists the most serious first, ten to
+  a page, with a search box (a host, a finding type, a word) and a chip per
+  severity.
 
 **Regenerate…** opens a dialog for writing the story again, with the optional
 additional context and, under *Advanced*, the prompt limits. **How it works**
@@ -321,13 +325,12 @@ The ⓘ icon in the panel header reveals important caveats:
   reflect recent IP address reassignments.
 
 Interactive LLM Q&A Chat
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-After the narrative is generated, the **Ask about this capture** panel beside
-the story allows follow-up questions about the PCAP. The LLM answers using the full story JSON **and** the
-Investigation Summary's deterministic answers as context — the answers are the
-authoritative ground truth it must prefer and must not contradict — and returns 3
-suggested follow-up questions with each answer.
+The **Ask about this capture** panel beside the story answers follow-up questions, looking things
+up with read-only tools (findings, conversations, hosts, address history, DNS lookups, traffic
+destinations and over time) and writing Wireshark filters it has checked on the capture. It is
+there before the story is written, too. See :doc:`capture-chat`.
 
 Investigation Panel
 ~~~~~~~~~~~~~~~~~~~

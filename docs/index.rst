@@ -51,7 +51,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/mac-lookup
    features/windows-identity
    features/timeline-analysis
-   features/ai-filter-generator
+   features/capture-chat
    features/story-mode
    features/custom-signatures
    features/report-export

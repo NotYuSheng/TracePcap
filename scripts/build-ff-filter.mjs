@@ -42,6 +42,14 @@ for (const span of sorted) {
 }
 if (duration > cursor + 0.05) parts.push({ from: cursor, to: duration, speed: 1 });
 
+// --parts: one "from to speed" line per segment, for cutting them one at a time (the filter below
+// decodes once into N trims, and ffmpeg then queues every later segment's frames in memory: on a
+// 9-minute recording that filled a 15 GB machine, 2026-11-16).
+if (process.argv.includes('--parts')) {
+  for (const p of parts) process.stdout.write(`${p.from.toFixed(3)} ${p.to.toFixed(3)} ${p.speed}\n`);
+  process.exit(0);
+}
+
 const chains = parts.map((p, i) => {
   const pts = p.speed === 1 ? 'PTS-STARTPTS' : `(PTS-STARTPTS)/${p.speed}`;
   return `[0:v]trim=${p.from.toFixed(3)}:${p.to.toFixed(3)},setpts=${pts}[s${i}]`;

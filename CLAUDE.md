@@ -15,6 +15,7 @@ Only build a custom component if SGDS has no equivalent.
 - Keep the copy inside these modals task-oriented: say what the thing is and how to act on it (e.g. "click a badge to inspect it and add evidence").
 - **Escape must close exactly one popup — the topmost one.** SGDS `Modal`s get this for free, so always wire `onHide` (leave it unwired only to deliberately block dismissal, e.g. mid-upload). Any popup that is *not* an SGDS `Modal` — an overlay panel, a portalled popover, a CSS-fullscreen mode — must call `useEscapeLayer(onClose, { ref })` from `@utils/useEscapeLayer` instead of installing its own `keydown` listener; the shared stack is what keeps one press from closing two layers.
 - **Click-toggled info/help popovers** use `EscapableOverlayTrigger` from `@components/common/EscapableOverlayTrigger` — same props as SGDS `OverlayTrigger`, but it owns `show` and joins the Escape stack. Never `OverlayTrigger … rootClose`: inside a `Modal`, one Escape closes both. Give the `Popover` an `id` (it locates the layer by it).
+- **The popover itself is `InfoPopover`** from `@components/common/InfoPopover`: a small `kind` label ("How it works", "How it's measured"), a `title`, the note, and a footer with its `source` and a `docs` page link. Every SGDS popover already gets the card style (rounded, shadow, no grey title bar) from `sgds-overrides.css`; use `InfoPopover` for any explainer so they all read the same.
 
 ## Branching
 
@@ -35,6 +36,7 @@ Only build a custom component if SGDS has no equivalent.
 - **Storage**: MinIO
 - **Build**: Docker Compose — run `docker compose build` to build, `docker compose up -d` to start
 - **After every change**: run `scripts/rebuild.sh` to rebuild and restart all services. It builds one image at a time; `docker compose up -d --build` builds them in parallel and, next to a running stack and a `mvn verify`, has frozen this 15 GB machine. Never run it alongside `mvn verify` or the frontend test suite.
+- **Before any heavy job** (image builds, `mvn verify`/test runs, the full frontend suite, Playwright recordings) run `scripts/mem-guard.sh "<job>"`: it refuses when under 4 GB is available or swap is over 40% used. `rebuild.sh` and `record-demo.sh` call it themselves. On 2026-11-16 a recording started with swap 59% full froze this machine (disk thrash, hard reset). Run heavy jobs one at a time; locally vitest uses at most 3 workers.
 
 ## API Conventions
 

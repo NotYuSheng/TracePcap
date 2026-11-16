@@ -465,6 +465,135 @@
         },
         "type": "object"
       },
+      "ChatStepDto": {
+        "properties": {
+          "arguments": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "ms": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChatToolDto": {
+        "properties": {
+          "example": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChatToolsResponse": {
+        "properties": {
+          "toolCalling": {
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ChatToolDto"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ChatTurnDto": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "elapsedMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterDto"
+            },
+            "type": "array"
+          },
+          "followUpQuestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "modelNote": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ChatStepDto"
+            },
+            "type": "array"
+          },
+          "toolsOffered": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ChatTurnRequest": {
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "maxItems": 40,
+            "minItems": 0,
+            "type": "array"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 4000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "type": "object"
+      },
       "Chunk": {
         "properties": {
           "binary": {
@@ -2007,6 +2136,18 @@
           "uploadedAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FilterDto": {
+        "properties": {
+          "expression": {
+            "type": "string"
+          },
+          "matches": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -5819,6 +5960,28 @@
         ]
       }
     },
+    "/api/v1/chat-tools": {
+      "get": {
+        "description": "Each tool with its label, what it looks up and an example question, and whether the configured LLM takes tools.",
+        "operationId": "tools",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatToolsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "What the capture chat can look up",
+        "tags": [
+          "Capture chat"
+        ]
+      }
+    },
     "/api/v1/clusters/{fileId}/dns-servers": {
       "get": {
         "description": "Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).",
@@ -8667,6 +8830,91 @@
         "summary": "Deterministic answers to the standard investigation questions for a file",
         "tags": [
           "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/chat-turns": {
+      "post": {
+        "description": "Starts answering and returns at once with the turn RUNNING. Poll the turn: its steps grow as tools run, and it ends DONE with the answer or FAILED with the error.",
+        "operationId": "ask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatTurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatTurnDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Ask a question about a capture",
+        "tags": [
+          "Capture chat"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/chat-turns/{turnId}": {
+      "get": {
+        "description": "The tool steps so far, and the answer, follow-up questions and checked filters once done. Turns are kept for 30 minutes.",
+        "operationId": "turn",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turnId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatTurnDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One question's progress or answer",
+        "tags": [
+          "Capture chat"
         ]
       }
     },
@@ -13570,6 +13818,10 @@
     {
       "description": "APIs for AI-powered network traffic story generation",
       "name": "Story Generation"
+    },
+    {
+      "description": "Ask about a capture; the LLM may call read-only tools to look things up",
+      "name": "Capture chat"
     },
     {
       "description": "APIs for PCAP file upload, download, and management",

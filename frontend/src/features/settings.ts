@@ -32,7 +32,7 @@ export interface SystemSetting {
 export interface LlmTestStep {
   key: 'reach' | 'key' | 'model' | 'reply';
   label: string;
-  status: 'OK' | 'FAIL' | 'SKIPPED';
+  status: 'OK' | 'WARN' | 'FAIL' | 'SKIPPED';
   detail: string;
   ms?: number | null;
 }

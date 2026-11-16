@@ -136,16 +136,17 @@ docker compose up -d
 
 ## Walkthrough
 
-The full tour: upload, conversations, story mode, the network map, filters, and a
-monitored network changing over eight weeks.
+The full tour, on a real incident (a STRRAT remote-access trojan on a corporate LAN, from
+malware-traffic-analysis.net's training exercises): upload, the Overview, the flagged
+conversations, the network map played back and one host's card, the story's four answers
+(victim, user, malware, C2), the chat finding the victim and writing a checked filter for the
+C2 traffic, the report drawer, and a monitored network changing over eight weeks.
 
 <div align="center">
 
 ![TracePcap walkthrough](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
 
 </div>
-
-> This walkthrough was recorded before the current design and is due to be re-recorded.
 
 ## Usage
 

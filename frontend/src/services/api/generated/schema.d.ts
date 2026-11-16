@@ -75,6 +75,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat-tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the capture chat can look up
+         * @description Each tool with its label, what it looks up and an example question, and whether the configured LLM takes tools.
+         */
+        get: operations["tools"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{fileId}/dns-servers": {
         parameters: {
             query?: never;
@@ -867,6 +887,46 @@ export interface paths {
         };
         /** Deterministic answers to the standard investigation questions for a file */
         get: operations["getAnswers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/chat-turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask a question about a capture
+         * @description Starts answering and returns at once with the turn RUNNING. Poll the turn: its steps grow as tools run, and it ends DONE with the answer or FAILED with the error.
+         */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/chat-turns/{turnId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One question's progress or answer
+         * @description The tool steps so far, and the answer, follow-up questions and checked filters once done. Turns are kept for 30 minutes.
+         */
+        get: operations["turn"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2921,6 +2981,46 @@ export interface components {
             /** Format: uuid */
             toSnapshotId?: string;
         };
+        ChatStepDto: {
+            arguments?: string;
+            label?: string;
+            /** Format: int64 */
+            ms?: number;
+            status?: string;
+            summary?: string;
+            tool?: string;
+        };
+        ChatToolDto: {
+            example?: string;
+            label?: string;
+            name?: string;
+            summary?: string;
+        };
+        ChatToolsResponse: {
+            toolCalling?: string;
+            tools?: components["schemas"]["ChatToolDto"][];
+        };
+        ChatTurnDto: {
+            answer?: string;
+            /** Format: int64 */
+            elapsedMs?: number;
+            error?: string;
+            errorCode?: string;
+            filters?: components["schemas"]["FilterDto"][];
+            followUpQuestions?: string[];
+            /** Format: uuid */
+            id?: string;
+            modelNote?: string;
+            status?: string;
+            steps?: components["schemas"]["ChatStepDto"][];
+            toolsOffered?: boolean;
+        };
+        ChatTurnRequest: {
+            history?: components["schemas"]["HistoryEntry"][];
+            /** Format: uuid */
+            networkId?: string;
+            question: string;
+        };
         Chunk: {
             binary?: boolean;
             /** Format: int64 */
@@ -3484,6 +3584,11 @@ export interface components {
             storageLocation?: string;
             /** Format: date-time */
             uploadedAt?: string;
+        };
+        FilterDto: {
+            expression?: string;
+            /** Format: int32 */
+            matches?: number;
         };
         FilterExecutionRequest: {
             filter: string;
@@ -4865,6 +4970,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PagedResponseAuditLogDto"];
+                };
+            };
+        };
+    };
+    tools: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ChatToolsResponse"];
                 };
             };
         };
@@ -6272,6 +6397,55 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnswerResponse"][];
+                };
+            };
+        };
+    };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatTurnRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ChatTurnDto"];
+                };
+            };
+        };
+    };
+    turn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ChatTurnDto"];
                 };
             };
         };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphEdge } from '../../types'
-import { activeInWindow, bytesHistogram, clampWindow, timeBounds, unseenByWindowEnd } from '../timeWindow'
+import { activeInWindow, bytesHistogram, clampWindow, timeBounds, unseenByWindowEnd, activeSegments, playWindow } from '../timeWindow'
 
 function edge(id: string, src: string, dst: string, start?: number, end?: number, bytes = 100): GraphEdge {
   return { id, source: src, target: dst, label: '', data: { protocol: 'TCP', packetCount: 1, totalBytes: bytes, conversationId: id, bidirectional: true, startTime: start, endTime: end } } as GraphEdge
@@ -53,3 +53,35 @@ describe('unseenByWindowEnd', () => {
     expect([...unseen].sort()).toEqual(['c2', 'phone'])
   })
 })
+
+describe('playing a capture with long idle gaps', () => {
+  // Two bursts six years apart, as in a capture merged from two days.
+  const YEAR = 365 * 86_400_000;
+  const edges = [
+    edge('a', 'x', 'y', 1_000, 2_000),
+    edge('b', 'x', 'z', 3_000, 9_000),
+    edge('c', 'x', 'w', 6 * YEAR, 6 * YEAR + 5_000),
+  ];
+  const bounds = { from: 1_000, to: 6 * YEAR + 5_000 };
+
+  it('finds the two bursts and leaves the gap out', () => {
+    expect(activeSegments(edges, bounds)).toEqual([
+      { from: 1_000, to: 9_000 },
+      { from: 6 * YEAR, to: 6 * YEAR + 5_000 },
+    ]);
+  });
+
+  it('keeps a capture with only short or relatively small gaps as one stretch', () => {
+    // 10-minute lulls in a 30-minute capture: under an hour, so they play as they are.
+    const lulls = [0, 1, 2, 3].map(i => edge(`l${i}`, 'x', 'y', 1_000_000 + i * 600_000, 1_001_000 + i * 600_000));
+    expect(activeSegments(lulls, { from: 1_000_000, to: 2_801_000 })).toHaveLength(1);
+  });
+
+  it('maps played time onto each burst in turn, never across the gap', () => {
+    const segs = activeSegments(edges, bounds);
+    expect(playWindow(segs, 0, 2_000)).toEqual({ from: 1_000, to: 3_000 });
+    // 8 s of the first burst played: the next position is the second burst's start.
+    expect(playWindow(segs, 8_000, 2_000)).toEqual({ from: 6 * YEAR, to: 6 * YEAR + 2_000 });
+    expect(playWindow(segs, 7_500, 2_000)).toEqual({ from: 8_500, to: 9_000 });
+  });
+});

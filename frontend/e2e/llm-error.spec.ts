@@ -39,20 +39,34 @@ test('Story tab shows an error alert when story generation returns 502', async (
   await expect(page.getByRole('button', { name: /Retry/i })).toBeVisible();
 });
 
-test('Filter Generator shows an error alert when filter generation returns 502', async ({ page }) => {
-  await page.route('**/api/v1/filter/*/generate', route =>
+test('Story chat shows an actionable alert when the LLM server is unreachable', async ({ page }) => {
+  // The chat answers in a background turn; a turn that fails on an unreachable LLM must say so,
+  // not leave a spinner (#1161, which also folded the Filter Generator into the chat).
+  await page.route('**/api/v1/files/*/chat-turns', route =>
     route.fulfill({
-      status: 502,
+      status: 201,
       contentType: 'application/json',
-      body: JSON.stringify(LLM_UNREACHABLE_502),
+      body: JSON.stringify({
+        id: '00000000-0000-0000-0000-000000000001',
+        status: 'FAILED',
+        steps: [],
+        answer: null,
+        followUpQuestions: [],
+        filters: [],
+        toolsOffered: false,
+        error: 'Failed to reach the LLM service',
+        errorCode: 'LLM_UNREACHABLE',
+        elapsedMs: 10,
+      }),
     })
   );
 
-  await page.goto(`/analysis/${fileId}/filter-generator`);
-  await page.locator('textarea').first().fill('show me all HTTP traffic');
-  await page.getByRole('button', { name: /Generate Filter/i }).click();
+  await page.goto(`/analysis/${fileId}/story`);
+  const box = page.getByRole('textbox', { name: 'Ask a question about this capture' });
+  await box.fill('A filter for the HTTP traffic');
+  await box.press('Enter');
 
-  const alert = page.locator('.alert-danger');
+  const alert = page.locator('.story-chat-panel .alert-danger');
   await expect(alert).toBeVisible();
   await expect(alert).toContainText(/LLM server is not responding/i);
 });
