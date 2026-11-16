@@ -16,7 +16,12 @@ const MONITOR_DIR = path.resolve(here, '../../sample-files/monitor_large');
 const SAMPLE_DIR = path.resolve(here, '../../sample-files');
 
 /** The capture the analysis half of the demo uploads on camera. */
-export const DEMO_FILE = 'demo_all_rules.pcap';
+/**
+ * The capture uploaded on camera. DEMO_CAPTURE points at another one (an absolute path), e.g. the
+ * STRRAT incident from docs/demos/strrat-you-dirty-rat.rst, which isn't committed (real malware
+ * traffic): its four questions (victim, user, malware, C2) all have answers.
+ */
+export const DEMO_FILE = process.env.DEMO_CAPTURE ? path.basename(process.env.DEMO_CAPTURE) : 'demo_all_rules.pcap';
 
 export const NETWORK_NAME = 'Office Audit — Corp HQ';
 export const NETWORK_DESCRIPTION =
@@ -168,7 +173,7 @@ export async function clearDemoFile(request: APIRequestContext): Promise<void> {
 
 /** Absolute path to the demo capture, for setInputFiles(). */
 export function demoFilePath(): string {
-  return path.join(SAMPLE_DIR, DEMO_FILE);
+  return process.env.DEMO_CAPTURE ?? path.join(SAMPLE_DIR, DEMO_FILE);
 }
 
 /** The demo network's id, or null when it doesn't exist yet. */
