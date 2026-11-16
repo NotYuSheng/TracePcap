@@ -72,6 +72,9 @@ if [ "${NETWORK_COUNT:-0}" -gt 1 ]; then
   echo "         (this destroys all uploaded pcaps and monitor data)" >&2
 fi
 
+# A recording runs a video-recording browser while the stack analyses a capture: it needs headroom.
+"$REPO_ROOT/scripts/mem-guard.sh" "the demo recording" 5
+
 echo "==> Recording walkthrough (Playwright)"
 # Clear stale videos so the newest-file pick below can't grab a previous run's.
 rm -rf "$VIDEO_DIR"

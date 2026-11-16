@@ -10,6 +10,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Builds need headroom; on a machine already paging, they freeze it (see mem-guard.sh).
+scripts/mem-guard.sh "the image builds" 3
+
 compose=(docker compose "$@")
 for service in $("${compose[@]}" config --services); do
   # Only services with a build section; the rest are pulled images.
