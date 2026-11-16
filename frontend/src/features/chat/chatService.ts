@@ -37,6 +37,8 @@ export interface ChatTurn {
   followUpQuestions: string[];
   filters: CheckedFilter[];
   toolsOffered: boolean;
+  /** Set when the LLM server answered with another model than the configured one. */
+  modelNote?: string | null;
   error: string | null;
   errorCode: string | null;
   elapsedMs: number;

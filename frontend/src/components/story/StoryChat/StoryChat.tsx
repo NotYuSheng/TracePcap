@@ -163,6 +163,7 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
               {m.turn && !m.turn.toolsOffered && (
                 <div className="chat-msg-note">Answered without tools: the LLM server didn’t take them.</div>
               )}
+              {m.turn?.modelNote && <div className="chat-msg-note">{m.turn.modelNote}</div>}
             </div>
           )
         )}

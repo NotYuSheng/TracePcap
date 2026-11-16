@@ -21,6 +21,8 @@ public class ChatTurnDto {
   List<FilterDto> filters;
   /** False when the LLM answered without tools (they're off, or its server doesn't support them). */
   boolean toolsOffered;
+  /** Set when the server answered with another model than the configured one. */
+  String modelNote;
   String error;
   /** LLM_UNREACHABLE, LLM_TIMEOUT, OUTPUT_TRUNCATED, LLM_BAD_RESPONSE, CONTEXT_TOO_LONG or null. */
   String errorCode;
