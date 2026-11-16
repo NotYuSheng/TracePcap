@@ -1,6 +1,9 @@
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { Badge, Button, Card, Popover } from '@govtechsg/sgds-react';
 import type { Finding, FindingSeverity } from '@/types';
+import { useMemo, useState } from 'react';
+import { Pagination } from '@components/common/Pagination/Pagination';
+import './FindingsPanel.css';
 
 function FindingsInfoPopover() {
   const popover = (
@@ -137,17 +140,35 @@ interface Props {
 }
 
 export function FindingsPanel({ findings }: Props) {
-  const grouped = SEVERITY_ORDER.reduce<Record<FindingSeverity, Finding[]>>(
-    (acc, sev) => {
-      acc[sev] = findings.filter(f => f.severity === sev);
-      return acc;
-    },
-    { CRITICAL: [], HIGH: [], MEDIUM: [], LOW: [] }
-  );
+  const [query, setQuery] = useState('');
+  const [severity, setSeverity] = useState<FindingSeverity | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
+  const counts = SEVERITY_ORDER.reduce<Record<FindingSeverity, number>>(
+    (acc, sev) => ({ ...acc, [sev]: findings.filter(f => f.severity === sev).length }),
+    { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+  );
   const total = findings.length;
-  const criticalCount = grouped.CRITICAL.length;
-  const highCount = grouped.HIGH.length;
+
+  // Most serious first; the search and the severity chip narrow it, then it is paged.
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return [...findings]
+      .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity))
+      .filter(f => !severity || f.severity === severity)
+      .filter(
+        f =>
+          !q ||
+          f.title.toLowerCase().includes(q) ||
+          f.summary.toLowerCase().includes(q) ||
+          f.type.toLowerCase().replace(/_/g, ' ').includes(q) ||
+          f.affectedIps.some(ip => ip.toLowerCase().includes(q))
+      );
+  }, [findings, query, severity]);
+  const totalPages = Math.max(1, Math.ceil(shown.length / pageSize));
+  const current = Math.min(page, totalPages);
+  const pageItems = shown.slice((current - 1) * pageSize, current * pageSize);
 
   return (
     <Card>
@@ -159,29 +180,82 @@ export function FindingsPanel({ findings }: Props) {
           </h6>
           <FindingsInfoPopover />
         </div>
-        <div className="d-flex gap-2 align-items-center">
-          <span className="text-muted small">
-            {total} finding{total !== 1 ? 's' : ''}
-          </span>
-          {criticalCount > 0 && <Badge bg="danger">{criticalCount} CRITICAL</Badge>}
-          {highCount > 0 && <Badge bg="warning" text="dark">{highCount} HIGH</Badge>}
-        </div>
+        <span className="text-muted small">
+          {total} finding{total !== 1 ? 's' : ''}
+        </span>
       </Card.Header>
       <Card.Body>
-        {SEVERITY_ORDER.map(sev => {
-          const group = grouped[sev];
-          if (group.length === 0) return null;
+        <div className="findings-tools">
+          <input
+            type="search"
+            className="form-control form-control-sm"
+            placeholder="Search findings: a host, a type, a word…"
+            aria-label="Search findings"
+            value={query}
+            onChange={e => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+          />
+          <div className="findings-severity" role="group" aria-label="Show findings of one severity">
+            <Button
+              size="sm"
+              variant={severity === null ? 'primary' : 'outline-secondary'}
+              aria-pressed={severity === null}
+              onClick={() => {
+                setSeverity(null);
+                setPage(1);
+              }}
+            >
+              All {total}
+            </Button>
+            {SEVERITY_ORDER.filter(sev => counts[sev] > 0).map(sev => (
+              <Button
+                key={sev}
+                size="sm"
+                variant={severity === sev ? 'primary' : 'outline-secondary'}
+                aria-pressed={severity === sev}
+                onClick={() => {
+                  setSeverity(severity === sev ? null : sev);
+                  setPage(1);
+                }}
+              >
+                {sev.charAt(0) + sev.slice(1).toLowerCase()} {counts[sev]}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {pageItems.length === 0 && (
+          <p className="text-muted small mb-0">No findings match.</p>
+        )}
+        {pageItems.map((finding, i) => {
+          // A severity heading where the severity changes, so each page still reads in groups.
+          const head = i === 0 || pageItems[i - 1].severity !== finding.severity;
           return (
-            <div key={sev} className="mb-3">
-              <h6 className={`small fw-bold text-uppercase mb-2 ${severityHeaderClass(sev)}`}>
-                {sev} ({group.length})
-              </h6>
-              {group.map((finding, i) => (
-                <FindingCard key={`${sev}-${i}`} finding={finding} />
-              ))}
+            <div key={`${current}-${i}`}>
+              {head && (
+                <h6 className={`small fw-bold text-uppercase mb-2 mt-2 ${severityHeaderClass(finding.severity)}`}>
+                  {finding.severity} ({counts[finding.severity]})
+                </h6>
+              )}
+              <FindingCard finding={finding} />
             </div>
           );
         })}
+        {shown.length > Math.min(10, pageSize) && (
+          <Pagination
+            currentPage={current}
+            totalPages={totalPages}
+            totalItems={shown.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={n => {
+              setPageSize(n);
+              setPage(1);
+            }}
+            pageSizeOptions={[10, 25, 50]}
+          />
+        )}
       </Card.Body>
     </Card>
   );
