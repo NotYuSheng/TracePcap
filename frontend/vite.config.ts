@@ -98,6 +98,14 @@ export default defineConfig(({ command, mode }) => {
       setupFiles: './src/test/setup.ts',
       css: false,
       exclude: [...configDefaults.exclude, 'e2e/**'],
+      // Locally, a few workers: one per core (7 here) next to the stack and an editor's language
+      // servers pushed a 15 GB machine into swap, and a later job froze it (2026-11-16). CI keeps
+      // vitest's default. Override with VITEST_MAX_WORKERS.
+      maxWorkers: process.env.VITEST_MAX_WORKERS
+        ? Number(process.env.VITEST_MAX_WORKERS)
+        : process.env.CI
+          ? undefined
+          : 3,
       // Report-only: no thresholds are set, so coverage cannot fail a run yet. The first
       // task is an honest baseline (#659) — a threshold picked before anyone knows the
       // number just gets bypassed.

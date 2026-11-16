@@ -36,6 +36,7 @@ Only build a custom component if SGDS has no equivalent.
 - **Storage**: MinIO
 - **Build**: Docker Compose — run `docker compose build` to build, `docker compose up -d` to start
 - **After every change**: run `scripts/rebuild.sh` to rebuild and restart all services. It builds one image at a time; `docker compose up -d --build` builds them in parallel and, next to a running stack and a `mvn verify`, has frozen this 15 GB machine. Never run it alongside `mvn verify` or the frontend test suite.
+- **Before any heavy job** (image builds, `mvn verify`/test runs, the full frontend suite, Playwright recordings) run `scripts/mem-guard.sh "<job>"`: it refuses when under 4 GB is available or swap is over 40% used. `rebuild.sh` and `record-demo.sh` call it themselves. On 2026-11-16 a recording started with swap 59% full froze this machine (disk thrash, hard reset). Run heavy jobs one at a time; locally vitest uses at most 3 workers.
 
 ## API Conventions
 
