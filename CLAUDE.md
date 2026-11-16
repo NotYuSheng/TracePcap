@@ -15,6 +15,7 @@ Only build a custom component if SGDS has no equivalent.
 - Keep the copy inside these modals task-oriented: say what the thing is and how to act on it (e.g. "click a badge to inspect it and add evidence").
 - **Escape must close exactly one popup — the topmost one.** SGDS `Modal`s get this for free, so always wire `onHide` (leave it unwired only to deliberately block dismissal, e.g. mid-upload). Any popup that is *not* an SGDS `Modal` — an overlay panel, a portalled popover, a CSS-fullscreen mode — must call `useEscapeLayer(onClose, { ref })` from `@utils/useEscapeLayer` instead of installing its own `keydown` listener; the shared stack is what keeps one press from closing two layers.
 - **Click-toggled info/help popovers** use `EscapableOverlayTrigger` from `@components/common/EscapableOverlayTrigger` — same props as SGDS `OverlayTrigger`, but it owns `show` and joins the Escape stack. Never `OverlayTrigger … rootClose`: inside a `Modal`, one Escape closes both. Give the `Popover` an `id` (it locates the layer by it).
+- **The popover itself is `InfoPopover`** from `@components/common/InfoPopover`: a small `kind` label ("How it works", "How it's measured"), a `title`, the note, and a footer with its `source` and a `docs` page link. Every SGDS popover already gets the card style (rounded, shadow, no grey title bar) from `sgds-overrides.css`; use `InfoPopover` for any explainer so they all read the same.
 
 ## Branching
 

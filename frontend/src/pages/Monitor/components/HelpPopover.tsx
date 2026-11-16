@@ -1,6 +1,7 @@
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import type { ReactNode, CSSProperties } from 'react';
-import { Button, Popover } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
+import { InfoPopover } from '@components/common/InfoPopover';
 
 interface HelpPopoverProps {
   /** DOM id for the popover (also its a11y handle). */
@@ -26,10 +27,9 @@ export const HelpPopover = ({ id, title, children, maxWidth = 380, buttonTitle, 
     trigger="click"
     placement="right"
     overlay={
-      <Popover id={id} style={{ maxWidth }}>
-        <Popover.Header>{title}</Popover.Header>
-        <Popover.Body className="small">{children}</Popover.Body>
-      </Popover>
+      <InfoPopover id={id} kind="Help" title={title} width={maxWidth} docs="features/network-monitor">
+        {children}
+      </InfoPopover>
     }
   >
     <Button

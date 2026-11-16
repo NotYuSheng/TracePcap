@@ -148,8 +148,12 @@
 }
 
 .chat-tools-list li {
-  padding: 7px 16px;
+  padding: 6px 0;
   border-top: 1px solid var(--tp-border, #eef0f3);
+}
+
+.chat-tools-list li:first-child {
+  border-top: 0;
 }
 
 .chat-tools-example {

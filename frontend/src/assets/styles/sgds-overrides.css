@@ -305,25 +305,55 @@
   color: var(--tp-text);
 }
 
-/* Popover — re-declare local vars on the element */
+/* Popover — every popover is a card (canvas "Info popovers", option B): rounded, soft shadow,
+   the title in bold inside the card instead of a grey bar, readable line height. InfoPopover adds
+   the kind label and the source footer. */
+.popover {
+  --sgds-popover-border-radius: 12px;
+  --sgds-popover-inner-border-radius: 11px;
+  --sgds-popover-border-color: var(--tp-border, #d5d9e1);
+  --sgds-popover-header-bg: transparent;
+  --sgds-popover-header-padding-x: 14px;
+  --sgds-popover-header-padding-y: 12px;
+  --sgds-popover-body-padding-x: 14px;
+  --sgds-popover-body-padding-y: 12px;
+
+  border-radius: 12px;
+  border-color: var(--tp-border, #d5d9e1);
+  box-shadow: 0 8px 24px rgb(16 24 40 / 14%);
+  font-size: 0.8125rem;
+}
+
+.popover-header {
+  background: transparent;
+  border-bottom: 0;
+  font-size: 0.875rem;
+  font-weight: 650;
+  padding: 12px 14px 0;
+}
+
+.popover-body {
+  line-height: 1.5;
+}
+
 [data-theme='dark'] .popover {
   --sgds-popover-bg: var(--tp-surface);
   --sgds-popover-border-color: var(--tp-border);
-  --sgds-popover-header-bg: var(--tp-bg-subtle);
+  --sgds-popover-header-bg: transparent;
   --sgds-popover-header-color: var(--tp-text);
   --sgds-popover-body-color: var(--tp-text);
 
   color: var(--tp-text);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 45%);
 }
 
 [data-theme='dark'] .popover-header {
-  background-color: var(--tp-bg-subtle);
+  background-color: transparent;
   color: var(--tp-text);
-  border-color: var(--tp-border);
 }
 
 [data-theme='dark'] .popover-body {
-  background-color: var(--tp-surface);
+  background-color: transparent;
   color: var(--tp-text);
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Popover } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
+import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { chatService, toolCallingNote, type ChatTools } from '@/features/chat/chatService';
 
@@ -15,23 +16,26 @@ export function ChatToolsPopover() {
   }, []);
   if (!tools) return null;
   const popover = (
-    <Popover id="chat-tools" className="chat-tools-popover">
-      <Popover.Header>Tools the chat can use</Popover.Header>
-      <Popover.Body className="small p-0">
-        <p className="text-muted px-3 pt-2 mb-1">
-          Read-only, and only on this capture. Each answer lists the ones it used.
-        </p>
-        <ul className="chat-tools-list">
-          {tools.tools.map(t => (
-            <li key={t.name}>
-              <b>{t.label}</b> <span className="text-muted">· {t.summary}</span>
-              <div className="text-muted chat-tools-example">“{t.example}”</div>
-            </li>
-          ))}
-        </ul>
-        <p className="text-muted px-3 pb-2 mb-0">{toolCallingNote(tools.toolCalling)}</p>
-      </Popover.Body>
-    </Popover>
+    <InfoPopover
+      id="chat-tools"
+      kind="Tools"
+      title="What the chat can look up"
+      source="read-only, this capture only"
+      docs="features/capture-chat"
+      docsAnchor="the-tools"
+      className="chat-tools-popover"
+      width={340}
+    >
+      <ul className="chat-tools-list">
+        {tools.tools.map(t => (
+          <li key={t.name}>
+            <b>{t.label}</b> <span className="text-muted">· {t.summary}</span>
+            <div className="text-muted chat-tools-example">“{t.example}”</div>
+          </li>
+        ))}
+      </ul>
+      <p className="text-muted mb-0 mt-2">{toolCallingNote(tools.toolCalling)}</p>
+    </InfoPopover>
   );
   return (
     <EscapableOverlayTrigger trigger="click" placement="bottom-end" overlay={popover}>

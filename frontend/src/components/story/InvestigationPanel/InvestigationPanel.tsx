@@ -1,6 +1,7 @@
+import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState } from 'react';
-import { Badge, Button, Card, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import type { InvestigationStep } from '@/types';
 import { formatBytes } from '@/utils/formatters';
 
@@ -8,11 +9,9 @@ interface InvestigationPanelProps {
   steps: InvestigationStep[];
 }
 
-function InfoPopover() {
+function InvestigationInfo() {
   const popover = (
-    <Popover id="info-investigation" style={{ maxWidth: '340px' }}>
-      <Popover.Header>Investigation — How it works</Popover.Header>
-      <Popover.Body className="small">
+    <InfoPopover id="info-investigation" kind="How it works" title="Investigation" source="the LLM’s queries" docs="features/story-mode" docsAnchor="investigation-panel">
         <p className="mb-2">
           Before writing the narrative, the LLM analyses the deterministic findings and traffic
           timeline, then generates hypotheses and targeted queries to retrieve real conversation
@@ -26,8 +25,7 @@ function InfoPopover() {
           <strong>Limitations:</strong> Query generation is LLM-driven and may not cover every
           finding. Queries cap at 5 per generation.
         </p>
-      </Popover.Body>
-    </Popover>
+      </InfoPopover>
   );
   return (
     <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
@@ -167,7 +165,7 @@ export const InvestigationPanel = ({ steps }: InvestigationPanelProps) => {
         <h6 className="mb-0 d-flex align-items-center">
           <i className="bi bi-search me-2"></i>
           LLM Investigation
-          <InfoPopover />
+          <InvestigationInfo />
         </h6>
         <div className="d-flex gap-2">
           <Badge bg="primary">

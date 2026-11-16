@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Popover } from '@govtechsg/sgds-react';
+import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 
 /**
@@ -10,11 +10,14 @@ export function SourceTag({
   id,
   source,
   title,
+  docsAnchor,
   children,
 }: {
   id: string;
   source: string;
   title: string;
+  /** The section on the Overview's docs page, when it has its own. */
+  docsAnchor?: string;
   children: ReactNode;
 }) {
   return (
@@ -22,10 +25,16 @@ export function SourceTag({
       trigger="click"
       placement="bottom"
       overlay={
-        <Popover id={id} style={{ maxWidth: 340 }}>
-          <Popover.Header>{title}</Popover.Header>
-          <Popover.Body className="small">{children}</Popover.Body>
-        </Popover>
+        <InfoPopover
+          id={id}
+          kind="How it's measured"
+          title={title}
+          source={source}
+          docs="features/analysis-overview"
+          docsAnchor={docsAnchor}
+        >
+          {children}
+        </InfoPopover>
       }
     >
       <button

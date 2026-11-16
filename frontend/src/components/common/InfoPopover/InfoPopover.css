@@ -1,0 +1,59 @@
+/* InfoPopover's parts; the card itself (radius, shadow, arrow) is every popover's, in
+   sgds-overrides.css. */
+.info-popover .popover-body {
+  padding: 12px 14px 10px;
+}
+
+.info-popover-kind {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sgds-primary, #5925dc);
+  margin-bottom: 2px;
+}
+
+.info-popover-title {
+  font-size: 0.875rem;
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+
+.info-popover-text {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.info-popover-text p:last-child,
+.info-popover-text ul:last-child {
+  margin-bottom: 0;
+}
+
+.info-popover-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  font-size: 0.75rem;
+  color: var(--tp-text-muted, #525a68);
+  background: var(--tp-bg-subtle, #fafbfc);
+  border-top: 1px solid var(--tp-border, #eef0f3);
+  border-radius: 0 0 12px 12px;
+}
+
+.info-popover-foot a {
+  color: var(--sgds-primary, #5925dc);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.info-popover-foot a:hover {
+  text-decoration: underline;
+}
+
+[data-theme='dark'] .info-popover-kind,
+[data-theme='dark'] .info-popover-foot a {
+  color: #b9a5ff;
+}

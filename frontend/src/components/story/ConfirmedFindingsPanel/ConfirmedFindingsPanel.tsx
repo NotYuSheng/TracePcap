@@ -1,5 +1,6 @@
+import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
-import { Button, Card, Popover } from '@govtechsg/sgds-react';
+import { Button, Card } from '@govtechsg/sgds-react';
 import type { Answer } from '@/types';
 
 interface ConfirmedFindingsPanelProps {
@@ -20,9 +21,7 @@ const GOAL_LABEL: Record<string, string> = {
 /** Click-toggled help behind the header's info icon — app convention (no native title tooltip). */
 function InvestigationSummaryInfoPopover() {
   const popover = (
-    <Popover id="info-investigation-summary" style={{ maxWidth: '340px' }}>
-      <Popover.Header>Investigation Summary — How it works</Popover.Header>
-      <Popover.Body className="small">
+    <InfoPopover id="info-investigation-summary" kind="How it works" title="Investigation Summary" source="deterministic checks" docs="features/story-mode">
         <p className="mb-2">
           These are deterministic answers to the standard investigation questions — who the victim
           is, the C2, the malware, the signed-in user — reached by checks over the extracted evidence
@@ -35,8 +34,7 @@ function InvestigationSummaryInfoPopover() {
           asserted it on the wire), or <strong>Inferred</strong> (a tool judged it) — so it is never
           presented as certain.
         </p>
-      </Popover.Body>
-    </Popover>
+      </InfoPopover>
   );
   return (
     <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
