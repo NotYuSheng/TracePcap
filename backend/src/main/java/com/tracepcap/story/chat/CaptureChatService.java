@@ -198,6 +198,7 @@ public class CaptureChatService {
         ? "I couldn't put an answer together from what I found. Try asking more narrowly."
         : a.answer();
     s.followUps = a.followUps();
+    s.modelNote = llm.modelMismatch();
     s.status = "DONE";
   }
 
@@ -252,6 +253,7 @@ public class CaptureChatService {
     volatile String answer;
     volatile List<String> followUps = List.of();
     volatile boolean toolsOffered;
+    volatile String modelNote;
     volatile String error;
     volatile String errorCode;
 
@@ -269,7 +271,7 @@ public class CaptureChatService {
       }
       return ChatTurnDto.builder()
           .id(id).status(status).steps(List.copyOf(steps)).answer(answer).followUpQuestions(followUps)
-          .filters(fs).toolsOffered(toolsOffered).error(error).errorCode(errorCode)
+          .filters(fs).toolsOffered(toolsOffered).modelNote(modelNote).error(error).errorCode(errorCode)
           .elapsedMs(System.currentTimeMillis() - started).build();
     }
   }

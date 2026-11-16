@@ -551,6 +551,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "modelNote": {
+            "type": "string"
+          },
           "status": {
             "type": "string"
           },

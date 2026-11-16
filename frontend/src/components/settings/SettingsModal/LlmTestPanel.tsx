@@ -9,6 +9,7 @@ function apiMessage(err: unknown): string | null {
 
 const ICON: Record<string, string> = {
   OK: 'bi-check-circle-fill text-success',
+  WARN: 'bi-exclamation-triangle-fill text-warning',
   FAIL: 'bi-x-circle-fill text-danger',
   SKIPPED: 'bi-dash-circle text-muted',
 };
@@ -63,8 +64,12 @@ export function LlmTestPanel({
       {error && <p className="small text-danger mt-2 mb-0">{error}</p>}
       {result && (
         <div className="mt-2" role="status" aria-live="polite">
-          <p className={`small fw-semibold mb-1 ${result.ok ? 'text-success' : 'text-danger'}`}>
-            {result.ok ? 'Connected.' : 'Not working.'}{' '}
+          <p
+            className={`small fw-semibold mb-1 ${
+              !result.ok ? 'text-danger' : result.steps.some(s => s.status === 'WARN') ? 'text-warning-emphasis' : 'text-success'
+            }`}
+          >
+            {!result.ok ? 'Not working.' : result.steps.some(s => s.status === 'WARN') ? 'Connected, with a warning.' : 'Connected.'}{' '}
             <span className="fw-normal text-muted">
               {result.model} at <span className="font-monospace">{result.baseUrl}</span>
             </span>

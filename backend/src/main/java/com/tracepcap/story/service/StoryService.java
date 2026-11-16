@@ -1054,6 +1054,8 @@ public class StoryService {
       throw new LlmException("Empty LLM response");
     }
 
+    // A reasoning model's thinking can hold braces of its own; it isn't the answer.
+    content = LlmClient.stripThinking(content);
     // Remove markdown code blocks if present
     content = content.replaceAll("```json\\s*", "").replaceAll("```\\s*", "");
 

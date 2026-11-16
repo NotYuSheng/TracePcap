@@ -38,6 +38,8 @@ public class LlmConnectionTester {
   static final int LIST_TIMEOUT_MS = 10_000;
   /** A one-token reply, capped well below a story's timeout so the test can't hang the page. */
   static final int REPLY_TIMEOUT_CAP_MS = 120_000;
+  /** Enough for a reasoning model to show that it reasons, still a quick reply. */
+  static final int REPLY_TOKENS = 24;
 
   private final LlmSettings settings;
   private final PolicyEditGate editGate;
@@ -112,11 +114,21 @@ public class LlmConnectionTester {
         if (m.hasNonNull("id")) models.add(m.get("id").asText());
       }
     }
+    ModelProfiles.Profile profile = ModelProfiles.describe(template(LIST_TIMEOUT_MS), objectMapper, baseUrl, apiKey, model);
+    if (!profile.canChat() && (models.isEmpty() || models.contains(model))) {
+      // An embedding model turns text into vectors for search; it can't write an answer.
+      steps.add(fail("model", "Model available",
+          model + " is an embedding model: it turns text into numbers for search and can't write answers."
+              + " Pick a chat model.", null));
+      steps.add(skip("reply", "Model replies"));
+      return result(steps, models, baseUrl, model);
+    }
+    String kindNote = profile.kind() == ModelProfiles.Kind.VISION ? " It's a vision model, which chats too." : "";
     if (models.isEmpty()) {
       steps.add(Step.builder().key("model").label("Model available").status("OK")
           .detail("The server doesn't list its models, so " + model + " is tried directly below.").build());
     } else if (models.contains(model)) {
-      steps.add(ok("model", "Model available", model + " is one of the server's " + models.size() + " models.", null));
+      steps.add(ok("model", "Model available", model + " is one of the server's " + models.size() + " models." + kindNote, null));
     } else {
       steps.add(fail("model", "Model available",
           model + " isn't among the server's " + models.size() + " models. Pick one of them.", null));
@@ -130,14 +142,15 @@ public class LlmConnectionTester {
       Map<String, Object> body = Map.of(
           "model", model,
           "messages", List.of(Map.of("role", "user", "content", "Reply with OK.")),
-          "max_tokens", 1,
+          "max_tokens", REPLY_TOKENS,
           "temperature", 0);
       HttpHeaders h = headers(apiKey);
       h.setContentType(MediaType.APPLICATION_JSON);
-      template(Math.min(settings.timeoutSeconds() * 1000, REPLY_TIMEOUT_CAP_MS))
-          .exchange(baseUrl + "/chat/completions", HttpMethod.POST, new HttpEntity<>(body, h), String.class);
+      String reply = template(Math.min(settings.timeoutSeconds() * 1000, REPLY_TIMEOUT_CAP_MS))
+          .exchange(baseUrl + "/chat/completions", HttpMethod.POST, new HttpEntity<>(body, h), String.class)
+          .getBody();
       long ms = System.currentTimeMillis() - t1;
-      steps.add(ok("reply", "Model replies", "Replied in " + ms + " ms.", ms));
+      steps.add(replyStep(model, reply, ms));
     } catch (HttpStatusCodeException e) {
       steps.add(fail("reply", "Model replies",
           "The server answered " + e.getStatusCode().value() + ": " + shorten(e.getResponseBodyAsString()),
@@ -145,11 +158,45 @@ public class LlmConnectionTester {
     } catch (Exception e) {
       steps.add(fail("reply", "Model replies", "No reply: " + rootMessage(e), System.currentTimeMillis() - t1));
     }
+    if (profile.toolUse() != null) {
+      steps.add(profile.toolUse()
+          ? ok("tools", "Takes tools", "The server says it takes tools, so the chat can look things up.", null)
+          : warn("tools", "Takes tools",
+              "The server says it doesn't take tools, so the chat will answer from the findings and the story only.", null));
+    }
     return result(steps, models, baseUrl, model);
   }
 
+  /** The reply's own model and form: a different model answering, or a reasoning model. */
+  Step replyStep(String asked, String reply, long ms) {
+    String answered = null;
+    boolean reasoning = false;
+    try {
+      JsonNode r = reply == null ? null : objectMapper.readTree(reply);
+      if (r != null) {
+        answered = r.path("model").asText(null);
+        JsonNode msg = r.path("choices").path(0).path("message");
+        String thought = msg.path("reasoning_content").asText(msg.path("reasoning").asText(""));
+        reasoning = !thought.isBlank() || msg.path("content").asText("").contains("<think>");
+      }
+    } catch (Exception ignored) {
+      // A reply that isn't JSON still counts as a reply.
+    }
+    String think = reasoning
+        ? " It's a reasoning model: it thinks before it answers, so give it a large LLM_MAX_TOKENS (24000 or more) and a long LLM_TIMEOUT."
+        : "";
+    if (!ModelProfiles.sameModel(asked, answered)) {
+      return warn("reply", "Model replies",
+          "Replied in " + ms + " ms, but as " + answered + ": the server answered with a different model than "
+              + asked + ", usually the one it has loaded. Load " + asked + " on the server, or set the model to "
+              + answered + "." + think, ms);
+    }
+    return ok("reply", "Model replies", "Replied in " + ms + " ms." + think, ms);
+  }
+
   private static LlmTestResult result(List<Step> steps, List<String> models, String baseUrl, String model) {
-    boolean ok = steps.stream().allMatch(s -> "OK".equals(s.getStatus()));
+    // A warning (another model answered, no tools) still works; only a failure means it doesn't.
+    boolean ok = steps.stream().noneMatch(s -> "FAIL".equals(s.getStatus()) || "SKIPPED".equals(s.getStatus()));
     return LlmTestResult.builder().ok(ok).steps(steps).models(models).baseUrl(baseUrl).model(model).build();
   }
 
@@ -168,6 +215,10 @@ public class LlmConnectionTester {
 
   private static Step ok(String key, String label, String detail, Long ms) {
     return Step.builder().key(key).label(label).status("OK").detail(detail).ms(ms).build();
+  }
+
+  private static Step warn(String key, String label, String detail, Long ms) {
+    return Step.builder().key(key).label(label).status("WARN").detail(detail).ms(ms).build();
   }
 
   private static Step fail(String key, String label, String detail, Long ms) {

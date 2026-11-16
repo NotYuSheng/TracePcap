@@ -3010,6 +3010,7 @@ export interface components {
             followUpQuestions?: string[];
             /** Format: uuid */
             id?: string;
+            modelNote?: string;
             status?: string;
             steps?: components["schemas"]["ChatStepDto"][];
             toolsOffered?: boolean;

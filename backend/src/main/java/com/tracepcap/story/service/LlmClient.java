@@ -76,6 +76,9 @@ public class LlmClient {
       modelContextLength = null;
       toolCallingSupported = null;
       toolChoiceRequiredSupported = true;
+      servedModel = null;
+      // The name alone, at once (an embedding model says so); the server's own word follows.
+      profile = ModelProfiles.fromName(settings.model());
       initializeModelCapabilities();
     }
   }
@@ -85,6 +88,14 @@ public class LlmClient {
   private static final Pattern PATTERN_CONTEXT_LENGTH_ALT = Pattern.compile("context length is (\\d+)");
 
   private volatile Integer effectiveMaxTokens;
+
+  /** What the configured model is (chat, vision, embedding) and whether it takes tools. */
+  private volatile ModelProfiles.Profile profile;
+
+  /** The model the server says answered the last call; servers that ignore the name differ. */
+  private volatile String servedModel;
+
+  private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
   private volatile Integer modelContextLength;
 
   /**
@@ -121,6 +132,7 @@ public class LlmClient {
         .start(
             () -> {
               try {
+                describeModel();
                 // If LLM_CONTEXT_LENGTH is explicitly configured, use it directly and skip
                 // the /v1/models auto-detection call.
                 if (llmConfig.getApi().getContextLength() != null) {
@@ -242,9 +254,38 @@ public class LlmClient {
     }
   }
 
-  /** The model calls go to now (Settings, else the deployment), for recording on a story. */
+  /**
+   * The model that writes the answers, for recording on a story: the one the server says answered
+   * when that isn't the one configured (a server that serves whatever it has loaded), else the
+   * configured one.
+   */
   public String currentModel() {
-    return settings.model();
+    String served = servedModel;
+    return served != null && !ModelProfiles.sameModel(settings.model(), served) ? served : settings.model();
+  }
+
+  /** A sentence when the server answered with another model than the configured one, else null. */
+  public String modelMismatch() {
+    String served = servedModel;
+    if (served == null || ModelProfiles.sameModel(settings.model(), served)) return null;
+    return "Answered by " + served + ", not " + settings.model()
+        + ": the LLM server uses the model it has loaded. Load " + settings.model() + " there, or set the model to " + served + ".";
+  }
+
+  /** Asks the server what the configured model is; a model it says takes no tools isn't offered them. */
+  private void describeModel() {
+    // Its own short-timeout client: best-effort, and kept off the health check's path.
+    org.springframework.http.client.SimpleClientHttpRequestFactory f = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+    f.setConnectTimeout(3_000);
+    f.setReadTimeout(5_000);
+    ModelProfiles.Profile p = ModelProfiles.describe(
+        new RestTemplate(f), JSON, settings.baseUrl(), settings.apiKey(), settings.model());
+    profile = p;
+    if (p.fromServer()) {
+      log.info("LLM model {}: {}{}", settings.model(), p.kind(),
+          p.toolUse() == null ? "" : p.toolUse() ? ", takes tools" : ", no tools");
+    }
+    if (Boolean.FALSE.equals(p.toolUse()) && isAutoToolCalling()) toolCallingSupported = Boolean.FALSE;
   }
 
   /** Get the effective max tokens (adjusted based on model capabilities) */
@@ -422,6 +463,14 @@ public class LlmClient {
   private void preflight(String systemPrompt, String userPrompt) {
     // Settings may have changed since the last call: a new server or model is checked afresh.
     refreshCapabilitiesIfChanged();
+    ModelProfiles.Profile p = profile;
+    if (p != null && !p.canChat()) {
+      throw new LlmException(
+          "The model set for the LLM (" + settings.model() + ") is an embedding model: it turns text into"
+              + " numbers for search and can't write answers. Pick a chat model in Settings › LLM.",
+          null,
+          LlmException.ErrorCode.LLM_BAD_RESPONSE);
+    }
     if (modelContextLength != null) {
       int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 2;
       int responseReserve = getEffectiveMaxTokens();
@@ -602,7 +651,22 @@ public class LlmClient {
         }
         // Checked after the cap: a model that spends its budget reasoning can stop with no message.
         if (choice.getMessage() == null) throw new LlmException("Empty response from LLM API");
-        return choice.getMessage();
+        noteServedModel(response.getBody().getModel());
+        Message message = choice.getMessage();
+        boolean calls = message.getToolCalls() != null && !message.getToolCalls().isEmpty();
+        String content = stripThinking(message.getContent());
+        boolean thought = (message.getReasoningContent() != null && !message.getReasoningContent().isBlank())
+            || (message.getContent() != null && message.getContent().contains("<think>"));
+        if (!calls && (content == null || content.isBlank()) && thought) {
+          // A reasoning model that used its whole reply thinking.
+          throw new LlmException(
+              "The model spent its whole reply reasoning and never gave an answer. Raise LLM_MAX_TOKENS"
+                  + " (reasoning models need 24000 or more) and LLM_TIMEOUT.",
+              null,
+              LlmException.ErrorCode.OUTPUT_TRUNCATED);
+        }
+        message.setContent(content);
+        return message;
       }
 
       throw new LlmException("Empty response from LLM API");
@@ -659,6 +723,29 @@ public class LlmClient {
     }
   }
 
+  /** Records which model answered, and says so once when it isn't the one asked for. */
+  private void noteServedModel(String served) {
+    if (served == null || served.isBlank()) return;
+    String before = servedModel;
+    servedModel = served;
+    if (!served.equals(before) && !ModelProfiles.sameModel(settings.model(), served)) {
+      log.warn("Asked the LLM for model '{}' but '{}' answered: the server uses the model it has loaded.",
+          settings.model(), served);
+    }
+  }
+
+  /**
+   * The answer without a reasoning model's thinking: {@code <think>…</think>} blocks go, and an
+   * unclosed {@code <think>} (the reply ended mid-thought) takes the rest with it.
+   */
+  static String stripThinking(String content) {
+    if (content == null || !content.contains("<think>")) return content;
+    String out = content.replaceAll("(?s)<think>.*?</think>", "");
+    int open = out.indexOf("<think>");
+    if (open >= 0) out = out.substring(0, open);
+    return out.trim();
+  }
+
   private static int parseGroup(String text, Pattern pattern) {
     Matcher m = pattern.matcher(text);
     return m.find() ? Integer.parseInt(m.group(1)) : 0;
@@ -703,6 +790,10 @@ public class LlmClient {
 
     @JsonProperty("tool_call_id")
     private String toolCallId;
+
+    /** A reasoning model's thinking, on servers that send it apart from the answer. Never sent back. */
+    @JsonProperty(value = "reasoning_content", access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+    private String reasoningContent;
 
     Message(String role, String content) {
       this.role = role;
@@ -750,6 +841,9 @@ public class LlmClient {
   /** OpenAI Chat Completion Response format */
   @Data
   private static class ChatCompletionResponse {
+    /** The model that answered, as the server names it. */
+    private String model;
+
     private List<Choice> choices;
   }
 
