@@ -4,6 +4,66 @@
  */
 
 export interface paths {
+    "/api/v1/ai-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the model is working on
+         * @description Waiting and running jobs first, in the order they'll run, then those finished in the last 30 minutes. Results are left out; get a job by id for its result.
+         */
+        get: operations["list_15"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One job's progress or result
+         * @description WAITING with its place in line, RUNNING, then DONE with the result or FAILED with why.
+         */
+        get: operations["get_4"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-jobs/{jobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a waiting job
+         * @description Takes it out of line. A running job can't be cancelled (400); only whoever asked, or an admin, can cancel (403). Returns the job, now CANCELLED.
+         */
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/{fileId}/progress": {
         parameters: {
             query?: never;
@@ -1492,6 +1552,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/story-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write the story in the background
+         * @description Queues the story and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: it ends DONE with the story as its result, or FAILED with why (CONTEXT_LENGTH_EXCEEDED carries the prompt to cut down). The current story stays until the new one is written. Asking again while one waits or runs returns that job.
+         */
+        post: operations["start_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/versions": {
         parameters: {
             query?: never;
@@ -1977,6 +2057,26 @@ export interface paths {
         post?: never;
         /** Delete an external event */
         delete: operations["delete_2"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/insight-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate insights in the background
+         * @description Queues the insights and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the new insight (whose own status says whether the model managed it). Asking again while one waits or runs returns that job.
+         */
+        post: operations["start_1"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2825,6 +2925,38 @@ export interface components {
             ip?: string;
             /** Format: int32 */
             lastSnapshot?: number;
+        };
+        AiJobDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            error?: components["schemas"]["AiJobError"];
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: uuid */
+            id?: string;
+            kind?: string;
+            /** Format: int32 */
+            position?: number;
+            requestedBy?: string;
+            result?: Record<string, never>;
+            /** Format: date-time */
+            startedAt?: string;
+            status?: string;
+            /** Format: uuid */
+            subjectId?: string;
+            subjectName?: string;
+            trigger?: string;
+            /** Format: int64 */
+            typicalMs?: number;
+        };
+        AiJobError: {
+            /** Format: int32 */
+            contextLength?: number;
+            errorCode?: string;
+            message?: string;
+            promptText?: string;
+            /** Format: int32 */
+            promptTokens?: number;
         };
         AnalysisProgressResponse: {
             /** Format: int32 */
@@ -4584,6 +4716,16 @@ export interface components {
             answer?: string;
             followUpQuestions?: string[];
         };
+        StoryJobRequest: {
+            additionalContext?: string;
+            customPrompt?: string;
+            /** Format: int32 */
+            maxFindings?: number;
+            /** Format: int32 */
+            maxRiskMatrix?: number;
+            /** Format: uuid */
+            networkId?: string;
+        };
         StoryQuestionRequest: {
             history?: components["schemas"]["HistoryEntry"][];
             question?: string;
@@ -4883,6 +5025,73 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_15: {
+        parameters: {
+            query?: {
+                kind?: string;
+                subjectId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"][];
+                };
+            };
+        };
+    };
+    get_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
+                };
+            };
+        };
+    };
     getAnalysisProgress: {
         parameters: {
             query?: never;
@@ -7214,6 +7423,32 @@ export interface operations {
             };
         };
     };
+    start_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StoryJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
+                };
+            };
+        };
+    };
     versions: {
         parameters: {
             query?: never;
@@ -8100,6 +8335,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    start_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["GenerateInsightRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
+                };
             };
         };
     };

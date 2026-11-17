@@ -51,6 +51,82 @@
         },
         "type": "object"
       },
+      "AiJobDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/AiJobError"
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subjectId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "typicalMs": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "AiJobError": {
+        "properties": {
+          "contextLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "promptText": {
+            "type": "string"
+          },
+          "promptTokens": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "AnalysisProgressResponse": {
         "properties": {
           "percent": {
@@ -4973,6 +5049,29 @@
         },
         "type": "object"
       },
+      "StoryJobRequest": {
+        "properties": {
+          "additionalContext": {
+            "type": "string"
+          },
+          "customPrompt": {
+            "type": "string"
+          },
+          "maxFindings": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxRiskMatrix": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "StoryQuestionRequest": {
         "properties": {
           "history": {
@@ -5801,6 +5900,116 @@
   },
   "openapi": "3.0.1",
   "paths": {
+    "/api/v1/ai-jobs": {
+      "get": {
+        "description": "Waiting and running jobs first, in the order they'll run, then those finished in the last 30 minutes. Results are left out; get a job by id for its result.",
+        "operationId": "list_15",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subjectId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiJobDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "What the model is working on",
+        "tags": [
+          "AI jobs"
+        ]
+      }
+    },
+    "/api/v1/ai-jobs/{jobId}": {
+      "get": {
+        "description": "WAITING with its place in line, RUNNING, then DONE with the result or FAILED with why.",
+        "operationId": "get_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One job's progress or result",
+        "tags": [
+          "AI jobs"
+        ]
+      }
+    },
+    "/api/v1/ai-jobs/{jobId}/cancel": {
+      "post": {
+        "description": "Takes it out of line. A running job can't be cancelled (400); only whoever asked, or an admin, can cancel (403). Returns the job, now CANCELLED.",
+        "operationId": "cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Cancel a waiting job",
+        "tags": [
+          "AI jobs"
+        ]
+      }
+    },
     "/api/v1/analysis/{fileId}/progress": {
       "get": {
         "operationId": "getAnalysisProgress",
@@ -10189,6 +10398,48 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/story-jobs": {
+      "post": {
+        "description": "Queues the story and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: it ends DONE with the story as its result, or FAILED with why (CONTEXT_LENGTH_EXCEEDED carries the prompt to cut down). The current story stays until the new one is written. Asking again while one waits or runs returns that job.",
+        "operationId": "start_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Write the story in the background",
+        "tags": [
+          "Story Generation"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/versions": {
       "get": {
         "operationId": "versions",
@@ -11618,6 +11869,48 @@
         "summary": "Update an external event",
         "tags": [
           "Network External Events"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/insight-jobs": {
+      "post": {
+        "description": "Queues the insights and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the new insight (whose own status says whether the model managed it). Asking again while one waits or runs returns that job.",
+        "operationId": "start_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInsightRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Generate insights in the background",
+        "tags": [
+          "Network Insights"
         ]
       }
     },
@@ -13766,6 +14059,10 @@
     {
       "description": "Change editable analysis policy in the app (audited)",
       "name": "Policy Settings"
+    },
+    {
+      "description": "AI work running in the background, one job at a time",
+      "name": "AI jobs"
     },
     {
       "description": "User notes attached to network entities, with history",

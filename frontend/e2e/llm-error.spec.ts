@@ -15,19 +15,29 @@ test.beforeAll(async ({ request }) => {
   fileId = await uploadAndProcessFixture(request);
 });
 
-test('Story tab shows an error alert when story generation returns 502', async ({ page }) => {
-  // Story endpoints collapsed onto /stories: GET ?fileId= (lookup) and POST (generate).
-  // One route, branched by method — force "no existing story" (204) so the Generate
-  // button shows, and a 502 on generate.
-  await page.route('**/api/v1/stories**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        status: 502,
-        contentType: 'application/json',
-        body: JSON.stringify(LLM_UNREACHABLE_502),
-      });
-    }
-    return route.fulfill({ status: 204, body: '' });
+test('Story tab shows an error alert when story generation fails with the LLM unreachable', async ({ page }) => {
+  // The story is written as a background AI job: POST …/story-jobs creates it, GET /ai-jobs/{id}
+  // reports it. Force "no existing story" (204), a job that's created, and a job that then fails
+  // with the LLM unreachable — the error must still show as a visible alert with Retry.
+  await page.route('**/api/v1/stories**', route => route.fulfill({ status: 204, body: '' }));
+  const job = {
+    id: 'job-1', kind: 'STORY', subjectId: fileId, subjectName: 'fixture', trigger: 'USER',
+    status: 'WAITING', position: 1, createdAt: new Date().toISOString(),
+  };
+  await page.route('**/api/v1/files/*/story-jobs', route =>
+    route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(job) })
+  );
+  await page.route('**/api/v1/ai-jobs**', route => {
+    const failed = route.request().url().includes('/ai-jobs/job-1');
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        failed
+          ? { ...job, status: 'FAILED', position: null, error: { errorCode: 'LLM_UNREACHABLE', message: LLM_UNREACHABLE_502.message } }
+          : []
+      ),
+    });
   });
 
   await page.goto(`/analysis/${fileId}/story`);

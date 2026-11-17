@@ -17,7 +17,9 @@ public interface StoryRepository extends JpaRepository<StoryEntity, UUID> {
    * @param fileId the file ID
    * @return optional story entity
    */
-  Optional<StoryEntity> findFirstByFileIdOrderByGeneratedAtDesc(UUID fileId);
+  /** The newest story of this status: a failed regenerate doesn't hide the last good story. */
+  Optional<StoryEntity> findFirstByFileIdAndStatusOrderByGeneratedAtDesc(
+      UUID fileId, StoryEntity.StoryStatus status);
 
   @Transactional
   void deleteByFileId(UUID fileId);

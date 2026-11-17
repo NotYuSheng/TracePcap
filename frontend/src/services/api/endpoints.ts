@@ -89,6 +89,11 @@ export const API_ENDPOINTS = {
 
   // Story
   STORIES: '/stories',
+  // AI work in the background: started from its own resource, checked on here.
+  AI_JOBS: '/ai-jobs',
+  AI_JOB: (jobId: string) => `/ai-jobs/${jobId}`,
+  AI_JOB_CANCEL: (jobId: string) => `/ai-jobs/${jobId}/cancel`,
+  STORY_JOBS: (fileId: string) => `/files/${fileId}/story-jobs`,
   GET_STORY: (storyId: string) => `/stories/${storyId}`,
   GET_STORY_BY_FILE: (fileId: string) => `/stories?fileId=${fileId}`,
   ASK_STORY: (storyId: string) => `/stories/${storyId}/questions`,
@@ -195,6 +200,7 @@ export const MONITOR_ENDPOINTS = {
     `/monitor/networks/${networkId}/annotations/${annotationId}`,
   INSIGHTS_LATEST: (networkId: string) => `/monitor/networks/${networkId}/insights/latest`,
   INSIGHTS_GENERATE: (networkId: string) => `/monitor/networks/${networkId}/insights`,
+  INSIGHT_JOBS: (networkId: string) => `/monitor/networks/${networkId}/insight-jobs`,
   SNAPSHOT_PATCH: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
   SNAPSHOT_INSIGHT_LATEST: (networkId: string, snapshotId: string) =>

@@ -378,6 +378,8 @@ export const NetworkDetailPage = () => {
                           insight={insight}
                           llmAvailable={true}
                           onGenerate={data.handleGenerateInsights}
+                          job={data.insightJob}
+                          onCancelJob={data.cancelInsightJob}
                         />
                       </Card.Body>
                     </Card>

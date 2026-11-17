@@ -3,11 +3,19 @@ import { Badge, Button } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import type { NetworkInsight, InsightAudience, InsightFocus, InsightOptions } from '@/features/insights/types/insights.types';
+import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
+import { isActive, type AiJob } from '@/features/aiJobs/aiJobs.types';
 
 interface NetworkInsightsPanelProps {
   insight: NetworkInsight | null;
   llmAvailable: boolean;
   onGenerate: (options: InsightOptions) => Promise<void>;
+  /**
+   * When generating runs in the background: the job, shown here while it waits or runs. Without
+   * it, generating waits on onGenerate as before.
+   */
+  job?: AiJob | null;
+  onCancelJob?: () => Promise<void>;
 }
 
 const SEVERITY_VARIANT: Record<string, string> = {
@@ -35,22 +43,26 @@ export const NetworkInsightsPanel = ({
   insight,
   llmAvailable,
   onGenerate,
+  job,
+  onCancelJob,
 }: NetworkInsightsPanelProps) => {
-  const [generating, setGenerating] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const jobActive = isActive(job);
+  const generating = starting || jobActive;
   const [error, setError] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [audience, setAudience] = useState<InsightAudience>('TECHNICAL');
   const [focus, setFocus]       = useState<InsightFocus>('SECURITY');
 
   const handleGenerate = async () => {
-    setGenerating(true);
+    setStarting(true);
     setError(null);
     try {
       await onGenerate({ audience, focus });
     } catch {
       setError('Failed to generate insights. Check that the LLM server is reachable.');
     } finally {
-      setGenerating(false);
+      setStarting(false);
     }
   };
 
@@ -87,7 +99,7 @@ export const NetworkInsightsPanel = ({
           disabled={generating || !llmAvailable}
         >
           {generating ? (
-            <><Spinner animation="border" size="sm" className="me-1" />Generating…</>
+            <><Spinner animation="border" size="sm" className="me-1" />{job?.status === 'WAITING' ? 'Queued…' : 'Generating…'}</>
           ) : (
             <><i className="bi bi-stars me-1" />{insight ? 'Regenerate' : 'Generate Insights'}</>
           )}
@@ -155,6 +167,17 @@ export const NetworkInsightsPanel = ({
       )}
 
       {error && <Alert variant="danger" className="py-2 small mb-3">{error}</Alert>}
+
+      {jobActive && job && (
+        <div className="mb-3">
+          <AiJobStatus
+            job={job}
+            doing="Generating insights"
+            whenDone={insight ? 'The new insights replace these when they are ready.' : 'They show here when they are ready.'}
+            onCancel={onCancelJob ? () => { onCancelJob().catch(() => setError("Couldn't cancel it.")); } : undefined}
+          />
+        </div>
+      )}
 
       {!insight && !generating && (
         <div className="text-center text-muted py-4">

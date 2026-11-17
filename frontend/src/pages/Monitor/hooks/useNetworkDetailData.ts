@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import { insightsService } from '@/features/insights/services/insightsService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
 import { subnetService } from '@/features/subnets/services/subnetService';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import type {
@@ -157,10 +159,15 @@ export function useNetworkDetailData(networkId: string | undefined) {
     setAnnotations(prev => prev.filter(a => a.id !== annotationId));
   };
 
+  // Insights are written in the background (minutes on a local model): the panel follows the job.
+  const insightJob = useAiJob<NetworkInsight>('INSIGHTS', networkId, {
+    onDone: ins => {
+      if (ins) setInsight(ins);
+    },
+  });
   const handleGenerateInsights = async (options: InsightOptions) => {
     if (!networkId) return;
-    const ins = await insightsService.generateInsights(networkId, options);
-    setInsight(ins);
+    await insightJob.start(() => aiJobsService.startInsights(networkId, options));
   };
 
   const handleSubnetSaved = (subnet: SubnetDefinition) => {
@@ -214,6 +221,8 @@ export function useNetworkDetailData(networkId: string | undefined) {
     handleUpdateAnnotation,
     handleDeleteAnnotation,
     handleGenerateInsights,
+    insightJob: insightJob.job,
+    cancelInsightJob: insightJob.cancel,
     handleSubnetSaved,
     handleSubnetDeleted,
     handlePatchChange,
