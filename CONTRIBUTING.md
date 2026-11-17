@@ -86,6 +86,13 @@ gh pr create --base main --head dev --title "release: <summary>"
 
 Review the accumulated diff, let CI run, merge. The merge to `main` publishes the images.
 
+Then tag the release on `main`'s merge commit (`gh release create vX.Y.Z --target <sha>`), and
+**merge `main` back into `dev`**: branch from `main`, open a PR against `dev`, and merge it with a
+**merge commit**, never a squash. The tag sits on `main`'s merge commit, which `dev` doesn't
+otherwise contain, so without this `git describe` on `dev` can't reach the new tag and every
+later version stamp names the release before it (after v0.3.x, `dev` still stamped
+`v0.2.0-601-…`). The PR changes no files; it only brings the tag into `dev`'s history.
+
 
 ## API Contract Workflow
 

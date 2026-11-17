@@ -128,6 +128,28 @@ active*.
 Edges, the traffic animation and the same-device links of :doc:`device-moves`
 draw as in the other layouts.
 
+Edges that would run through a device
+-------------------------------------
+
+Devices sit in a grid, so a straight edge between two devices in the same row
+or column (or that happen to line up) would run through every device between
+them, and read as traffic to them. **Route** (next to **Edges**, above the map)
+picks how the map avoids that:
+
+- **Bend around devices** (the default): only an edge that would touch another
+  device bends, into the gentlest arc that clears it. Every other edge stays as
+  it was. A pair of devices with traffic both ways bends together.
+- **Along the gaps**: an edge that would touch a device is drawn with right
+  angles through the space between devices and around their labels, like a
+  diagram drawn by hand, also between groups. Edges sharing a gap sit side by
+  side. On a very busy map, routing stops after about a second and a half;
+  the edges left over bend instead.
+- **Straight lines**: every edge straight, as before.
+
+The traffic dots follow each edge's shape. The choice is kept with your node
+label settings (see :doc:`settings`), so it follows your account. The draw.io
+export keeps plain connectors; set a route style on them in draw.io.
+
 Exporting to draw.io
 --------------------
 

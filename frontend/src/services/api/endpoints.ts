@@ -89,6 +89,11 @@ export const API_ENDPOINTS = {
 
   // Story
   STORIES: '/stories',
+  // AI work in the background: started from its own resource, checked on here.
+  AI_JOBS: '/ai-jobs',
+  AI_JOB: (jobId: string) => `/ai-jobs/${jobId}`,
+  AI_JOB_CANCEL: (jobId: string) => `/ai-jobs/${jobId}/cancel`,
+  STORY_JOBS: (fileId: string) => `/files/${fileId}/story-jobs`,
   GET_STORY: (storyId: string) => `/stories/${storyId}`,
   GET_STORY_BY_FILE: (fileId: string) => `/stories?fileId=${fileId}`,
   ASK_STORY: (storyId: string) => `/stories/${storyId}/questions`,
@@ -125,6 +130,7 @@ export const API_ENDPOINTS = {
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,
   TRACER_PEERS: (conversationId: string) => `/tracer/${conversationId}/peers`,
   TRACER_EXPLAIN: (conversationId: string) => `/tracer/${conversationId}/explanations`,
+  TRACER_EXPLANATION_JOBS: (conversationId: string) => `/tracer/${conversationId}/explanation-jobs`,
 
   // IP Org Rules (Network Labels)
   IP_ORG_RULES: '/ip-org-rules',
@@ -195,10 +201,13 @@ export const MONITOR_ENDPOINTS = {
     `/monitor/networks/${networkId}/annotations/${annotationId}`,
   INSIGHTS_LATEST: (networkId: string) => `/monitor/networks/${networkId}/insights/latest`,
   INSIGHTS_GENERATE: (networkId: string) => `/monitor/networks/${networkId}/insights`,
+  INSIGHT_JOBS: (networkId: string) => `/monitor/networks/${networkId}/insight-jobs`,
   SNAPSHOT_PATCH: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
   SNAPSHOT_INSIGHT_LATEST: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights/latest`,
+  SNAPSHOT_INSIGHT_JOBS: (networkId: string, snapshotId: string) =>
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}/insight-jobs`,
   SNAPSHOT_INSIGHT_GENERATE: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights`,
 };
@@ -209,6 +218,7 @@ export const SUBNET_ENDPOINTS = {
   SUBNET_DETECT: (fileId: string) => `/subnets/detect?fileId=${fileId}`,
   SUBNET_DETECT_NETWORK: (networkId: string) => `/subnets/detect/network?networkId=${networkId}`,
   SUBNET_SAVE_DETECTED: '/subnets/detected',
+  SUBNET_LABEL_JOBS: (id: number) => `/subnets/${id}/label-suggestion-jobs`,
   SUBNET_SUGGEST_LABEL: (id: number, networkId?: string, fileId?: string) => {
     const p = new URLSearchParams();
     if (networkId) p.set('networkId', networkId);
@@ -231,6 +241,7 @@ export const INSIGHTS_ENDPOINTS = {
   NODE_ROLE_UPSERT: '/node-roles',
   NODE_ROLE_DELETE: (fileId: string, entityType: string, entityKey: string) =>
     `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  ROLE_SUGGESTION_JOBS: '/node-roles/suggestion-jobs',
   NODE_ROLE_SUGGEST: (entityType: string, entityKey: string, fileId: string) =>
     `/node-roles/suggest?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}&fileId=${fileId}`,
   NODE_ROLE_SUGGEST_PREVIEW: (entityType: string, entityKey: string, fileId: string) =>

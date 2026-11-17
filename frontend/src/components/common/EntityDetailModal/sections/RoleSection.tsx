@@ -3,6 +3,7 @@ import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { staleTooltip } from '@/features/insights/utils/nodeRoleStaleness';
+import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 import type { useEntityRole } from '../hooks/useEntityRole';
 
 interface RoleSectionProps {
@@ -130,6 +131,18 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
 
       {r.roleLoading && (
         <div className="text-muted small fst-italic">Loading role…</div>
+      )}
+
+      {r.roleJob && (
+        <div className="mb-2">
+          <AiJobStatus
+            compact
+            job={r.roleJob}
+            doing="Suggesting a role"
+            whenDone="You can close this card; the suggestion waits here for you."
+            onCancel={() => { r.cancelSuggestion().catch(() => {}); }}
+          />
+        </div>
       )}
 
       {r.roleSuggestError && (
