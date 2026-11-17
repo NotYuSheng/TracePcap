@@ -1565,7 +1565,7 @@ export interface paths {
          * Write the story in the background
          * @description Queues the story and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: it ends DONE with the story as its result, or FAILED with why (CONTEXT_LENGTH_EXCEEDED carries the prompt to cut down). The current story stays until the new one is written. Asking again while one waits or runs returns that job.
          */
-        post: operations["start_2"];
+        post: operations["start_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2075,7 +2075,7 @@ export interface paths {
          * Generate insights in the background
          * @description Queues the insights and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the new insight (whose own status says whether the model managed it). Asking again while one waits or runs returns that job.
          */
-        post: operations["start_1"];
+        post: operations["start_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2212,6 +2212,26 @@ export interface paths {
         head?: never;
         /** Update a snapshot's metadata */
         patch: operations["patchSnapshot"];
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insight-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate a capture's insights in the background
+         * @description Queues the insights and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the new insight. Asking again while one waits or runs returns that job.
+         */
+        post: operations["start_4"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insights": {
@@ -2385,6 +2405,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node-roles/suggestion-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest a role in the background
+         * @description Queues the suggestion and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the saved role (or, with preview, a label and description for the editor, not saved); FAILED with why, including when there's too little traffic to say. Asking again while one waits or runs returns that job.
+         */
+        post: operations["start_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/permissions": {
         parameters: {
             query?: never;
@@ -2451,7 +2491,7 @@ export interface paths {
          * Re-apply the rules to one capture, or to every out-of-date one (audited)
          * @description Runs in the background; poll the job. 201 for a new job; 200 with the running job if one is already running. Needs DETECTION_RULES_GLOBAL.
          */
-        post: operations["start"];
+        post: operations["start_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2694,6 +2734,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/subnets/{id}/label-suggestion-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest a subnet label in the background
+         * @description Checks the subnet has members in the scanned captures (422 at once if not), then queues the suggestion and returns with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries a label and description for the edit form (not saved). Scope with networkId, or to one capture with fileId.
+         */
+        post: operations["start_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/subnets/{id}/suggest-label": {
         parameters: {
             query?: never;
@@ -2843,6 +2903,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tracer/{conversationId}/explanation-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain each packet in the background
+         * @description Returns at once with a job. Explanations already worked out (they're kept per conversation), or a conversation with no packets, come back DONE straight away; otherwise the job waits its turn for the model. Check on it at /ai-jobs/{id}: DONE carries the explanations, or an error saying why the model couldn't give them.
+         */
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tracer/{conversationId}/explanations": {
         parameters: {
             query?: never;
@@ -2944,6 +3024,7 @@ export interface components {
             status?: string;
             /** Format: uuid */
             subjectId?: string;
+            subjectKey?: string;
             subjectName?: string;
             trigger?: string;
             /** Format: int64 */
@@ -4536,6 +4617,13 @@ export interface components {
             roleDescription?: string;
             roleLabel?: string;
         };
+        RoleSuggestionJobRequest: {
+            entityKey: string;
+            entityType: string;
+            /** Format: uuid */
+            fileId: string;
+            preview?: boolean;
+        };
         RuleImportRequest: {
             content: string;
             /** @enum {string} */
@@ -5030,6 +5118,7 @@ export interface operations {
             query?: {
                 kind?: string;
                 subjectId?: string;
+                subjectKey?: string;
             };
             header?: never;
             path?: never;
@@ -7423,7 +7512,7 @@ export interface operations {
             };
         };
     };
-    start_2: {
+    start_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -8338,7 +8427,7 @@ export interface operations {
             };
         };
     };
-    start_1: {
+    start_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -8621,6 +8710,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NetworkSnapshotDto"];
+                };
+            };
+        };
+    };
+    start_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                snapshotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["GenerateInsightRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
                 };
             };
         };
@@ -8942,6 +9058,30 @@ export interface operations {
             };
         };
     };
+    start_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleSuggestionJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
+                };
+            };
+        };
+    };
     list_1: {
         parameters: {
             query?: never;
@@ -9052,7 +9192,7 @@ export interface operations {
             };
         };
     };
-    start: {
+    start_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -9396,6 +9536,31 @@ export interface operations {
             };
         };
     };
+    start_1: {
+        parameters: {
+            query?: {
+                networkId?: string;
+                fileId?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
+                };
+            };
+        };
+    };
     suggestLabel: {
         parameters: {
             query?: {
@@ -9612,6 +9777,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TimelineDataDto"][];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AiJobDto"];
                 };
             };
         };

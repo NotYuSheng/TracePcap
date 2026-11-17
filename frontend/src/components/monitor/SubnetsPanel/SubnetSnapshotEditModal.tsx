@@ -3,7 +3,9 @@ import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { insightsService } from '@/features/insights/services/insightsService';
-import { subnetService } from '@/features/subnets/services/subnetService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
+import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 import type { NetworkSnapshot, SubnetOverrideInput } from '@/features/monitor/types/monitor.types';
 
 interface SubnetSnapshotEditModalProps {
@@ -26,22 +28,31 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
   const [label, setLabel] = useState(existing?.label ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [saving, setSaving] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The suggestion runs in the background (one job at a time for the model): closing this doesn't
+  // lose it, and reopening picks it up. Scoped to THIS snapshot's traffic, like the role editor.
+  const labelJob = useAiJob<{ label?: string; description?: string }>('SUBNET_LABEL', networkId, {
+    onDone: s => {
+      if (s?.label) setLabel(s.label);
+      if (s?.description) setDescription(s.description);
+    },
+    onFailed: job => setError(job.error?.message || 'Suggestion failed. Check that the LLM server is reachable (LLM_BASE_URL).'),
+  }, `subnet:${subnetId}:${snapshot.fileId}`);
+  const suggesting = starting || labelJob.active;
+
   const suggest = async () => {
-    setSuggesting(true);
+    setStarting(true);
     setError(null);
     try {
-      // Scope the suggestion to THIS snapshot's traffic (per-snapshot AI, like the role editor).
-      const s = await subnetService.suggestLabel(subnetId, networkId, snapshot.fileId);
-      if (s.label) setLabel(s.label);
-      if (s.description) setDescription(s.description);
+      await labelJob.start(() => aiJobsService.startSubnetLabel(subnetId, networkId, snapshot.fileId));
     } catch (err: unknown) {
+      // e.g. 422 straight away: no member nodes seen in this capture.
       const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(apiMsg ?? (err instanceof Error ? err.message : 'Suggestion failed. Check that the LLM server is reachable (LLM_BASE_URL).'));
     } finally {
-      setSuggesting(false);
+      setStarting(false);
     }
   };
 
@@ -123,6 +134,17 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
             ? <><Spinner size="sm" className="me-1" />Suggesting…</>
             : <><i className="bi bi-stars me-1" />Suggest with AI</>}
         </Button>
+        {labelJob.active && labelJob.job && (
+          <div className="mt-2">
+            <AiJobStatus
+              compact
+              job={labelJob.job}
+              doing="Suggesting a label"
+              whenDone="You can close this; the suggestion fills in here when you're back."
+              onCancel={() => { labelJob.cancel().catch(() => {}); }}
+            />
+          </div>
+        )}
       </Modal.Body>
       <Modal.Footer className="d-flex justify-content-end gap-2">
         <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>

@@ -7,6 +7,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { insightsService } from '@/features/insights/services/insightsService'
+import { aiJobsService } from '@/features/aiJobs/aiJobsService'
+import type { AiJob } from '@/features/aiJobs/aiJobs.types'
 import type { NodeRole } from '@/features/insights/types/insights.types'
 import { useEntityRole } from '../useEntityRole'
 
@@ -20,7 +22,18 @@ vi.mock('@/features/insights/services/insightsService', () => ({
   },
 }))
 
+// Suggestions run as background AI jobs; here they come back already finished.
+vi.mock('@/features/aiJobs/aiJobsService', () => ({
+  AI_JOBS_CHANGED: 'tracepcap:ai-jobs-changed',
+  aiJobsService: { list: vi.fn().mockResolvedValue([]), get: vi.fn(), cancel: vi.fn(), startRoleSuggestion: vi.fn() },
+}))
+
 const mocked = vi.mocked(insightsService)
+const jobs = vi.mocked(aiJobsService)
+const finished = (preview: boolean, over: Partial<AiJob>): AiJob => ({
+  id: 'j1', kind: preview ? 'ROLE_PREVIEW' : 'ROLE_SUGGESTION', subjectId: '11111111-1111-1111-1111-111111111111',
+  subjectKey: 'IP:10.0.0.1', trigger: 'USER', status: 'DONE', createdAt: '2026-11-17T10:00:00Z', ...over,
+})
 const FILE = '11111111-1111-1111-1111-111111111111'
 
 const role = (overrides: Partial<NodeRole> = {}): NodeRole =>
@@ -31,7 +44,10 @@ const role = (overrides: Partial<NodeRole> = {}): NodeRole =>
     ...overrides,
   }) as NodeRole
 
-afterEach(() => vi.resetAllMocks())
+afterEach(() => {
+  vi.resetAllMocks()
+  jobs.list.mockResolvedValue([])
+})
 
 function render(showRole = true) {
   return renderHook(() => useEntityRole('IP', '10.0.0.1', FILE, showRole))
@@ -56,7 +72,7 @@ describe('useEntityRole', () => {
   describe('suggest', () => {
     it('replaces an unconfirmed role outright', async () => {
       mocked.getNodeRole.mockResolvedValue(role({ confirmedByHuman: false }))
-      mocked.suggestNodeRole.mockResolvedValue(role({ roleLabel: 'ai guess' }))
+      jobs.startRoleSuggestion.mockResolvedValue(finished(false, { result: role({ roleLabel: 'ai guess' }) }))
 
       const { result } = render()
       await waitFor(() => expect(result.current.role).not.toBeNull())
@@ -71,10 +87,9 @@ describe('useEntityRole', () => {
       mocked.getNodeRole.mockResolvedValue(
         role({ roleLabel: 'analyst label', confirmedByHuman: true })
       )
-      mocked.suggestNodeRolePreview.mockResolvedValue({
-        roleLabel: 'ai guess',
-        roleDescription: 'ai description',
-      })
+      jobs.startRoleSuggestion.mockResolvedValue(
+        finished(true, { result: { roleLabel: 'ai guess', roleDescription: 'ai description' } })
+      )
 
       const { result } = render()
       await waitFor(() => expect(result.current.role?.confirmedByHuman).toBe(true))
@@ -85,19 +100,21 @@ describe('useEntityRole', () => {
       expect(result.current.role?.roleLabel).toBe('analyst label')
       expect(result.current.roleLabelDraft).toBe('ai guess')
       expect(result.current.roleEditing).toBe(true)
-      expect(mocked.suggestNodeRole).not.toHaveBeenCalled()
+      expect(jobs.startRoleSuggestion).toHaveBeenCalledWith(FILE, 'IP', '10.0.0.1', true)
     })
 
     it('surfaces the suggestion error message', async () => {
       mocked.getNodeRole.mockResolvedValue(null)
-      mocked.suggestNodeRole.mockRejectedValue(new Error('Only 2 conversations seen'))
+      jobs.startRoleSuggestion.mockResolvedValue(
+        finished(false, { status: 'FAILED', error: { message: 'Only 2 conversations seen' } })
+      )
 
       const { result } = render()
       await waitFor(() => expect(result.current.roleLoading).toBe(false))
       await act(async () => { await result.current.suggest() })
 
-      // insightsService turns a 422 into this message; the hook must show it rather than
-      // discarding the reason no role could be suggested.
+      // The model's "not enough evidence" comes back as the job's error; the hook must show it
+      // rather than discarding the reason no role could be suggested.
       expect(result.current.roleSuggestError).toBe('Only 2 conversations seen')
       expect(result.current.roleSuggesting).toBe(false)
     })

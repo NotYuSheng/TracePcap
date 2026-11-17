@@ -84,4 +84,24 @@ describe('following a background job', () => {
     expect(svc.cancel).toHaveBeenCalledWith('j1')
     expect(result.current.active).toBe(false)
   })
+
+  it('hands over an answer that came back already done, without checking again', async () => {
+    const onDone = vi.fn()
+    const { result } = renderHook(() => useAiJob('TRACE_EXPLANATIONS', null, { onDone }, 'conv-1'))
+    await act(async () => {
+      await result.current.start(async () =>
+        job({ kind: 'TRACE_EXPLANATIONS', subjectId: null, subjectKey: 'conv-1', status: 'DONE', result: 'cached' })
+      )
+    })
+    expect(onDone).toHaveBeenCalledWith('cached', expect.objectContaining({ status: 'DONE' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(svc.get).not.toHaveBeenCalled()
+  })
+
+  it('looks up a job about one host by its key, so reopening the card finds it', async () => {
+    svc.list.mockResolvedValue([job({ kind: 'ROLE_PREVIEW', subjectKey: 'IP:10.0.0.5', status: 'RUNNING' })])
+    const { result } = renderHook(() => useAiJob('ROLE_PREVIEW', 'f1', {}, 'IP:10.0.0.5'))
+    await waitFor(() => expect(result.current.active).toBe(true))
+    expect(svc.list).toHaveBeenCalledWith({ kind: 'ROLE_PREVIEW', subjectId: 'f1', subjectKey: 'IP:10.0.0.5' })
+  })
 })

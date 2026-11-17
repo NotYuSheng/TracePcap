@@ -124,29 +124,55 @@ public class ConversationTracerService {
   }
 
   public TracerExplainResponse explainSteps(UUID conversationId) {
+    Prepared p = prepareExplanations(conversationId);
+    if (p.ready() != null) return p.ready();
+    try {
+      return p.ask().call();
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * Explanations ready to ask the model for. {@code ready} is set when no model time is needed
+   * (cached, or a conversation with no packets); otherwise {@code ask} calls the model.
+   * {@code name} is the conversation as people read it, e.g. {@code 10.0.0.5:443 → 1.2.3.4:51000}.
+   */
+  public record Prepared(
+      String name, TracerExplainResponse ready, java.util.concurrent.Callable<TracerExplainResponse> ask) {}
+
+  public Prepared prepareExplanations(UUID conversationId) {
+    ConversationFacts conv = conversationLookup.conversationFactsById(conversationId)
+        .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
+    String name = "%s:%s → %s:%s".formatted(
+        conv.flow().srcIp(), conv.flow().srcPort() != null ? conv.flow().srcPort() : "?",
+        conv.flow().dstIp(), conv.flow().dstPort() != null ? conv.flow().dstPort() : "?");
+
     // Return from cache if available
     List<StepExplanation> cached = explanationCache.get(conversationId);
     if (cached != null) {
       log.info("Returning cached explanations for conversation {}", conversationId);
-      return TracerExplainResponse.builder()
+      return new Prepared(name, TracerExplainResponse.builder()
           .conversationId(conversationId.toString())
           .explanations(cached)
-          .build();
+          .build(), null);
     }
-
-    ConversationFacts conv = conversationLookup.conversationFactsById(conversationId)
-        .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
 
     List<PacketFacts> packets =
         packetLookup.packetsInConversation(conversationId);
 
     if (packets.isEmpty()) {
-      return TracerExplainResponse.builder()
+      return new Prepared(name, TracerExplainResponse.builder()
           .conversationId(conversationId.toString())
           .explanations(Collections.emptyList())
-          .build();
+          .build(), null);
     }
+    return new Prepared(name, null, () -> ask(conversationId, conv, packets));
+  }
 
+  private TracerExplainResponse ask(UUID conversationId, ConversationFacts conv, List<PacketFacts> packets) {
     String systemPrompt = buildSystemPrompt(conv);
     String userPrompt = buildUserPrompt(conv, packets);
 

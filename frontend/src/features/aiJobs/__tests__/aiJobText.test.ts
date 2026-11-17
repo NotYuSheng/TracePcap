@@ -27,5 +27,8 @@ describe('how a background job is described', () => {
   it('links each kind to where its answer lands', () => {
     expect(jobPath({ kind: 'STORY', subjectId: 'f1' } as AiJob)).toBe('/analysis/f1/story')
     expect(jobPath({ kind: 'INSIGHTS', subjectId: 'n1' } as AiJob)).toBe('/monitor/n1')
+    expect(jobPath({ kind: 'ROLE_PREVIEW', subjectId: 'f1' } as AiJob)).toBe('/analysis/f1/network-diagram')
+    expect(jobPath({ kind: 'SUBNET_LABEL', subjectId: null } as AiJob)).toBeNull()
+    expect(jobPath({ kind: 'TRACE_EXPLANATIONS', subjectId: null } as AiJob)).toBeNull()
   })
 })

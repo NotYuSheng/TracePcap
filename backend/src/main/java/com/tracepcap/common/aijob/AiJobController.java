@@ -29,8 +29,10 @@ public class AiJobController {
       summary = "What the model is working on",
       description = "Waiting and running jobs first, in the order they'll run, then those finished in the last 30 minutes. Results are left out; get a job by id for its result.")
   public List<AiJobDto> list(
-      @RequestParam(required = false) String kind, @RequestParam(required = false) UUID subjectId) {
-    return jobs.list(kind, subjectId);
+      @RequestParam(required = false) String kind,
+      @RequestParam(required = false) UUID subjectId,
+      @RequestParam(required = false) String subjectKey) {
+    return jobs.list(kind, subjectId, subjectKey);
   }
 
   @GetMapping("/{jobId}")

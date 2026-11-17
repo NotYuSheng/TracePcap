@@ -195,4 +195,34 @@ class AiJobServiceTest {
     assertThat(jobs.list("STORY", null)).hasSize(1);
     assertThat(jobs.list(null, network)).extracting(AiJobDto::getKind).containsExactly("INSIGHTS");
   }
+
+  @Test
+  void jobs_about_different_hosts_on_one_capture_are_separate() {
+    AiJobDto a = jobs.submitFor("ROLE_SUGGESTION", capture, "IP:10.0.0.5", "10.0.0.5", () -> "a");
+    AiJobDto again = jobs.submitFor("ROLE_SUGGESTION", capture, "IP:10.0.0.5", "10.0.0.5", () -> "a2");
+    AiJobDto b = jobs.submitFor("ROLE_SUGGESTION", capture, "IP:10.0.0.6", "10.0.0.6", () -> "b");
+
+    assertThat(again.getId()).isEqualTo(a.getId());
+    assertThat(b.getId()).isNotEqualTo(a.getId());
+    assertThat(jobs.list("ROLE_SUGGESTION", capture, "IP:10.0.0.6")).extracting(AiJobDto::getId).containsExactly(b.getId());
+    assertThat(a.getSubjectKey()).isEqualTo("IP:10.0.0.5");
+  }
+
+  @Test
+  void a_job_with_no_subject_is_told_apart_by_its_key() {
+    AiJobDto a = jobs.submitFor("TRACE_EXPLANATIONS", null, "conv-1", "10.0.0.5:443 → 1.2.3.4:51000", () -> "x");
+    AiJobDto b = jobs.submitFor("TRACE_EXPLANATIONS", null, "conv-2", "other", () -> "y");
+    assertThat(b.getId()).isNotEqualTo(a.getId());
+    assertThat(jobs.submitFor("TRACE_EXPLANATIONS", null, "conv-1", "again", () -> "z").getId()).isEqualTo(a.getId());
+  }
+
+  @Test
+  void an_answer_that_needs_no_model_time_is_done_at_once_and_never_queued() {
+    jobs.submit("STORY", capture, "a", () -> "story"); // the model is busy
+    AiJobDto cached = jobs.finished("TRACE_EXPLANATIONS", null, "conv-1", "conv", "cached explanations");
+
+    assertThat(cached.getStatus()).isEqualTo("DONE");
+    assertThat(cached.getResult()).isEqualTo("cached explanations");
+    assertThat(worker.queued).hasSize(1);
+  }
 }

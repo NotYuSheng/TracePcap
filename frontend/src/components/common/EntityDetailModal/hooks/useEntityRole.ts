@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { insightsService } from '@/features/insights/services/insightsService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
+import type { AiJob } from '@/features/aiJobs/aiJobs.types';
 import type { NodeRole } from '@/features/insights/types/insights.types';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 
@@ -10,7 +13,7 @@ import type { EntityType } from '@/features/notes/services/entityNotesService';
 export function useEntityRole(entityType: EntityType, entityKey: string, fileId: string, showRole: boolean) {
   const [role, setRole] = useState<NodeRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
-  const [roleSuggesting, setRoleSuggesting] = useState(false);
+  const [roleStarting, setRoleStarting] = useState(false);
   const [roleSuggestError, setRoleSuggestError] = useState<string | null>(null);
   const [roleInfoOpen, setRoleInfoOpen] = useState(false);
   const [roleEditing, setRoleEditing] = useState(false);
@@ -28,7 +31,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     setRoleLabelDraft('');
     setRoleDescDraft('');
     setRoleEditing(false);
-    setRoleSuggesting(false);
+    setRoleStarting(false);
     setRoleSuggestError(null);
     setRoleSaving(false);
     setRoleInfoOpen(false);
@@ -42,28 +45,43 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     return () => { active = false; };
   }, [showRole, entityType, entityKey, fileId, reloadKey]);
 
-  const suggest = async () => {
+  // Suggestions run in the background (one job at a time for the model): closing the card doesn't
+  // lose one, and reopening it picks up a suggestion still on its way.
+  const jobKey = `${entityType}:${entityKey}`;
+  const failed = (job: AiJob) => setRoleSuggestError(job.error?.message || 'Suggestion failed.');
+  const saveJob = useAiJob<NodeRole>('ROLE_SUGGESTION', showRole ? fileId : null, {
+    onDone: suggested => { if (suggested) setRole(suggested); },
+    onFailed: failed,
+  }, jobKey);
+  const previewJob = useAiJob<{ roleLabel?: string; roleDescription?: string }>('ROLE_PREVIEW', showRole ? fileId : null, {
+    onDone: s => {
+      setRoleLabelDraft(s?.roleLabel ?? '');
+      setRoleDescDraft(s?.roleDescription ?? '');
+      setRoleEditing(true);
+    },
+    onFailed: failed,
+  }, jobKey);
+  const roleJob = saveJob.active ? saveJob.job : previewJob.active ? previewJob.job : null;
+  const roleSuggesting = roleStarting || !!roleJob;
+
+  const startSuggestion = async (preview: boolean) => {
     if (!fileId) return;
-    setRoleSuggesting(true);
+    setRoleStarting(true);
     setRoleSuggestError(null);
     try {
-      // A confirmed label is never silently overwritten — suggest into the editor for review.
-      if (role?.confirmedByHuman) {
-        const s = await insightsService.suggestNodeRolePreview(entityType, entityKey, fileId);
-        setRoleLabelDraft(s.roleLabel ?? '');
-        setRoleDescDraft(s.roleDescription ?? '');
-        setRoleEditing(true);
-      } else {
-        const suggested = await insightsService.suggestNodeRole(entityType, entityKey, fileId);
-        setRole(suggested);
-      }
+      const job = preview ? previewJob : saveJob;
+      await job.start(() => aiJobsService.startRoleSuggestion(fileId, entityType, entityKey, preview));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Suggestion failed.';
-      setRoleSuggestError(msg);
+      setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.');
     } finally {
-      setRoleSuggesting(false);
+      setRoleStarting(false);
     }
   };
+
+  // A confirmed label is never silently overwritten — suggest into the editor for review.
+  const suggest = () => startSuggestion(!!role?.confirmedByHuman);
+
+  const cancelSuggestion = () => (saveJob.active ? saveJob.cancel() : previewJob.cancel());
 
   const accept = async () => {
     if (!role) return;
@@ -140,26 +158,14 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
   };
 
   /** Fetch a fresh AI suggestion from this snapshot's traffic and open the editor pre-filled. */
-  const suggestUpdate = async () => {
-    if (!fileId) return;
-    setRoleSuggesting(true);
-    setRoleSuggestError(null);
-    try {
-      const s = await insightsService.suggestNodeRolePreview(entityType, entityKey, fileId);
-      setRoleLabelDraft(s.roleLabel ?? '');
-      setRoleDescDraft(s.roleDescription ?? '');
-      setRoleEditing(true);
-    } catch (err: unknown) {
-      setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.');
-    } finally {
-      setRoleSuggesting(false);
-    }
-  };
+  const suggestUpdate = () => startSuggestion(true);
 
   return {
     role,
     roleLoading,
     roleSuggesting,
+    roleJob,
+    cancelSuggestion,
     roleSuggestError,
     roleInfoOpen,
     setRoleInfoOpen,

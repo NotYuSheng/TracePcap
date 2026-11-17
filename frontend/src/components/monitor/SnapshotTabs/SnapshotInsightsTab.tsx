@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { insightsService } from '@/features/insights/services/insightsService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
 import type { InsightOptions, NetworkInsight } from '@/features/insights/types/insights.types';
 
 /** The AI write-up for one capture: shown when there is one, generated on request. */
@@ -18,9 +20,12 @@ export function SnapshotInsightsTab({ networkId, snapshotId }: { networkId: stri
     };
   }, [networkId, snapshotId]);
 
+  // Generated in the background (one job at a time for the model): the tab follows the job.
+  const job = useAiJob<NetworkInsight>('SNAPSHOT_INSIGHTS', networkId, {
+    onDone: ins => { if (ins) setResult({ id: snapshotId, insight: ins }); },
+  }, snapshotId);
   const handleGenerate = async (options: InsightOptions) => {
-    const ins = await insightsService.generateSnapshotInsight(networkId, snapshotId, options);
-    setResult({ id: snapshotId, insight: ins });
+    await job.start(() => aiJobsService.startSnapshotInsights(networkId, snapshotId, options));
   };
 
   if (result?.id !== snapshotId) {
@@ -30,5 +35,13 @@ export function SnapshotInsightsTab({ networkId, snapshotId }: { networkId: stri
       </div>
     );
   }
-  return <NetworkInsightsPanel insight={result.insight} llmAvailable={true} onGenerate={handleGenerate} />;
+  return (
+    <NetworkInsightsPanel
+      insight={result.insight}
+      llmAvailable={true}
+      onGenerate={handleGenerate}
+      job={job.job}
+      onCancelJob={job.cancel}
+    />
+  );
 }

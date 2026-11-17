@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -77,16 +78,50 @@ public class AiJobService {
    * Queues the work, or returns the job already waiting or running for the same kind and subject.
    * {@code trigger} is {@code USER} or {@code UPLOAD}.
    */
-  public synchronized AiJobDto submit(
+  public AiJobDto submit(
       String kind, UUID subjectId, String subjectName, String trigger, Callable<?> work) {
+    return queue(kind, subjectId, null, subjectName, trigger, work);
+  }
+
+  /**
+   * As {@link #submit}, for something finer than a capture or network: one host on a capture, one
+   * subnet, one conversation. {@code subjectKey} tells such jobs apart (e.g. {@code IP:10.0.0.5});
+   * {@code subjectId} is where the answer lands, or null.
+   */
+  public AiJobDto submitFor(
+      String kind, UUID subjectId, String subjectKey, String subjectName, Callable<?> work) {
+    return queue(kind, subjectId, subjectKey, subjectName, "USER", work);
+  }
+
+  /**
+   * Records work that needed no model time (a cached answer): a job that is already DONE, so
+   * callers check on every kind of request the same way, and it never waits in line.
+   */
+  public synchronized AiJobDto finished(
+      String kind, UUID subjectId, String subjectKey, String subjectName, Object result) {
+    evictOld();
+    Job job = new Job(UUID.randomUUID(), kind, subjectId, subjectKey, subjectName, "USER", actor.username(), now());
+    job.startedAt = job.createdAt;
+    job.finishedAt = job.createdAt;
+    job.result = result;
+    job.status = "DONE";
+    jobs.put(job.id, job);
+    return toDto(job, true);
+  }
+
+  private synchronized AiJobDto queue(
+      String kind, UUID subjectId, String subjectKey, String subjectName, String trigger, Callable<?> work) {
     evictOld();
     for (Job j : jobs.values()) {
-      if (j.active() && j.kind.equals(kind) && j.subjectId.equals(subjectId)) return toDto(j, true);
+      if (j.active() && j.kind.equals(kind) && Objects.equals(j.subjectId, subjectId)
+          && Objects.equals(j.subjectKey, subjectKey)) {
+        return toDto(j, true);
+      }
     }
-    Job job = new Job(UUID.randomUUID(), kind, subjectId, subjectName, trigger, actor.username(), now());
+    Job job = new Job(UUID.randomUUID(), kind, subjectId, subjectKey, subjectName, trigger, actor.username(), now());
     jobs.put(job.id, job);
     job.future = worker.submit(() -> run(job, work));
-    log.info("AI job {} queued: {} for {} ({})", job.id, kind, subjectId, trigger);
+    log.info("AI job {} queued: {} for {} {} ({})", job.id, kind, subjectId, subjectKey, trigger);
     return toDto(job, true);
   }
 
@@ -96,10 +131,16 @@ public class AiJobService {
 
   /** Waiting and running jobs, then the ones finished in the last 30 minutes, newest first. */
   public List<AiJobDto> list(String kind, UUID subjectId) {
+    return list(kind, subjectId, null);
+  }
+
+  /** As above, narrowed to one {@code subjectKey} when given. */
+  public List<AiJobDto> list(String kind, UUID subjectId, String subjectKey) {
     evictOld();
     return jobs.values().stream()
         .filter(j -> kind == null || j.kind.equals(kind))
-        .filter(j -> subjectId == null || j.subjectId.equals(subjectId))
+        .filter(j -> subjectId == null || subjectId.equals(j.subjectId))
+        .filter(j -> subjectKey == null || subjectKey.equals(j.subjectKey))
         .sorted(Comparator.comparing((Job j) -> !j.active()).thenComparing(j -> j.createdAt))
         .map(j -> toDto(j, false))
         .toList();
@@ -207,7 +248,7 @@ public class AiJobService {
 
   private AiJobDto toDto(Job j, boolean full) {
     return AiJobDto.builder()
-        .id(j.id).kind(j.kind).subjectId(j.subjectId).subjectName(j.subjectName)
+        .id(j.id).kind(j.kind).subjectId(j.subjectId).subjectKey(j.subjectKey).subjectName(j.subjectName)
         .trigger(j.trigger).requestedBy(j.requestedBy).status(j.status).position(position(j))
         .createdAt(j.createdAt).startedAt(j.startedAt).finishedAt(j.finishedAt)
         .typicalMs(typicalMs(j.kind))
@@ -221,6 +262,7 @@ public class AiJobService {
     final UUID id;
     final String kind;
     final UUID subjectId;
+    final String subjectKey;
     final String subjectName;
     final String trigger;
     final String requestedBy;
@@ -232,10 +274,12 @@ public class AiJobService {
     volatile AiJobDto.AiJobError error;
     volatile Future<?> future;
 
-    Job(UUID id, String kind, UUID subjectId, String subjectName, String trigger, String requestedBy, Instant createdAt) {
+    Job(UUID id, String kind, UUID subjectId, String subjectKey, String subjectName, String trigger,
+        String requestedBy, Instant createdAt) {
       this.id = id;
       this.kind = kind;
       this.subjectId = subjectId;
+      this.subjectKey = subjectKey;
       this.subjectName = subjectName;
       this.trigger = trigger;
       this.requestedBy = requestedBy;

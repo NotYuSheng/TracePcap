@@ -92,6 +92,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "subjectKey": {
+            "type": "string"
+          },
           "subjectName": {
             "type": "string"
           },
@@ -4540,6 +4543,29 @@
         },
         "type": "object"
       },
+      "RoleSuggestionJobRequest": {
+        "properties": {
+          "entityKey": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "preview": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entityKey",
+          "entityType",
+          "fileId"
+        ],
+        "type": "object"
+      },
       "RuleImportRequest": {
         "properties": {
           "content": {
@@ -5919,6 +5945,14 @@
             "required": false,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subjectKey",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           }
@@ -10401,7 +10435,7 @@
     "/api/v1/files/{fileId}/story-jobs": {
       "post": {
         "description": "Queues the story and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: it ends DONE with the story as its result, or FAILED with why (CONTEXT_LENGTH_EXCEEDED carries the prompt to cut down). The current story stays until the new one is written. Asking again while one waits or runs returns that job.",
-        "operationId": "start_2",
+        "operationId": "start_6",
         "parameters": [
           {
             "in": "path",
@@ -11875,7 +11909,7 @@
     "/api/v1/monitor/networks/{networkId}/insight-jobs": {
       "post": {
         "description": "Queues the insights and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the new insight (whose own status says whether the model managed it). Asking again while one waits or runs returns that job.",
-        "operationId": "start_1",
+        "operationId": "start_5",
         "parameters": [
           {
             "in": "path",
@@ -12326,6 +12360,57 @@
         "summary": "Update a snapshot's metadata",
         "tags": [
           "Monitor Snapshots"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insight-jobs": {
+      "post": {
+        "description": "Queues the insights and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the new insight. Asking again while one waits or runs returns that job.",
+        "operationId": "start_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snapshotId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInsightRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Generate a capture's insights in the background",
+        "tags": [
+          "Snapshot Insights"
         ]
       }
     },
@@ -12858,6 +12943,38 @@
         ]
       }
     },
+    "/api/v1/node-roles/suggestion-jobs": {
+      "post": {
+        "description": "Queues the suggestion and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries the saved role (or, with preview, a label and description for the editor, not saved); FAILED with why, including when there's too little traffic to say. Asking again while one waits or runs returns that job.",
+        "operationId": "start_3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleSuggestionJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Suggest a role in the background",
+        "tags": [
+          "Node Roles"
+        ]
+      }
+    },
     "/api/v1/permissions": {
       "get": {
         "operationId": "list_1",
@@ -13010,7 +13127,7 @@
       },
       "post": {
         "description": "Runs in the background; poll the job. 201 for a new job; 200 with the running job if one is already running. Needs DETECTION_RULES_GLOBAL.",
-        "operationId": "start",
+        "operationId": "start_2",
         "requestBody": {
           "content": {
             "application/json": {
@@ -13524,6 +13641,57 @@
         ]
       }
     },
+    "/api/v1/subnets/{id}/label-suggestion-jobs": {
+      "post": {
+        "description": "Checks the subnet has members in the scanned captures (422 at once if not), then queues the suggestion and returns with the job WAITING. Check on it at /ai-jobs/{id}: DONE carries a label and description for the edit form (not saved). Scope with networkId, or to one capture with fileId.",
+        "operationId": "start_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Suggest a subnet label in the background",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
     "/api/v1/subnets/{id}/suggest-label": {
       "post": {
         "description": "Collects the subnet's member nodes across recent snapshots and asks the LLM to suggest a concise label naming the subnet plus a description of its purpose and any anomalies. The result is not persisted — the analyst reviews it in the edit form and saves it onto the subnet's own label/description. Optionally scope to a network via networkId.",
@@ -13880,6 +14048,39 @@
         "summary": "Get binned timeline data for a specific time range",
         "tags": [
           "Timeline"
+        ]
+      }
+    },
+    "/api/v1/tracer/{conversationId}/explanation-jobs": {
+      "post": {
+        "description": "Returns at once with a job. Explanations already worked out (they're kept per conversation), or a conversation with no packets, come back DONE straight away; otherwise the job waits its turn for the model. Check on it at /ai-jobs/{id}: DONE carries the explanations, or an error saying why the model couldn't give them.",
+        "operationId": "start",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Explain each packet in the background",
+        "tags": [
+          "Conversation Tracer"
         ]
       }
     },

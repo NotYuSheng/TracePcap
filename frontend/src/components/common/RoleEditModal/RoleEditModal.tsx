@@ -4,6 +4,9 @@ import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { insightsService } from '@/features/insights/services/insightsService';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
+import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 
 interface RoleEditModalProps {
   entityType: EntityType;
@@ -34,7 +37,7 @@ export function RoleEditModal({
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const [hasRole, setHasRole] = useState(false);
@@ -56,17 +59,26 @@ export function RoleEditModal({
     return () => { active = false; };
   }, [entityType, entityKey, fileId]);
 
+  // The suggestion runs in the background (one job at a time for the model); the same job as the
+  // host card's, so asking from both places doesn't ask twice.
+  const previewJob = useAiJob<{ roleLabel?: string; roleDescription?: string }>('ROLE_PREVIEW', fileId, {
+    onDone: s => {
+      setLabel(s?.roleLabel ?? '');
+      setDescription(s?.roleDescription ?? '');
+    },
+    onFailed: job => setError(job.error?.message || 'Suggestion failed.'),
+  }, `${entityType}:${entityKey}`);
+  const suggesting = starting || previewJob.active;
+
   const suggest = async () => {
-    setSuggesting(true);
+    setStarting(true);
     setError(null);
     try {
-      const s = await insightsService.suggestNodeRolePreview(entityType, entityKey, fileId);
-      setLabel(s.roleLabel ?? '');
-      setDescription(s.roleDescription ?? '');
+      await previewJob.start(() => aiJobsService.startRoleSuggestion(fileId, entityType, entityKey, true));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Suggestion failed.');
     } finally {
-      setSuggesting(false);
+      setStarting(false);
     }
   };
 
@@ -157,6 +169,17 @@ export function RoleEditModal({
                 ? <><Spinner size="sm" className="me-1" />Suggesting…</>
                 : <><i className="bi bi-stars me-1" />Suggest with AI</>}
             </Button>
+            {previewJob.active && previewJob.job && (
+              <div className="mt-2">
+                <AiJobStatus
+                  compact
+                  job={previewJob.job}
+                  doing="Suggesting a role"
+                  whenDone="You can close this; the suggestion fills in here when you're back."
+                  onCancel={() => { previewJob.cancel().catch(() => {}); }}
+                />
+              </div>
+            )}
           </>
         )}
       </Modal.Body>

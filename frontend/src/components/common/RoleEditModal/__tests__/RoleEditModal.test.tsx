@@ -8,6 +8,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { insightsService } from '@/features/insights/services/insightsService'
+import { aiJobsService } from '@/features/aiJobs/aiJobsService'
+import type { AiJob } from '@/features/aiJobs/aiJobs.types'
 import { RoleEditModal } from '../RoleEditModal'
 
 vi.mock('@/features/insights/services/insightsService', () => ({
@@ -19,10 +21,24 @@ vi.mock('@/features/insights/services/insightsService', () => ({
   },
 }))
 
-const mocked = vi.mocked(insightsService)
-const FILE = '11111111-1111-1111-1111-111111111111'
+// The suggestion runs as a background AI job; here it comes back already finished.
+vi.mock('@/features/aiJobs/aiJobsService', () => ({
+  AI_JOBS_CHANGED: 'tracepcap:ai-jobs-changed',
+  aiJobsService: { list: vi.fn().mockResolvedValue([]), get: vi.fn(), cancel: vi.fn(), startRoleSuggestion: vi.fn() },
+}))
 
-afterEach(() => vi.resetAllMocks())
+const mocked = vi.mocked(insightsService)
+const jobs = vi.mocked(aiJobsService)
+const FILE = '11111111-1111-1111-1111-111111111111'
+const preview = (over: Partial<AiJob>): AiJob => ({
+  id: 'j1', kind: 'ROLE_PREVIEW', subjectId: FILE, subjectKey: 'IP:10.0.0.1', trigger: 'USER',
+  status: 'DONE', createdAt: '2026-11-17T10:00:00Z', ...over,
+})
+
+afterEach(() => {
+  vi.resetAllMocks()
+  jobs.list.mockResolvedValue([])
+})
 
 function renderModal() {
   const onClose = vi.fn()
@@ -79,10 +95,9 @@ describe('RoleEditModal', () => {
 
   it('fills the form from an AI suggestion without saving it', async () => {
     mocked.getNodeRole.mockResolvedValue(null as never)
-    mocked.suggestNodeRolePreview.mockResolvedValue({
-      roleLabel: 'file server',
-      roleDescription: 'serves files',
-    } as never)
+    jobs.startRoleSuggestion.mockResolvedValue(
+      preview({ result: { roleLabel: 'file server', roleDescription: 'serves files' } })
+    )
     renderModal()
     await waitFor(() => expect(mocked.getNodeRole).toHaveBeenCalled())
 
@@ -96,13 +111,15 @@ describe('RoleEditModal', () => {
 
   it('surfaces the reason a suggestion could not be made', async () => {
     mocked.getNodeRole.mockResolvedValue(null as never)
-    mocked.suggestNodeRolePreview.mockRejectedValue(new Error('Only 2 conversations seen'))
+    jobs.startRoleSuggestion.mockResolvedValue(
+      preview({ status: 'FAILED', error: { message: 'Only 2 conversations seen' } })
+    )
     renderModal()
     await waitFor(() => expect(mocked.getNodeRole).toHaveBeenCalled())
 
     await userEvent.click(screen.getByRole('button', { name: /suggest/i }))
 
-    // insightsService turns a 422 into this message; swallowing it leaves the analyst pressing
+    // The model's "not enough evidence" is the job's error; swallowing it leaves the analyst pressing
     // a button that appears to do nothing.
     expect(await screen.findByText(/Only 2 conversations seen/)).toBeInTheDocument()
   })

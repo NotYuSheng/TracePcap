@@ -3,7 +3,10 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Badge, Button, Modal, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
-import { tracerService, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
+import { tracerService, type TracerExplainResponse, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
+import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 
 function AiExplanationInfoPopover() {
   const popover = (
@@ -100,8 +103,26 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [explanations, setExplanations] = useState<Map<number, string>>(new Map());
-  const [explainLoading, setExplainLoading] = useState(false);
+  const [explainStarting, setExplainStarting] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
+
+  // Explanations are written in the background (one job at a time for the model); ones already
+  // worked out come back at once. Closing the tracer doesn't lose them.
+  const explainJob = useAiJob<TracerExplainResponse>('TRACE_EXPLANATIONS', null, {
+    onDone: data => {
+      if (!data) return;
+      if (data.error) {
+        setExplainError(data.error);
+        return;
+      }
+      const map = new Map<number, string>();
+      data.explanations.forEach(e => map.set(e.stepIndex, e.explanation));
+      setExplanations(map);
+    },
+    onFailed: job => setExplainError(job.error?.message || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.'),
+  }, conversationId);
+  const startExplainJob = explainJob.start;
+  const explainLoading = explainStarting || explainJob.active;
 
   const [dotT, setDotT] = useState(0);
 
@@ -143,27 +164,26 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
     return () => { cancelled = true; };
   }, [tracer, conversationId]);
 
-  // Fetch LLM explanations after steps load
+  // Ask for the explanations once the steps are in
+  const hasSteps = !!tracer && tracer.steps.length > 0;
   useEffect(() => {
-    if (!tracer || tracer.steps.length === 0) return;
-    setExplainLoading(true);
-    setExplainError(null);
-    tracerService.explain(conversationId)
-      .then(data => {
-        if (data.error) {
-          setExplainError(data.error);
-          return;
-        }
-        const map = new Map<number, string>();
-        data.explanations.forEach(e => map.set(e.stepIndex, e.explanation));
-        setExplanations(map);
-      })
-      .catch((err) => {
-        const backendError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-        setExplainError(backendError || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.');
-      })
-      .finally(() => setExplainLoading(false));
-  }, [tracer, conversationId]);
+    if (!hasSteps) return;
+    let alive = true;
+    const run = async () => {
+      setExplainStarting(true);
+      setExplainError(null);
+      try {
+        await startExplainJob(() => aiJobsService.startExplanations(conversationId));
+      } catch (err) {
+        const backendError = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        if (alive) setExplainError(backendError || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.');
+      } finally {
+        if (alive) setExplainStarting(false);
+      }
+    };
+    run();
+    return () => { alive = false; };
+  }, [hasSteps, conversationId, startExplainJob]);
 
   // Auto-play
   useEffect(() => {
@@ -411,7 +431,17 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
                   >
                     <i className="bi bi-stars" style={{ color: '#6c757d', flexShrink: 0 }} />
                     {explainLoading ? (
-                      <span className="text-muted">Generating AI explanation…</span>
+                      explainJob.active && explainJob.job ? (
+                        <AiJobStatus
+                          compact
+                          job={explainJob.job}
+                          doing="Explaining each packet"
+                          whenDone="They fill in here when they're ready."
+                          onCancel={() => { explainJob.cancel().catch(() => {}); }}
+                        />
+                      ) : (
+                        <span className="text-muted">Generating AI explanation…</span>
+                      )
                     ) : explainError ? (
                       <span style={{ color: 'var(--bs-danger)' }}>{explainError}</span>
                     ) : explanations.has(currentStep) ? (

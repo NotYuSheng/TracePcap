@@ -53,6 +53,24 @@ public class SubnetLabelSuggestionService {
    * otherwise all captures are considered. Nothing is persisted.
    */
   public SubnetLabelSuggestionDto suggest(Long subnetId, UUID networkId, UUID fileId) {
+    try {
+      return prepare(subnetId, networkId, fileId).suggestion().call();
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /** A suggestion ready to ask the model for: what's checked up front, and the model call itself. */
+  public record Prepared(String cidr, java.util.concurrent.Callable<SubnetLabelSuggestionDto> suggestion) {}
+
+  /**
+   * Everything before the model call (the subnet exists, it has members in the scanned captures),
+   * so a request that can't be answered fails at once instead of after waiting its turn for the
+   * model. The returned call asks the model.
+   */
+  public Prepared prepare(Long subnetId, UUID networkId, UUID fileId) {
     SubnetDefinitionEntity subnet =
         subnetRepo
             .findById(subnetId)
@@ -68,7 +86,11 @@ public class SubnetLabelSuggestionService {
       throw new InsufficientEvidenceException(
           "No member nodes were observed in " + subnet.getCidr() + " across the scanned captures.");
     }
+    return new Prepared(subnet.getCidr(), () -> ask(subnet, members, fileIds));
+  }
 
+  private SubnetLabelSuggestionDto ask(
+      SubnetDefinitionEntity subnet, List<MemberNode> members, List<UUID> fileIds) {
     String context = buildContext(members);
     String raw = llmClient.generateCompletion(buildSystemPrompt(), buildUserPrompt(subnet.getCidr(), context));
     Suggestion parsed = parse(raw);
