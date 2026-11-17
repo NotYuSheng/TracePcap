@@ -1,4 +1,5 @@
 import type Sigma from 'sigma';
+import { pointAlong, type Pt } from '@/features/network/services/edgeRouting';
 
 /** How long a dot takes to cross an edge, in ms. */
 const CROSS_MS = 2200;
@@ -68,20 +69,23 @@ export function drawParticles(
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     if (dx * dx + dy * dy < 16) continue; // too short to see anything move
+    // A routed edge (the map's "Along the gaps") follows its route, in screen coordinates.
+    const route = (display as unknown as { route?: Pt[] }).route?.map(p => sigma.graphToViewport(p));
     const curvature = display.type === 'curved' ? Number((display as unknown as { curvature?: number }).curvature ?? 0) : 0;
     // The curve's control point, in screen coordinates (y down).
     const cx = (a.x + b.x) / 2 + dy * curvature;
     const cy = (a.y + b.y) / 2 - dx * curvature;
     const n = dotsFor(e.bytes);
-    ctx.fillStyle = display.color || '#888';
+    ctx.fillStyle = (display as unknown as { routeColor?: string }).routeColor || display.color || '#888';
     ctx.globalAlpha = 0.9;
     for (let i = 0; i < n; i++) {
       let p = (now / CROSS_MS + e.phase + i / n) % 1;
       // Two-way traffic: every other dot runs back.
       if (e.bidirectional && i % 2 === 1) p = 1 - p;
       const q = 1 - p;
-      const x = q * q * a.x + 2 * q * p * cx + p * p * b.x;
-      const y = q * q * a.y + 2 * q * p * cy + p * p * b.y;
+      const along = route ? pointAlong(route, p) : null;
+      const x = along ? along.x : q * q * a.x + 2 * q * p * cx + p * p * b.x;
+      const y = along ? along.y : q * q * a.y + 2 * q * p * cy + p * p * b.y;
       ctx.beginPath();
       ctx.arc(x * ratio, y * ratio, 2.6 * ratio, 0, Math.PI * 2);
       ctx.fill();

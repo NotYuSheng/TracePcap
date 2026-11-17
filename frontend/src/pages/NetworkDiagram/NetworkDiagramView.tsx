@@ -35,7 +35,7 @@ import { nodeIdentityKey } from '@/utils/deviceType';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { TimeScrubber } from '@/features/network/components/TimeScrubber';
 import { activeInWindow, timeBounds, unseenByWindowEnd, type TimeWindow } from '@/features/network/services/timeWindow';
-import type { EdgeColorMode, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
+import type { EdgeColorMode, EdgeRouting, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
 import { edgeBytesRange } from '@components/network/NetworkGraph/NetworkGraph';
 import type { VolumePair } from '@components/network/VolumeHeatmap';
 import { VolumeLegend } from '@components/network/VolumeLegend';
@@ -247,6 +247,9 @@ export const NetworkDiagramView = ({
 
   // The network map, as a draw.io diagram: grouped the same way, whatever layout is showing.
   const nodeLabelConfig = useStore(st => st.nodeLabelConfig);
+  const setNodeLabelConfig = useStore(st => st.setNodeLabelConfig);
+  // How the map keeps edges from running through devices; kept with the label settings.
+  const edgeRouting: EdgeRouting = nodeLabelConfig.edgeRouting ?? 'bend';
   const downloadMap = () => {
     const layout = layoutGroups(
       buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, deviceLinks: shownDeviceLinks, ...groupingEdits(mapEdits) }),
@@ -807,6 +810,23 @@ export const NetworkDiagramView = ({
                     <option value="hidden">Hidden</option>
                   </Form.Select>
                 </div>
+                {layoutType === 'grouped' && edgeColorMode !== 'hidden' && (
+                  <div className="d-flex align-items-center gap-2">
+                    <Form.Label className="mb-0 text-muted small" htmlFor="edge-routing">Route</Form.Label>
+                    <Form.Select
+                      id="edge-routing"
+                      size="sm"
+                      aria-label="How edges avoid devices"
+                      style={{ width: 190 }}
+                      value={edgeRouting}
+                      onChange={e => setNodeLabelConfig({ ...nodeLabelConfig, edgeRouting: e.target.value as EdgeRouting })}
+                    >
+                      <option value="bend">Bend around devices</option>
+                      <option value="lanes">Along the gaps</option>
+                      <option value="straight">Straight lines</option>
+                    </Form.Select>
+                  </div>
+                )}
                 {edgeColorMode === 'volume' && (
                   <VolumeLegend
                     maxValue={edgeRange.max}
@@ -881,6 +901,7 @@ export const NetworkDiagramView = ({
                 onFilterClick={() => setShowFilterModal(true)}
                 activeFilterCount={activeFilterCount}
                 edgeColorMode={edgeColorMode}
+                edgeRouting={edgeRouting}
                 highlightedNodes={highlightedNodes}
                 activeInWindow={windowActive}
                 animateTraffic={animateTraffic && axisMode === 'window'}

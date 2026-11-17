@@ -16,6 +16,8 @@ import { buildGroupTree, layoutGroups, CELL_H, CELL_W, NODE_TOP, type GroupedLay
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 import { drawGroupBoxes } from './groupBoxes';
+import { drawRoutes } from './routeDrawing';
+import { bendEdges, routeOrthogonal, type EdgeEnds, type Pt } from '@/features/network/services/edgeRouting';
 import { groupingEdits, type NetworkMapEdits } from '@/features/network/services/networkMapEdits';
 import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, buildAppLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
 import { getAppColor } from '@/utils/appColors';
@@ -38,6 +40,8 @@ export interface NodeHighlight {
 
 /** How edges are coloured; 'hidden' draws none, except a hovered device's own. */
 export type EdgeColorMode = 'transport' | 'application' | 'volume' | 'hidden';
+/** The network map's edges: bend blocked ones around devices, route them along the gaps, or straight. */
+export type EdgeRouting = 'bend' | 'lanes' | 'straight';
 
 interface NetworkGraphProps {
   nodes: GraphNode[];
@@ -102,6 +106,11 @@ interface NetworkGraphProps {
    * legend rendered by the caller.
    */
   edgeColorMode?: EdgeColorMode;
+  /**
+   * How the network map keeps edges from running through devices: bend the blocked ones (the
+   * default), route them along the grid's gaps, or leave every edge straight.
+   */
+  edgeRouting?: EdgeRouting;
   /**
    * Render light regardless of the user's theme — for PDF capture, which always wants white
    * diagrams (see captureNetworkDiagrams.ts).
@@ -512,6 +521,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onGroupClick,
   onMoveToGroup,
   edgeColorMode = 'transport',
+  edgeRouting = 'bend',
   forceLight = false,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
@@ -673,6 +683,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, [animateTraffic, hasLinks, hasWindow, hasFlights]);
 
   const edgeColorModeRef = useRef(edgeColorMode);
+  const edgeRoutingRef = useRef(edgeRouting);
   const activeInWindowRef = useRef(activeInWindow);
   useEffect(() => {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -685,11 +696,21 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigmaRef.current?.refresh();
   }, [activeInWindow]);
 
+  // Switching how edges are routed redraws the map's edges, nothing else.
+  useEffect(() => {
+    edgeRoutingRef.current = edgeRouting;
+    const sigma = sigmaRef.current;
+    const layout = groupLayoutRef.current;
+    if (layoutType !== 'grouped' || !sigma || !layout) return;
+    applyEdgeRouting(sigma.getGraph(), layout, edgeRouting);
+    sigma.refresh();
+  }, [edgeRouting, layoutType]);
+
   // The network map's grouping can arrive after the graph (segments load separately): regroup.
   useEffect(() => {
     const sigma = sigmaRef.current;
     if (layoutType !== 'grouped' || !sigma) return;
-    applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+    applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef, edgeRoutingRef.current);
     sigma.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkSegments, customPrivateRanges, dnsNames, mapEdits]);
@@ -917,6 +938,12 @@ export const NetworkGraph = memo(function NetworkGraph({
         if (win && !win.edgeIds.has(edge) && !edge.split('|').some(id => win.edgeIds.has(id))) {
           res['hidden'] = true;
         }
+        // Routed along the map's gaps: the route is drawn under the graph in this colour, and
+        // the edge's own straight stroke is left invisible.
+        if (data['route']) {
+          res['routeColor'] = res['color'];
+          res['color'] = 'rgba(0,0,0,0)';
+        }
         return res;
       },
     });
@@ -936,6 +963,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         activeInWindowRef.current?.nodeIds ?? null,
         dropTargetRef.current,
       );
+      drawRoutes(canvas, sigma);
     });
 
     // Test seam for the README demo recording (frontend/e2e/demo.spec.ts).
@@ -983,6 +1011,18 @@ export const NetworkGraph = memo(function NetworkGraph({
             const s = sigma.graphToViewport(graph.getNodeAttributes(source) as { x: number; y: number });
             const t = sigma.graphToViewport(graph.getNodeAttributes(target) as { x: number; y: number });
             labelCtx.beginPath();
+            const route = attrs['route'] as { x: number; y: number }[] | undefined;
+            if (route) {
+              // Routed along the map's gaps: the same right-angle path as on screen.
+              const pts = route.map(p => sigma.graphToViewport(p));
+              labelCtx.moveTo(pts[0].x, pts[0].y);
+              for (const p of pts.slice(1)) labelCtx.lineTo(p.x, p.y);
+              labelCtx.strokeStyle = (attrs['color'] as string) ?? '#999';
+              labelCtx.lineWidth = Math.max(0.6, (attrs['size'] as number) ?? 1);
+              labelCtx.globalAlpha = 0.75;
+              labelCtx.stroke();
+              return;
+            }
             labelCtx.moveTo(s.x, s.y);
             // Curved parallels must bow the same way here as Sigma draws them on screen, or the PDF
             // would show overlapping straight lines again. Same control point Sigma uses: the
@@ -1066,7 +1106,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         if (target && home && target !== home.id && onMoveToGroupRef.current) {
           onMoveToGroupRef.current(dragNode, target);
         } else {
-          applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+          applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef, edgeRoutingRef.current);
           sigma.refresh();
         }
       } else if (dragMoved) {
@@ -1185,7 +1225,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     resetLayoutRef.current = () => {
       setNodesMoved(false);
       if (layoutType === 'grouped') {
-        applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+        applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef, edgeRoutingRef.current);
         sigma.refresh();
       } else if (layoutType === 'hierarchicalTd') {
         applyHierarchicalLayout(graph, elkRef.current!).then(() => !cancelled && sigma.refresh());
@@ -1197,7 +1237,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     };
 
     if (layoutType === 'grouped') {
-      applyGroupedLayout(sigma, nodes, groupingRef.current, groupLayoutRef);
+      applyGroupedLayout(sigma, nodes, groupingRef.current, groupLayoutRef, edgeRoutingRef.current);
       sigma.refresh();
       requestAnimationFrame(() => {
         revealCanvas();
@@ -1539,6 +1579,7 @@ function applyGroupedLayout(
   nodes: GraphNode[],
   grouping: Parameters<typeof buildGroupTree>[1],
   out: { current: GroupedLayout | null },
+  routing: EdgeRouting = 'bend',
 ): void {
   const graph = sigma.getGraph();
   const present = nodes.filter(n => graph.hasNode(n.id));
@@ -1549,6 +1590,7 @@ function applyGroupedLayout(
     graph.setNodeAttribute(id, 'y', -p.y);
   });
   out.current = layout;
+  applyEdgeRouting(graph, layout, routing);
   // Frame the boxes, not just the nodes: the camera fits the bounding box, and the outer boxes and
   // their names reach past the outermost devices.
   if (layout.boxes.length) {
@@ -1559,6 +1601,44 @@ function applyGroupedLayout(
     const below = (top - bottom) * 0.08;
     sigma.setCustomBBox({ x: [Math.min(...xs), Math.max(...xs)], y: [bottom - below, top] });
   }
+}
+
+/**
+ * Keeps the map's edges from running through devices. Undoes the last routing, then, for
+ * each straight edge that would pass through a device: `lanes` routes it along the grid's gaps
+ * (within a group) and `bend` curves it just enough to clear; `straight` leaves edges as drawn.
+ * Edges already curved apart as parallels are left alone.
+ */
+function applyEdgeRouting(graph: Graph, layout: GroupedLayout, routing: EdgeRouting): void {
+  graph.forEachEdge((edge, attrs) => {
+    if (attrs['routedBy']) {
+      graph.mergeEdgeAttributes(edge, {
+        type: attrs['ownType'] ?? 'arrow',
+        curvature: attrs['ownCurvature'] ?? 0,
+        route: undefined,
+        routedBy: undefined,
+      });
+    }
+  });
+  if (routing === 'straight') return;
+  const all: EdgeEnds[] = [];
+  graph.forEachEdge((edge, attrs, source, target) => {
+    all.push({ key: edge, source, target, curvature: attrs['type'] === 'curved' ? ((attrs['curvature'] as number) ?? 0) : 0 });
+  });
+  const pos = layout.positions;
+  const routes: Map<string, Pt[]> = routing === 'lanes' ? routeOrthogonal(all, pos) : new Map();
+  const keep = (edge: string) => ({
+    ownType: graph.getEdgeAttribute(edge, 'type'),
+    ownCurvature: graph.getEdgeAttribute(edge, 'curvature') ?? 0,
+  });
+  routes.forEach((route, edge) => {
+    // Stored in graph coordinates (y up), ready for graphToViewport.
+    graph.mergeEdgeAttributes(edge, { ...keep(edge), route: route.map(p => ({ x: p.x, y: -p.y })), routedBy: 'lanes' });
+  });
+  const bends = bendEdges(all.filter(e => !routes.has(e.key)), pos);
+  bends.forEach((curvature, edge) => {
+    graph.mergeEdgeAttributes(edge, { ...keep(edge), type: 'curved', curvature, routedBy: 'bend' });
+  });
 }
 
 /** What a legend click picks out: a node type (`type:<nodeType>`, `device:<deviceType>`, `unknown`) or an edge colour. */
