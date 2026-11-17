@@ -27,11 +27,30 @@ export function clock(iso?: string | null): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export const KIND_LABEL: Record<string, string> = { STORY: 'Story', INSIGHTS: 'Insights' };
+export const KIND_LABEL: Record<string, string> = {
+  STORY: 'Story',
+  INSIGHTS: 'Insights',
+  SNAPSHOT_INSIGHTS: 'Capture insights',
+  ROLE_SUGGESTION: 'Role',
+  ROLE_PREVIEW: 'Role',
+  SUBNET_LABEL: 'Subnet label',
+  TRACE_EXPLANATIONS: 'Packet explanations',
+};
 
 /** Where the job's answer shows up. */
 export function jobPath(job: AiJob): string | null {
-  if (job.kind === 'STORY') return `/analysis/${job.subjectId}/story`;
-  if (job.kind === 'INSIGHTS') return `/monitor/${job.subjectId}`;
-  return null;
+  if (!job.subjectId) return null;
+  switch (job.kind) {
+    case 'STORY':
+      return `/analysis/${job.subjectId}/story`;
+    case 'ROLE_SUGGESTION':
+    case 'ROLE_PREVIEW':
+      return `/analysis/${job.subjectId}/network-diagram`;
+    case 'INSIGHTS':
+    case 'SNAPSHOT_INSIGHTS':
+    case 'SUBNET_LABEL':
+      return `/monitor/${job.subjectId}`;
+    default:
+      return null;
+  }
 }

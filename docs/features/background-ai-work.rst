@@ -5,6 +5,18 @@ Writing a story or a network's insights takes the LLM minutes on a local model. 
 that work in the background: you ask, the page shows where the work is, and you can leave the
 page, reload it, or keep working elsewhere. The answer lands where you asked for it.
 
+What runs this way
+------------------
+
+Everything TracePcap asks the LLM for, except the chat:
+
+- **Story**: written after upload, or with **Write the story** / **Regenerate** on the Story tab.
+- **Insights** for a monitored network, and for one capture in it (its **Insights** tab).
+- **Suggest with AI** for a host's role (the host card, and the role editor), and for a subnet's
+  label.
+- The **Trace** view's plain-English explanation of each packet. Explanations already worked out
+  for a conversation come back straight away.
+
 Where it shows
 --------------
 
@@ -18,6 +30,10 @@ Where it shows
 While a story is rewritten, the current story stays on the page; the new one replaces it when
 it's ready. If the rewrite fails, the current story is kept. Insights work the same way on a
 monitored network's **Overview**.
+
+In smaller places (the host card, the role and subnet editors, the Trace view) it's one line:
+*Waiting for the model · next in line. You can close this card; the suggestion waits here for
+you.* Close it and come back, and the suggestion is filled in.
 
 **The header.** While the model has work, a chip appears next to the settings gear:
 **AI · 1 running · 1 waiting**. Click it for the list: what each job is, what it's for (a capture
@@ -65,6 +81,14 @@ Each kind of work is started from its own resource and returns at once with the 
 - ``POST /api/v1/files/{fileId}/story-jobs``: the body takes the Story tab's options
   (``additionalContext``, ``maxFindings``, ``maxRiskMatrix``, ``networkId``, ``customPrompt``).
 - ``POST /api/v1/monitor/networks/{networkId}/insight-jobs``: ``audience`` and ``focus``.
+- ``POST /api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insight-jobs``: the same, for
+  one capture.
+- ``POST /api/v1/node-roles/suggestion-jobs``: ``fileId``, ``entityType``, ``entityKey``, and
+  ``preview`` (true: a label for the editor, not saved).
+- ``POST /api/v1/subnets/{id}/label-suggestion-jobs``: optional ``networkId`` or ``fileId``. A
+  subnet with no members in the scanned captures fails at once (422) instead of waiting in line.
+- ``POST /api/v1/tracer/{conversationId}/explanation-jobs``: explanations already worked out come
+  back ``DONE`` at once.
 
 Check on it with ``GET /api/v1/ai-jobs/{id}``: ``WAITING`` (with ``position``, 1 being next),
 ``RUNNING``, then ``DONE`` with ``result`` (the story or insight) or ``FAILED`` with ``error``. A
@@ -73,5 +97,6 @@ so it can be cut down and sent again as ``customPrompt``. ``GET /api/v1/ai-jobs`
 and running jobs, then those finished in the last 30 minutes; ``POST /api/v1/ai-jobs/{id}/cancel``
 cancels a waiting one.
 
-The older ``POST /api/v1/stories`` and ``POST /api/v1/monitor/networks/{networkId}/insights`` still
-work, but hold the request open until the model answers.
+The older endpoints (``POST /api/v1/stories``, ``…/insights``, ``/node-roles/suggest``,
+``/subnets/{id}/suggest-label``, ``/tracer/{conversationId}/explanations``) still work, but hold the
+request open until the model answers.

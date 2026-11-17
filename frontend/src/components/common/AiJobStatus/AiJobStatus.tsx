@@ -12,18 +12,45 @@ interface Props {
   whenDone: string;
   onCancel?: () => void;
   cancelling?: boolean;
+  /** One small line, for a card or a dialog: no bar, Cancel as a link. */
+  compact?: boolean;
 }
 
 /**
  * A background AI job, shown where it was asked for: waiting (its place in line, Cancel) or
  * running (how long so far, how long it usually takes). The page around it stays usable.
  */
-export function AiJobStatus({ job, doing, whenDone, onCancel, cancelling }: Props) {
+export function AiJobStatus({ job, doing, whenDone, onCancel, cancelling, compact }: Props) {
   const now = useNow();
   const waiting = job.status === 'WAITING';
   const elapsed = runningFor(job, now);
   const typical = job.typicalMs ?? null;
   const share = typical ? Math.min(0.95, elapsed / typical) : null;
+
+  if (compact) {
+    return (
+      <div className="ai-job-status-line small text-muted" role="status" data-testid="ai-job-status">
+        <i className={`bi ${waiting ? 'bi-hourglass-split' : 'bi-stars'} me-1`} aria-hidden="true" />
+        {waiting ? (
+          <>Waiting for the model · {placeInLine(job.position)}.</>
+        ) : (
+          <>
+            {doing} · {shortDuration(elapsed)}
+            {typical ? `, usually about ${shortDuration(typical)}` : ''}.
+          </>
+        )}{' '}
+        {whenDone}
+        {waiting && onCancel && (
+          <>
+            {' '}
+            <Button variant="link" size="sm" className="p-0 align-baseline" onClick={onCancel} disabled={cancelling}>
+              Cancel
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="ai-job-status" role="status" data-testid="ai-job-status">

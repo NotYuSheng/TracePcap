@@ -12,8 +12,10 @@ public class AiJobDto {
   UUID id;
   /** What it is, e.g. {@code STORY} or {@code INSIGHTS}. */
   String kind;
-  /** What it's about: a capture for a story, a monitored network for insights. */
+  /** Where its answer lands: a capture for a story, a monitored network for insights. */
   UUID subjectId;
+  /** Something finer within it, when the job is about one host, subnet or conversation. */
+  String subjectKey;
   /** That thing's name, for the header's list. */
   String subjectName;
   /** {@code USER} when someone asked for it, {@code UPLOAD} when an upload option did. */

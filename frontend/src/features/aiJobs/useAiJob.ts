@@ -14,20 +14,32 @@ interface Handlers<R> {
  * On mount it picks up a job already waiting or running, so a reload, or coming back to the page,
  * shows it again; while one is active it checks every 3 s and calls onDone / onFailed when it ends.
  */
-export function useAiJob<R = unknown>(kind: string, subjectId: string | undefined, handlers: Handlers<R>) {
+export function useAiJob<R = unknown>(
+  kind: string,
+  subjectId: string | null | undefined,
+  handlers: Handlers<R>,
+  /** For jobs about something finer: one host (IP:10.0.0.5), subnet or conversation. */
+  subjectKey?: string | null
+) {
   const [tracked, setJob] = useState<AiJob | null>(null);
-  // A job followed for another capture or network (the page moved on) isn't this one's.
-  const job = tracked && tracked.kind === kind && tracked.subjectId === subjectId ? tracked : null;
+  // A job followed for another capture, host or network (the page moved on) isn't this one's.
+  const job =
+    tracked &&
+    tracked.kind === kind &&
+    (tracked.subjectId ?? null) === (subjectId ?? null) &&
+    (tracked.subjectKey ?? null) === (subjectKey ?? null)
+      ? tracked
+      : null;
   const handlersRef = useRef(handlers);
   useEffect(() => {
     handlersRef.current = handlers;
   });
 
   useEffect(() => {
-    if (!subjectId) return;
+    if (!subjectId && !subjectKey) return;
     let alive = true;
     aiJobsService
-      .list({ kind, subjectId })
+      .list({ kind, ...(subjectId && { subjectId }), ...(subjectKey && { subjectKey }) })
       .then(list => {
         const active = list.find(j => isActive(j));
         if (alive && active) setJob(active);
@@ -36,7 +48,7 @@ export function useAiJob<R = unknown>(kind: string, subjectId: string | undefine
     return () => {
       alive = false;
     };
-  }, [kind, subjectId]);
+  }, [kind, subjectId, subjectKey]);
 
   useEffect(() => {
     if (!isActive(job)) return;
@@ -58,6 +70,9 @@ export function useAiJob<R = unknown>(kind: string, subjectId: string | undefine
   const start = useCallback(async (create: () => Promise<AiJob>) => {
     const created = await create();
     setJob(created);
+    // An answer that needed no model time (e.g. explanations already worked out) is DONE at once.
+    if (created.status === 'DONE') handlersRef.current.onDone?.(created.result as R, created);
+    else if (created.status === 'FAILED') handlersRef.current.onFailed?.(created);
     return created;
   }, []);
 

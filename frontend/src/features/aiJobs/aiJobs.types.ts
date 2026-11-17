@@ -1,5 +1,12 @@
 /** AI work running in the background (GET /ai-jobs): one job at a time for the model. */
-export type AiJobKind = 'STORY' | 'INSIGHTS';
+export type AiJobKind =
+  | 'STORY'
+  | 'INSIGHTS'
+  | 'SNAPSHOT_INSIGHTS'
+  | 'ROLE_SUGGESTION'
+  | 'ROLE_PREVIEW'
+  | 'SUBNET_LABEL'
+  | 'TRACE_EXPLANATIONS';
 export type AiJobStatus = 'WAITING' | 'RUNNING' | 'DONE' | 'FAILED' | 'CANCELLED';
 
 export interface AiJobError {
@@ -14,7 +21,10 @@ export interface AiJobError {
 export interface AiJob {
   id: string;
   kind: AiJobKind | string;
-  subjectId: string;
+  /** Where the answer lands (a capture, a network); null for a conversation's explanations. */
+  subjectId?: string | null;
+  /** Something finer within it: one host (IP:10.0.0.5), subnet or conversation. */
+  subjectKey?: string | null;
   subjectName?: string | null;
   /** USER when someone asked for it, UPLOAD when an upload option did. */
   trigger: 'USER' | 'UPLOAD' | string;
