@@ -32,6 +32,12 @@ export interface NodeLabelConfig {
   fields: NodeLabelFieldOption[];
   /** Optional static text lines drawn as the final lines under every node (in order). */
   customText: string[];
+  /**
+   * How the network map keeps edges from running through devices: bend them around (default),
+   * route them along the grid's gaps, or draw them straight. Kept with the label settings, so it
+   * follows the account like they do.
+   */
+  edgeRouting?: 'bend' | 'lanes' | 'straight';
 }
 
 export const DEFAULT_NODE_LABEL_CONFIG: NodeLabelConfig = {
@@ -63,12 +69,15 @@ export function normalizeNodeLabelConfig(cfg: NodeLabelConfig): NodeLabelConfig 
       ? [raw]
       : [];
 
+  const routing = cfg?.edgeRouting;
+  const edgeRouting = routing === 'lanes' || routing === 'straight' || routing === 'bend' ? { edgeRouting: routing } : {};
+
   const persisted = (cfg?.fields ?? []).filter(f => f?.field != null && f.field in NODE_LABEL_FIELD_META);
-  if (persisted.length === 0) return { fields: [...DEFAULT_NODE_LABEL_CONFIG.fields], customText };
+  if (persisted.length === 0) return { fields: [...DEFAULT_NODE_LABEL_CONFIG.fields], customText, ...edgeRouting };
   const missing = DEFAULT_NODE_LABEL_CONFIG.fields.filter(
     def => !persisted.some(f => f.field === def.field),
   );
-  return { fields: [...persisted, ...missing.map(def => ({ ...def }))], customText };
+  return { fields: [...persisted, ...missing.map(def => ({ ...def }))], customText, ...edgeRouting };
 }
 
 export interface NodeLabelSlice {
@@ -80,5 +89,9 @@ export interface NodeLabelSlice {
 export const createNodeLabelSlice: StateCreator<NodeLabelSlice> = set => ({
   nodeLabelConfig: DEFAULT_NODE_LABEL_CONFIG,
   setNodeLabelConfig: config => set({ nodeLabelConfig: config }),
-  resetNodeLabelConfig: () => set({ nodeLabelConfig: DEFAULT_NODE_LABEL_CONFIG }),
+  // Resets the labels; how edges are routed is a separate choice and stays.
+  resetNodeLabelConfig: () =>
+    set(state => ({
+      nodeLabelConfig: { ...DEFAULT_NODE_LABEL_CONFIG, ...(state.nodeLabelConfig.edgeRouting && { edgeRouting: state.nodeLabelConfig.edgeRouting }) },
+    })),
 });
