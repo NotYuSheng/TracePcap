@@ -57,7 +57,7 @@ export function StoryGoals({ goals, additional, loading }: StoryGoalsProps) {
                   <p className="story-goal-headline">{g.headline}</p>
                   <div className="story-goal-meta">
                     {GRADE_LABEL[g.grade ?? ''] ?? (g.grade ?? '').toLowerCase()}
-                    {g.confidence > 0 && ` · ${Math.round(g.confidence * 100)}% confidence`}
+                    {g.confidence > 0 && ` · ${Math.round(g.confidence)}% confidence`}
                     {g.basis.length > 0 && ` · ${g.basis.length} ${g.basis.length === 1 ? 'reason' : 'reasons'}`}
                   </div>
                 </>
