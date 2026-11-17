@@ -58,6 +58,13 @@ public class NetworkInsightService {
         .map(this::toDto);
   }
 
+  /** The network's name, for a queued job; 404 when there's no such network. */
+  public String networkName(UUID networkId) {
+    return networkRepository.findById(networkId)
+        .map(NetworkEntity::getName)
+        .orElseThrow(() -> new ResourceNotFoundException("Network not found: " + networkId));
+  }
+
   public boolean hasInsights(UUID networkId) {
     return insightRepository.existsByNetworkId(networkId);
   }

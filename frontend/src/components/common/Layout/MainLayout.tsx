@@ -5,6 +5,7 @@ import { Button, Container, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { usePreferencesSync } from '@/features/preferences/usePreferencesSync';
 import { AuthMenu } from '@/auth/AuthMenu';
+import { AiWorkChip } from '@components/common/AiWorkChip/AiWorkChip';
 import { getAccessToken } from '@/auth/tokenStore';
 import { env } from '@/config/env';
 import { directApiUrl } from '@/services/api/directUrl';
@@ -153,6 +154,8 @@ export const MainLayout = () => {
               </Nav>
 
               <div className="d-flex align-items-center gap-2 ms-auto">
+                {/* Shown only while the model has background work: why something is waiting. */}
+                {backendReady === true && <AiWorkChip />}
                 <Button
                   type="button"
                   size="sm"

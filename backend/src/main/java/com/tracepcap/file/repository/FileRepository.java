@@ -52,6 +52,10 @@ public interface FileRepository
   /** A capture's versions (#915 phase 3), oldest first. */
   List<FileEntity> findByDerivedFromOrderByUploadedAtAsc(java.util.UUID derivedFrom);
 
+  /** Captures in this analysis state whose background story is in one of these states. */
+  List<FileEntity> findByStatusAndStoryStatusIn(
+      FileEntity.FileStatus status, java.util.Collection<String> storyStatuses);
+
   @org.springframework.data.jpa.repository.Query("SELECT f.id FROM FileEntity f WHERE f.status = :status")
   List<java.util.UUID> findIdsByStatus(
       @org.springframework.data.repository.query.Param("status") FileEntity.FileStatus status);

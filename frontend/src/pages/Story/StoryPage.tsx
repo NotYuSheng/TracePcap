@@ -12,6 +12,8 @@ import {
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
 import { StoryProgress } from '@components/story/StoryProgress/StoryProgress';
+import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
+import { placeInLine } from '@/features/aiJobs/aiJobText';
 import { StoryGoals } from '@components/story/StoryGoals';
 import { StoryNarrative } from '@components/story/StoryNarrative';
 import { StoryHowItWorks, StoryPromptSettings } from '@components/story/StoryInfoCard';
@@ -51,6 +53,8 @@ export const StoryPage = () => {
     totalFindings,
     totalRiskMatrix,
     background,
+    job,
+    cancelJob,
   } = storyState;
 
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
@@ -157,6 +161,32 @@ export const StoryPage = () => {
       </Modal.Body>
     </Modal>
   );
+
+  // No story yet, and one is waiting for the model: say where it is in line.
+  if (generating && !story && job?.status === 'WAITING') {
+    return (
+      <div className="story-start">
+        <Card className="story-start-card" data-testid="story-waiting">
+          <Card.Body>
+            <span className="story-pill story-pill-writing">Queued</span>
+            <h1 className="story-start-title">The story is waiting its turn</h1>
+            <p className="text-muted">
+              {job.trigger === 'UPLOAD'
+                ? 'It was asked for when this capture was uploaded. '
+                : ''}
+              The model writes one thing at a time and this is {placeInLine(job.position)}. You can
+              leave this page; it shows here when it is ready.
+            </p>
+            {job.trigger !== 'UPLOAD' && (
+              <Button variant="outline-secondary" size="sm" onClick={() => cancelJob()}>
+                Cancel
+              </Button>
+            )}
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  }
 
   if (generating && !story) {
     const timeoutSec = Math.round(llmTimeoutMs / 1000);
@@ -325,6 +355,15 @@ export const StoryPage = () => {
       <div className="story-grid">
         <div className="story-main">
           <StoryGoals goals={goals} additional={additional} loading={!goalsLoaded} />
+
+          {generating && job && (
+            <AiJobStatus
+              job={job}
+              doing="Rewriting the story"
+              whenDone="The new story replaces this one when it's ready."
+              onCancel={() => cancelJob()}
+            />
+          )}
 
           <Card className="story-card">
             <Card.Body>

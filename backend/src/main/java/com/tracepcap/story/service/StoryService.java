@@ -84,9 +84,6 @@ public class StoryService {
       Integer maxFindings, Integer maxRiskMatrix, UUID networkId) {
     log.info("Generating story for file: {}", fileId);
 
-    // Delete any existing stories for this file so we always generate fresh
-    storyRepository.deleteByFileId(fileId);
-
     // Verify file exists
     FileEntity file =
         fileRepository
@@ -146,7 +143,7 @@ public class StoryService {
             .modelUsed(llmClient.currentModel())
             .content(objectMapper.writeValueAsString(storyResponse))
             .build();
-        storyRepository.save(story);
+        replaceStory(fileId, story);
         log.info("Successfully generated story from custom prompt for file: {}", fileId);
         return storyResponse;
       }
@@ -212,7 +209,7 @@ public class StoryService {
               .content(objectMapper.writeValueAsString(storyResponse))
               .build();
 
-      storyRepository.save(story);
+      replaceStory(fileId, story);
 
       log.info("Successfully generated story for file: {}", fileId);
       return storyResponse;
@@ -237,6 +234,15 @@ public class StoryService {
       if (e instanceof ContextLengthExceededException) throw (ContextLengthExceededException) e;
       throw new RuntimeException("Failed to generate story: " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * The new story replaces the file's earlier ones only once it's written: while a regenerate runs
+   * (minutes on a local model), and if it fails, the last good story stays readable.
+   */
+  private void replaceStory(UUID fileId, StoryEntity story) {
+    storyRepository.deleteByFileId(fileId);
+    storyRepository.save(story);
   }
 
   /**
@@ -307,8 +313,7 @@ public class StoryService {
   /** The latest completed story's JSON for a capture, if it has one. */
   public Optional<String> storyContent(UUID fileId) {
     return storyRepository
-        .findFirstByFileIdOrderByGeneratedAtDesc(fileId)
-        .filter(story -> story.getStatus() == StoryEntity.StoryStatus.COMPLETED)
+        .findFirstByFileIdAndStatusOrderByGeneratedAtDesc(fileId, StoryEntity.StoryStatus.COMPLETED)
         .map(StoryEntity::getContent);
   }
 
@@ -320,8 +325,7 @@ public class StoryService {
    */
   public Optional<StoryResponse> getStoryByFileId(UUID fileId) {
     return storyRepository
-        .findFirstByFileIdOrderByGeneratedAtDesc(fileId)
-        .filter(story -> story.getStatus() == StoryEntity.StoryStatus.COMPLETED)
+        .findFirstByFileIdAndStatusOrderByGeneratedAtDesc(fileId, StoryEntity.StoryStatus.COMPLETED)
         .map(
             story -> {
               try {

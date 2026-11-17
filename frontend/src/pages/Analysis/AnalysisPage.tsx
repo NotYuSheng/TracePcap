@@ -21,6 +21,10 @@ import { AnalysisLoadingView } from './AnalysisLoadingView';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { storyService } from '@/features/story/services/storyService';
+import { aiJobsService } from '@/features/aiJobs/aiJobsService';
+import { useAiJob } from '@/features/aiJobs/useAiJob';
+import { useNow } from '@/features/aiJobs/useNow';
+import type { AiJob } from '@/features/aiJobs/aiJobs.types';
 import type { Story } from '@/types';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
 import type { DeviceLink, GraphNode, GraphEdge } from '@/features/network/types';
@@ -94,6 +98,10 @@ export interface StoryGenerationState {
   setTotalRiskMatrix: Dispatch<SetStateAction<number | undefined>>;
   /** The story asked for at upload, while it is on its way (or if it failed). */
   background: { status: 'QUEUED' | 'WRITING' | 'FAILED'; error?: string | null } | null;
+  /** The story being written in the background (waiting for the model, or running), if any. */
+  job: AiJob | null;
+  /** Takes a waiting story out of line. */
+  cancelJob: () => Promise<void>;
 }
 
 export interface AnalysisOutletContext {
@@ -161,7 +169,6 @@ export const AnalysisPage = () => {
 
   // ── Story generation state (lifted here so it survives tab switches) ──────
   const [story, setStory] = useState<Story | null>(null);
-  const [storyGenerating, setStoryGenerating] = useState(false);
   const [storyError, setStoryError] = useState<string | null>(null);
   const [storyContextError, setStoryContextError] = useState<{
     promptText: string;
@@ -169,14 +176,12 @@ export const AnalysisPage = () => {
     contextLength: number;
   } | null>(null);
   const [storyEditablePrompt, setStoryEditablePrompt] = useState('');
-  const [storyElapsedSeconds, setStoryElapsedSeconds] = useState(0);
   const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
   const [additionalContext, setAdditionalContext] = useState('');
   const [maxFindings, setMaxFindings] = useState(20);
   const [maxRiskMatrix, setMaxRiskMatrix] = useState(15);
   const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
   const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
-  const storyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     apiClient
@@ -187,65 +192,80 @@ export const AnalysisPage = () => {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (storyGenerating) {
-      setStoryElapsedSeconds(0);
-      storyTimerRef.current = setInterval(() => setStoryElapsedSeconds(s => s + 1), 1000);
-    } else {
-      if (storyTimerRef.current) {
-        clearInterval(storyTimerRef.current);
-        storyTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (storyTimerRef.current) clearInterval(storyTimerRef.current);
-    };
-  }, [storyGenerating]);
-
-  const generateStory = useCallback(
-    async (customPrompt?: string) => {
-      try {
-        setStoryGenerating(true);
-        setStoryError(null);
-        setStoryContextError(null);
-        const generated = await storyService.generateStory(
-          fileId!,
-          additionalContext,
-          llmTimeoutMs,
-          customPrompt,
-          maxFindings,
-          maxRiskMatrix,
-          networkContext
-        );
-        setStory(generated);
-        if (generated.findings?.length) setTotalFindings(generated.findings.length);
-        if (generated.aggregates?.protocolRiskMatrix?.length)
-          setTotalRiskMatrix(generated.aggregates.protocolRiskMatrix.length);
-      } catch (err) {
-        const data =
-          (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
-        if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
-          setStoryContextError({
-            promptText: (data.promptText as string) ?? '',
-            promptTokens: (data.promptTokens as number) ?? 0,
-            contextLength: (data.contextLength as number) ?? 0,
-          });
-          setStoryEditablePrompt((data.promptText as string) ?? '');
-        } else {
-          setStoryError(
-            describeLlmError(err, {
+  // The story is written in the background, one AI job at a time: the page follows the job, so
+  // leaving or reloading the page doesn't lose it, and the current story stays until it's replaced.
+  const [background, setBackground] = useState<StoryGenerationState['background']>(null);
+  const storyJob = useAiJob<Story | null>('STORY', fileId, {
+    onDone: written => {
+      setBackground(null);
+      if (!written) return;
+      setStory(written);
+      if (written.findings?.length) setTotalFindings(written.findings.length);
+      if (written.aggregates?.protocolRiskMatrix?.length)
+        setTotalRiskMatrix(written.aggregates.protocolRiskMatrix.length);
+    },
+    onFailed: job => {
+      const e = job.error ?? {};
+      if (job.trigger === 'UPLOAD') {
+        setBackground({ status: 'FAILED', error: e.message });
+      } else if (e.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
+        setStoryContextError({
+          promptText: e.promptText ?? '',
+          promptTokens: e.promptTokens ?? 0,
+          contextLength: e.contextLength ?? 0,
+        });
+        setStoryEditablePrompt(e.promptText ?? '');
+      } else {
+        setStoryError(
+          describeLlmError(
+            { response: { data: { errorCode: e.errorCode, message: e.message } } },
+            {
               subject: 'Story generation',
               timeoutMs: llmTimeoutMs,
               timeoutHint: 'reduce the capture size',
               fallback: 'Failed to generate story',
-            })
-          );
-        }
-      } finally {
-        setStoryGenerating(false);
+            }
+          )
+        );
       }
     },
-    [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix, networkContext]
+  });
+  const storyGenerating = storyJob.active;
+  const storyStartedAt = storyJob.job?.startedAt ?? null;
+
+  const now = useNow(storyGenerating ? 1000 : 60000);
+  const storyElapsedSeconds =
+    storyGenerating && storyStartedAt
+      ? Math.max(0, Math.round((now - new Date(storyStartedAt).getTime()) / 1000))
+      : 0;
+
+  const startStoryJob = storyJob.start;
+  const generateStory = useCallback(
+    async (customPrompt?: string) => {
+      setStoryError(null);
+      setStoryContextError(null);
+      try {
+        await startStoryJob(() =>
+          aiJobsService.startStory(fileId!, {
+            additionalContext,
+            customPrompt,
+            maxFindings,
+            maxRiskMatrix,
+            networkId: networkContext,
+          })
+        );
+      } catch (err) {
+        setStoryError(
+          describeLlmError(err, {
+            subject: 'Story generation',
+            timeoutMs: llmTimeoutMs,
+            timeoutHint: 'reduce the capture size',
+            fallback: "Couldn't start writing the story",
+          })
+        );
+      }
+    },
+    [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix, networkContext, startStoryJob]
   );
 
   // Load existing story once on mount
@@ -266,7 +286,6 @@ export const AnalysisPage = () => {
 
   // The story asked for at upload ("write the story when analysis finishes"): while it is queued or
   // being written, check every 15 s and show it the moment it lands.
-  const [background, setBackground] = useState<StoryGenerationState['background']>(null);
   useEffect(() => {
     if (!fileId) return;
     let alive = true;
@@ -316,6 +335,8 @@ export const AnalysisPage = () => {
       setEditablePrompt: setStoryEditablePrompt,
       elapsedSeconds: storyElapsedSeconds,
       llmTimeoutMs,
+      job: storyJob.job,
+      cancelJob: storyJob.cancel,
       additionalContext,
       setAdditionalContext,
       maxFindings,
@@ -338,6 +359,8 @@ export const AnalysisPage = () => {
       storyEditablePrompt,
       storyElapsedSeconds,
       llmTimeoutMs,
+      storyJob.job,
+      storyJob.cancel,
       additionalContext,
       maxFindings,
       maxRiskMatrix,
