@@ -8,7 +8,7 @@ release = "0.1.1"
 version = "0.1.1"
 today = "2026-06-26"
 
-extensions = ["sphinx_rtd_theme", "sphinx_sitemap"]
+extensions = ["sphinx_rtd_theme", "sphinx_sitemap", "sphinxext.opengraph"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
@@ -30,8 +30,20 @@ rst_prolog = """
    :keywords: PCAP analysis, network forensics, packet capture, deep packet inspection, nDPI, Wireshark, self-hosted, offline, incident response, network audit
 """
 
+# sphinxext-opengraph: og:/twitter: tags on every page, so a shared docs link shows a card with
+# the page's own title and opening paragraph, and the social preview image (the same one the
+# GitHub repo uses; 1280x640, regenerate from the design canvas when the UI changes a lot).
+ogp_site_url = html_baseurl
+ogp_site_name = "TracePcap"
+ogp_image = "_static/social-preview.png"
+ogp_image_alt = "TracePcap: self-hosted PCAP analysis and network forensics, with the network map"
+ogp_type = "website"
+ogp_custom_meta_tags = [
+    '<meta name="twitter:card" content="summary_large_image">',
+]
+
 html_theme = "sphinx_rtd_theme"
-html_static_path = []  # populate when screenshots are added under _static/
+html_static_path = ["_static"]
 html_logo = None
 html_theme_options = {
     "navigation_depth": 4,
