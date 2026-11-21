@@ -55,7 +55,7 @@ For Everyone
 ------------
 
 The **Settings** page's other sections, under *This install*: **System**, **Detection
-rules**, **Address defaults**, **Permissions**, **Audit log** and **Users**.
+rules**, **Address defaults**, **Roles**, **Audit log** and **Users**.
 
 **System.** Every deploy-time setting (each environment variable in :doc:`../configuration/environment-variables`)
 is listed with its **effective value**, including values derived from ``APP_MEMORY_MB``
@@ -114,8 +114,8 @@ Who can change what
 -------------------
 
 What someone may do comes from their roles: Viewer, Analyst, Lead and Admin. Who has a
-role is set in Keycloak; what each role may do is set on this page's **Permissions** tab,
-as a grid of permissions against roles. Only the admin role can change it; everyone else
+role is set in Keycloak; what each role may do is set on this page's **Roles** tab,
+one role at a time. Only the admin role can change it; everyone else
 sees it locked. See :doc:`roles-and-permissions`.
 
 Audit log

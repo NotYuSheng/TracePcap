@@ -61,17 +61,31 @@ function roles(viewerPerms: string[] = ['SEE_CAPTURES'], defaultKey = 'analyst')
 }
 
 describe('PermissionsPanel: what each role may do', () => {
-  it('shows the grid to a non-admin with every box locked, and says why', async () => {
+  it('lists the roles, opens on your own, and locks every box for a non-admin with the reason', async () => {
     server.use(
       http.get('*/me', () => HttpResponse.json(me(false))),
       http.get('*/roles', () => HttpResponse.json(roles()))
     );
     render(<PermissionsPanel />);
 
-    expect(await screen.findByTestId('permissions-locked')).toHaveTextContent('SYSTEM_SETTINGS_EDITABLE');
+    expect(await screen.findByTestId('permissions-locked')).toHaveTextContent(
+      'SYSTEM_SETTINGS_EDITABLE'
+    );
     expect(screen.getByTestId('my-roles')).toHaveTextContent('Analyst');
-    expect(screen.getByLabelText('Viewer: Ask the AI')).toBeDisabled();
+    // Opens on the caller's own role.
+    expect(
+      within(screen.getByRole('listbox', { name: 'Roles' })).getByRole('option', {
+        name: /Analyst/,
+      })
+    ).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Analyst: Ask the AI')).toBeChecked();
+    expect(screen.getByLabelText('Analyst: Ask the AI')).toBeDisabled();
+
+    await userEvent.click(
+      within(screen.getByRole('listbox', { name: 'Roles' })).getByRole('option', { name: /Viewer/ })
+    );
+    expect(screen.getByLabelText('Viewer: Ask the AI')).not.toBeChecked();
+    expect(screen.getByLabelText('Viewer: Ask the AI')).toBeDisabled();
   });
 
   it('lets an admin give a role a permission, and choose the default role', async () => {
@@ -91,8 +105,14 @@ describe('PermissionsPanel: what each role may do', () => {
     );
     render(<PermissionsPanel />);
 
-    // The admin role always has everything; seeing captures is every role's.
+    // Opens on the caller's role. The admin role always has everything.
     expect(await screen.findByLabelText('Admin: Ask the AI')).toBeDisabled();
+    expect(screen.getByText(/Given by the Keycloak client role/)).toBeInTheDocument();
+
+    // Seeing captures is every role's.
+    await userEvent.click(
+      within(screen.getByRole('listbox', { name: 'Roles' })).getByRole('option', { name: /Viewer/ })
+    );
     expect(screen.getByLabelText('Viewer: See captures, networks and findings')).toBeDisabled();
 
     await userEvent.click(screen.getByLabelText('Viewer: Ask the AI'));
@@ -168,10 +188,21 @@ describe('SystemPage (#915)', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     // The sections are down the left, like a capture's analysis.
     const rail = screen.getByRole('navigation', { name: 'Settings sections' });
-    for (const section of ['Personal', 'System', 'Detection rules', 'Address defaults', 'Permissions', 'Audit log', 'Users']) {
+    for (const section of [
+      'Personal',
+      'System',
+      'Detection rules',
+      'Address defaults',
+      'Roles',
+      'Audit log',
+      'Users',
+    ]) {
       expect(within(rail).getByRole('button', { name: section })).toBeInTheDocument();
     }
-    expect(within(rail).getByRole('button', { name: 'Personal' })).toHaveAttribute('aria-current', 'page');
+    expect(within(rail).getByRole('button', { name: 'Personal' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
     expect(screen.getByRole('heading', { name: 'Personal' })).toBeInTheDocument();
   });
 });

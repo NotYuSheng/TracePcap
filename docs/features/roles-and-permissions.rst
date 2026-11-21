@@ -10,8 +10,8 @@ The work is split the way most apps in a shared login realm split it:
   on the ``tracepcap-frontend`` client. Your identity team assigns it there, usually to a
   group (*SOC team* gets ``analyst``), sometimes to one person. TracePcap never creates
   groups or changes who is in them.
-- **What a role may do is decided in TracePcap**, on the Settings page's **Permissions**
-  tab, by an admin.
+- **What a role may do is decided in TracePcap**, on the Settings page's **Roles** tab,
+  by an admin.
 
 When someone signs in, their token carries the TracePcap roles Keycloak gave them, and
 only those. Other apps' roles and the user's list of groups stay out of it.
@@ -45,7 +45,7 @@ The four roles
        the admins out from inside TracePcap.
 
 Someone with several roles may do everything any of them allows. Someone whose sign-in
-carries none of them gets the **default role**, set at the top of the Permissions tab:
+carries none of them gets the **default role**, set on the Roles tab, under the list of roles:
 *Analyst* unless an admin changes it.
 
 **When you upgrade** with login on, everyone without a role becomes an Analyst. They keep
@@ -53,7 +53,7 @@ everything they could do before, except four things that were open to everyone a
 the Lead role: reading the audit log, deleting a network, deleting other people's captures
 (and captures from before uploaders were recorded), and cancelling someone else's AI work.
 Give the people who do those the ``lead`` role in Keycloak, or tick them for Analyst on the
-Permissions tab.
+Roles tab.
 
 The permissions
 ---------------
@@ -115,7 +115,7 @@ The permissions
 Installs that set some of these to *Admins only* before roles existed keep that: those items
 start with the admin role alone. The catalogue suggests moving global rules, network settings
 and address defaults to Lead, and analysis policy to Admin. An admin can make that change on
-the Permissions tab.
+the Roles tab.
 
 **Your own captures.** TracePcap records who uploaded each capture. *Delete your own
 captures* covers the ones you uploaded. Captures uploaded before this was recorded have no
@@ -124,9 +124,10 @@ uploader, so deleting them needs *Delete anyone's captures*.
 Changing what a role may do
 ---------------------------
 
-On the Settings page, open **Permissions**. Each row is a permission and each column a
-role. An admin ticks or clears a box, and it applies at once. Everyone else sees the same
-grid, locked. Two rows can't change: every role may see captures, and only the admin role
+On the Settings page, open **Roles**. The roles are listed on the left, with how many
+permissions each has; pick one to see its permissions, grouped, on the right, along with the
+Keycloak client role that gives it. An admin ticks or clears a box, and it applies at once.
+Everyone else sees the same page, locked. Two rows can't change: every role may see captures, and only the admin role
 may change roles. Every change, and every change of the default role, is in the audit log.
 
 When someone tries something their roles don't allow, the app says which permission it needs

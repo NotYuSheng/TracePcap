@@ -1,5 +1,4 @@
 import { useSearchParams } from 'react-router-dom';
-import { Card } from '@govtechsg/sgds-react';
 import { AnalysisRail, type RailItem } from '@pages/Analysis/AnalysisRail';
 import { SystemSettingsTab } from '@components/settings/SettingsModal/SystemSettingsTab';
 import { PersonalSettingsTab } from '@components/settings/SettingsModal/PersonalSettingsTab';
@@ -9,6 +8,7 @@ import { AddressDefaultsPanel } from './AddressDefaultsPanel';
 import { AuditLogPanel } from './AuditLogPanel';
 import { DetectionRulesPanel } from './DetectionRulesPanel';
 import { PermissionsPanel } from './PermissionsPanel';
+import './SystemPage.css';
 
 /** The Keycloak admin console's user list for this realm. Keycloak is proxied same-origin by default. */
 function keycloakUsersUrl(): string {
@@ -27,7 +27,7 @@ const TABS = [
   { key: 'system', title: 'System', short: 'System', icon: 'bi-sliders', group: 'This install' },
   { key: 'rules', title: 'Detection rules', short: 'Rules', icon: 'bi-shield-check' },
   { key: 'addresses', title: 'Address defaults', short: 'Addresses', icon: 'bi-signpost-split' },
-  { key: 'permissions', title: 'Permissions', short: 'Permissions', icon: 'bi-key' },
+  { key: 'roles', title: 'Roles', short: 'Roles', icon: 'bi-key' },
   { key: 'audit', title: 'Audit log', short: 'Audit', icon: 'bi-clock-history' },
   { key: 'users', title: 'Users', short: 'Users', icon: 'bi-people' },
 ] as const;
@@ -47,8 +47,10 @@ export function SystemPage() {
   // (?tab=rules), so other pages can link straight to it.
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
-  // `?tab=settings` was the System tab before the two pages became one.
-  const asked = requested === 'settings' ? 'system' : requested;
+  // Older links: `?tab=settings` was the System tab before the two pages became one, and
+  // `?tab=permissions` the Roles tab before roles.
+  const asked =
+    requested === 'settings' ? 'system' : requested === 'permissions' ? 'roles' : requested;
   const tab: TabKey = TABS.some(t => t.key === asked) ? (asked as TabKey) : 'personal';
   const setTab = (key: TabKey) =>
     setParams(key === 'personal' ? {} : { tab: key }, { replace: true });
@@ -73,36 +75,39 @@ export function SystemPage() {
                 <>
                   {' '}
                   Signed in as <strong>{me.username}</strong>
-                  {me.authEnabled ? (me.admin ? ' (admin).' : ' (analyst).') : ' (login is off).'}
+                  {me.authEnabled
+                    ? me.roles.length
+                      ? ` (${me.roles.join(', ')}).`
+                      : '.'
+                    : ' (login is off).'}
                 </>
               )}
             </div>
           </div>
         </header>
         <div className="analysis-body">
-          <Card>
-            <Card.Header>
-              <h2 className="h6 mb-0" id={`system-tab-${tab}`}>
-                {current.title}
-              </h2>
-            </Card.Header>
-            <Card.Body id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
+          {/* No card around the section: its title sits on the page, and the panel brings its own
+              surface (Roles lays out two cards of its own). */}
+          <section id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
+            <h2 className="settings-section-title" id={`system-tab-${tab}`}>
+              {current.title}
+            </h2>
+            <div className={tab === 'roles' ? undefined : 'settings-surface'}>
               {tab === 'personal' && <PersonalSettingsTab />}
               {tab === 'system' && <SystemSettingsTab />}
               {tab === 'rules' && <DetectionRulesPanel />}
               {tab === 'addresses' && <AddressDefaultsPanel />}
-              {tab === 'permissions' && <PermissionsPanel />}
+              {tab === 'roles' && <PermissionsPanel />}
               {tab === 'audit' && <AuditLogPanel />}
               {tab === 'users' &&
                 (env.AUTH_ENABLED ? (
                   <div className="small">
                     <p>
-                      Users, groups and who has which role are managed in Keycloak. To give a
-                      group (or one person) a role, open it, then Role mapping, Assign role,
-                      Filter by clients, and pick{' '}
-                      <span className="font-monospace">{env.OIDC_CLIENT_ID}</span> and the role:
-                      viewer, analyst, lead or admin. What each role may do is on the Permissions
-                      tab.
+                      Users, groups and who has which role are managed in Keycloak. To give a group
+                      (or one person) a role, open it, then Role mapping, Assign role, Filter by
+                      clients, and pick <span className="font-monospace">{env.OIDC_CLIENT_ID}</span>{' '}
+                      and the role: viewer, analyst, lead or admin. What each role may do is on the
+                      Roles tab.
                     </p>
                     <a
                       href={keycloakUsersUrl()}
@@ -121,8 +126,8 @@ export function SystemPage() {
                     described in the Authentication section of the docs.
                   </p>
                 ))}
-            </Card.Body>
-          </Card>
+            </div>
+          </section>
         </div>
       </div>
     </div>
