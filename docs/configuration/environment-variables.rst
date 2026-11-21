@@ -111,6 +111,18 @@ documented in its own section below with the surrounding detail.
    * - Variable
      - Default
      - Effect
+   * - ``KEYCLOAK_REALM``
+     - ``tracepcap``
+     - The Keycloak realm people sign in through. The bundled Keycloak creates
+       ``tracepcap``; set this to use a realm of your own, such as your
+       organisation's shared realm. Baked into the frontend, so changing it
+       needs a rebuild.
+   * - ``KEYCLOAK_CLIENT_ID``
+     - ``tracepcap``
+     - TracePcap's client in that realm. Its client roles are TracePcap's roles
+       (see :doc:`../features/roles-and-permissions`). Baked into the frontend,
+       so changing it needs a rebuild. Up to v0.4 the client was called
+       ``tracepcap-frontend``: see :ref:`renamed-client`.
    * - ``TRACEPCAP_AUTH_ENABLED``
      - ``false``
      - Gates the API behind a Keycloak JWT and adds a login flow. Set to
@@ -353,6 +365,18 @@ walkthrough. They are ignored by the base stack.
        the app via this same origin. Include the port only if non-standard
        (e.g. ``:8888``); omit for standard 80/443. **Does not track**
        ``NGINX_PORT`` — set it to match your actual port.
+   * - ``KEYCLOAK_REALM``
+     - ``tracepcap``
+     - The Keycloak realm people sign in through. The bundled Keycloak creates
+       ``tracepcap``; set this to use a realm of your own, such as your
+       organisation's shared realm. Baked into the frontend, so changing it
+       needs a rebuild.
+   * - ``KEYCLOAK_CLIENT_ID``
+     - ``tracepcap``
+     - TracePcap's client in that realm. Its client roles are TracePcap's roles
+       (see :doc:`../features/roles-and-permissions`). Baked into the frontend,
+       so changing it needs a rebuild. Up to v0.4 the client was called
+       ``tracepcap-frontend``: see :ref:`renamed-client`.
    * - ``TRACEPCAP_AUTH_ENABLED``
      - ``false``
      - Backend toggle. When ``false`` (default, base stack) the API is
@@ -370,7 +394,8 @@ walkthrough. They are ignored by the base stack.
 .. note::
    ``KEYCLOAK_ISSUER_URI``, ``KEYCLOAK_JWK_SET_URI``, and the ``VITE_AUTH_*``
    build args are set automatically by ``docker-compose.prod.yml`` and derived
-   from ``PUBLIC_URL`` — you normally do not set them by hand.
+   from ``PUBLIC_URL``, ``KEYCLOAK_REALM`` and ``KEYCLOAK_CLIENT_ID``: you
+   normally do not set them by hand.
 
 Spring Profile & CORS
 ---------------------

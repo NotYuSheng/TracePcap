@@ -30,7 +30,7 @@ public class AuthProperties {
   private String jwkSetUri;
 
   /** Keycloak client whose roles are read; its client role {@code admin} marks an admin (#915). */
-  private String clientId = "tracepcap-frontend";
+  private String clientId = "tracepcap";
 
   /** Login off only: whether admin-only actions are allowed for everyone (#915). Default false. */
   private boolean systemSettingsEditable = false;

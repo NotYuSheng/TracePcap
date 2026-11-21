@@ -7,7 +7,7 @@ permissions: *Ask the AI*, *Delete anyone's captures*, *Edit retention* and so o
 The work is split the way most apps in a shared login realm split it:
 
 - **Who has a role is decided in Keycloak.** Each role is a client role of the same name
-  on the ``tracepcap-frontend`` client. Your identity team assigns it there, usually to a
+  on the ``tracepcap`` client. Your identity team assigns it there, usually to a
   group (*SOC team* gets ``analyst``), sometimes to one person. TracePcap never creates
   groups or changes who is in them.
 - **What a role may do is decided in TracePcap**, on the Settings page's **Roles** tab,
@@ -146,7 +146,7 @@ role of their own:
 2. Tick what it may do. **Start from…** on any role replaces its permissions with another
    role's, to start over.
 3. In Keycloak, your identity team creates the client role of that name on
-   ``tracepcap-frontend`` (Clients › tracepcap-frontend › Roles › Create role) and assigns it
+   ``tracepcap`` (Clients › tracepcap › Roles › Create role) and assigns it
    to a group.
 
 A custom role can be renamed or have its description changed with **Edit**; its Keycloak name
@@ -159,7 +159,7 @@ Giving someone a role
 ---------------------
 
 In Keycloak, not TracePcap: see :doc:`../configuration/user-management`. In short, assign the
-client role (``viewer``, ``analyst``, ``lead`` or ``admin`` on ``tracepcap-frontend``) to a
+client role (``viewer``, ``analyst``, ``lead`` or ``admin`` on ``tracepcap``) to a
 group, and everyone in the group has it from their next sign-in.
 
 Login off

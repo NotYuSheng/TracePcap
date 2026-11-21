@@ -134,14 +134,14 @@ Giving someone a role
 ---------------------
 
 TracePcap's four roles, ``viewer``, ``analyst``, ``lead`` and ``admin``, are **client
-roles** on the ``tracepcap-frontend`` client. What each may do is set in TracePcap (see
+roles** on the ``tracepcap`` client. What each may do is set in TracePcap (see
 :doc:`../features/roles-and-permissions`); who has which is set here.
 
 The usual way is to give the role to a **group**, so everyone in it has it:
 
 1. In the admin console, open **Groups** and select the group (or create one).
 2. Open **Role mapping** → **Assign role**.
-3. Change the filter to **Filter by clients**, select ``tracepcap-frontend`` and the role
+3. Change the filter to **Filter by clients**, select ``tracepcap`` and the role
    (for example ``analyst``), and click **Assign**.
 
 To give one person a role directly, do the same from **Users** → the user → **Role
@@ -152,8 +152,9 @@ Someone with none of the four roles gets the default role set in TracePcap (*Ana
 an admin changes it).
 
 **Upgrading an existing install:** the realm import only runs when Keycloak first starts, so an
-existing realm has only ``admin``. Create ``viewer``, ``analyst`` and ``lead`` yourself:
-**Clients** → ``tracepcap-frontend`` → **Roles** → **Create role**, one for each name.
+existing realm has only ``admin``, on a client still called ``tracepcap-frontend``. First rename
+the client (see :ref:`renamed-client`), then create ``viewer``, ``analyst`` and ``lead``
+yourself: **Clients** → ``tracepcap`` → **Roles** → **Create role**, one for each name.
 
 With login off there are no accounts and no roles. Whether admin-only settings
 can be changed is then set for everyone by ``SYSTEM_SETTINGS_EDITABLE`` (see
@@ -162,7 +163,7 @@ can be changed is then set for everyone by ``SYSTEM_SETTINGS_EDITABLE`` (see
 Notes
 -----
 
-- The realm defines four **client roles** on the ``tracepcap-frontend`` client:
+- The realm defines four **client roles** on the ``tracepcap`` client:
   ``viewer``, ``analyst``, ``lead`` and ``admin``. A signed-in user with none of them
   gets TracePcap's default role (see :doc:`../features/roles-and-permissions`).
 - Self-service registration and email-based password recovery are off by design
