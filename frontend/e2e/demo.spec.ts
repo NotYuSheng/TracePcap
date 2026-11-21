@@ -304,6 +304,10 @@ test('README demo walkthrough', async ({ page, request }) => {
   // It reads every capture's devices first, which can hold the page before it paints.
   await timeline.fastForward('Inventory loading', 2, async () => {
     await expect(page.getByPlaceholder('Search MAC addresses…')).toBeVisible({ timeout: 120_000 });
+    // In the DOM isn't on screen: a page this size can hold the paint while the recorder competes for
+    // the CPU, and a take ended on the Timeline with the rail already on Inventory. Wait for two
+    // painted frames, which only come once the browser has drawn it.
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))));
   });
   await page.waitForTimeout(1_000);
   await beat(page, FEATURE * 1.5);

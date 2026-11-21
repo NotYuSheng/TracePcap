@@ -30,7 +30,7 @@
 # recording without recording again. 960px, 100s, 7.8 MB.
 # Re-recorded 2026-11-21 as strrat-infection.pcapng (a fresh name and hash: the recording deletes
 # any upload with the demo's name, and the operator's own strrat-you-dirty-rat.pcapng is starred
-# and kept). The MP4 from the same take is the YouTube demo. 86 s: GIF 8.1 MB, MP4 9.9 MB.
+# and kept). The MP4 from the same take is the YouTube demo. 82 s: GIF 7.8 MB, MP4 9.9 MB.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
