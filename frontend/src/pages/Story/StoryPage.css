@@ -117,6 +117,26 @@
   overflow: hidden;
 }
 
+/* Docked in the analysis page's own column: the story takes the full width, and the chat fills
+   the column from the header to the window's bottom, edge to edge. */
+.story-grid-docked {
+  grid-template-columns: minmax(0, 1fr);
+}
+.story-aside-docked {
+  position: static;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.story-aside-docked .story-chat-panel.card {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
 .story-chat-header {
   padding: 14px 18px 12px;
   border-bottom: 1px solid var(--tp-border, #e4e7ec);
