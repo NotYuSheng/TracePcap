@@ -114,8 +114,6 @@ services:
       # Backend-reachable JWKS endpoint (internal docker network), fetched lazily so the
       # backend need not wait for Keycloak to be ready.
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-tracepcap}/protocol/openid-connect/certs
-      # The Keycloak client whose client roles are TracePcap's roles. Must match the frontend's.
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-tracepcap}
     depends_on:
       keycloak:
         condition: service_started
