@@ -141,11 +141,13 @@ body {
   color: var(--tp-text-muted);
 }
 
-/* Network detail page: sticky in-page section nav + scroll anchors */
-.tp-anchor {
-  /* Clear the sticky page header (~112px) when an anchor is scrolled into view */
-  scroll-margin-top: 124px;
+/* Anything scrolled into view (an in-page link, scrollIntoView) stops just below the sticky
+   header (81px) instead of under it. The README demo frames each component this way too. */
+html {
+  scroll-padding-top: 96px;
 }
+
+/* Network detail page: sticky in-page section nav */
 
 .tp-section-nav.sidenav.sticky {
   /* Sit just below the sticky page header (112px) so the nav isn't clipped */
