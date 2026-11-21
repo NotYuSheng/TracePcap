@@ -45,7 +45,7 @@ class CurrentActorIsAdminTest {
 
   @Test
   void loginOn_clientRoleMakesAnAdmin() {
-    login(Map.of("tracepcap-frontend", Map.of("roles", List.of("admin"))));
+    login(Map.of("tracepcap", Map.of("roles", List.of("admin"))));
     assertThat(new CurrentActor(props(true, false)).isAdmin()).isTrue();
   }
 
@@ -57,7 +57,7 @@ class CurrentActorIsAdminTest {
     assertThat(actor.isAdmin()).as("no resource_access").isFalse();
     login(Map.of("account", Map.of("roles", List.of("admin"))));
     assertThat(actor.isAdmin()).as("admin on a different client").isFalse();
-    login(Map.of("tracepcap-frontend", Map.of("roles", List.of("viewer"))));
+    login(Map.of("tracepcap", Map.of("roles", List.of("viewer"))));
     assertThat(actor.isAdmin()).as("other role").isFalse();
   }
 }

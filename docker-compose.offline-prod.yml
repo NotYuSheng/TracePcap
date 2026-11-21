@@ -109,11 +109,13 @@ services:
       # Restated so an air-gapped deployment's guarantee doesn't rest on a default in the file
       # below it. Left overridable: a deployment with internet access may opt back in.
       GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
-      # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
-      KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
+      # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/<realm>.
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/${KEYCLOAK_REALM:-tracepcap}
       # Backend-reachable JWKS endpoint (internal docker network), fetched lazily so the
       # backend need not wait for Keycloak to be ready.
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/tracepcap/protocol/openid-connect/certs
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-tracepcap}/protocol/openid-connect/certs
+      # The Keycloak client whose client roles are TracePcap's roles. Must match the frontend's.
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-tracepcap}
     depends_on:
       keycloak:
         condition: service_started

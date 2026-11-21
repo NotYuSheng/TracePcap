@@ -138,7 +138,7 @@ Making someone an admin
 1. In the admin console, open **Users** and select the user.
 2. Open **Role mapping** → **Assign role**.
 3. Change the filter to **Filter by clients**, select
-   ``tracepcap-frontend`` ``admin``, and click **Assign**.
+   ``tracepcap`` ``admin``, and click **Assign**.
 
 The change takes effect at the user's next sign-in (or token refresh, within
 minutes). To remove it, unassign the role the same way.
@@ -151,7 +151,7 @@ Notes
 -----
 
 - Every signed-in realm user is an **analyst**. The realm defines one role,
-  the **client role** ``admin`` on the ``tracepcap-frontend`` client. An admin
+  the **client role** ``admin`` on the ``tracepcap`` client. An admin
   can change settings marked admin-only and decide which settings need an admin
   (see :ref:`settings-permissions`).
 - Self-service registration and email-based password recovery are off by design

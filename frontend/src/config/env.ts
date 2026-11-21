@@ -69,5 +69,5 @@ export const env = {
   OIDC_REALM: requiredString(import.meta.env.VITE_OIDC_REALM, 'tracepcap'),
 
   /** OIDC public client id registered in the Keycloak realm. */
-  OIDC_CLIENT_ID: requiredString(import.meta.env.VITE_OIDC_CLIENT_ID, 'tracepcap-frontend'),
+  OIDC_CLIENT_ID: requiredString(import.meta.env.VITE_OIDC_CLIENT_ID, 'tracepcap'),
 } as const;

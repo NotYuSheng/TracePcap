@@ -8,7 +8,7 @@
   "accessTokenLifespan": 900,
   "clients": [
     {
-      "clientId": "tracepcap-frontend",
+      "clientId": "tracepcap",
       "name": "TracePcap Frontend (SPA)",
       "enabled": true,
       "protocol": "openid-connect",
@@ -47,7 +47,7 @@
   ],
   "roles": {
     "client": {
-      "tracepcap-frontend": [
+      "tracepcap": [
         {
           "name": "admin",
           "description": "TracePcap admin: may change settings marked admin-only (#915). Grant via Users > Role mapping > Filter by clients.",
