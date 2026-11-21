@@ -132,6 +132,8 @@ docker compose up -d
 
 **4. Open** [http://localhost:80](http://localhost:80) in your browser.
 
+> **Kubernetes:** there's a Helm chart at [tracepcap-helm](https://github.com/NotYuSheng/tracepcap-helm) (`helm install tracepcap oci://ghcr.io/notyusheng/charts/tracepcap`). See [Kubernetes (Helm)](https://notyusheng.github.io/TracePcap/getting-started/kubernetes.html).
+
 > **Note:** First startup may take a minute while PostgreSQL and MinIO initialise. AI features require a running LLM server pointed to by `LLM_API_BASE_URL`; all other features work without it. TracePcap is built to run fully offline — `LLM_API_BASE_URL` must point to a self- or LAN-hosted server, never a public/internet API.
 
 ## Walkthrough
@@ -199,7 +201,7 @@ PCAP, PCAPNG, CAP (max 327MB at the default `APP_MEMORY_MB`).
 
 Full documentation is at **https://notyusheng.github.io/TracePcap**. Start here for anything not covered in this README:
 
-- [Installation & prerequisites](https://notyusheng.github.io/TracePcap/getting-started/installation.html) · [Offline / air-gapped deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html)
+- [Installation & prerequisites](https://notyusheng.github.io/TracePcap/getting-started/installation.html) · [Offline / air-gapped deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html) · [Kubernetes (Helm)](https://notyusheng.github.io/TracePcap/getting-started/kubernetes.html)
 - [Feature guides](https://notyusheng.github.io/TracePcap/) — one page per capability above
 - [Custom signature rules](https://notyusheng.github.io/TracePcap/configuration/signature-rules.html) — full YAML spec, match fields, and payload/regex matching
 - [Authentication (OIDC / Keycloak)](https://notyusheng.github.io/TracePcap/configuration/authentication.html) · [Environment variables](https://notyusheng.github.io/TracePcap/configuration/environment-variables.html) · [LLM setup](https://notyusheng.github.io/TracePcap/configuration/llm-setup.html)
