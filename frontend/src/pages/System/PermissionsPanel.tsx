@@ -131,7 +131,7 @@ export function PermissionsPanel() {
                         <i className="bi bi-lock-fill ms-1 small" aria-label="can't be changed" />
                       )}
                     </span>
-                    <code className="roles-list-key">{r.key}</code>
+                    {r.description && <span className="roles-list-desc">{r.description}</span>}
                   </span>
                   {r.defaultRole && me.authEnabled && (
                     <span className="roles-tag roles-tag-default">default</span>

@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Card } from '@govtechsg/sgds-react';
 import { AnalysisRail, type RailItem } from '@pages/Analysis/AnalysisRail';
 import { SystemSettingsTab } from '@components/settings/SettingsModal/SystemSettingsTab';
 import { PersonalSettingsTab } from '@components/settings/SettingsModal/PersonalSettingsTab';
@@ -40,6 +42,16 @@ const RAIL_ITEMS: RailItem[] = TABS.map(t => ({
   icon: t.icon,
   group: 'group' in t ? t.group : undefined,
 }));
+
+/** A Settings section's content, in the app's standard card (no header: the title is above it). */
+function SectionCard({ bare, children }: { bare: boolean; children: ReactNode }) {
+  if (bare) return <>{children}</>;
+  return (
+    <Card>
+      <Card.Body>{children}</Card.Body>
+    </Card>
+  );
+}
 
 export function SystemPage() {
   const me = useMe();
@@ -86,13 +98,13 @@ export function SystemPage() {
           </div>
         </header>
         <div className="analysis-body">
-          {/* No card around the section: its title sits on the page, and the panel brings its own
-              surface (Roles lays out two cards of its own). */}
+          {/* The section's title sits on the page, and its content in the same SGDS Card the
+              Analysis and Monitor pages use (Roles lays out two cards of its own). */}
           <section id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
             <h2 className="settings-section-title" id={`system-tab-${tab}`}>
               {current.title}
             </h2>
-            <div className={tab === 'roles' ? undefined : 'settings-surface'}>
+            <SectionCard bare={tab === 'roles'}>
               {tab === 'personal' && <PersonalSettingsTab />}
               {tab === 'system' && <SystemSettingsTab />}
               {tab === 'rules' && <DetectionRulesPanel />}
@@ -126,7 +138,7 @@ export function SystemPage() {
                     described in the Authentication section of the docs.
                   </p>
                 ))}
-            </div>
+            </SectionCard>
           </section>
         </div>
       </div>

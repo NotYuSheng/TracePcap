@@ -49,8 +49,8 @@ class PermissionServiceTest {
         role("lead", 30, false,
             PermissionAction.SEE_CAPTURES, PermissionAction.READ_AUDIT_LOG, PermissionAction.DELETE_ANY_CAPTURES);
     admin = role("admin", 40, false);
-    List<RoleEntity> all = List.of(viewer, analyst, lead, admin);
-    when(repo.findAllByOrderByPositionAscKeyAsc()).thenReturn(all);
+    List<RoleEntity> all = List.of(admin, lead, analyst, viewer); // most access first
+    when(repo.findAllByOrderByPositionDescKeyAsc()).thenReturn(all);
     for (RoleEntity r : all) when(repo.findById(r.getKey())).thenReturn(Optional.of(r));
     when(repo.findFirstByDefaultRoleTrue()).thenReturn(Optional.of(analyst));
     when(actor.username()).thenReturn("ana");
@@ -65,7 +65,7 @@ class PermissionServiceTest {
   @Test
   void loginOff_everyoneHasEveryRoleButAdmin_andAdminOnlyWithSystemSettingsEditable() {
     when(actor.authEnabled()).thenReturn(false);
-    assertThat(service.callerRoles()).extracting(RoleEntity::getKey).containsExactly("viewer", "analyst", "lead");
+    assertThat(service.callerRoles()).extracting(RoleEntity::getKey).containsExactly("lead", "analyst", "viewer");
     assertThat(service.can(PermissionAction.UPLOAD_CAPTURES)).isTrue();
     // As before roles: a lone analyst with login off can still read the log and delete anything.
     assertThat(service.can(PermissionAction.READ_AUDIT_LOG)).isTrue();
@@ -82,7 +82,7 @@ class PermissionServiceTest {
   @Test
   void loginOn_theTokensRolesCombine_andAnUnknownRoleGivesNothing() {
     loginWith("viewer", "lead", "typo-role");
-    assertThat(service.callerRoles()).extracting(RoleEntity::getKey).containsExactly("viewer", "lead");
+    assertThat(service.callerRoles()).extracting(RoleEntity::getKey).containsExactly("lead", "viewer");
     assertThat(service.can(PermissionAction.DOWNLOAD_REPORT)).isTrue(); // from viewer
     assertThat(service.can(PermissionAction.READ_AUDIT_LOG)).isTrue(); // from lead
     assertThat(service.can(PermissionAction.UPLOAD_CAPTURES)).isFalse(); // neither

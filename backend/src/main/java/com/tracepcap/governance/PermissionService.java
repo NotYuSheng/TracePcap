@@ -42,7 +42,7 @@ public class PermissionService {
   /** The roles that apply to the caller, in the order Settings lists them. */
   @Transactional(readOnly = true)
   public List<RoleEntity> callerRoles() {
-    List<RoleEntity> all = roleRepository.findAllByOrderByPositionAscKeyAsc();
+    List<RoleEntity> all = roleRepository.findAllByOrderByPositionDescKeyAsc();
     if (!currentActor.authEnabled()) {
       boolean admin = currentActor.isAdmin();
       return all.stream().filter(r -> admin || !isAdminRole(r)).toList();
@@ -120,7 +120,7 @@ public class PermissionService {
   /** Every role and what it may do. */
   @Transactional(readOnly = true)
   public List<RoleDto> listRoles() {
-    return roleRepository.findAllByOrderByPositionAscKeyAsc().stream().map(this::toDto).toList();
+    return roleRepository.findAllByOrderByPositionDescKeyAsc().stream().map(this::toDto).toList();
   }
 
   /**

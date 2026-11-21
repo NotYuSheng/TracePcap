@@ -57,8 +57,8 @@ class RolesMigrationIntegrationTest {
 
   @Test
   void seedsTheFourBuiltInRoles_withAnalystAsTheDefault() {
-    List<RoleEntity> all = roles.findAllByOrderByPositionAscKeyAsc();
-    assertThat(all).extracting(RoleEntity::getKey).containsExactly("viewer", "analyst", "lead", "admin");
+    List<RoleEntity> all = roles.findAllByOrderByPositionDescKeyAsc();
+    assertThat(all).extracting(RoleEntity::getKey).containsExactly("admin", "lead", "analyst", "viewer");
     assertThat(roles.findFirstByDefaultRoleTrue()).get().extracting(RoleEntity::getKey).isEqualTo("analyst");
 
     Map<String, java.util.Set<String>> perms =

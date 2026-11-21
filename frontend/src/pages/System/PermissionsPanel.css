@@ -42,9 +42,19 @@
   display: flex;
   flex-direction: column;
 }
-.roles-list-key {
-  font-size: 0.7rem;
+/* What the role is for, in a line or two; the full text and the Keycloak name are on the right. */
+.roles-list-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.35;
   color: var(--tp-text-muted);
+}
+.roles-list-item.active .roles-list-desc {
+  color: inherit;
+  opacity: 0.8;
 }
 .roles-list-count {
   font-size: 0.75rem;

@@ -1,12 +1,6 @@
-/* Settings sections: the title on the page, the content on a plain surface (no card header bar). */
+/* Settings sections: the title on the page, above the section's card. */
 .settings-section-title {
   margin: 0 0 12px;
   font-size: 1.125rem;
   font-weight: 600;
-}
-.settings-surface {
-  padding: 18px 20px;
-  border: 1px solid var(--tp-border);
-  border-radius: 14px;
-  background: var(--tp-surface);
 }
