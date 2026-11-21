@@ -6,34 +6,27 @@ the workflow for deploying to a machine that has no internet access.
 
 .. note::
 
-   **Geolocation behaviour:** By default, TracePcap attempts to enrich
-   external IPs using `ipinfo.io <https://ipinfo.io>`_ when internet access
-   is available. On an air-gapped machine it automatically falls back to the
-   bundled **DB-IP Lite MMDB** — no configuration change is needed. All other
-   features (packet parsing, nDPI, session reconstruction, file extraction,
-   custom signatures) are fully offline at all times.
+   **Geolocation behaviour:** By default TracePcap geolocates external IPs
+   from the bundled **DB-IP Lite MMDB** only, and never contacts
+   `ipinfo.io <https://ipinfo.io>`_, so no configuration change is needed
+   offline. All other features (packet parsing, nDPI, session reconstruction,
+   file extraction, custom signatures) are fully offline at all times.
 
-   If you want to force MMDB-only lookups even on an internet-connected
-   machine, set ``GEO_FORCE_OFFLINE=true`` (see below). If the MMDB file is
-   not at the default location, also set the ``GEO_MMDB_PATH`` environment
-   variable (or ``tracepcap.geo.mmdb-path`` in ``application.yml``).
+   If the MMDB file is not at the default location, set the ``GEO_MMDB_PATH``
+   environment variable (or ``tracepcap.geo.mmdb-path`` in
+   ``application.yml``).
 
-Suppressing Runtime Egress (``GEO_FORCE_OFFLINE``)
---------------------------------------------------
+No Runtime Egress (``GEO_FORCE_OFFLINE``)
+-----------------------------------------
 
-The ipinfo.io geolocation enrichment is the **one intentional runtime
-egress** in TracePcap. By default the backend probes ``ipinfo.io`` (~every
-60s while resolving new external IPs) and uses it when reachable, falling
-back to the bundled MMDB otherwise. The fallback is graceful, but the
-outbound *attempt* still occurs.
-
-For strict air-gapped or egress-monitored deployments, set:
+The only outbound call TracePcap can make at runtime is the optional
+ipinfo.io geolocation lookup, and it's **off by default** in every stack:
 
 .. code-block:: ini
 
-   GEO_FORCE_OFFLINE=true
+   GEO_FORCE_OFFLINE=true   # the default
 
-When enabled, TracePcap:
+With it on (the default), TracePcap:
 
 - **never** performs the connectivity probe or any ipinfo.io lookup — no
   outbound ``ipinfo.io`` connection is attempted (verifiable via egress
@@ -41,9 +34,14 @@ When enabled, TracePcap:
 - resolves geo **exclusively** from the bundled DB-IP Lite MMDB
   (``geo_source = mmdb`` on every result).
 
-This is the recommended setting for the offline compose stack. With it set,
-TracePcap makes **no external network calls at runtime** (aside from a
+So TracePcap makes **no external network calls at runtime** (aside from a
 locally-hosted LLM server, if configured — see below).
+
+Setting ``GEO_FORCE_OFFLINE=false`` opts in to ipinfo.io, which adds ASN and
+organisation: the backend then probes ``ipinfo.io`` (about every 60s while
+resolving new external IPs), uses it when reachable, and falls back to the
+MMDB otherwise. Even when it falls back, the outbound *attempt* still
+happens, so leave it ``true`` on air-gapped or egress-monitored machines.
 
 Overview
 --------

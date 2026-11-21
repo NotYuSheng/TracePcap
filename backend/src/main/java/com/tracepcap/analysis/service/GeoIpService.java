@@ -57,7 +57,7 @@ public class GeoIpService {
    * and geo is resolved exclusively from the bundled MMDB. For strict air-gapped or
    * egress-monitored deployments. Default false.
    */
-  @Value("${tracepcap.geo.force-offline:false}")
+  @Value("${tracepcap.geo.force-offline:true}")
   private boolean forceOffline;
 
   private final IpGeoInfoRepository geoInfoRepository;

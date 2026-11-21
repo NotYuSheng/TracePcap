@@ -158,12 +158,11 @@ documented in its own section below with the surrounding detail.
        Distinct from ``GEO_FORCE_OFFLINE``, which keeps enrichment but stops it
        reaching the network. Not retroactive. See `Geolocation`_.
    * - ``GEO_FORCE_OFFLINE``
-     - ``false`` / ``true``
-     - Suppresses the ``ipinfo.io`` connectivity probe and lookups, resolving
-       geolocation from the bundled database only. Defaults to ``false`` in the
-       base stack and ``true`` in the offline stack and both production
-       overlays. This is the one intentional outbound call at runtime. See
-       `Geolocation`_.
+     - ``true``
+     - Resolves geolocation from the bundled database only, with no ``ipinfo.io``
+       connectivity probe and no lookups, in every stack. ``false`` opts in to
+       ipinfo.io when it's reachable, the only outbound call TracePcap makes at
+       runtime. See `Geolocation`_.
 
 .. note::
 
@@ -490,13 +489,13 @@ the answer comes from. They are easy to confuse.
 .. code-block:: text
 
    GEO_ENRICHMENT_ENABLED=false  ->  no geo data at all (no lookups of any kind)
-   GEO_FORCE_OFFLINE=true        ->  geo data from the bundled MMDB only, zero egress
-   GEO_FORCE_OFFLINE=false       ->  ipinfo.io when reachable, MMDB when not
+   GEO_FORCE_OFFLINE=true        ->  geo data from the bundled MMDB only, zero egress (default)
+   GEO_FORCE_OFFLINE=false       ->  ipinfo.io when reachable, MMDB when not (opt-in)
 
-For an air-gapped deployment you want ``GEO_FORCE_OFFLINE=true``, **not**
-``GEO_ENRICHMENT_ENABLED=false`` — the MMDB lookup is local to the container and
-never touches the network, so disabling enrichment outright loses the map, the
-country columns and the geo-based scanning signals for no egress benefit. See
+To stop geolocation reaching the network, leave ``GEO_FORCE_OFFLINE=true`` (the default);
+**don't** set ``GEO_ENRICHMENT_ENABLED=false``. The MMDB lookup is local to the container and
+never touches the network, so disabling enrichment outright loses the map, the country
+columns and the geo-based scanning signals for no egress benefit. See
 :doc:`../getting-started/offline-deployment`.
 
 .. list-table::
@@ -515,12 +514,12 @@ country columns and the geo-based scanning signals for no egress benefit. See
        the cache directly (subnet label suggestions, host identity evidence,
        change detection). Clear the cache table if you need the data gone.
    * - ``GEO_FORCE_OFFLINE``
-     - ``false`` / ``true``
-     - Suppresses the ``ipinfo.io`` connectivity probe and all lookups,
-       resolving from the bundled DB-IP Lite MMDB only (``geo_source = mmdb``).
-       ``false`` in the base stack; ``true`` in the offline stack and both
-       production overlays. ASN and organisation are unavailable from the MMDB,
-       so those fields stay empty offline.
+     - ``true``
+     - ``true`` (every stack) resolves from the bundled DB-IP Lite MMDB only
+       (``geo_source = mmdb``), with no ``ipinfo.io`` connectivity probe and no
+       lookups. ``false`` opts in to ipinfo.io when reachable, which adds ASN and
+       organisation; the MMDB doesn't have them, so those fields stay empty by
+       default.
    * - ``GEO_MMDB_PATH``
      - *(bundled)*
      - Override the location of the offline MMDB. Empty (the default) uses the

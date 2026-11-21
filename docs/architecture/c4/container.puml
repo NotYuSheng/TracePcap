@@ -18,7 +18,7 @@ System_Boundary(tracepcap, "TracePcap (Docker Compose)") {
 }
 
 System_Ext(llm, "LLM server", "OpenAI-compatible, local (LLM_BASE_URL)")
-System_Ext(ipinfo, "ipinfo.io", "Optional online geolocation. Base stack only: off by default with login on or offline (GEO_FORCE_OFFLINE)")
+System_Ext(ipinfo, "ipinfo.io", "Optional online geolocation. Off by default (GEO_FORCE_OFFLINE=true): geo comes from a bundled database")
 
 Rel(analyst, nginx, "Opens the app", "HTTPS")
 Rel(nginx, spa, "Serves")
@@ -29,6 +29,6 @@ Rel(backend, keycloak, "Fetches the token signing keys", "JWKS")
 Rel(backend, postgres, "Reads and writes", "JDBC")
 Rel(backend, minio, "Stores and reads captures", "S3 API")
 Rel(backend, llm, "Story, insights, chat, suggestions", "HTTP")
-Rel(backend, ipinfo, "Geolocates public IPs, when allowed and reachable", "HTTPS")
+Rel(backend, ipinfo, "Geolocates public IPs, only if opted in", "HTTPS")
 
 @enduml

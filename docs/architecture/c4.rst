@@ -57,10 +57,10 @@ TracePcap runs fully offline; both outside systems are **optional**:
 - **LLM server.** A local, OpenAI-compatible inference server at ``LLM_BASE_URL`` writes stories
   and insights and answers questions. It's sent findings, never raw packets. Without one,
   everything else works (see :doc:`../configuration/llm-setup`).
-- **ipinfo.io.** Online geolocation, controlled by ``GEO_FORCE_OFFLINE``. It's **off by default**
-  in the prod (login on) and offline stacks, even with internet, so they never contact it. On the
-  base stack it's on, and used only when reachable. Either way a bundled DB-IP database answers
-  when ipinfo.io isn't used (see :doc:`../features/geolocation`).
+- **ipinfo.io.** Online geolocation, **off by default** in every stack (``GEO_FORCE_OFFLINE=true``),
+  so TracePcap never contacts it; a bundled DB-IP database answers instead. Set
+  ``GEO_FORCE_OFFLINE=false`` to opt in; it's then used when reachable (see
+  :doc:`../features/geolocation`).
 
 Keycloak can also be outside: point TracePcap at your organisation's own realm instead of the
 bundled one (see :doc:`../configuration/authentication`).
