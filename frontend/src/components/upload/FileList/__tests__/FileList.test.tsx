@@ -22,6 +22,10 @@ const files = Array.from({ length: 60 }, (_, i) => ({
 
 function serve(favourites: string[] = []) {
   server.use(
+    // Who's asking (roles, #915): login off, so every capture action is allowed.
+    http.get(apiUrl('/me'), () =>
+      HttpResponse.json({ username: 'system', authEnabled: false, admin: false, canManagePermissions: false, roles: [], permissions: [] })
+    ),
     http.get(apiUrl('/files'), ({ request }) => {
       const u = new URL(request.url)
       const size = Number(u.searchParams.get('pageSize') ?? 20)
@@ -59,9 +63,12 @@ describe('FileList', () => {
     const menu = await screen.findByLabelText(/items per page/i, { selector: 'select' })
     fireEvent.change(menu, { target: { value: '100' } })
     // All 60 on one page now, and the menu is still there to pick a smaller size.
-    await waitFor(() => expect(screen.getAllByRole('link', { name: /^cap-\d+\.pcap$/ })).toHaveLength(60))
+    // By text, not role: a role query computes the accessibility tree of all 60 rows on every
+    // retry, which ran past the 5 s test timeout on a busy CI runner (#956).
+    await waitFor(() => expect(screen.getAllByText(/^cap-\d+\.pcap$/, { selector: 'a' })).toHaveLength(60))
     expect(screen.getByLabelText(/items per page/i, { selector: 'select' })).toBeInTheDocument()
-  })
+    // 60 rows: give a busy CI runner room (it once took 5.1 s against the 5 s default).
+  }, 15_000)
 
   it('stars a capture as a favourite', async () => {
     const favourites: string[] = []
