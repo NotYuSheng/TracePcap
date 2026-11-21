@@ -1,12 +1,12 @@
 <h1 align="center">TracePcap</h1>
 
 <p align="center">
-  <strong>Self-hosted packet-capture analysis for black-box network forensics: reconstruct the devices, topology, sessions and threats of a network from its traffic alone.</strong>
+  <strong>Open-source, self-hosted PCAP analyzer for network forensics: reconstruct the devices, topology, sessions and threats of a network from packet captures alone.</strong>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> •
-  <a href="#what-it-does">What it does</a> •
+  <a href="#features">Features</a> •
   <a href="#see-it-in-action">See it in action</a> •
   <a href="#how-it-works">How it works</a> •
   <a href="https://notyusheng.github.io/TracePcap">Documentation</a>
@@ -25,15 +25,16 @@
 
 [![TracePcap network diagram: an office capture's devices grouped by network and played back over time, two phones that held the same address in turn, one phone's identity card, and the map filtered down to a flagged telnet login to a camera](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
 
-**[▶ Watch the demo on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI)** (1 min 22 s)
+**[Watch the demo on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI)** (1 min 22 s)
 
 </div>
 
 ---
 
 **TracePcap** is for when all you have is the traffic: no documentation, no asset list, no prior
-knowledge of the network. Upload packet captures and it works out which devices are there, what
-each one is, who talked to whom, and what looks wrong. It can also track how a network changes
+knowledge of the network. Upload packet captures (PCAP or PCAPNG) and it works out which devices
+are there, what each one is, who talked to whom, and what looks wrong, using tshark, nDPI and
+Suricata underneath. It can also track how a network changes
 between captures, and an LLM can write up what happened. Everything runs on your own machine,
 fully offline.
 
@@ -84,35 +85,35 @@ and [Supported CPU architectures](https://notyusheng.github.io/TracePcap/getting
 
 </details>
 
-## What it does
+## Features
 
 Every item links to its page in the [documentation](https://notyusheng.github.io/TracePcap).
 
-**🔎 Discover: build an inventory from nothing**
+**Discover: build an inventory from nothing**
 
 - [Network map](https://notyusheng.github.io/TracePcap/features/network-visualization.html): devices grouped by network, played back over time, with filters by address, port, device type, protocol and risk.
 - [Device classification](https://notyusheng.github.io/TracePcap/features/geolocation.html): router, server, IoT, phone, laptop and more, from behaviour, [manufacturer](https://notyusheng.github.io/TracePcap/features/mac-lookup.html) and [Windows sign-ins](https://notyusheng.github.io/TracePcap/features/windows-identity.html).
 - [Devices on an address](https://notyusheng.github.io/TracePcap/features/address-reuse.html): tells apart devices that held the same IP in turn, and follows [devices that move](https://notyusheng.github.io/TracePcap/features/device-moves.html).
 - [Where the traffic goes](https://notyusheng.github.io/TracePcap/features/traffic-groups.html): your networks, organisations and countries, from a bundled geolocation database.
 
-**🔬 Inspect: see exactly what crossed the wire**
+**Inspect: see exactly what crossed the wire**
 
 - [Conversations](https://notyusheng.github.io/TracePcap/features/conversations.html): every flow, filterable and sortable, exportable as PCAP or CSV.
 - [Session reconstruction](https://notyusheng.github.io/TracePcap/features/session-reconstruction.html) and [packet replay](https://notyusheng.github.io/TracePcap/features/packet-replay.html): the payloads, in hex and text, step by step.
 - [File extraction](https://notyusheng.github.io/TracePcap/features/file-extraction.html): files carried over HTTP and raw TCP/UDP streams.
 - [Traffic over time](https://notyusheng.github.io/TracePcap/features/timeline-analysis.html), and [comparing captures](https://notyusheng.github.io/TracePcap/features/comparison.html) side by side.
 
-**🛡️ Detect: surface threats and anomalies**
+**Detect: surface threats and anomalies**
 
 - [Suricata IDS](https://notyusheng.github.io/TracePcap/features/ids-threat-detection.html) alerts and [nDPI](https://notyusheng.github.io/TracePcap/features/ndpi-analysis.html) application, risk and TLS (JA3, SNI, certificate) analysis on every conversation.
 - [Detection rules](https://notyusheng.github.io/TracePcap/features/custom-signatures.html) of your own, by address, port, JA3, hostname, app or payload pattern, for one capture, one network or everything.
 
-**🤖 Narrate: plain language, from a local LLM (optional)**
+**Narrate: plain language, from a local LLM (optional)**
 
 - [Story](https://notyusheng.github.io/TracePcap/features/story-mode.html): who was attacked, who was signed in, what malware ran and where it called home, each answer with its evidence, then the whole story in order.
 - [Ask about a capture](https://notyusheng.github.io/TracePcap/features/capture-chat.html): a chat that looks things up before answering and writes checked Wireshark filters.
 
-**📈 Monitor: follow a network across captures**
+**Monitor: follow a network across captures**
 
 - [Network monitor](https://notyusheng.github.io/TracePcap/features/network-monitor.html): add captures of the same network over time; each is compared with the one before (new devices, ARP and MAC drift, gateway, protocol and VPN changes), ranked by severity.
 
@@ -126,7 +127,7 @@ traffic, the report, and a monitored network changing over eight weeks.
 
 <div align="center">
 
-[![TracePcap feature tour](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
+[![TracePcap feature tour: uploading a capture, the Overview, flagged conversations, the network map, the story's four answers, the chat writing a Wireshark filter, the PDF report, and a monitored network over eight weeks](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
 
 Click the GIF for the [full-quality video on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI), with chapters and captions.
 
