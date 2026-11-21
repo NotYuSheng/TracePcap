@@ -23,7 +23,9 @@
 
 <div align="center">
 
-![TracePcap network diagram: an office capture's devices grouped by network and played back over time, two phones that held the same address in turn, one phone's identity card, and the map filtered down to a flagged telnet login to a camera](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
+[![TracePcap network diagram: an office capture's devices grouped by network and played back over time, two phones that held the same address in turn, one phone's identity card, and the map filtered down to a flagged telnet login to a camera](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
+
+**[▶ Watch the demo on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI)** (1 min 22 s)
 
 </div>
 
@@ -151,7 +153,9 @@ Two more worked cases: [Devices on a DHCP network: "Who was 10.0.0.50?"](https:/
 
 <div align="center">
 
-![TracePcap feature tour](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
+[![TracePcap feature tour](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
+
+Click the GIF for the [full-quality video on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI), with chapters and captions.
 
 </div>
 
