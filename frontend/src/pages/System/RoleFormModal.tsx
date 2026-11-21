@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { env } from '@/config/env';
@@ -33,7 +34,7 @@ interface Props {
 }
 
 /**
- * Create a custom role, or rename one. Its Keycloak name is fixed once created: it's what Keycloak
+ * Create a custom role, or rename one, in the right-hand drawer. Its Keycloak name is fixed once created: it's what Keycloak
  * assigns, so changing it would silently take the role away from everyone who has it.
  */
 export function RoleFormModal({ show, editing, roles, onHide, onSubmit }: Props) {
@@ -82,93 +83,95 @@ export function RoleFormModal({ show, editing, roles, onHide, onSubmit }: Props)
   };
 
   return (
-    <Modal show={show} onHide={saving ? () => undefined : onHide} centered>
-      <Form onSubmit={submit}>
-        <Modal.Header closeButton>
-          <Modal.Title>{editing ? `Edit ${editing.label}` : 'New role'}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3" controlId="role-label">
-            <Form.Label>Name</Form.Label>
-            <Form.Control
-              value={label}
-              maxLength={60}
-              autoFocus
-              placeholder="Incident responder"
-              onChange={e => setLabel(e.target.value)}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3" controlId="role-key">
-            <Form.Label>Keycloak client role</Form.Label>
-            <Form.Control
-              className="font-monospace"
-              value={effectiveKey}
-              maxLength={100}
-              disabled={!!editing}
-              isInvalid={taken || keyInvalid}
-              onChange={e => {
-                setKeyTouched(true);
-                setKey(e.target.value.trim());
-              }}
-            />
-            <Form.Control.Feedback type="invalid">
-              {taken
-                ? 'There is already a role with this name.'
-                : "Letters, digits, '-', '_' and '.' only, starting with a letter or digit."}
-            </Form.Control.Feedback>
-            <Form.Text>
-              {editing ? (
-                "Can't change: it's what Keycloak assigns. To use another name, create a new role."
-              ) : (
-                <>
-                  Someone has this role when Keycloak gives them the client role of this name on{' '}
-                  <code>{env.OIDC_CLIENT_ID}</code>. Your identity team creates it there and assigns
-                  it to groups.
-                </>
-              )}
-            </Form.Text>
-          </Form.Group>
-          <Form.Group className="mb-3" controlId="role-description">
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={2}
-              maxLength={255}
-              value={description}
-              placeholder="Who it's for and what they do"
-              onChange={e => setDescription(e.target.value)}
-            />
-          </Form.Group>
-          {!editing && (
-            <Form.Group controlId="role-copy-from">
-              <Form.Label>Start from</Form.Label>
-              <Form.Select value={copyFrom} onChange={e => setCopyFrom(e.target.value)}>
-                <option value="">Nothing: seeing captures only</option>
-                {roles.map(r => (
-                  <option key={r.key} value={r.key}>
-                    {r.label}'s permissions
-                  </option>
-                ))}
-              </Form.Select>
-              <Form.Text>You can change any permission afterwards.</Form.Text>
-            </Form.Group>
-          )}
-          {error && (
-            <Alert variant="danger" className="py-2 mt-3 mb-0 small">
-              {error}
-            </Alert>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
+    <SideDrawer
+      show={show}
+      onHide={() => !saving && onHide()}
+      title={editing ? `Edit ${editing.label}` : 'New role'}
+      titleId="role-form-title"
+      footer={
+        <>
           <Button type="button" variant="outline-secondary" onClick={onHide} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={!canSave}>
+          <Button type="submit" form="role-form" variant="primary" disabled={!canSave}>
             {saving && <Spinner animation="border" size="sm" className="me-1" />}
             {editing ? 'Save' : 'Create role'}
           </Button>
-        </Modal.Footer>
+        </>
+      }
+    >
+      <Form id="role-form" onSubmit={submit}>
+        <Form.Group className="mb-3" controlId="role-label">
+          <Form.Label>Name</Form.Label>
+          <Form.Control
+            value={label}
+            maxLength={60}
+            autoFocus
+            placeholder="Incident responder"
+            onChange={e => setLabel(e.target.value)}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3" controlId="role-key">
+          <Form.Label>Keycloak client role</Form.Label>
+          <Form.Control
+            className="font-monospace"
+            value={effectiveKey}
+            maxLength={100}
+            disabled={!!editing}
+            isInvalid={taken || keyInvalid}
+            onChange={e => {
+              setKeyTouched(true);
+              setKey(e.target.value.trim());
+            }}
+          />
+          <Form.Control.Feedback type="invalid">
+            {taken
+              ? 'There is already a role with this name.'
+              : "Letters, digits, '-', '_' and '.' only, starting with a letter or digit."}
+          </Form.Control.Feedback>
+          <Form.Text>
+            {editing ? (
+              "Can't change: it's what Keycloak assigns. To use another name, create a new role."
+            ) : (
+              <>
+                Someone has this role when Keycloak gives them a client role of this name on
+                TracePcap's client in Keycloak (client ID <code>{env.OIDC_CLIENT_ID}</code>). Your
+                identity team creates it there and assigns it to groups.
+              </>
+            )}
+          </Form.Text>
+        </Form.Group>
+        <Form.Group className="mb-3" controlId="role-description">
+          <Form.Label>Description</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={2}
+            maxLength={255}
+            value={description}
+            placeholder="Who it's for and what they do"
+            onChange={e => setDescription(e.target.value)}
+          />
+        </Form.Group>
+        {!editing && (
+          <Form.Group controlId="role-copy-from">
+            <Form.Label>Start from</Form.Label>
+            <Form.Select value={copyFrom} onChange={e => setCopyFrom(e.target.value)}>
+              <option value="">Nothing: seeing captures only</option>
+              {roles.map(r => (
+                <option key={r.key} value={r.key}>
+                  {r.label}'s permissions
+                </option>
+              ))}
+            </Form.Select>
+            <Form.Text>You can change any permission afterwards.</Form.Text>
+          </Form.Group>
+        )}
+        {error && (
+          <Alert variant="danger" className="py-2 mt-3 mb-0 small">
+            {error}
+          </Alert>
+        )}
       </Form>
-    </Modal>
+    </SideDrawer>
   );
 }

@@ -292,7 +292,8 @@ export function PermissionsPanel() {
             <div className="roles-keycloak">
               <div>
                 <strong>Given by the Keycloak client role</strong>{' '}
-                <code className="roles-chip">{role.key}</code> on <code>{env.OIDC_CLIENT_ID}</code>
+                <code className="roles-chip">{role.key}</code> on TracePcap's Keycloak client,{' '}
+                <code>{env.OIDC_CLIENT_ID}</code>
               </div>
               <div className="text-muted mt-1">
                 TracePcap doesn't create it or give it to anyone. In Keycloak:{' '}
