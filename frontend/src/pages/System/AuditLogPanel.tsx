@@ -131,7 +131,7 @@ export function AuditLogPanel() {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<string | null>(null);
   const [result, setResult] = useState<Paged<AuditLogEntry> | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
@@ -151,10 +151,14 @@ export function AuditLogPanel() {
       .then(r => {
         if (!active) return;
         setResult(r);
-        setError(false);
+        setError(null);
       })
-      .catch(() => {
-        if (active) setError(true);
+      .catch(err => {
+        if (!active) return;
+        // Refused by the caller's roles: say why, so they know whom to ask.
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message;
+        setError(msg ?? "Couldn't load the audit log.");
       });
     return () => {
       active = false;
@@ -201,7 +205,12 @@ export function AuditLogPanel() {
           ))}
         </div>
       </div>
-      {error && <p className="text-danger small">Couldn't load the audit log.</p>}
+      {error && (
+        <p className="small text-muted" data-testid="audit-error">
+          <i className="bi bi-lock me-1" aria-hidden="true" />
+          {error}
+        </p>
+      )}
       {!error && !result && (
         <div className="text-muted small py-3">
           <Spinner animation="border" size="sm" className="me-2" />

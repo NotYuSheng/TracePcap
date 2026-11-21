@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { insightsService } from '@/features/insights/services/insightsService';
@@ -70,6 +72,8 @@ export function RoleEditModal({
   }, `${entityType}:${entityKey}`);
   const suggesting = starting || previewJob.active;
 
+  const ai = usePermission('ASK_AI');
+  const labels = usePermission('LABEL_HOSTS');
   const suggest = async () => {
     setStarting(true);
     setError(null);
@@ -162,13 +166,13 @@ export function RoleEditModal({
               variant="outline-primary"
               size="sm"
               onClick={suggest}
-              disabled={suggesting || saving}
-              title="Ask the AI to classify this node from this snapshot's traffic"
+              disabled={suggesting || saving || !ai.allowed}
             >
               {suggesting
                 ? <><Spinner size="sm" className="me-1" />Suggesting…</>
                 : <><i className="bi bi-stars me-1" />Suggest with AI</>}
             </Button>
+            <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
             {previewJob.active && previewJob.job && (
               <div className="mt-2">
                 <AiJobStatus
@@ -186,14 +190,15 @@ export function RoleEditModal({
       <Modal.Footer className="d-flex justify-content-between">
         <div>
           {stale && hasRole && (
-            <Button variant="outline-secondary" size="sm" onClick={dismiss} disabled={saving}>
+            <Button variant="outline-secondary" size="sm" onClick={dismiss} disabled={saving || !labels.allowed}>
               <i className="bi bi-check-lg me-1" />Dismiss — still correct
             </Button>
           )}
         </div>
         <div className="d-flex gap-2">
           <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={save} disabled={saving || loading || !label.trim()}>
+          <PermissionLock action="LABEL_HOSTS" className="align-self-center" />
+          <Button variant="primary" size="sm" onClick={save} disabled={saving || loading || !label.trim() || !labels.allowed}>
             {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
           </Button>
         </div>

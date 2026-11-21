@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
@@ -65,6 +67,7 @@ export const StoryPage = () => {
   const [additional, setAdditional] = useState<Answer[]>([]);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [showRegenerate, setShowRegenerate] = useState(false);
+  const ai = usePermission('ASK_AI');
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab | null>(null);
 
@@ -321,10 +324,11 @@ export const StoryPage = () => {
               </Button>
             </p>
             {settings}
-            <Button variant="primary" className="mt-3" onClick={() => handleGenerateStory()}>
+            <Button variant="primary" className="mt-3" onClick={() => handleGenerateStory()} disabled={!ai.allowed}>
               <i className="bi bi-stars me-2" aria-hidden="true"></i>
               Write the story
             </Button>
+            <PermissionLock action="ASK_AI" className="ms-2 mt-3" />
           </Card.Body>
         </Card>
         {howItWorks}
@@ -349,10 +353,11 @@ export const StoryPage = () => {
         <Button variant="link" size="sm" onClick={() => setShowHowItWorks(true)}>
           How it works
         </Button>
-        <Button variant="outline-primary" size="sm" onClick={() => setShowRegenerate(true)} disabled={generating}>
+        <Button variant="outline-primary" size="sm" onClick={() => setShowRegenerate(true)} disabled={generating || !ai.allowed}>
           <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`} aria-hidden="true"></i>
           {generating ? 'Writing…' : 'Regenerate…'}
         </Button>
+        <PermissionLock action="ASK_AI" />
       </div>
 
       {error && (

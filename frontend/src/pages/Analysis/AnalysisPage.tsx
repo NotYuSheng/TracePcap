@@ -13,6 +13,8 @@ import {
   type SetStateAction,
 } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Link, useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { useNetworkDiagramFilterState } from '@/features/network/hooks/useNetworkDiagramFilterState';
@@ -174,6 +176,7 @@ export const AnalysisPage = () => {
   // height. Rendered only on the Story tab; null elsewhere.
   const [asideSlot, setAsideSlot] = useState<HTMLElement | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const report = usePermission('DOWNLOAD_REPORT');
 
   // ── Story generation state (lifted here so it survives tab switches) ──────
   const [story, setStory] = useState<Story | null>(null);
@@ -462,10 +465,13 @@ export const AnalysisPage = () => {
                   <div className="d-flex flex-wrap align-items-start gap-3">
                     <NetworkContextPicker fileId={fileId!} />
                     <div className="d-flex flex-column align-items-end gap-1">
-                      <Button variant="outline-primary" size="sm" onClick={() => setShowReport(true)}>
-                        <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
-                        Download report
-                      </Button>
+                      <div className="d-flex align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setShowReport(true)} disabled={!report.allowed}>
+                          <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
+                          Download report
+                        </Button>
+                        <PermissionLock action="DOWNLOAD_REPORT" />
+                      </div>
                     </div>
                   </div>
                 </Card.Body>
