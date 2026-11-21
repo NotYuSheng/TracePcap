@@ -112,8 +112,9 @@ services:
       # REQUIRED, so the endpoint is always a deliberate choice — point it at a local inference
       # server (LM Studio, Ollama, vLLM) for an offline deployment.
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:?set LLM_API_BASE_URL in .env (e.g. http://<host>:1234/v1) — see .env.example}
-      # Resolve GeoIP from the bundled MMDB instead of probing ipinfo.io at runtime, matching
-      # docker-compose.offline.yml. Set GEO_FORCE_OFFLINE=false to opt back into online lookups.
+      # Restated so a hardened deployment's no-egress guarantee doesn't rest on the base file's
+      # default (also true): GeoIP from the bundled MMDB, never probing ipinfo.io. Set
+      # GEO_FORCE_OFFLINE=false to opt in to online lookups.
       GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/<realm>.
       KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/${KEYCLOAK_REALM:-tracepcap}

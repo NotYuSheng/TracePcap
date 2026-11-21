@@ -5,20 +5,24 @@ Geolocation
 -----------
 
 TracePcap enriches every external (non-RFC-1918) IP address with country and
-ASN information using a two-source lookup strategy:
+city, from one of two sources:
 
-1. **ipinfo.io** (online) — queried first when internet is reachable.
+1. **DB-IP Lite MMDB** (the default) — bundled inside the Docker image, so
+   lookups never leave the host. Returns country, region, and city. ASN data
+   is not available from the MMDB source.
+2. **ipinfo.io** (opt-in, online) — only when ``GEO_FORCE_OFFLINE=false``, and
+   then queried first when it's reachable, with the MMDB as the fallback.
    Returns country, region, city, ASN, and organisation name. The ``org``
    field (e.g. ``AS8075 Microsoft Corporation``) is split into the ASN number
    and organisation name. Results are cached permanently in PostgreSQL.
-2. **DB-IP Lite MMDB** (offline fallback) — bundled inside the Docker image.
-   Used automatically when internet is unreachable or ipinfo.io fails.
-   Returns country, region, and city. ASN data is not available from the
-   MMDB source.
+
+``GEO_FORCE_OFFLINE`` is ``true`` by default in every stack, so TracePcap
+doesn't probe or query ipinfo.io unless you opt in (see
+:doc:`../configuration/environment-variables`).
 
 The source used for each cached entry (``"ipinfo"`` or ``"mmdb"``) is stored
 and can be surfaced in the UI so users understand the data accuracy context.
-On an air-gapped machine the MMDB is used exclusively.
+With the default setting, or on an air-gapped machine, the MMDB is used exclusively.
 
 Cached entries older than **30 days** are treated as stale and re-looked up
 on the next analysis run.
@@ -28,7 +32,7 @@ Data Shown
 
 - **Country** — ISO 3166-1 alpha-2 code and flag displayed inline.
 - **Region / City** — state/province and city name (where available).
-- **ASN** — Autonomous System number and organisation name (ipinfo.io only).
+- **ASN** — Autonomous System number and organisation name (ipinfo.io only, so only when you've opted in).
 
 These fields appear in:
 
