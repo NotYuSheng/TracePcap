@@ -13,12 +13,12 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=flat&logo=springboot&logoColor=white" alt="Spring Boot"/>
-  <img src="https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black" alt="React"/>
-  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker"/>
-  <img src="https://img.shields.io/badge/MinIO-C72E49?style=flat&logo=minio&logoColor=white" alt="MinIO"/>
-  <img src="https://img.shields.io/badge/Java-21-007396?style=flat&logo=openjdk&logoColor=white" alt="Java 21"/>
+  <a href="https://github.com/NotYuSheng/TracePcap/releases/latest"><img src="https://img.shields.io/github/v/release/NotYuSheng/TracePcap?label=release" alt="Latest release"/></a>
+  <a href="https://github.com/NotYuSheng/TracePcap/actions/workflows/test-backend.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/NotYuSheng/TracePcap/test-backend.yml?branch=main&label=backend%20tests" alt="Backend tests"/></a>
+  <a href="https://github.com/NotYuSheng/TracePcap/actions/workflows/test-frontend.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/NotYuSheng/TracePcap/test-frontend.yml?branch=main&label=frontend%20tests" alt="Frontend tests"/></a>
+  <a href="https://github.com/NotYuSheng/TracePcap/actions/workflows/system-tests.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/NotYuSheng/TracePcap/system-tests.yml?branch=main&label=system%20tests" alt="System tests"/></a>
+  <a href="https://notyusheng.github.io/TracePcap"><img src="https://img.shields.io/github/actions/workflow/status/NotYuSheng/TracePcap/docs.yml?branch=main&label=docs" alt="Documentation"/></a>
+  <a href="https://github.com/NotYuSheng/TracePcap/blob/main/LICENSE"><img src="https://img.shields.io/github/license/NotYuSheng/TracePcap" alt="MIT license"/></a>
 </p>
 
 <div align="center">
