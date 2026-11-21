@@ -1,15 +1,15 @@
 <h1 align="center">TracePcap</h1>
 
 <p align="center">
-  <strong>Self-hosted PCAP analysis tool for black-box network traffic forensics — reconstruct devices, topology, sessions, and threats from captured packets alone, with no prior knowledge of the network.</strong>
+  <strong>Self-hosted packet-capture analysis for black-box network forensics: reconstruct the devices, topology, sessions and threats of a network from its traffic alone.</strong>
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#feature-tour">Feature tour</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#documentation">Documentation</a>
+  <a href="#quick-start">Quick start</a> •
+  <a href="#what-it-does">What it does</a> •
+  <a href="#see-it-in-action">See it in action</a> •
+  <a href="#how-it-works">How it works</a> •
+  <a href="https://notyusheng.github.io/TracePcap">Documentation</a>
 </p>
 
 <p align="center">
@@ -31,125 +31,98 @@
 
 ---
 
-**TracePcap** is a self-hosted PCAP analysis workbench for **black-box network analysis** — situations where you work from the **traffic itself**, with no documentation or prior knowledge of the network. Upload one or more packet captures and TracePcap characterises devices, maps topology, reconstructs sessions, detects threats, tracks changes over time, and generates AI-powered narratives — all derived purely from observed traffic. It runs fully **offline / air-gapped** and keeps packet data on your own infrastructure.
+**TracePcap** is for when all you have is the traffic: no documentation, no asset list, no prior
+knowledge of the network. Upload packet captures and it works out which devices are there, what
+each one is, who talked to whom, and what looks wrong. It can also track how a network changes
+between captures, and an LLM can write up what happened. Everything runs on your own machine,
+fully offline.
 
-This makes it well-suited for:
+Use it for:
 
-- **Network audits and third-party assessments** — handed a PCAP with no documentation; build the picture from scratch
-- **Incident response & network forensics** — incomplete records; reconstruct what happened from packet evidence
-- **Penetration test reconnaissance** — map an unknown or scarcely-documented network from captured traffic
-- **Research and education** — explore any capture without needing context about the environment
+- **Network audits and third-party assessments:** handed a capture and nothing else, build the picture from scratch.
+- **Incident response and forensics:** reconstruct what happened from packet evidence when records are incomplete.
+- **Penetration-test reconnaissance:** map an unknown network from captured traffic.
+- **Research and teaching:** explore any capture without context about where it came from.
 
-## Features
+## Quick start
 
-TracePcap's capabilities fall into five pillars. Each links to its full page in the [documentation](https://notyusheng.github.io/TracePcap).
+You need **Docker with Docker Compose**, on amd64 or arm64 (including Apple Silicon), and at
+least **8 GB of RAM** (6 GB with Suricata off).
 
-### 🔎 Discover — build an inventory from nothing
-
-| Capability | What it does |
-|---|---|
-| **Network Visualization** | Interactive topology using Sigma.js (WebGL) + graphology with ForceAtlas2 / ELK layouts, a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, and clickable node detail panels |
-| **Device Classification** | Automatic device-type inference (Router, Server, IoT, Mobile, Laptop/Desktop) from traffic behaviour and manufacturer data |
-| **Subnet Detection & Labelling** | Infer subnet structure from traffic patterns or define CIDRs manually; group observed IPs by subnet across all snapshots |
-| **MAC Manufacturer Lookup** | Wireshark OUI database integration for vendor identification from MAC addresses |
-| **Node Role Annotation** | Annotate any IP/device with a role label (e.g. "SCADA Controller", "Historian"); AI-suggested from traffic signals, human-confirmable |
-
-### 🔬 Inspect — see exactly what crossed the wire
-
-| Capability | What it does |
-|---|---|
-| **Conversation Tracking** | Paginated conversation list with advanced filtering (IP, port, protocol, app, risk, custom rules, device type, country, payload pattern), multi-column sorting, column picker, and bulk PCAP export |
-| **Session Reconstruction** | TCP/UDP application-layer payload decoding with a hex + ASCII viewer for inspecting raw packet payloads |
-| **File Extraction** | HTTP object extraction and raw TCP/UDP stream extraction; automatic MIME type detection; bulk download |
-| **Timeline Analysis** | Chronological traffic visualization with configurable time granularity and protocol breakdown |
-
-### 🛡️ Detect — surface threats and anomalies
-
-| Capability | What it does |
-|---|---|
-| **nDPI Deep Packet Inspection** | nDPI v5: application identification, traffic categories, risk/alert flags, JA3/JA3S TLS fingerprints, SNI extraction, and TLS certificate metadata per conversation |
-| **Custom Signature Rules** | YAML detection rules matched against IP, CIDR, port, JA3, hostname, app, protocol, and payload byte / regex patterns; live-reloaded without restart |
-| **Geolocation & ASN Enrichment** | Country/ASN enrichment for external IPs via a bundled offline GeoIP database (optional online enrichment when reachable) |
-
-### 🤖 Narrate (AI) — turn packets into plain language
-
-| Capability | What it does |
-|---|---|
-| **Story Mode** | AI-generated narrative reconstruction of network activity with an interactive LLM Q&A chat, custom context input, and story timeline |
-| **AI Filter Generator** | LLM-powered Wireshark/tcpdump filter generation from natural-language queries, with confidence scores and packet-level results |
-
-### 📈 Track over time — detect drift across captures
-
-| Capability | What it does |
-|---|---|
-| **Network Monitor** | Load multiple PCAPs as ordered snapshots to track device, IP, protocol, and topology changes over time — useful for repeated audits or ongoing capture sessions |
-| **Change Detection** | Automatic diffing between consecutive snapshots — ARP/MAC drift, gateway changes, new devices, new protocols/apps, ASN and VPN shifts — ranked by severity ([details](https://notyusheng.github.io/TracePcap/features/network-monitor.html)) |
-
-### Platform
-
-**PCAP Upload & Management** (PCAP/PCAPNG/CAP with MinIO object storage, duplicate detection, configurable limits) · **Real-time asynchronous processing** with stage-by-stage progress · **Multi-protocol support** (TCP, UDP, ICMP, TLS, HTTP, DNS, QUIC, and L2: ARP, STP, LLDP, CDP) · **Export** as PDF report (with live topology capture), per-conversation or bulk PCAP, and CSV.
-
-## Quick Start
-
-### Prerequisites
-
-| Software | Version | Purpose |
-|----------|---------|---------|
-| Docker | Latest | Container runtime |
-| Docker Compose | Latest | Multi-container orchestration |
-| LLM Server | Any OpenAI-compatible API, self- or LAN-hosted | AI features (e.g. LM Studio, Ollama) — optional |
-
-**CPU architecture:** amd64 (x86-64) or arm64 (aarch64), including Apple Silicon. See [Supported CPU Architectures](docs/getting-started/supported-architectures.rst).
-
-**Minimum hardware** (sizes the TracePcap stack only; the LLM, if self-hosted, is extra):
-
-| | Minimum | Recommended | Comfortable |
-|---|---------|-------------|-------------|
-| RAM | 6GB (`SURICATA_ENABLED=false`) | 8GB+ | 16GB |
-| CPU | 4 cores | 4+ cores | 8 cores |
-| Storage | 10GB | 50GB+ | 100GB+ SSD |
-
-The default stack's container limits total ~4.4GB (~5.4GB with the Keycloak auth overlay). Upload size is derived from `APP_MEMORY_MB` (max upload ≈ 16% of it; 327MB at the default `2048`). See [Container Resource Limits](docs/operations/production-hardening.rst) for the per-service breakdown and tuning.
-
-### Installation
-
-**1. Clone and set up:**
 ```bash
 git clone https://github.com/NotYuSheng/TracePcap.git
 cd TracePcap
 cp .env.example .env
-```
-
-**2. Configure `.env`** (defaults work out of the box; AI features need an LLM endpoint):
-```env
-APP_MEMORY_MB=2048                          # 327MB max upload (derived from this)
-NGINX_PORT=80                               # change if port 80 is in use
-LLM_API_BASE_URL=http://localhost:1234/v1   # local/LAN inference server (must not be a public API)
-LLM_MODEL=Qwen2.5-14B-Coder-Instruct
-```
-
-**3. Start the application:**
-```bash
 docker compose up -d
 ```
 
-**4. Open** [http://localhost:80](http://localhost:80) in your browser.
+Open **http://localhost** and drop in a capture (`.pcap`, `.pcapng` or `.cap`, up to 327 MB by
+default). The first start takes a minute while the database and storage initialise.
 
-> **Note:** First startup may take a minute while PostgreSQL and MinIO initialise. AI features require a running LLM server pointed to by `LLM_API_BASE_URL`; all other features work without it. TracePcap is built to run fully offline — `LLM_API_BASE_URL` must point to a self- or LAN-hosted server, never a public/internet API.
+**Next steps**
 
-## Feature tour
+- **Turn on the AI features** (story, chat, insights): point `LLM_API_BASE_URL` in `.env` at a
+  local or LAN OpenAI-compatible server such as LM Studio or Ollama, never a public API. Everything
+  else works without one. See [LLM setup](https://notyusheng.github.io/TracePcap/configuration/llm-setup.html).
+- **Turn on login** (Keycloak, with Viewer, Analyst, Lead and Admin roles) before more than one
+  person uses it. See [Authentication](https://notyusheng.github.io/TracePcap/configuration/authentication.html).
+- **Air-gapped machine?** See [Offline deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html).
 
-Two minutes through the app's main features: upload, the Overview, the flagged conversations,
-the network map played back and one host's card, the story's four answers (victim, user, malware,
-C2), the chat finding the victim and writing a checked filter for the C2 traffic, the report
-drawer, and a monitored network changing over eight weeks.
+<details>
+<summary>Hardware sizing</summary>
 
-The capture it runs on is a real incident: a STRRAT remote-access trojan on a corporate LAN, from
-malware-traffic-analysis.net's training exercises. The investigation itself, step by step and
-checked against the exercise's answer key, is in the docs:
-[STRRAT infection: "You dirty rat!"](https://notyusheng.github.io/TracePcap/demos/strrat-you-dirty-rat.html).
-Two more worked cases: [Devices on a DHCP network: "Who was 10.0.0.50?"](https://notyusheng.github.io/TracePcap/demos/devices-on-a-dhcp-network.html) and
-[Two sites, one range: telling networks apart](https://notyusheng.github.io/TracePcap/demos/two-sites-one-range.html).
+| | Minimum | Recommended | Comfortable |
+|---|---|---|---|
+| RAM | 6 GB (`SURICATA_ENABLED=false`) | 8 GB+ | 16 GB |
+| CPU | 4 cores | 4+ cores | 8 cores |
+| Storage | 10 GB | 50 GB+ | 100 GB+ SSD |
+
+This sizes the TracePcap stack only; a self-hosted LLM needs its own. The containers' limits total
+about 4.4 GB (5.4 GB with login on). The upload limit follows `APP_MEMORY_MB`: about 16% of it, so
+327 MB at the default 2048. See [Container resource limits](https://notyusheng.github.io/TracePcap/operations/production-hardening.html)
+and [Supported CPU architectures](https://notyusheng.github.io/TracePcap/getting-started/supported-architectures.html).
+
+</details>
+
+## What it does
+
+Every item links to its page in the [documentation](https://notyusheng.github.io/TracePcap).
+
+**🔎 Discover: build an inventory from nothing**
+
+- [Network map](https://notyusheng.github.io/TracePcap/features/network-visualization.html): devices grouped by network, played back over time, with filters by address, port, device type, protocol and risk.
+- [Device classification](https://notyusheng.github.io/TracePcap/features/geolocation.html): router, server, IoT, phone, laptop and more, from behaviour, [manufacturer](https://notyusheng.github.io/TracePcap/features/mac-lookup.html) and [Windows sign-ins](https://notyusheng.github.io/TracePcap/features/windows-identity.html).
+- [Devices on an address](https://notyusheng.github.io/TracePcap/features/address-reuse.html): tells apart devices that held the same IP in turn, and follows [devices that move](https://notyusheng.github.io/TracePcap/features/device-moves.html).
+- [Where the traffic goes](https://notyusheng.github.io/TracePcap/features/traffic-groups.html): your networks, organisations and countries, from a bundled geolocation database.
+
+**🔬 Inspect: see exactly what crossed the wire**
+
+- [Conversations](https://notyusheng.github.io/TracePcap/features/conversations.html): every flow, filterable and sortable, exportable as PCAP or CSV.
+- [Session reconstruction](https://notyusheng.github.io/TracePcap/features/session-reconstruction.html) and [packet replay](https://notyusheng.github.io/TracePcap/features/packet-replay.html): the payloads, in hex and text, step by step.
+- [File extraction](https://notyusheng.github.io/TracePcap/features/file-extraction.html): files carried over HTTP and raw TCP/UDP streams.
+- [Traffic over time](https://notyusheng.github.io/TracePcap/features/timeline-analysis.html), and [comparing captures](https://notyusheng.github.io/TracePcap/features/comparison.html) side by side.
+
+**🛡️ Detect: surface threats and anomalies**
+
+- [Suricata IDS](https://notyusheng.github.io/TracePcap/features/ids-threat-detection.html) alerts and [nDPI](https://notyusheng.github.io/TracePcap/features/ndpi-analysis.html) application, risk and TLS (JA3, SNI, certificate) analysis on every conversation.
+- [Detection rules](https://notyusheng.github.io/TracePcap/features/custom-signatures.html) of your own, by address, port, JA3, hostname, app or payload pattern, for one capture, one network or everything.
+
+**🤖 Narrate: plain language, from a local LLM (optional)**
+
+- [Story](https://notyusheng.github.io/TracePcap/features/story-mode.html): who was attacked, who was signed in, what malware ran and where it called home, each answer with its evidence, then the whole story in order.
+- [Ask about a capture](https://notyusheng.github.io/TracePcap/features/capture-chat.html): a chat that looks things up before answering and writes checked Wireshark filters.
+
+**📈 Monitor: follow a network across captures**
+
+- [Network monitor](https://notyusheng.github.io/TracePcap/features/network-monitor.html): add captures of the same network over time; each is compared with the one before (new devices, ARP and MAC drift, gateway, protocol and VPN changes), ranked by severity.
+
+**Around all of it:** a [PDF report](https://notyusheng.github.io/TracePcap/features/report-export.html), [re-analysing](https://notyusheng.github.io/TracePcap/features/reanalysis.html) with other options, [roles and permissions](https://notyusheng.github.io/TracePcap/features/roles-and-permissions.html) with an audit log, and one [Settings](https://notyusheng.github.io/TracePcap/features/settings.html) page.
+
+## See it in action
+
+Two minutes through the main features: upload, the Overview, the flagged conversations, the
+network map and one host's card, the story's four answers, the chat writing a filter for the C2
+traffic, the report, and a monitored network changing over eight weeks.
 
 <div align="center">
 
@@ -159,79 +132,68 @@ Click the GIF for the [full-quality video on YouTube](https://www.youtube.com/wa
 
 </div>
 
-## Usage
+The capture is a real incident: a STRRAT remote-access trojan on a corporate LAN, from
+malware-traffic-analysis.net's training exercises. Worked investigations, step by step:
 
-### Single-file analysis
+- [STRRAT infection: "You dirty rat!"](https://notyusheng.github.io/TracePcap/demos/strrat-you-dirty-rat.html), checked against the exercise's answer key
+- [Devices on a DHCP network: "Who was 10.0.0.50?"](https://notyusheng.github.io/TracePcap/demos/devices-on-a-dhcp-network.html)
+- [Two sites, one range: telling networks apart](https://notyusheng.github.io/TracePcap/demos/two-sites-one-range.html)
 
-1. **Upload** — drag-and-drop a PCAP/PCAPNG/CAP file; optionally enable nDPI analysis and file extraction
-2. **Analyze** — processed asynchronously with a per-stage progress view
-3. **Overview** — detected applications, protocols, risk alerts, and custom signature matches
-4. **Visualize** — explore the interactive topology with filters, layout controls, and node detail panels
-5. **Conversations** — review flows with advanced filtering, session reconstruction, and payload inspection
-6. **Story Mode** — read the AI-generated narrative and ask follow-up questions
-7. **Extracted Files** — browse and download files recovered from HTTP responses and raw streams
-8. **Generate Filters** — create Wireshark/tcpdump filters from natural language
-9. **Export** — a PDF report, per-conversation or bulk PCAP, or CSV
+## How it works
 
-### Multi-file Network Monitor
+`docker compose` runs nginx (serving the React web app), a Spring Boot backend, PostgreSQL and
+MinIO, plus Keycloak when login is on. The backend's image bundles **tshark**, **nDPI 6**,
+**Suricata** and **mergecap**, and runs them on each capture.
 
-Build a picture of an unknown network from captures taken at different times, and track how it changes between them:
+![TracePcap containers](docs/architecture/c4/container.svg)
 
-1. **Create a Network** (e.g. "Client Site — Building A")
-2. **Add Snapshots** — upload PCAPs in capture order; each becomes a time-ordered snapshot
-3. **Review the Diagram** — changed nodes are highlighted by severity
-4. **Track Drift** — device, IP, protocol, and VPN changes detected automatically between consecutive snapshots
-5. **Define Subnets** — "Detect Subnets" to infer CIDRs from traffic, or add them manually
-6. **Annotate Nodes** — assign role labels, with "Suggest with AI" from traffic signals
-7. **Correlate Events** — log real-world events (maintenance windows, incidents) against observed changes
-8. **Generate Insights** — an AI narrative explaining changes across snapshots
+- **Nothing leaves your machine.** Captures are stored and analysed locally. Geolocation comes from
+  a bundled DB-IP database (online lookups are off unless you opt in with `GEO_FORCE_OFFLINE=false`),
+  and the LLM, if you use one, must be local or on your LAN. It's sent findings, not raw packets.
+- **Login is optional.** The base stack runs open, for one person. With login on, Keycloak decides
+  who may sign in and which role they have; TracePcap decides what each role may do.
 
-The Monitor assumes you know nothing about the network upfront: there is no persistent agent or sensor — you feed in PCAPs and it compares them. Subnets, device roles, and topology are all **inferred from traffic** rather than imported from a CMDB, and the first snapshot becomes the implicit baseline for change detection. See [Network Monitor](https://notyusheng.github.io/TracePcap/features/network-monitor.html) for the full change-detection event reference.
-
-### Supported file formats
-
-PCAP, PCAPNG, CAP (max 327MB at the default `APP_MEMORY_MB`).
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| **Backend** | Spring Boot 3.2.1, Java 21, Maven, Lombok, MapStruct |
-| **Frontend** | React 19, Vite, TypeScript, SGDS React |
-| **Visualization** | Sigma.js + graphology + ELK (topology), React Flow (cluster graph), Recharts, D3.js |
-| **Reverse Proxy** | Nginx |
-| **Packet Parsing** | tshark / Wireshark, nDPI v5 (deep packet inspection) |
-| **Database** | PostgreSQL 15 with Flyway migrations |
-| **Object Storage** | MinIO (S3-compatible) |
-| **Containerization** | Docker, Docker Compose |
-| **API Documentation** | SpringDoc OpenAPI (Swagger UI) |
-
-## Documentation
-
-Full documentation is at **https://notyusheng.github.io/TracePcap**. Start here for anything not covered in this README:
-
-- [Installation & prerequisites](https://notyusheng.github.io/TracePcap/getting-started/installation.html) · [Offline / air-gapped deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html)
-- [Feature guides](https://notyusheng.github.io/TracePcap/) — one page per capability above
-- [Custom signature rules](https://notyusheng.github.io/TracePcap/configuration/signature-rules.html) — full YAML spec, match fields, and payload/regex matching
-- [Authentication (OIDC / Keycloak)](https://notyusheng.github.io/TracePcap/configuration/authentication.html) · [Environment variables](https://notyusheng.github.io/TracePcap/configuration/environment-variables.html) · [LLM setup](https://notyusheng.github.io/TracePcap/configuration/llm-setup.html)
-- [Operations](https://notyusheng.github.io/TracePcap/) — logs, backups, database access, production hardening
-
-Interactive API docs (Swagger UI) are at **http://localhost:80/swagger-ui.html** when the app is running.
+More in [System architecture](docs/architecture/c4.rst) and the
+[five-stage pipeline](https://notyusheng.github.io/TracePcap/architecture/layers.html).
 
 ## Security
 
-- **Local processing** — all PCAP analysis runs on your server; packet data never leaves your infrastructure
-- **Offline-capable** — GeoIP uses a bundled DB-IP MMDB fallback; LLM queries use a configurable local endpoint
-- **No authentication by default** — the base stack runs fully open; enable OIDC/Keycloak auth before exposing to multiple users (see the [Authentication guide](https://notyusheng.github.io/TracePcap/configuration/authentication.html), and **change all default credentials** for any real deployment)
-- **Object storage** — MinIO is not exposed outside the Docker network
+- **Turn on login before sharing it.** The base stack has no authentication; anyone who can reach
+  it can use it. See [Authentication](https://notyusheng.github.io/TracePcap/configuration/authentication.html),
+  and **change every default credential** in `.env` for a real deployment.
+- **Roles** limit what each person may do (upload, ask the AI, export packets, delete others'
+  captures, change settings), and changes are recorded in an audit log. Everyone who can sign in
+  can see every capture.
+- **PostgreSQL (5432) and the MinIO console (9001) are published on the host** by every stack.
+  Firewall them, or remove those ports, on any machine others can reach; see
+  [Production hardening](https://notyusheng.github.io/TracePcap/operations/production-hardening.html).
 
-Data is shared across all authenticated users (no per-user ownership) in this version; per-user scoping is tracked separately (issues #360, #444).
+## Documentation
 
-## Sample Files
+Everything is at **https://notyusheng.github.io/TracePcap**:
 
-The [`sample-files/`](sample-files/) directory contains example PCAPs, including `atm_capture1.cap` (ATM traffic), `free5gc.pcap` (5G core), `demo_all_rules.pcap` (triggers the full set of custom signature demo rules), `dns_demo.pcap` and `http_demo.pcap` (classification demos, each with a `gen_*.py` regenerator), and `monitor_large/` (8 weekly snapshots of a simulated 550-node network for the Network Monitor). A full set of demo rules is in [`signatures.sample.yml`](signatures.sample.yml).
+- **Getting started:** [installation](https://notyusheng.github.io/TracePcap/getting-started/installation.html), [offline deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html)
+- **Configuration:** [environment variables](https://notyusheng.github.io/TracePcap/configuration/environment-variables.html), [LLM setup](https://notyusheng.github.io/TracePcap/configuration/llm-setup.html), [authentication](https://notyusheng.github.io/TracePcap/configuration/authentication.html), [users and roles](https://notyusheng.github.io/TracePcap/configuration/user-management.html), [detection rules](https://notyusheng.github.io/TracePcap/configuration/signature-rules.html)
+- **Operations:** [production hardening](https://notyusheng.github.io/TracePcap/operations/production-hardening.html), [backup and restore](https://notyusheng.github.io/TracePcap/operations/backup-restore.html), [logs and monitoring](https://notyusheng.github.io/TracePcap/operations/logs-monitoring.html)
 
-## Star History
+The REST API is described at `/swagger-ui/index.html` on a running instance (off in the production
+overlay), and in [`openapi/baseline.json`](openapi/baseline.json).
+
+## Sample captures
+
+[`sample-files/`](sample-files/) has captures to try, most with the `gen_*.py` script that made them:
+
+- `office_showcase.pcap`: a small office (four VLANs) plus the cases the network map shows best, good for a first look
+- `demo_all_rules.pcap`: triggers every rule in [`signatures.sample.yml`](signatures.sample.yml)
+- `dhcp_address_reuse.pcap`, `device_roaming.pcap`, `site_to_site_vpn.pcap`: the device-identity cases from the docs' worked investigations
+- `monitor_large/`: eight weekly captures of a simulated 550-device network, for the network monitor
+- `free5gc.pcap` (5G core traffic), and protocol samples: `ftp.pcap`, `signal.pcap`, `discord.pcap`
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Branch from `dev` and open pull requests against `dev`.
+
+## Star history
 
 <a href="https://www.star-history.com/?type=date&repos=NotYuSheng%2FTracePcap">
  <picture>
@@ -243,4 +205,4 @@ The [`sample-files/`](sample-files/) directory contains example PCAPs, including
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).
