@@ -101,6 +101,8 @@ final class SystemSettingsCatalog {
           "OIDC issuer (Keycloak realm) used when login is on."),
       new Entry("KEYCLOAK_JWK_SET_URI", "tracepcap.auth.jwk-set-uri", null, Group.INFRASTRUCTURE, false, "Keycloak JWK set URI",
           "Where the backend fetches the login token signing keys; discovered from the issuer when blank."),
+      new Entry("KEYCLOAK_CLIENT_ID", "tracepcap.auth.client-id", "tracepcap", Group.INFRASTRUCTURE, false, "Keycloak client ID",
+          "TracePcap's client in the Keycloak realm. Its client roles are TracePcap's roles. Must match the frontend's build."),
       new Entry("SYSTEM_SETTINGS_EDITABLE", "tracepcap.auth.system-settings-editable", "false", Group.INFRASTRUCTURE, false, "System settings editable",
           "With login off, whether actions marked admin-only are allowed for everyone (true) or no one (false). Ignored with login on, where the Keycloak client role admin decides."),
       new Entry("ANALYSIS_TIMEOUT_SECONDS", "tracepcap.analysis.timeout-seconds", "300", Group.MEMORY, false, "Analysis timeout seconds",
