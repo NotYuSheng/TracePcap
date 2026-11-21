@@ -1,44 +1,14 @@
 System Architecture (C4)
 ========================
 
-TracePcap's architecture drawn with the `C4 model <https://c4model.com>`_, from the outside in:
-who uses it and what it talks to (context), what runs where (containers), and how the backend is
-organised (components). Each level zooms into one box of the level above. Click a diagram to
-open it full size.
-
-.. contents::
-   :local:
-   :depth: 1
-
-
-Level 1: System context
------------------------
-
-.. figure:: c4/context.svg
-   :target: ../_images/context.svg
-   :alt: C4 system context: analysts and admins use TracePcap; TracePcap uses an identity
-         provider, an LLM server and ipinfo.io, all optional
-   :width: 80%
-
-TracePcap runs fully offline. Everything it talks to outside itself is **optional**:
-
-- **Identity provider.** Keycloak decides who may sign in and which roles they have. It's bundled
-  with the login-on deployment, or it can be your organisation's own realm (see
-  :doc:`../configuration/authentication`). With login off there's no identity provider at all.
-- **LLM server.** A local, OpenAI-compatible inference server writes stories and insights and
-  answers questions. It's sent findings, never raw packets. Without one, everything else works
-  (see :doc:`../configuration/llm-setup`).
-- **ipinfo.io.** Used for geolocation only when it's reachable; a bundled DB-IP database answers
-  otherwise (see :doc:`../features/geolocation`).
-
-
-Level 2: Containers
--------------------
+TracePcap's containers, drawn with the `C4 model <https://c4model.com>`_: each box is something
+that runs on its own (a Docker container, or the web app in the browser), and the lines are how
+they talk. Click the diagram to open it full size.
 
 .. figure:: c4/container.svg
    :target: ../_images/container.svg
-   :alt: C4 containers: the web app served by nginx, the Spring Boot backend with its packet
-         tools, PostgreSQL, MinIO, and Keycloak when login is on
+   :alt: C4 containers: the web app served by nginx, the Spring Boot backend, PostgreSQL, MinIO,
+         and Keycloak when login is on; outside, an LLM server and ipinfo.io
    :width: 100%
 
 What ``docker compose`` runs. The base stack is ``docker-compose.yml``; turning login on adds
@@ -62,11 +32,9 @@ Keycloak from ``docker-compose.prod.yml``.
    * - Backend
      - Spring Boot 3, Java 21
      - The REST API, the analysis pipeline, background AI jobs (one at a time for the model),
-       roles and the audit log. Its parts are on Level 3.
-   * - Packet tools
-     - tshark, ndpiReader, Suricata, mergecap
-     - Run as subprocesses inside the backend's container. They're the only code that reads the
-       capture itself.
+       roles and the audit log. Its image bundles the packet tools (tshark, ndpiReader, Suricata,
+       mergecap), which it runs as subprocesses: they're the only code that reads the capture
+       itself. How the backend is organised inside is in :doc:`layers`.
    * - Database
      - PostgreSQL 15, Flyway
      - Analysis results, findings, labels, networks, roles, the audit log and settings.
@@ -81,32 +49,26 @@ Keycloak from ``docker-compose.prod.yml``.
 ``docker-compose.yml`` also runs two one-shot helpers, ``minio-volume-perms`` and ``minio-init``,
 which prepare the storage volume and bucket and then exit. They're left off the diagram.
 
+Outside TracePcap
+-----------------
 
-Level 3: Backend components
----------------------------
+TracePcap runs fully offline; both outside systems are **optional**:
 
-.. figure:: c4/component-backend.svg
-   :target: ../_images/component-backend.svg
-   :alt: C4 components of the backend, grouped by pipeline stage: Ingest, Extract, Scan,
-         Adjudicate, the knowledge layer, Narrate and Present, plus Governance
-   :width: 75%
+- **LLM server.** A local, OpenAI-compatible inference server at ``LLM_BASE_URL`` writes stories
+  and insights and answers questions. It's sent findings, never raw packets. Without one,
+  everything else works (see :doc:`../configuration/llm-setup`).
+- **ipinfo.io.** Used for geolocation only when it's reachable; a bundled DB-IP database answers
+  otherwise (see :doc:`../features/geolocation`).
 
-The backend is organised as a pipeline. Data changes shape at each stage: packets → facts →
-insights → conclusions → narrative. Each box is a stage, and the modules in it are the Java
-packages under ``com.tracepcap``. The tags say how each stage works: **D** deterministic, **L**
-LLM-driven, **H** human-annotated.
-
-What each stage may and may not do, and how the boundaries are enforced, is in
-:doc:`layers` and :doc:`enforcement`. The knowledge layer is described in :doc:`knowledge-layer`.
-
+Keycloak can also be outside: point TracePcap at your organisation's own realm instead of the
+bundled one (see :doc:`../configuration/authentication`).
 
 .. _c4-editing:
 
-Editing the diagrams
---------------------
+Editing the diagram
+-------------------
 
-The sources are PlantUML files in ``docs/architecture/c4/``, with the rendered SVG committed next
-to each one:
+The source is ``docs/architecture/c4/container.puml``, with the rendered SVG committed next to it:
 
 .. code-block:: bash
 
@@ -116,10 +78,10 @@ to each one:
 The script runs a pinned PlantUML image in Docker (no Java needed) with networking off. CI runs
 ``scripts/render-diagrams.sh --check`` and fails if a committed SVG doesn't match its source.
 
-Two rules keep the diagrams working offline and stable:
+Two rules keep the diagram working offline and stable:
 
 - **Include the C4 library from PlantUML itself**, ``!include <C4/C4_Container>``, never
   ``!includeurl https://raw.githubusercontent.com/...``. The library ships inside PlantUML; the URL
   form needs the internet to render and follows whatever upstream changes.
-- **No version number in the title.** Git already versions each file; a hand-typed version goes
+- **No version number in the title.** Git already versions the file; a hand-typed version goes
   stale.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Renders the architecture diagrams (docs/architecture/c4/*.puml) to SVG next to each source.
+# Renders the architecture diagram(s) (docs/architecture/c4/*.puml) to SVG next to each source.
 #
 #   scripts/render-diagrams.sh           render
 #   scripts/render-diagrams.sh --check   fail if a committed SVG doesn't match its .puml (CI)
