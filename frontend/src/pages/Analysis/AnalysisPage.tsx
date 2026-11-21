@@ -112,6 +112,11 @@ export interface AnalysisOutletContext {
   storyState: StoryGenerationState;
   /** Reloads the summary without blanking the page, e.g. after a rule change (#925). */
   refreshSummary: () => void;
+  /**
+   * The column beside the whole page, the capture bar included, on sections that have one (Story's
+   * chat). A section portals into it; null where there's no such column.
+   */
+  asideSlot: HTMLElement | null;
 }
 
 // Re-export so NetworkDiagramPage can import from one place
@@ -165,6 +170,9 @@ export const AnalysisPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   // The "Viewing with" network (#925): the report includes its rules' matches.
   const [networkContext] = useNetworkContext();
+  // Story's chat gets a column of its own beside the capture bar and the story, the window's full
+  // height. Rendered only on the Story tab; null elsewhere.
+  const [asideSlot, setAsideSlot] = useState<HTMLElement | null>(null);
   const [showReport, setShowReport] = useState(false);
 
   // ── Story generation state (lifted here so it survives tab switches) ──────
@@ -423,7 +431,8 @@ export const AnalysisPage = () => {
           active={activeTab}
           onSelect={handleTabChange}
         />
-        <div className="analysis-main">
+        <div className={`analysis-main${activeTab === 'story' ? ' analysis-main-with-aside' : ''}`}>
+          <div className="analysis-main-column">
           {/* The capture bar: which capture, and the page-wide controls. */}
           <div className="analysis-capture-bar">
             <div className="analysis-capture-id">
@@ -483,10 +492,13 @@ export const AnalysisPage = () => {
                   networkDiagramFilters,
                   storyState,
                   refreshSummary: () => void refetch({ silent: true }),
+                  asideSlot: activeTab === 'story' ? asideSlot : null,
                 } satisfies AnalysisOutletContext
               }
             />
           </div>
+          </div>
+          {activeTab === 'story' && <div className="analysis-aside" ref={setAsideSlot} />}
         </div>
       </div>
     </div>
