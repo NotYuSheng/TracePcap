@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 #
-# Records the README demo GIF end to end:
-#   Playwright drives the app and records WebM -> ffmpeg encodes an optimized GIF.
+# Records the README demo GIF, or the demo video, end to end:
+#   Playwright drives the app and records WebM -> ffmpeg encodes an optimized GIF, or an MP4.
 #
 # Prerequisites:
 #   - the stack is up:            docker compose up -d --build
 #   - Playwright chromium:        (cd frontend && npx playwright install chromium)
 #   - ffmpeg on PATH:             sudo apt install ffmpeg
 #
-# Usage: scripts/record-demo.sh [output.gif]
+# Usage: scripts/record-demo.sh [output.gif|output.mp4]
 #        DEMO_SPEC=hero scripts/record-demo.sh sample-files/TracePcap-Hero.gif   (the short hero)
+#
+# An output ending in .mp4 writes the video instead (the YouTube demo the README's GIFs link to):
+# the recording's native 1280x720 at 25 fps, H.264, no sound, and each fast-forwarded wait captioned
+# ("Fast-forwarded 120x · Story being written") so a viewer knows time was skipped. Size knobs
+# below are GIF-only. Record once and encode both from it:
+#   scripts/record-demo.sh demo.mp4 && DEMO_ENCODE_ONLY=1 scripts/record-demo.sh sample-files/TracePcap-Demo.gif
+# The video isn't committed (YouTube hosts it); the GIF is.
 #
 # The README walkthrough (2026-11-16) is the STRRAT incident from docs/demos/strrat-you-dirty-rat.rst,
 # which isn't committed (real malware traffic). Download it as that page says, convert it to pcapng
@@ -25,6 +32,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${1:-$REPO_ROOT/sample-files/TracePcap-Demo.gif}"
+case "$OUT" in *.mp4) VIDEO=1 ;; *) VIDEO=0 ;; esac
 VIDEO_DIR="$REPO_ROOT/frontend/test-results"
 BASE_URL="${E2E_BASE_URL:-http://localhost:8888}"
 
@@ -129,10 +137,17 @@ if [ -n "$FF_FILTER" ]; then
   PARTS_DIR="$(mktemp -d)"
   trap 'rm -rf "$PALETTE" "$TRIMMED" "$PARTS_DIR"' EXIT
   i=0
-  while read -r from to speed; do
+  while read -r from to speed label; do
     part="$PARTS_DIR/part$(printf %03d $i).mp4"
+    vf="setpts=(PTS-STARTPTS)/${speed}"
+    if [ "$VIDEO" = "1" ] && [ "$speed" != "1" ]; then
+      # The caption comes from a file: a label's colons, commas and quotes would need escaping
+      # inside the filter graph.
+      printf 'Fast-forwarded %sx · %s' "$speed" "${label:-waiting}" > "$PARTS_DIR/caption$i.txt"
+      vf="$vf,drawtext=textfile=$PARTS_DIR/caption$i.txt:font=Sans:fontsize=22:fontcolor=white:box=1:boxcolor=0x1f2937@0.85:boxborderw=12:x=w-tw-28:y=h-th-28"
+    fi
     ffmpeg -nostdin -v error -y -ss "$from" -to "$to" -i "$WEBM" -an \
-      -vf "setpts=(PTS-STARTPTS)/${speed}" -r 25 -c:v libx264 -preset veryfast -crf 18 "$part"
+      -vf "$vf" -r 25 -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p "$part"
     echo "file '$part'" >> "$PARTS_DIR/list.txt"
     i=$((i + 1))
   done < <(node "$REPO_ROOT/scripts/build-ff-filter.mjs" "$TIMELINE" "$DURATION" --parts)
@@ -141,6 +156,15 @@ if [ -n "$FF_FILTER" ]; then
   echo "==> Runtime ${DURATION}s -> $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$SOURCE")s"
 else
   SOURCE="$WEBM"
+fi
+
+if [ "$VIDEO" = "1" ]; then
+  echo "==> Encoding MP4 (native size, H.264)"
+  # High quality for an upload that YouTube re-encodes anyway; faststart so it plays while loading.
+  ffmpeg -v error -y -ss "$START" -i "$SOURCE" -an -r 25 -c:v libx264 -preset slow -crf 16 \
+    -pix_fmt yuv420p -movflags +faststart "$OUT"
+  echo "==> Wrote $OUT ($(du -h "$OUT" | cut -f1), $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT")s)"
+  exit 0
 fi
 
 echo "==> Encoding GIF (${WIDTH}px, ${FPS}fps, ${MAX_COLORS} colors)"
