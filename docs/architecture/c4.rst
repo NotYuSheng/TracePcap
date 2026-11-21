@@ -1,13 +1,19 @@
 System Architecture (C4)
 ========================
 
-TracePcap's containers, drawn with the `C4 model <https://c4model.com>`_: each box is something
-that runs on its own (a Docker container, or the web app in the browser), and the lines are how
-they talk. Click the diagram to open it full size.
+TracePcap's containers, drawn with the `C4 model <https://c4model.com>`_: one box per Docker
+container that ``docker compose`` runs, and the lines are how they talk. Click the diagram to open it
+full size.
+
+.. note::
+
+   C4's "container" means anything that runs on its own, which strictly makes the React app (it
+   runs in the browser) a container separate from the nginx that serves it. We draw them as one
+   box on purpose, because they ship as one image, so the diagram matches what you deploy.
 
 .. figure:: c4/container.svg
    :target: ../_images/container.svg
-   :alt: C4 containers: the web app served by nginx, the Spring Boot backend, PostgreSQL, MinIO,
+   :alt: C4 containers: the web app (nginx serving React), the Spring Boot backend, PostgreSQL, MinIO,
          and Keycloak when login is on; outside, an LLM server and ipinfo.io
    :width: 100%
 
@@ -21,14 +27,12 @@ Keycloak from ``docker-compose.prod.yml``.
    * - Container
      - Technology
      - What it does
-   * - Web server
-     - nginx
-     - Serves the web app and is the single origin the browser talks to: ``/api`` goes to the
-       backend and, with login on, ``/realms`` and ``/admin`` go to Keycloak. One origin means no
-       CORS and one ``PUBLIC_URL``.
    * - Web app
-     - React, TypeScript, Vite
-     - Runs in the browser. Calls ``/api/v1`` with the signed-in user's token.
+     - nginx serving React, TypeScript, Vite
+     - The UI, built into the nginx image and run in the browser, calling ``/api/v1`` with the
+       signed-in user's token. nginx is also the single origin the browser talks to: ``/api`` goes
+       to the backend and, with login on, ``/realms`` and ``/admin`` go to Keycloak. One origin
+       means no CORS and one ``PUBLIC_URL``.
    * - Backend
      - Spring Boot 3, Java 21
      - The REST API, the analysis pipeline, background AI jobs (one at a time for the model),
