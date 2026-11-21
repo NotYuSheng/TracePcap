@@ -152,6 +152,7 @@ export const API_ENDPOINTS = {
   ROLES: '/roles',
   ROLE: (key: string) => `/roles/${encodeURIComponent(key)}`,
   AUDIT_LOG: '/audit-log',
+  USERS: '/users',
   NETWORK_MEMBERSHIPS: '/network-memberships',
   STALE_CAPTURES: '/detection-rules/stale-captures',
   DETECTION_RULES: '/detection-rules',

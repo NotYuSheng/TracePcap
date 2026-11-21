@@ -283,8 +283,9 @@ public class PermissionService {
     return s == null || s.isBlank() ? null : s.trim();
   }
 
-  private Set<PermissionAction> permissionsOf(List<RoleEntity> roles) {
-    if (roles.stream().anyMatch(this::isAdminRole)) return EnumSet.allOf(PermissionAction.class);
+  /** What {@code roles} add up to: the admin role is everything; others their union, plus seeing. */
+  static Set<PermissionAction> permissionsOf(List<RoleEntity> roles) {
+    if (roles.stream().anyMatch(PermissionService::isAdminRole)) return EnumSet.allOf(PermissionAction.class);
     Set<PermissionAction> out = EnumSet.of(PermissionAction.SEE_CAPTURES);
     for (RoleEntity role : roles) {
       for (String name : role.getPermissions()) {
@@ -295,7 +296,7 @@ public class PermissionService {
     return out;
   }
 
-  private boolean isAdminRole(RoleEntity role) {
+  private static boolean isAdminRole(RoleEntity role) {
     return BuiltInRole.ADMIN.key().equals(role.getKey());
   }
 

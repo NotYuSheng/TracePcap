@@ -22,4 +22,9 @@ public class RoleDto {
   /** False for the admin role, which always has every permission. */
   private boolean editable;
   private List<PermissionAction> permissions;
+  /**
+   * When a sign-in last carried this role's Keycloak client role; null if none has (with login on,
+   * often a client role missing in Keycloak). Always null with login off.
+   */
+  private java.time.LocalDateTime lastSignInAt;
 }

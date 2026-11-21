@@ -25,11 +25,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoleController {
 
   private final PermissionService permissionService;
+  private final UserDirectoryService userDirectory;
 
   @GetMapping
   @Operation(summary = "List the roles and what each may do")
   public List<RoleDto> list() {
-    return permissionService.listRoles();
+    List<RoleDto> roles = permissionService.listRoles();
+    roles.forEach(r -> r.setLastSignInAt(userDirectory.lastSignInWith(r.getKey())));
+    return roles;
   }
 
   @PostMapping

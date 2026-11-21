@@ -16,10 +16,15 @@ public class MeController {
 
   private final CurrentActor currentActor;
   private final PermissionService permissionService;
+  private final UserDirectoryService userDirectory;
 
   @GetMapping
-  @Operation(summary = "Who I am and what I may change")
+  @Operation(
+      summary = "Who I am and what I may change",
+      description = "With login on, also records that the caller signed in (Settings › Users).")
   public MeDto me() {
+    // The app asks this when it loads: that's a sign-in, for Settings › Users.
+    userDirectory.recordCaller();
     return MeDto.builder()
         .username(currentActor.username())
         .authEnabled(currentActor.authEnabled())

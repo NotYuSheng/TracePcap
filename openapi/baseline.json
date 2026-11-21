@@ -4231,6 +4231,33 @@
         },
         "type": "object"
       },
+      "PagedResponseUserDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PatchSnapshotRequest": {
         "properties": {
           "context": {
@@ -4610,6 +4637,10 @@
             "type": "string"
           },
           "label": {
+            "type": "string"
+          },
+          "lastSignInAt": {
+            "format": "date-time",
             "type": "string"
           },
           "permissions": {
@@ -5956,6 +5987,44 @@
         },
         "type": "object"
       },
+      "UserDto": {
+        "properties": {
+          "defaultRole": {
+            "type": "boolean"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "firstSeen": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastSeen": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "permissionCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unknownRoles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UserGroup": {
         "properties": {
           "id": {
@@ -6084,7 +6153,7 @@
     "/api/v1/ai-jobs": {
       "get": {
         "description": "Waiting and running jobs first, in the order they'll run, then those finished in the last 30 minutes. Results are left out; get a job by id for its result.",
-        "operationId": "list_16",
+        "operationId": "list_17",
         "parameters": [
           {
             "in": "query",
@@ -6298,7 +6367,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.",
-        "operationId": "list_15",
+        "operationId": "list_16",
         "parameters": [
           {
             "in": "query",
@@ -7873,7 +7942,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_14",
+        "operationId": "list_15",
         "responses": {
           "200": {
             "content": {
@@ -7954,7 +8023,7 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_13",
+        "operationId": "list_14",
         "parameters": [
           {
             "in": "query",
@@ -9318,7 +9387,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_12",
+        "operationId": "list_13",
         "parameters": [
           {
             "in": "path",
@@ -10265,7 +10334,7 @@
     },
     "/api/v1/files/{fileId}/networks": {
       "get": {
-        "operationId": "list_11",
+        "operationId": "list_12",
         "parameters": [
           {
             "in": "path",
@@ -10338,7 +10407,7 @@
     "/api/v1/files/{fileId}/occupancies": {
       "get": {
         "description": "Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.",
-        "operationId": "list_10",
+        "operationId": "list_11",
         "parameters": [
           {
             "in": "path",
@@ -10770,7 +10839,7 @@
     },
     "/api/v1/ip-org-rules": {
       "get": {
-        "operationId": "list_9",
+        "operationId": "list_10",
         "responses": {
           "200": {
             "content": {
@@ -10850,6 +10919,7 @@
     },
     "/api/v1/me": {
       "get": {
+        "description": "With login on, also records that the caller signed in (Settings › Users).",
         "operationId": "me",
         "responses": {
           "200": {
@@ -11019,7 +11089,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations": {
       "get": {
-        "operationId": "list_8",
+        "operationId": "list_9",
         "parameters": [
           {
             "in": "path",
@@ -11502,7 +11572,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/detection-rules": {
       "get": {
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "path",
@@ -11837,7 +11907,7 @@
     "/api/v1/monitor/networks/{networkId}/devices": {
       "get": {
         "description": "One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.",
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "in": "path",
@@ -11905,7 +11975,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/external-events": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_6",
         "parameters": [
           {
             "in": "path",
@@ -12663,7 +12733,7 @@
     "/api/v1/monitor/networks/{networkId}/subnets": {
       "get": {
         "description": "Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.",
-        "operationId": "list_4",
+        "operationId": "list_5",
         "parameters": [
           {
             "in": "path",
@@ -12774,7 +12844,7 @@
     },
     "/api/v1/network-memberships": {
       "get": {
-        "operationId": "list_3",
+        "operationId": "list_4",
         "responses": {
           "200": {
             "content": {
@@ -13132,7 +13202,7 @@
     },
     "/api/v1/permissions": {
       "get": {
-        "operationId": "list_2",
+        "operationId": "list_3",
         "responses": {
           "200": {
             "content": {
@@ -13206,7 +13276,7 @@
     },
     "/api/v1/roles": {
       "get": {
-        "operationId": "list_1",
+        "operationId": "list_2",
         "responses": {
           "200": {
             "content": {
@@ -13547,7 +13617,7 @@
     "/api/v1/subnets": {
       "get": {
         "description": "Without networkId, the shared default. With networkId, the subnets in effect in that network (its own entries layered on the default, #915 phase 4), with staleness against that network's snapshots.",
-        "operationId": "list",
+        "operationId": "list_1",
         "parameters": [
           {
             "in": "query",
@@ -14401,6 +14471,58 @@
           "Conversation Tracer"
         ]
       }
+    },
+    "/api/v1/users": {
+      "get": {
+        "description": "search matches the username or name. Empty with login off. Needs Read the audit log.",
+        "operationId": "list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseUserDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List everyone who has signed in, most recent first",
+        "tags": [
+          "Users"
+        ]
+      }
     }
   },
   "tags": [
@@ -14519,6 +14641,10 @@
     {
       "description": "User-assigned roles for network entities (hosts/subnets)",
       "name": "Node Roles"
+    },
+    {
+      "description": "Who has signed in and the roles their last sign-in carried. Read-only: people and role assignments live in Keycloak",
+      "name": "Users"
     },
     {
       "description": "Detection rules that belong to one capture",
