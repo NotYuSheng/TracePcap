@@ -142,9 +142,10 @@ body {
 }
 
 /* Anything scrolled into view (an in-page link, scrollIntoView) stops just below the sticky
-   header (81px) instead of under it. The README demo frames each component this way too. */
+   header (its height is measured into --tp-header-h) instead of under it. The README demo frames
+   each component this way too. */
 html {
-  scroll-padding-top: 96px;
+  scroll-padding-top: calc(var(--tp-header-h, 81px) + 15px);
 }
 
 /* Network detail page: sticky in-page section nav */
