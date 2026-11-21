@@ -28,6 +28,9 @@
 # The story's wait was then re-encoded at 120x (edit its span's speed in
 # frontend/test-results/demo-timeline.json) with DEMO_ENCODE_ONLY=1, which re-encodes the last
 # recording without recording again. 960px, 100s, 7.8 MB.
+# Re-recorded 2026-11-21 as strrat-infection.pcapng (a fresh name and hash: the recording deletes
+# any upload with the demo's name, and the operator's own strrat-you-dirty-rat.pcapng is starred
+# and kept). The MP4 from the same take is the YouTube demo. 96 s: GIF 7.5 MB, MP4 9.6 MB.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
