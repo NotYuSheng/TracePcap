@@ -18,6 +18,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    :maxdepth: 2
    :caption: Architecture
 
+   architecture/c4
    architecture/layers
    architecture/enforcement
    architecture/adjudication-explainability

@@ -1,0 +1,89 @@
+System Architecture (C4)
+========================
+
+TracePcap's containers, drawn with the `C4 model <https://c4model.com>`_: each box is something
+that runs on its own (a Docker container, or the web app in the browser), and the lines are how
+they talk. Click the diagram to open it full size.
+
+.. figure:: c4/container.svg
+   :target: ../_images/container.svg
+   :alt: C4 containers: the web app served by nginx, the Spring Boot backend, PostgreSQL, MinIO,
+         and Keycloak when login is on; outside, an LLM server and ipinfo.io
+   :width: 100%
+
+What ``docker compose`` runs. The base stack is ``docker-compose.yml``; turning login on adds
+Keycloak from ``docker-compose.prod.yml``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 25 55
+
+   * - Container
+     - Technology
+     - What it does
+   * - Web server
+     - nginx
+     - Serves the web app and is the single origin the browser talks to: ``/api`` goes to the
+       backend and, with login on, ``/realms`` and ``/admin`` go to Keycloak. One origin means no
+       CORS and one ``PUBLIC_URL``.
+   * - Web app
+     - React, TypeScript, Vite
+     - Runs in the browser. Calls ``/api/v1`` with the signed-in user's token.
+   * - Backend
+     - Spring Boot 3, Java 21
+     - The REST API, the analysis pipeline, background AI jobs (one at a time for the model),
+       roles and the audit log. Its image bundles the packet tools (tshark, ndpiReader, Suricata,
+       mergecap), which it runs as subprocesses: they're the only code that reads the capture
+       itself. How the backend is organised inside is in :doc:`layers`.
+   * - Database
+     - PostgreSQL 15, Flyway
+     - Analysis results, findings, labels, networks, roles, the audit log and settings.
+   * - Object storage
+     - MinIO
+     - The captures, and the files extracted from them.
+   * - Keycloak
+     - Keycloak 26
+     - Login on only: realm ``tracepcap``, client ``tracepcap``, the four roles as client roles
+       (see :doc:`../features/roles-and-permissions`).
+
+``docker-compose.yml`` also runs two one-shot helpers, ``minio-volume-perms`` and ``minio-init``,
+which prepare the storage volume and bucket and then exit. They're left off the diagram.
+
+Outside TracePcap
+-----------------
+
+TracePcap runs fully offline; both outside systems are **optional**:
+
+- **LLM server.** A local, OpenAI-compatible inference server at ``LLM_BASE_URL`` writes stories
+  and insights and answers questions. It's sent findings, never raw packets. Without one,
+  everything else works (see :doc:`../configuration/llm-setup`).
+- **ipinfo.io.** Online geolocation, controlled by ``GEO_FORCE_OFFLINE``. It's **off by default**
+  in the prod (login on) and offline stacks, even with internet, so they never contact it. On the
+  base stack it's on, and used only when reachable. Either way a bundled DB-IP database answers
+  when ipinfo.io isn't used (see :doc:`../features/geolocation`).
+
+Keycloak can also be outside: point TracePcap at your organisation's own realm instead of the
+bundled one (see :doc:`../configuration/authentication`).
+
+.. _c4-editing:
+
+Editing the diagram
+-------------------
+
+The source is ``docs/architecture/c4/container.puml``, with the rendered SVG committed next to it:
+
+.. code-block:: bash
+
+   # after editing a .puml
+   scripts/render-diagrams.sh
+
+The script runs a pinned PlantUML image in Docker (no Java needed) with networking off. CI runs
+``scripts/render-diagrams.sh --check`` and fails if a committed SVG doesn't match its source.
+
+Two rules keep the diagram working offline and stable:
+
+- **Include the C4 library from PlantUML itself**, ``!include <C4/C4_Container>``, never
+  ``!includeurl https://raw.githubusercontent.com/...``. The library ships inside PlantUML; the URL
+  form needs the internet to render and follows whatever upstream changes.
+- **No version number in the title.** Git already versions the file; a hand-typed version goes
+  stale.

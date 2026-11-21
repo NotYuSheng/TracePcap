@@ -7,9 +7,11 @@ on:
       - dev
     paths:
       - "docs/**"
+      - "scripts/render-diagrams.sh"
   pull_request:
     paths:
       - "docs/**"
+      - "scripts/render-diagrams.sh"
 
 # Allow only one concurrent deployment
 concurrency:
@@ -17,6 +19,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  diagrams:
+    name: Diagrams match their sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render docs/architecture/c4/*.puml and compare with the committed SVGs
+        run: scripts/render-diagrams.sh --check
+
   build:
     runs-on: ubuntu-latest
     steps:
