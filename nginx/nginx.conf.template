@@ -10,7 +10,7 @@ server {
     # these in: the resolver from /etc/resolv.conf (Docker's 127.0.0.11, or the cluster DNS on
     # Kubernetes), the upstreams from NGINX_BACKEND_URL / NGINX_KEYCLOAK_URL. nginx's resolver
     # ignores resolv.conf search domains, so on Kubernetes the URLs must be fully qualified.
-    resolver ${NGINX_RESOLVER} valid=5s ipv6=off;
+    resolver ${NGINX_RESOLVER} valid=5s ipv6=${NGINX_RESOLVER_IPV6};
     set $backend ${NGINX_BACKEND_URL};
     # Keycloak upstream as a variable so nginx starts even when the IdP isn't deployed
     # (default/auth-off stack never hits the /realms paths below).
