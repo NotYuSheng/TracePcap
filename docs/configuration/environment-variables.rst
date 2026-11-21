@@ -331,6 +331,20 @@ Nginx
    * - ``NGINX_PORT``
      - ``80``
      - Host port on which nginx listens. Change if port 80 is already in use.
+   * - ``NGINX_BACKEND_URL``
+     - ``http://backend:8080``
+     - Where nginx proxies ``/api`` and Swagger. Only needed outside Compose:
+       nginx's resolver ignores DNS search domains, so on Kubernetes this must
+       be the fully qualified Service URL (the
+       `Helm chart <https://github.com/NotYuSheng/tracepcap-helm>`_ sets it).
+   * - ``NGINX_KEYCLOAK_URL``
+     - ``http://keycloak:8080``
+     - Where nginx proxies the Keycloak paths when auth is enabled.
+   * - ``NGINX_RESOLVER``
+     - first ``nameserver`` in ``/etc/resolv.conf``
+     - DNS server nginx re-resolves the upstreams with. Docker's embedded DNS
+       (``127.0.0.11``) under Compose, the cluster DNS on Kubernetes. These three
+       are read by the nginx container itself, so set them on that service.
 
 Public Origin & Authentication
 ------------------------------
