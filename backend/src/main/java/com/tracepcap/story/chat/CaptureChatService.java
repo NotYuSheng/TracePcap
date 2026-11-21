@@ -222,12 +222,24 @@ public class CaptureChatService {
         String answer = n.path("answer").asText(null);
         List<String> follow = new ArrayList<>();
         n.path("followUpQuestions").forEach(q -> { if (q.isTextual() && !q.asText().isBlank()) follow.add(q.asText()); });
-        if (answer != null) return new Parsed(answer, follow.subList(0, Math.min(3, follow.size())));
+        if (answer != null) {
+          return new Parsed(unescapeLineBreaks(answer), follow.subList(0, Math.min(3, follow.size())));
+        }
       } catch (Exception ignored) {
         // Not JSON after all: fall through to the plain text.
       }
     }
     return new Parsed(text.replaceAll("(?s)^```\\w*|```$", "").trim(), List.of());
+  }
+
+  /**
+   * Some models escape their line breaks twice inside the JSON, so the parsed answer reads
+   * "…destinations.\\n\\nWhat is talking to:\\n• C2…" with the backslashes on screen. Only when the
+   * answer has no real line break at all: then a literal backslash-n is that, not part of a filter.
+   */
+  static String unescapeLineBreaks(String answer) {
+    if (answer.indexOf('\n') >= 0 || !answer.contains("\\n")) return answer;
+    return answer.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t");
   }
 
   private String quote(String s) {
