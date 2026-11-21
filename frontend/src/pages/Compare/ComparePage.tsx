@@ -18,10 +18,7 @@ import { ErrorMessage } from '@components/common/ErrorMessage';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { toggleSet } from '@/features/network/constants';
-import {
-  edgeMatchesLegendKey,
-  applyNetworkFilters,
-} from '@/features/network/services/networkService';
+import { edgeMatchesLegendKey, applyNetworkFilters } from '@/features/network/services/networkService';
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { formatBytes } from '@/utils/formatters';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
@@ -76,16 +73,8 @@ export const ComparePage = () => {
   const [nodeLimit, setNodeLimit] = useState(DEFAULT_DIAGRAM_NODES);
   const [customInput, setCustomInput] = useState('');
 
-  const {
-    mergedNodes,
-    mergedEdges,
-    totalNodes,
-    hiddenNodes,
-    perFileStats,
-    labels,
-    loading,
-    error,
-  } = useCompareData(fileIds, fileNames ?? [], nodeLimit);
+  const { mergedNodes, mergedEdges, totalNodes, hiddenNodes, perFileStats, labels, loading, error } =
+    useCompareData(fileIds, fileNames ?? [], nodeLimit);
 
   // ── Hidden sources toggle ────────────────────────────────────────────────
   const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set());
@@ -137,7 +126,9 @@ export const ComparePage = () => {
     setHasRisksOnly(false);
   };
 
-  const [layoutType, setLayoutType] = useState<GraphLayoutType>('circular');
+  const [layoutType, setLayoutType] = useState<GraphLayoutType>(
+    'circular'
+  );
 
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -245,18 +236,9 @@ export const ComparePage = () => {
         : mergedEdges;
 
     return applyNetworkFilters(mergedNodes, sourceFilteredEdges, {
-      hasRisksOnly,
-      activeLegendProtocols,
-      activeAppFilters,
-      activeL7Protocols,
-      activeCategories,
-      activeRiskTypes,
-      activeCustomSigs,
-      activeFileTypes,
-      activeCountries,
-      activeNodeFilters,
-      portFilter,
-      ipFilter,
+      hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols,
+      activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes,
+      activeCountries, activeNodeFilters, portFilter, ipFilter,
     });
   }, [
     mergedNodes,
@@ -644,12 +626,7 @@ export const ComparePage = () => {
           <Card ref={graphCardRef}>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
-              <FullscreenToggle
-                isFullscreen={isFullscreen}
-                onToggle={toggleFullscreen}
-                hintSignal={fullscreenHint}
-                hintId="fullscreen-hint-compare"
-              />
+              <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} hintSignal={fullscreenHint} hintId="fullscreen-hint-compare" />
             </Card.Header>
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph

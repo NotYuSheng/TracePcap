@@ -148,13 +148,11 @@ export const ConversationPage = () => {
       .getPacketLocation(fileId, frame)
       .then(loc => {
         if (!loc) return undefined;
-        return conversationService
-          .getConversationDetail(loc.conversationId, filters.networkId)
-          .then(conv => {
-            setSelectedConversation(conv);
-            setSelectedIndex(-1);
-            setHighlightPacket(frame);
-          });
+        return conversationService.getConversationDetail(loc.conversationId, filters.networkId).then(conv => {
+          setSelectedConversation(conv);
+          setSelectedIndex(-1);
+          setHighlightPacket(frame);
+        });
       })
       .catch(err => console.error('Failed to open packet:', err))
       .finally(() => setDetailLoading(false));
@@ -186,29 +184,23 @@ export const ConversationPage = () => {
     };
   }, [fileId, filters]);
 
-  const openConversation = useCallback(
-    async (conversation: Conversation, index: number) => {
-      setSelectedIndex(index);
-      setDetailLoading(true);
-      try {
-        if (conversation.packets && conversation.packets.length > 0) {
-          setSelectedConversation(conversation);
-        } else {
-          const full = await conversationService.getConversationDetail(
-            conversation.id,
-            filters.networkId
-          );
-          setSelectedConversation(full);
-        }
-      } catch (err) {
-        console.error('Failed to load conversation details:', err);
+  const openConversation = useCallback(async (conversation: Conversation, index: number) => {
+    setSelectedIndex(index);
+    setDetailLoading(true);
+    try {
+      if (conversation.packets && conversation.packets.length > 0) {
         setSelectedConversation(conversation);
-      } finally {
-        setDetailLoading(false);
+      } else {
+        const full = await conversationService.getConversationDetail(conversation.id, filters.networkId);
+        setSelectedConversation(full);
       }
-    },
-    [filters.networkId]
-  );
+    } catch (err) {
+      console.error('Failed to load conversation details:', err);
+      setSelectedConversation(conversation);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [filters.networkId]);
 
   // List and detail: something is always shown. Pick the first conversation when nothing (or a
   // conversation no longer on this page) is selected, and keep the selected row in view.
@@ -226,6 +218,7 @@ export const ConversationPage = () => {
       .querySelector(`[data-conversation-id="${selectedConversation.id}"]`)
       ?.scrollIntoView({ block: 'nearest' });
   }, [selectedConversation]);
+
 
   const exportConversationCsv = useCallback((conversation: Conversation) => {
     const hexToAscii = (hex: string) => {
@@ -316,14 +309,7 @@ export const ConversationPage = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!selectedConversation) return;
       const t = e.target as HTMLElement | null;
-      if (
-        t &&
-        (t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.tagName === 'SELECT' ||
-          t.isContentEditable)
-      )
-        return;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
       const fwd = e.key === 'ArrowRight' || e.key === 'ArrowDown';
       if (back || fwd) e.preventDefault();
@@ -333,6 +319,8 @@ export const ConversationPage = () => {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [selectedConversation, handlePrev, handleNext]);
+
+
 
   // Filter options from the already-loaded analysis summary
   const protocolOptions = (data.protocolDistribution ?? []).map(p => ({
@@ -436,131 +424,123 @@ export const ConversationPage = () => {
         </div>
       </div>
 
-      <div className="conv-split">
-        <section className="conv-list-card" aria-label="Conversation list">
-          <div className="conv-list-head">
-            <Form.Label htmlFor="conv-sort" className="mb-0 small text-muted">
-              Sort
-            </Form.Label>
-            <Form.Select
-              id="conv-sort"
-              size="sm"
-              className="conv-sort"
-              value={`${filters.sortBy}:${filters.sortDir}`}
-              onChange={e => {
-                const [sortBy, sortDir] = e.target.value.split(':') as [SortField, 'asc' | 'desc'];
-                setFilters({ sortBy, sortDir, page: 1 });
-              }}
-            >
-              <option value=":asc">In capture order</option>
-              <option value="startTime:desc">Newest first</option>
-              <option value="bytes:desc">Most bytes</option>
-              <option value="packets:desc">Most packets</option>
-              <option value="duration:desc">Longest</option>
-              <option value="srcIp:asc">Source address</option>
-              <option value="dstIp:asc">Destination address</option>
-            </Form.Select>
-          </div>
-          <div className="conv-list-scroll" style={{ opacity: loading ? 0.4 : 1 }}>
-            {loading && conversations.length === 0 && (
-              <LoadingSpinner size="medium" message="Loading conversations..." />
-            )}
-            {!loading && conversations.length === 0 && (
-              <p className="text-muted small p-3 mb-0">No conversations match these filters.</p>
-            )}
-            <ConversationListCompact
-              conversations={conversations}
-              selectedId={selectedConversation?.id ?? null}
-              onSelect={(c, i) => openConversation(c, i)}
-            />
-          </div>
-          {totalPages > 1 && (
-            <div className="conv-list-foot">
-              <Pagination
-                currentPage={filters.page}
-                totalPages={totalPages}
-                onPageChange={page => setFilters({ page })}
-                pageSize={filters.pageSize}
-                totalItems={totalItems}
-                showPageSizeSelector
-                onPageSizeChange={pageSize => setFilters({ pageSize, page: 1 })}
+        <div className="conv-split">
+          <section className="conv-list-card" aria-label="Conversation list">
+            <div className="conv-list-head">
+              <Form.Label htmlFor="conv-sort" className="mb-0 small text-muted">
+                Sort
+              </Form.Label>
+              <Form.Select
+                id="conv-sort"
+                size="sm"
+                className="conv-sort"
+                value={`${filters.sortBy}:${filters.sortDir}`}
+                onChange={e => {
+                  const [sortBy, sortDir] = e.target.value.split(':') as [SortField, 'asc' | 'desc'];
+                  setFilters({ sortBy, sortDir, page: 1 });
+                }}
+              >
+                <option value=":asc">In capture order</option>
+                <option value="startTime:desc">Newest first</option>
+                <option value="bytes:desc">Most bytes</option>
+                <option value="packets:desc">Most packets</option>
+                <option value="duration:desc">Longest</option>
+                <option value="srcIp:asc">Source address</option>
+                <option value="dstIp:asc">Destination address</option>
+              </Form.Select>
+            </div>
+            <div className="conv-list-scroll" style={{ opacity: loading ? 0.4 : 1 }}>
+              {loading && conversations.length === 0 && (
+                <LoadingSpinner size="medium" message="Loading conversations..." />
+              )}
+              {!loading && conversations.length === 0 && (
+                <p className="text-muted small p-3 mb-0">No conversations match these filters.</p>
+              )}
+              <ConversationListCompact
+                conversations={conversations}
+                selectedId={selectedConversation?.id ?? null}
+                onSelect={(c, i) => openConversation(c, i)}
               />
             </div>
+            {totalPages > 1 && (
+              <div className="conv-list-foot">
+                <Pagination
+                  currentPage={filters.page}
+                  totalPages={totalPages}
+                  onPageChange={page => setFilters({ page })}
+                  pageSize={filters.pageSize}
+                  totalItems={totalItems}
+                  showPageSizeSelector
+                  onPageSizeChange={pageSize => setFilters({ pageSize, page: 1 })}
+                />
+              </div>
+            )}
+          </section>
+          <section className="conv-pane" aria-label="Conversation detail">
+            {selectedConversation ? (
+              <>
+                <div className="conv-pane-head">
+                  <h2 className="conv-pane-title">{modalTitle}</h2>
+                  <div className="conv-pane-actions">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-info"
+            className="ms-2"
+            onClick={() => selectedConversation && setTracerConversationId(selectedConversation.id)}
+            title="Step through packets with AI explanations"
+          >
+            <i className="bi bi-play-circle me-1"></i>Trace
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-secondary"
+            className="ms-2"
+            onClick={() => selectedConversation && exportConversationCsv(selectedConversation)}
+            title="Export this conversation as CSV"
+          >
+            <i className="bi bi-download me-1"></i>CSV
+          </Button>
+          {selectedConversation && (
+            <a
+              href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
+              download={makeExportFilename(
+                exportBase,
+                'pcap',
+                `${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}`
+              )}
+              className="btn btn-sm btn-outline-secondary ms-2"
+              title="Export this conversation as PCAP"
+            >
+              <i className="bi bi-download me-1"></i>PCAP
+            </a>
           )}
-        </section>
-        <section className="conv-pane" aria-label="Conversation detail">
-          {selectedConversation ? (
-            <>
-              <div className="conv-pane-head">
-                <h2 className="conv-pane-title">{modalTitle}</h2>
-                <div className="conv-pane-actions">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline-info"
-                    className="ms-2"
-                    onClick={() =>
-                      selectedConversation && setTracerConversationId(selectedConversation.id)
-                    }
-                    title="Step through packets with AI explanations"
-                  >
-                    <i className="bi bi-play-circle me-1"></i>Trace
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline-secondary"
-                    className="ms-2"
-                    onClick={() =>
-                      selectedConversation && exportConversationCsv(selectedConversation)
-                    }
-                    title="Export this conversation as CSV"
-                  >
-                    <i className="bi bi-download me-1"></i>CSV
-                  </Button>
-                  {selectedConversation && (
-                    <a
-                      href={conversationService.getConversationPcapExportUrl(
-                        selectedConversation.id
-                      )}
-                      download={makeExportFilename(
-                        exportBase,
-                        'pcap',
-                        `${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}`
-                      )}
-                      className="btn btn-sm btn-outline-secondary ms-2"
-                      title="Export this conversation as PCAP"
-                    >
-                      <i className="bi bi-download me-1"></i>PCAP
-                    </a>
-                  )}
+                  </div>
                 </div>
-              </div>
-              <div className="conv-pane-body">
-                {detailLoading ? (
-                  <LoadingSpinner size="medium" message="Loading conversation..." />
-                ) : (
-                  selectedConversation && (
-                    <ConversationDetail
-                      conversation={selectedConversation}
-                      signatureSeverities={signatureSeverities}
-                      signatureScopes={signatureScopes}
-                      hostClassMap={hostClassMap}
-                      fileId={fileId}
-                      highlightPacketNumber={highlightPacket}
-                      bare
-                    />
-                  )
-                )}
-              </div>
-            </>
+                <div className="conv-pane-body">
+          {detailLoading ? (
+            <LoadingSpinner size="medium" message="Loading conversation..." />
           ) : (
-            <p className="text-muted small p-4 mb-0">
-              Pick a conversation on the left to see it here.
-            </p>
+            selectedConversation && (
+              <ConversationDetail
+                conversation={selectedConversation}
+                signatureSeverities={signatureSeverities}
+                signatureScopes={signatureScopes}
+                hostClassMap={hostClassMap}
+                fileId={fileId}
+                highlightPacketNumber={highlightPacket}
+                bare
+              />
+            )
           )}
-        </section>
-      </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted small p-4 mb-0">Pick a conversation on the left to see it here.</p>
+            )}
+          </section>
+        </div>
 
       {/* Conversation Tracer modal */}
       {tracerConversationId && (

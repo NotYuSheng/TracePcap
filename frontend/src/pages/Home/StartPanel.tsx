@@ -199,8 +199,7 @@ export function StartPanel({
               <span className="fw-semibold">Write the story when analysis finishes</span>
               <br />
               <span className="text-muted">
-                The LLM writes it in the background, one capture at a time, so it is ready when you
-                open Story.
+                The LLM writes it in the background, one capture at a time, so it is ready when you open Story.
               </span>
             </span>
           </label>

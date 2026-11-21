@@ -63,9 +63,7 @@ export const NetworkDetailPage = () => {
   const addCaptures = usePermission('NETWORK_CAPTURES');
   // Set up moved into the Settings drawer; its old links open it.
   const [showSettings, setShowSettings] = useState(() =>
-    ['setup', 'expected', 'subnets'].includes(
-      new URLSearchParams(window.location.search).get('section') ?? ''
-    )
+    ['setup', 'expected', 'subnets'].includes(new URLSearchParams(window.location.search).get('section') ?? '')
   );
   const [showAddresses, setShowAddresses] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
@@ -322,9 +320,7 @@ export const NetworkDetailPage = () => {
                       <Card.Body>
                         <div className="d-flex align-items-baseline gap-2 flex-wrap mb-2">
                           <h2 className="h6 mb-0">Network map · latest capture</h2>
-                          <span className="small text-muted">
-                            {latest.fileName} · {day(latest)}
-                          </span>
+                          <span className="small text-muted">{latest.fileName} · {day(latest)}</span>
                           <button
                             type="button"
                             className="btn btn-link btn-sm p-0 ms-auto"
@@ -347,41 +343,41 @@ export const NetworkDetailPage = () => {
                       <Card.Body>
                         <div className="d-flex align-items-center mb-2">
                           <h2 className="h6 mb-0">Insights</h2>
-                          <HelpPopover
-                            id="network-insights-info"
-                            title="Network Insights"
-                            buttonTitle="About network insights"
-                          >
-                            <p className="mb-2">
-                              Clicking <strong>Generate</strong> sends your network's snapshots,
-                              change events, device roles, external events, and analyst annotations
-                              to the configured LLM. It returns a structured narrative explaining
-                              observed behaviour in operational context.
-                            </p>
-                            <p className="fw-semibold mb-1">Output sections</p>
-                            <ul className="mb-2 ps-3">
-                              <li className="mb-1">
-                                <strong>Summary</strong> — one-paragraph overview of the period
-                              </li>
-                              <li className="mb-1">
-                                <strong>Narrative</strong> — detailed section-by-section analysis
-                              </li>
-                              <li className="mb-1">
-                                <strong>Anomalies</strong> — flagged deviations with severity
-                              </li>
-                              <li className="mb-1">
-                                <strong>Correlations</strong> — links between external events and
-                                network changes
-                              </li>
-                              <li>
-                                <strong>Recommendations</strong> — suggested follow-up actions
-                              </li>
-                            </ul>
-                            <p className="mb-0 text-muted fst-italic">
-                              Assign device roles and add external events first to get richer, more
-                              contextual insights.
-                            </p>
-                          </HelpPopover>
+                        <HelpPopover
+                          id="network-insights-info"
+                          title="Network Insights"
+                          buttonTitle="About network insights"
+                        >
+                          <p className="mb-2">
+                            Clicking <strong>Generate</strong> sends your network's snapshots, change
+                            events, device roles, external events, and analyst annotations to the
+                            configured LLM. It returns a structured narrative explaining observed
+                            behaviour in operational context.
+                          </p>
+                          <p className="fw-semibold mb-1">Output sections</p>
+                          <ul className="mb-2 ps-3">
+                            <li className="mb-1">
+                              <strong>Summary</strong> — one-paragraph overview of the period
+                            </li>
+                            <li className="mb-1">
+                              <strong>Narrative</strong> — detailed section-by-section analysis
+                            </li>
+                            <li className="mb-1">
+                              <strong>Anomalies</strong> — flagged deviations with severity
+                            </li>
+                            <li className="mb-1">
+                              <strong>Correlations</strong> — links between external events and network
+                              changes
+                            </li>
+                            <li>
+                              <strong>Recommendations</strong> — suggested follow-up actions
+                            </li>
+                          </ul>
+                          <p className="mb-0 text-muted fst-italic">
+                            Assign device roles and add external events first to get richer, more
+                            contextual insights.
+                          </p>
+                        </HelpPopover>
                         </div>
                         <NetworkInsightsPanel
                           insight={insight}
@@ -442,9 +438,7 @@ export const NetworkDetailPage = () => {
                       onClick={() => setInventoryTab(key)}
                     >
                       {label}
-                      {count !== undefined && (
-                        <span className="network-inventory-count">{count}</span>
-                      )}
+                      {count !== undefined && <span className="network-inventory-count">{count}</span>}
                     </button>
                   ))}
                 </div>
@@ -480,38 +474,40 @@ export const NetworkDetailPage = () => {
         <section className="network-settings-section">
           <div className="d-flex align-items-center mb-2">
             <h3 className="h6 mb-0">Expected state</h3>
-            <HelpPopover
-              id="baseline-definitions-info"
-              title="Baseline Definitions"
-              buttonTitle="About baseline definitions"
-            >
-              <p className="mb-2 text-muted">
-                Manually declare what is <em>expected</em> on this network. Entries here suppress
-                false-positive change events for known-good devices, bindings, and services.
-              </p>
-              <ul className="mb-0 ps-3">
-                <li className="mb-1">
-                  <strong>Device (MAC)</strong> — a MAC address that is authorised on the network
-                </li>
-                <li className="mb-1">
-                  <strong>IP ↔ MAC Binding</strong> — a fixed IP-to-MAC mapping (e.g. a static DHCP
-                  lease)
-                </li>
-                <li className="mb-1">
-                  <strong>Gateway IP</strong> — the expected default gateway address
-                </li>
-                <li className="mb-1">
-                  <strong>Protocol</strong> — a layer-7 protocol that is always expected
-                </li>
-                <li className="mb-1">
-                  <strong>Application</strong> — an application name that is always expected
-                </li>
-                <li>
-                  <strong>VPN Fingerprint</strong> — a VPN risk type that is authorised on this
-                  network
-                </li>
-              </ul>
-            </HelpPopover>
+                    <HelpPopover
+                      id="baseline-definitions-info"
+                      title="Baseline Definitions"
+                      buttonTitle="About baseline definitions"
+                    >
+                      <p className="mb-2 text-muted">
+                        Manually declare what is <em>expected</em> on this network. Entries here
+                        suppress false-positive change events for known-good devices, bindings, and
+                        services.
+                      </p>
+                      <ul className="mb-0 ps-3">
+                        <li className="mb-1">
+                          <strong>Device (MAC)</strong> — a MAC address that is authorised on the
+                          network
+                        </li>
+                        <li className="mb-1">
+                          <strong>IP ↔ MAC Binding</strong> — a fixed IP-to-MAC mapping (e.g. a
+                          static DHCP lease)
+                        </li>
+                        <li className="mb-1">
+                          <strong>Gateway IP</strong> — the expected default gateway address
+                        </li>
+                        <li className="mb-1">
+                          <strong>Protocol</strong> — a layer-7 protocol that is always expected
+                        </li>
+                        <li className="mb-1">
+                          <strong>Application</strong> — an application name that is always expected
+                        </li>
+                        <li>
+                          <strong>VPN Fingerprint</strong> — a VPN risk type that is authorised on
+                          this network
+                        </li>
+                      </ul>
+                    </HelpPopover>
           </div>
           <BaselineDefinitionPanel
             networkId={network.id}
@@ -523,55 +519,56 @@ export const NetworkDetailPage = () => {
         <section className="network-settings-section">
           <div className="d-flex align-items-center mb-2">
             <h3 className="h6 mb-0">Subnets</h3>
-            <HelpPopover
-              id="subnet-definitions-info"
-              title="How Subnet Detection Works"
-              maxWidth={400}
-              buttonTitle="How subnet detection works"
-            >
-              <p className="mb-2">
-                The scanner collects all <strong>private IP addresses</strong> (RFC 1918:{' '}
-                <code>10.x</code>, <code>172.16–31.x</code>, <code>192.168.x</code>) seen in the
-                snapshot's host classifications. For each observed IP, candidate CIDRs at every
-                prefix length from /20 to /29 are generated and scored by{' '}
-                <strong>host density</strong> (observed hosts ÷ subnet capacity). A greedy
-                non-overlapping selection picks the highest-density candidates, preferring tighter,
-                more specific prefixes.
-              </p>
-              <p className="mb-2">
-                <strong>Scan All Snapshots</strong> runs detection across every snapshot and adds a{' '}
-                <strong>Consistency</strong> score — subnets seen in more snapshots float to the
-                top. Single-snapshot candidates are flagged in amber.
-              </p>
-              <p className="mb-2">
-                <strong>Per-snapshot overrides.</strong> Individual snapshots can carry their own
-                subnet list that shadows the global definitions for that snapshot's change
-                detection. Set them from a capture's <em>Subnets</em> tab in the Timeline.
-              </p>
-              <p className="fw-semibold mb-1">Limitations</p>
-              <ul className="mb-0 ps-3">
-                <li className="mb-1">
-                  <strong>Prefix range /20–/29 only.</strong> Very large blocks or micro-segments
-                  (/30–/32) are outside the search range.
-                </li>
-                <li className="mb-1">
-                  <strong>No routing topology awareness.</strong> Infers from observed host
-                  distribution only — no VLAN or gateway knowledge.
-                </li>
-                <li className="mb-1">
-                  <strong>Small subnets are dropped.</strong> Segments with fewer than 3 classified
-                  hosts will not appear.
-                </li>
-                <li className="mb-1">
-                  <strong>Only classified hosts count.</strong> Hosts with too little traffic to be
-                  fingerprinted are excluded.
-                </li>
-                <li>
-                  <strong>Tunnel &amp; VPN addresses.</strong> Private IPs in VPN overlays are
-                  treated the same as LAN hosts.
-                </li>
-              </ul>
-            </HelpPopover>
+                    <HelpPopover
+                      id="subnet-definitions-info"
+                      title="How Subnet Detection Works"
+                      maxWidth={400}
+                      buttonTitle="How subnet detection works"
+                    >
+                      <p className="mb-2">
+                        The scanner collects all <strong>private IP addresses</strong> (RFC 1918:{' '}
+                        <code>10.x</code>, <code>172.16–31.x</code>, <code>192.168.x</code>) seen in
+                        the snapshot's host classifications. For each observed IP, candidate CIDRs
+                        at every prefix length from /20 to /29 are generated and scored by{' '}
+                        <strong>host density</strong> (observed hosts ÷ subnet capacity). A greedy
+                        non-overlapping selection picks the highest-density candidates, preferring
+                        tighter, more specific prefixes.
+                      </p>
+                      <p className="mb-2">
+                        <strong>Scan All Snapshots</strong> runs detection across every snapshot and
+                        adds a <strong>Consistency</strong> score — subnets seen in more snapshots
+                        float to the top. Single-snapshot candidates are flagged in amber.
+                      </p>
+                      <p className="mb-2">
+                        <strong>Per-snapshot overrides.</strong> Individual snapshots can carry
+                        their own subnet list that shadows the global definitions for that
+                        snapshot's change detection. Set them from a capture's <em>Subnets</em> tab in
+                        the Timeline.
+                      </p>
+                      <p className="fw-semibold mb-1">Limitations</p>
+                      <ul className="mb-0 ps-3">
+                        <li className="mb-1">
+                          <strong>Prefix range /20–/29 only.</strong> Very large blocks or
+                          micro-segments (/30–/32) are outside the search range.
+                        </li>
+                        <li className="mb-1">
+                          <strong>No routing topology awareness.</strong> Infers from observed host
+                          distribution only — no VLAN or gateway knowledge.
+                        </li>
+                        <li className="mb-1">
+                          <strong>Small subnets are dropped.</strong> Segments with fewer than 3
+                          classified hosts will not appear.
+                        </li>
+                        <li className="mb-1">
+                          <strong>Only classified hosts count.</strong> Hosts with too little
+                          traffic to be fingerprinted are excluded.
+                        </li>
+                        <li>
+                          <strong>Tunnel &amp; VPN addresses.</strong> Private IPs in VPN overlays
+                          are treated the same as LAN hosts.
+                        </li>
+                      </ul>
+                    </HelpPopover>
           </div>
           <SubnetsPanel
             networkId={networkId!}
@@ -622,9 +619,7 @@ export const NetworkDetailPage = () => {
           <Modal.Title>Notes</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p className="small text-muted">
-            Free-text notes on this network. Insights read them as context.
-          </p>
+          <p className="small text-muted">Free-text notes on this network. Insights read them as context.</p>
           <NetworkAnnotationsPanel
             annotations={annotations}
             onAdd={data.handleAddAnnotation}
@@ -651,6 +646,7 @@ export const NetworkDetailPage = () => {
           />
         </Modal.Body>
       </Modal>
+
 
       <ManagePcapsModal
         show={showManage}

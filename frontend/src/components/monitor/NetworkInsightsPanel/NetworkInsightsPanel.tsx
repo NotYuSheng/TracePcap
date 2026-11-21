@@ -4,12 +4,7 @@ import { PermissionLock } from '@components/common/PermissionLock';
 import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
-import type {
-  NetworkInsight,
-  InsightAudience,
-  InsightFocus,
-  InsightOptions,
-} from '@/features/insights/types/insights.types';
+import type { NetworkInsight, InsightAudience, InsightFocus, InsightOptions } from '@/features/insights/types/insights.types';
 import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 import { isActive, type AiJob } from '@/features/aiJobs/aiJobs.types';
 
@@ -32,43 +27,19 @@ const SEVERITY_VARIANT: Record<string, string> = {
 };
 
 const AUDIENCE_OPTIONS: { value: InsightAudience; label: string; desc: string }[] = [
-  {
-    value: 'TECHNICAL',
-    label: 'Technical',
-    desc: 'IPs, MACs, protocol names verbatim — for active investigators',
-  },
-  { value: 'EXECUTIVE', label: 'Executive', desc: 'Plain English, business impact — no jargon' },
-  { value: 'OT', label: 'OT / ICS', desc: 'Framed around operational & industrial impact' },
+  { value: 'TECHNICAL',  label: 'Technical',  desc: 'IPs, MACs, protocol names verbatim — for active investigators' },
+  { value: 'EXECUTIVE',  label: 'Executive',  desc: 'Plain English, business impact — no jargon' },
+  { value: 'OT',         label: 'OT / ICS',   desc: 'Framed around operational & industrial impact' },
 ];
 
 const FOCUS_OPTIONS: { value: InsightFocus; label: string; desc: string }[] = [
-  {
-    value: 'SECURITY',
-    label: 'Security',
-    desc: 'Suspicious patterns, ARP spoofing, lateral movement leads',
-  },
-  {
-    value: 'OPERATIONAL',
-    label: 'Operational',
-    desc: 'Expected vs unexpected from a network ops perspective',
-  },
-  {
-    value: 'COMPLIANCE',
-    label: 'Compliance',
-    desc: 'Baseline deviations, reviewed vs unreviewed events',
-  },
+  { value: 'SECURITY',    label: 'Security',    desc: 'Suspicious patterns, ARP spoofing, lateral movement leads' },
+  { value: 'OPERATIONAL', label: 'Operational', desc: 'Expected vs unexpected from a network ops perspective' },
+  { value: 'COMPLIANCE',  label: 'Compliance',  desc: 'Baseline deviations, reviewed vs unreviewed events' },
 ];
 
-const AUDIENCE_LABELS: Record<string, string> = {
-  TECHNICAL: 'Technical',
-  EXECUTIVE: 'Executive',
-  OT: 'OT / ICS',
-};
-const FOCUS_LABELS: Record<string, string> = {
-  SECURITY: 'Security',
-  OPERATIONAL: 'Operational',
-  COMPLIANCE: 'Compliance',
-};
+const AUDIENCE_LABELS: Record<string, string> = { TECHNICAL: 'Technical', EXECUTIVE: 'Executive', OT: 'OT / ICS' };
+const FOCUS_LABELS:    Record<string, string> = { SECURITY: 'Security', OPERATIONAL: 'Operational', COMPLIANCE: 'Compliance' };
 
 export const NetworkInsightsPanel = ({
   insight,
@@ -84,7 +55,7 @@ export const NetworkInsightsPanel = ({
   const [error, setError] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [audience, setAudience] = useState<InsightAudience>('TECHNICAL');
-  const [focus, setFocus] = useState<InsightFocus>('SECURITY');
+  const [focus, setFocus]       = useState<InsightFocus>('SECURITY');
 
   const handleGenerate = async () => {
     setStarting(true);
@@ -119,14 +90,9 @@ export const NetworkInsightsPanel = ({
           <i className={`bi bi-gear${showOptions ? '-fill' : ''}`} />
           Options
           {(audience !== 'TECHNICAL' || focus !== 'SECURITY') && (
-            <span className="badge bg-primary ms-1" style={{ fontSize: '0.6rem' }}>
-              custom
-            </span>
+            <span className="badge bg-primary ms-1" style={{ fontSize: '0.6rem' }}>custom</span>
           )}
-          <i
-            className={`bi bi-chevron-${showOptions ? 'up' : 'down'} ms-1`}
-            style={{ fontSize: '0.7rem' }}
-          />
+          <i className={`bi bi-chevron-${showOptions ? 'up' : 'down'} ms-1`} style={{ fontSize: '0.7rem' }} />
         </button>
 
         <Button
@@ -136,15 +102,9 @@ export const NetworkInsightsPanel = ({
           disabled={generating || !llmAvailable || !ai.allowed}
         >
           {generating ? (
-            <>
-              <Spinner animation="border" size="sm" className="me-1" />
-              {job?.status === 'WAITING' ? 'Queued…' : 'Generating…'}
-            </>
+            <><Spinner animation="border" size="sm" className="me-1" />{job?.status === 'WAITING' ? 'Queued…' : 'Generating…'}</>
           ) : (
-            <>
-              <i className="bi bi-stars me-1" />
-              {insight ? 'Regenerate' : 'Generate Insights'}
-            </>
+            <><i className="bi bi-stars me-1" />{insight ? 'Regenerate' : 'Generate Insights'}</>
           )}
         </Button>
         <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
@@ -155,10 +115,7 @@ export const NetworkInsightsPanel = ({
         <div className="border rounded p-3 mb-3 bg-light" style={{ fontSize: '0.85rem' }}>
           <div className="row g-3">
             <div className="col-sm-6">
-              <div
-                className="fw-semibold mb-2 text-muted"
-                style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}
-              >
+              <div className="fw-semibold mb-2 text-muted" style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Audience
               </div>
               <div className="d-flex flex-column gap-1">
@@ -177,19 +134,14 @@ export const NetworkInsightsPanel = ({
                     />
                     <div>
                       <div className="fw-semibold">{opt.label}</div>
-                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        {opt.desc}
-                      </div>
+                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>{opt.desc}</div>
                     </div>
                   </label>
                 ))}
               </div>
             </div>
             <div className="col-sm-6">
-              <div
-                className="fw-semibold mb-2 text-muted"
-                style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}
-              >
+              <div className="fw-semibold mb-2 text-muted" style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Focus
               </div>
               <div className="d-flex flex-column gap-1">
@@ -208,9 +160,7 @@ export const NetworkInsightsPanel = ({
                     />
                     <div>
                       <div className="fw-semibold">{opt.label}</div>
-                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        {opt.desc}
-                      </div>
+                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>{opt.desc}</div>
                     </div>
                   </label>
                 ))}
@@ -220,29 +170,15 @@ export const NetworkInsightsPanel = ({
         </div>
       )}
 
-      {error && (
-        <Alert variant="danger" className="py-2 small mb-3">
-          {error}
-        </Alert>
-      )}
+      {error && <Alert variant="danger" className="py-2 small mb-3">{error}</Alert>}
 
       {jobActive && job && (
         <div className="mb-3">
           <AiJobStatus
             job={job}
             doing="Generating insights"
-            whenDone={
-              insight
-                ? 'The new insights replace these when they are ready.'
-                : 'They show here when they are ready.'
-            }
-            onCancel={
-              onCancelJob
-                ? () => {
-                    onCancelJob().catch(() => setError("Couldn't cancel it."));
-                  }
-                : undefined
-            }
+            whenDone={insight ? 'The new insights replace these when they are ready.' : 'They show here when they are ready.'}
+            onCancel={onCancelJob ? () => { onCancelJob().catch(() => setError("Couldn't cancel it.")); } : undefined}
           />
         </div>
       )}
@@ -291,8 +227,7 @@ export const NetworkInsightsPanel = ({
           {insight.anomalies && insight.anomalies.length > 0 && (
             <div className="mb-4">
               <h6 className="border-bottom pb-1 mb-2">
-                <i className="bi bi-exclamation-diamond me-1" />
-                Anomalies
+                <i className="bi bi-exclamation-diamond me-1" />Anomalies
               </h6>
               {insight.anomalies.map((a, i) => (
                 <div key={i} className="d-flex align-items-start gap-2 mb-2">
@@ -306,9 +241,7 @@ export const NetworkInsightsPanel = ({
                   </Badge>
                   <div>
                     <div className="small fw-semibold">{a.title}</div>
-                    <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                      {a.description}
-                    </div>
+                    <div className="text-muted" style={{ fontSize: '0.8rem' }}>{a.description}</div>
                   </div>
                 </div>
               ))}
@@ -319,8 +252,7 @@ export const NetworkInsightsPanel = ({
           {insight.correlations && insight.correlations.length > 0 && (
             <div className="mb-4">
               <h6 className="border-bottom pb-1 mb-2">
-                <i className="bi bi-link-45deg me-1" />
-                Event Correlations
+                <i className="bi bi-link-45deg me-1" />Event Correlations
               </h6>
               <div className="border rounded overflow-hidden">
                 <table className="table table-sm table-hover align-middle mb-0">
@@ -349,39 +281,27 @@ export const NetworkInsightsPanel = ({
           {insight.recommendations && insight.recommendations.length > 0 && (
             <div className="mb-4">
               <h6 className="border-bottom pb-1 mb-2">
-                <i className="bi bi-check2-square me-1" />
-                Recommendations
+                <i className="bi bi-check2-square me-1" />Recommendations
               </h6>
               <ol className="ps-4 mb-0">
                 {insight.recommendations.map((r, i) => (
-                  <li key={i} className="small mb-1">
-                    {r}
-                  </li>
+                  <li key={i} className="small mb-1">{r}</li>
                 ))}
               </ol>
             </div>
           )}
 
           {/* Footer */}
-          <div
-            className="text-muted border-top pt-2 mt-2 d-flex flex-wrap gap-2 align-items-center"
-            style={{ fontSize: '0.7rem' }}
-          >
+          <div className="text-muted border-top pt-2 mt-2 d-flex flex-wrap gap-2 align-items-center" style={{ fontSize: '0.7rem' }}>
             <span>Generated {new Date(insight.generatedAt).toLocaleString('en-GB')}</span>
             {insight.modelUsed && <span>· {insight.modelUsed}</span>}
             {insight.audience && (
-              <span
-                className="badge bg-light text-muted border"
-                style={{ fontSize: '0.65rem', fontWeight: 400 }}
-              >
+              <span className="badge bg-light text-muted border" style={{ fontSize: '0.65rem', fontWeight: 400 }}>
                 {AUDIENCE_LABELS[insight.audience] ?? insight.audience}
               </span>
             )}
             {insight.focus && (
-              <span
-                className="badge bg-light text-muted border"
-                style={{ fontSize: '0.65rem', fontWeight: 400 }}
-              >
+              <span className="badge bg-light text-muted border" style={{ fontSize: '0.65rem', fontWeight: 400 }}>
                 {FOCUS_LABELS[insight.focus] ?? insight.focus}
               </span>
             )}

@@ -401,12 +401,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
       </div>
 
       {keepError && (
-        <Alert
-          variant="warning"
-          className="py-2 small"
-          onClose={() => setKeepError(null)}
-          dismissible
-        >
+        <Alert variant="warning" className="py-2 small" onClose={() => setKeepError(null)} dismissible>
           {keepError}
         </Alert>
       )}
@@ -476,10 +471,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         aria-label={`${file.favourite ? 'Unfavourite' : 'Favourite'} ${file.fileName}`}
                         onClick={() => setFavourite(file, !file.favourite)}
                       >
-                        <i
-                          className={`bi ${file.favourite ? 'bi-star-fill' : 'bi-star'}`}
-                          aria-hidden="true"
-                        />
+                        <i className={`bi ${file.favourite ? 'bi-star-fill' : 'bi-star'}`} aria-hidden="true" />
                       </button>
                       <Link to={`/analysis/${file.fileId}`} className="captures-name">
                         {file.fileName}
@@ -532,12 +524,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         <Button
                           variant="outline-warning"
                           size="sm"
-                          onClick={() =>
-                            changeExpiry(file, {
-                              keepForever: false,
-                              expiresAt: extendedTo(expiry, 7, now),
-                            })
-                          }
+                          onClick={() => changeExpiry(file, { keepForever: false, expiresAt: extendedTo(expiry, 7, now) })}
                         >
                           Keep 7 days longer
                         </Button>
@@ -578,9 +565,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                               <>
                                 <Dropdown.Divider />
                                 {file.keepForever ? (
-                                  <Dropdown.Item
-                                    onClick={() => changeExpiry(file, { keepForever: false })}
-                                  >
+                                  <Dropdown.Item onClick={() => changeExpiry(file, { keepForever: false })}>
                                     Let it expire
                                   </Dropdown.Item>
                                 ) : (
@@ -589,18 +574,13 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                                       <Dropdown.Item
                                         key={d}
                                         onClick={() =>
-                                          changeExpiry(file, {
-                                            keepForever: false,
-                                            expiresAt: extendedTo(expiry, d, now),
-                                          })
+                                          changeExpiry(file, { keepForever: false, expiresAt: extendedTo(expiry, d, now) })
                                         }
                                       >
                                         Keep {d} {d === 1 ? 'day' : 'days'} longer
                                       </Dropdown.Item>
                                     ))}
-                                    <Dropdown.Item
-                                      onClick={() => changeExpiry(file, { keepForever: true })}
-                                    >
+                                    <Dropdown.Item onClick={() => changeExpiry(file, { keepForever: true })}>
                                       Keep forever
                                     </Dropdown.Item>
                                   </>

@@ -127,12 +127,7 @@ export const MonitorPage = () => {
           </p>
         </div>
         <div className="d-flex align-items-center">
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => setShowCreate(true)}
-            disabled={!create.allowed}
-          >
+          <Button type="button" variant="primary" onClick={() => setShowCreate(true)} disabled={!create.allowed}>
             <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>New network
           </Button>
           <PermissionLock action="NETWORK_CREATE" />
@@ -282,17 +277,14 @@ export const MonitorPage = () => {
                               {st.action}
                             </Link>
                           )}
-                          {addCaptures.allowed &&
-                            (st.key === 'review' ||
-                              st.key === 'critical' ||
-                              st.key === 'clear') && (
-                              <Link
-                                to={`/monitor/${n.id}?add=1`}
-                                className="btn btn-sm btn-outline-secondary ms-2"
-                              >
-                                Add a capture
-                              </Link>
-                            )}
+                          {addCaptures.allowed && (st.key === 'review' || st.key === 'critical' || st.key === 'clear') && (
+                            <Link
+                              to={`/monitor/${n.id}?add=1`}
+                              className="btn btn-sm btn-outline-secondary ms-2"
+                            >
+                              Add a capture
+                            </Link>
+                          )}
                           <Dropdown align="end" className="d-inline-block ms-2">
                             <Dropdown.Toggle
                               variant="outline-secondary"
@@ -304,10 +296,7 @@ export const MonitorPage = () => {
                               <i className="bi bi-three-dots" aria-hidden="true"></i>
                             </Dropdown.Toggle>
                             <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
-                              <Dropdown.Item
-                                onClick={() => setEditNetwork(n)}
-                                disabled={!rename.allowed}
-                              >
+                              <Dropdown.Item onClick={() => setEditNetwork(n)} disabled={!rename.allowed}>
                                 Rename
                               </Dropdown.Item>
                               <Dropdown.Item
@@ -317,9 +306,7 @@ export const MonitorPage = () => {
                               >
                                 Delete
                                 {!remove.allowed && (
-                                  <span className="d-block small text-muted">
-                                    Your roles can't delete networks
-                                  </span>
+                                  <span className="d-block small text-muted">Your roles can't delete networks</span>
                                 )}
                               </Dropdown.Item>
                             </Dropdown.Menu>

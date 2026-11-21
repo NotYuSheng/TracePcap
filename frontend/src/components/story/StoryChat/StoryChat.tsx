@@ -34,11 +34,7 @@ function AnswerText({ text }: { text: string }) {
   return (
     <div className="chat-msg-text">
       {parts.map((p, i) =>
-        p.length > 2 && p.startsWith('`') && p.endsWith('`') ? (
-          <code key={i}>{p.slice(1, -1)}</code>
-        ) : (
-          p
-        )
+        p.length > 2 && p.startsWith('`') && p.endsWith('`') ? <code key={i}>{p.slice(1, -1)}</code> : p
       )}
     </div>
   );
@@ -161,22 +157,14 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
         )}
         {messages.map((m, i) =>
           m.role === 'user' ? (
-            <div key={i} className="chat-msg chat-msg-user">
-              {m.text}
-            </div>
+            <div key={i} className="chat-msg chat-msg-user">{m.text}</div>
           ) : (
             <div key={i} className="chat-msg chat-msg-ai">
-              {m.turn && (
-                <ChatSteps steps={m.turn.steps} running={false} elapsedMs={m.turn.elapsedMs} />
-              )}
+              {m.turn && <ChatSteps steps={m.turn.steps} running={false} elapsedMs={m.turn.elapsedMs} />}
               <AnswerText text={m.text} />
-              {m.turn?.filters.map(f => (
-                <FilterCard key={f.expression} fileId={fileId} filter={f} />
-              ))}
+              {m.turn?.filters.map(f => <FilterCard key={f.expression} fileId={fileId} filter={f} />)}
               {m.turn && !m.turn.toolsOffered && (
-                <div className="chat-msg-note">
-                  Answered without tools: the LLM server didn’t take them.
-                </div>
+                <div className="chat-msg-note">Answered without tools: the LLM server didn’t take them.</div>
               )}
               {m.turn?.modelNote && <div className="chat-msg-note">{m.turn.modelNote}</div>}
             </div>
@@ -188,12 +176,7 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
               <ChatSteps steps={working.steps} running elapsedMs={working.elapsedMs} />
             ) : (
               <div className="text-muted small">
-                <Spinner
-                  animation="border"
-                  size="sm"
-                  className="me-2"
-                  style={{ width: '0.7rem', height: '0.7rem' }}
-                />
+                <Spinner animation="border" size="sm" className="me-2" style={{ width: '0.7rem', height: '0.7rem' }} />
                 Thinking…{working ? ` ${Math.round(working.elapsedMs / 1000)} s` : ''}
               </div>
             )}

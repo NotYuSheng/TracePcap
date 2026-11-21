@@ -62,15 +62,9 @@ export function NotesTab({
           disabled={noteSaving || noteDeleting || !noteChanged || !labels.allowed}
         >
           {noteSaving ? (
-            <>
-              <Spinner size="sm" className="me-1" />
-              Saving…
-            </>
+            <><Spinner size="sm" className="me-1" />Saving…</>
           ) : (
-            <>
-              <i className="bi bi-floppy me-1" />
-              Save Note
-            </>
+            <><i className="bi bi-floppy me-1" />Save Note</>
           )}
         </Button>
         <PermissionLock action="LABEL_HOSTS" className="align-self-center" />
@@ -81,14 +75,10 @@ export function NotesTab({
             onClick={onDelete}
             disabled={noteDeleting || noteSaving || !labels.allowed}
           >
-            {noteDeleting ? (
-              <Spinner size="sm" />
-            ) : (
-              <>
-                <i className="bi bi-trash me-1" />
-                Delete
-              </>
-            )}
+            {noteDeleting
+              ? <Spinner size="sm" />
+              : <><i className="bi bi-trash me-1" />Delete</>
+            }
           </Button>
         )}
       </div>

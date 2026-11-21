@@ -276,15 +276,7 @@ export const AnalysisPage = () => {
         );
       }
     },
-    [
-      fileId,
-      additionalContext,
-      llmTimeoutMs,
-      maxFindings,
-      maxRiskMatrix,
-      networkContext,
-      startStoryJob,
-    ]
+    [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix, networkContext, startStoryJob]
   );
 
   // Load existing story once on mount
@@ -311,10 +303,9 @@ export const AnalysisPage = () => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const check = async () => {
       try {
-        const { data: meta } = await apiClient.get<{
-          storyStatus?: string | null;
-          storyError?: string | null;
-        }>(API_ENDPOINTS.FILE_METADATA(fileId));
+        const { data: meta } = await apiClient.get<{ storyStatus?: string | null; storyError?: string | null }>(
+          API_ENDPOINTS.FILE_METADATA(fileId)
+        );
         if (!alive) return;
         const status = meta.storyStatus;
         if (status === 'QUEUED' || status === 'WRITING') {
@@ -445,78 +436,73 @@ export const AnalysisPage = () => {
         />
         <div className={`analysis-main${activeTab === 'story' ? ' analysis-main-with-aside' : ''}`}>
           <div className="analysis-main-column">
-            {/* The capture bar: which capture, and the page-wide controls. */}
-            <div className="analysis-capture-bar">
-              <div className="analysis-capture-id">
-                <div className="analysis-capture-crumb">
-                  <Link to="/">Captures</Link>
-                  <span aria-hidden="true" className="text-muted mx-1">
-                    ›
-                  </span>
-                </div>
-                <h2 className="analysis-capture-name">
-                  <FavouriteStar fileId={fileId!} fileName={data.fileName} />
-                  {data.fileName}
-                </h2>
-                <div className="analysis-capture-facts">{captureFacts(data)}</div>
+          {/* The capture bar: which capture, and the page-wide controls. */}
+          <div className="analysis-capture-bar">
+            <div className="analysis-capture-id">
+              <div className="analysis-capture-crumb">
+                <Link to="/">Captures</Link>
+                <span aria-hidden="true" className="text-muted mx-1">
+                  ›
+                </span>
               </div>
+              <h2 className="analysis-capture-name">
+                <FavouriteStar fileId={fileId!} fileName={data.fileName} />
+                {data.fileName}
+              </h2>
+              <div className="analysis-capture-facts">{captureFacts(data)}</div>
             </div>
+          </div>
 
-            <div className="analysis-body">
-              {activeTab === 'file' && (
-                <Card className="mb-4">
-                  <Card.Body>
-                    <h2 className="h6 mb-1">Detection rules and report</h2>
-                    <p className="small text-muted mb-3">
-                      Which custom detection rules apply to this capture, and a PDF of the whole
-                      analysis.
-                    </p>
-                    <div className="d-flex flex-wrap align-items-start gap-3">
-                      <NetworkContextPicker fileId={fileId!} />
-                      <div className="d-flex flex-column align-items-end gap-1">
-                        <div className="d-flex align-items-center">
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => setShowReport(true)}
-                            disabled={!report.allowed}
-                          >
-                            <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
-                            Download report
-                          </Button>
-                          <PermissionLock action="DOWNLOAD_REPORT" />
-                        </div>
+          <div className="analysis-body">
+            {activeTab === 'file' && (
+              <Card className="mb-4">
+                <Card.Body>
+                  <h2 className="h6 mb-1">Detection rules and report</h2>
+                  <p className="small text-muted mb-3">
+                    Which custom detection rules apply to this capture, and a PDF of the whole
+                    analysis.
+                  </p>
+                  <div className="d-flex flex-wrap align-items-start gap-3">
+                    <NetworkContextPicker fileId={fileId!} />
+                    <div className="d-flex flex-column align-items-end gap-1">
+                      <div className="d-flex align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setShowReport(true)} disabled={!report.allowed}>
+                          <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
+                          Download report
+                        </Button>
+                        <PermissionLock action="DOWNLOAD_REPORT" />
                       </div>
                     </div>
-                  </Card.Body>
-                </Card>
-              )}
-              <ReportDrawer
-                show={showReport}
-                onHide={() => setShowReport(false)}
-                fileId={fileId!}
-                fileName={data.fileName}
-                networkId={networkContext ?? undefined}
-                summary={data}
-                hasStory={!!story}
-                graphStateRef={networkGraphStateRef}
-              />
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
+            <ReportDrawer
+              show={showReport}
+              onHide={() => setShowReport(false)}
+              fileId={fileId!}
+              fileName={data.fileName}
+              networkId={networkContext ?? undefined}
+              summary={data}
+              hasStory={!!story}
+              graphStateRef={networkGraphStateRef}
+            />
 
-              {/* Tab Content */}
-              <Outlet
-                context={
-                  {
-                    data,
-                    fileId: fileId!,
-                    networkGraphStateRef,
-                    networkDiagramFilters,
-                    storyState,
-                    refreshSummary: () => void refetch({ silent: true }),
-                    asideSlot: activeTab === 'story' ? asideSlot : null,
-                  } satisfies AnalysisOutletContext
-                }
-              />
-            </div>
+            {/* Tab Content */}
+            <Outlet
+              context={
+                {
+                  data,
+                  fileId: fileId!,
+                  networkGraphStateRef,
+                  networkDiagramFilters,
+                  storyState,
+                  refreshSummary: () => void refetch({ silent: true }),
+                  asideSlot: activeTab === 'story' ? asideSlot : null,
+                } satisfies AnalysisOutletContext
+              }
+            />
+          </div>
           </div>
           {activeTab === 'story' && <div className="analysis-aside" ref={setAsideSlot} />}
         </div>
