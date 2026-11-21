@@ -124,6 +124,98 @@ describe('PermissionsPanel: what each role may do', () => {
   });
 });
 
+describe('PermissionsPanel: custom roles', () => {
+  it('creates a role named after its Keycloak client role, starting from another', async () => {
+    let list = roles();
+    let created: unknown = null;
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(true))),
+      http.get('*/roles', () => HttpResponse.json(list)),
+      http.post('*/roles', async ({ request }) => {
+        created = await request.json();
+        list = [
+          ...list,
+          {
+            key: 'incident-responder',
+            label: 'Incident responder',
+            builtIn: false,
+            defaultRole: false,
+            editable: true,
+            permissions: ['SEE_CAPTURES', 'ASK_AI'],
+          },
+        ];
+        return HttpResponse.json(list[list.length - 1], { status: 201 });
+      })
+    );
+    render(<PermissionsPanel />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /New role/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Incident responder');
+    // The Keycloak name follows the name until it's edited.
+    expect(screen.getByLabelText('Keycloak client role')).toHaveValue('incident-responder');
+    await userEvent.selectOptions(screen.getByLabelText('Start from'), 'analyst');
+    await userEvent.click(screen.getByRole('button', { name: 'Create role' }));
+
+    await waitFor(() =>
+      expect(created).toEqual({
+        key: 'incident-responder',
+        label: 'Incident responder',
+        copyFrom: 'analyst',
+      })
+    );
+    // The new role opens, with what it needs from Keycloak.
+    expect(await screen.findByRole('heading', { name: 'Incident responder' })).toBeInTheDocument();
+    expect(screen.getByText(/Create role/, { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Incident responder: Ask the AI')).toBeChecked();
+  });
+
+  it("won't take a Keycloak name another role has", async () => {
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(true))),
+      http.get('*/roles', () => HttpResponse.json(roles()))
+    );
+    render(<PermissionsPanel />);
+    await userEvent.click(await screen.findByRole('button', { name: /New role/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Viewer');
+    expect(screen.getByText('There is already a role with this name.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create role' })).toBeDisabled();
+  });
+
+  it('deletes a custom role after asking; built-in roles have no delete', async () => {
+    let list = [
+      ...roles(),
+      {
+        key: 'responder',
+        label: 'Responder',
+        builtIn: false,
+        defaultRole: false,
+        editable: true,
+        permissions: ['SEE_CAPTURES'],
+      },
+    ];
+    let deleted: string | null = null;
+    server.use(
+      http.get('*/me', () => HttpResponse.json({ ...me(true), roles: ['responder'] })),
+      http.get('*/roles', () => HttpResponse.json(list)),
+      http.delete('*/roles/:key', ({ params }) => {
+        deleted = String(params.key);
+        list = list.filter(r => r.key !== deleted);
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    render(<PermissionsPanel />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Delete role/ }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Delete role/ }));
+    await waitFor(() => expect(deleted).toBe('responder'));
+    await waitFor(() =>
+      expect(screen.queryByRole('option', { name: /Responder/ })).not.toBeInTheDocument()
+    );
+    expect(screen.queryByRole('button', { name: /Delete role/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('AuditLogPanel (#915)', () => {
   it('lists entries with what changed, readably, and searches', async () => {
     const searches: (string | null)[] = [];

@@ -61,6 +61,23 @@ export interface Role {
   permissions: PermissionAction[];
 }
 
+/** A change to a role; omitted fields stay as they are. Name and description: custom roles only. */
+export interface RoleChange {
+  permissions?: PermissionAction[];
+  defaultRole?: boolean;
+  label?: string;
+  description?: string;
+}
+
+/** Mirrors CreateRoleRequest. */
+export interface NewRole {
+  key: string;
+  label: string;
+  description?: string;
+  /** A role whose permissions the new one starts with. */
+  copyFrom?: string;
+}
+
 /** Mirrors MeDto. */
 export interface Me {
   username: string;
@@ -97,19 +114,29 @@ export const meService = {
   getMe: async (): Promise<Me> => (await apiClient.get<Me>(API_ENDPOINTS.ME)).data,
   getRoles: async (): Promise<Role[]> => (await apiClient.get<Role[]>(API_ENDPOINTS.ROLES)).data,
   /** Replaces what a role may do, and/or makes it the default role. Admin only. */
-  updateRole: async (
-    key: string,
-    change: { permissions?: PermissionAction[]; defaultRole?: boolean },
-  ): Promise<Role> => (await apiClient.patch<Role>(API_ENDPOINTS.ROLE(key), change)).data,
+  updateRole: async (key: string, change: RoleChange): Promise<Role> =>
+    (await apiClient.patch<Role>(API_ENDPOINTS.ROLE(key), change)).data,
+  /** A custom role, named by the Keycloak client role that gives it. Admin only. */
+  createRole: async (role: NewRole): Promise<Role> =>
+    (await apiClient.post<Role>(API_ENDPOINTS.ROLES, role)).data,
+  /** Deletes a custom role (not a built-in one, nor the default). Admin only. */
+  deleteRole: async (key: string): Promise<void> => {
+    await apiClient.delete(API_ENDPOINTS.ROLE(key));
+  },
   getAuditLog: async (
     page: number,
     pageSize: number,
     search?: string,
-    targetTypes?: string[],
+    targetTypes?: string[]
   ): Promise<Paged<AuditLogEntry>> =>
     (
       await apiClient.get<Paged<AuditLogEntry>>(API_ENDPOINTS.AUDIT_LOG, {
-        params: { page, pageSize, ...(search ? { search } : {}), ...(targetTypes?.length ? { targetTypes } : {}) },
+        params: {
+          page,
+          pageSize,
+          ...(search ? { search } : {}),
+          ...(targetTypes?.length ? { targetTypes } : {}),
+        },
         // targetTypes=a&targetTypes=b, as Spring reads a list.
         paramsSerializer: { indexes: null },
       })

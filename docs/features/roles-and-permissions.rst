@@ -133,6 +133,28 @@ may change roles. Every change, and every change of the default role, is in the 
 When someone tries something their roles don't allow, the app says which permission it needs
 and which roles they have, so they know whom to ask.
 
+Your own roles
+--------------
+
+The four built-in roles cover most teams. When they don't (an incident responder who may
+export packets but not label hosts, a contractor who may only read reports), an admin adds a
+role of their own:
+
+1. On the **Roles** tab, choose **New role**. Give it a name, and check the **Keycloak client
+   role** it's given by (filled in from the name: *Incident responder* becomes
+   ``incident-responder``). Optionally **start from** another role's permissions.
+2. Tick what it may do. **Start from…** on any role replaces its permissions with another
+   role's, to start over.
+3. In Keycloak, your identity team creates the client role of that name on
+   ``tracepcap-frontend`` (Clients › tracepcap-frontend › Roles › Create role) and assigns it
+   to a group.
+
+A custom role can be renamed or have its description changed with **Edit**; its Keycloak name
+can't change, because that's what Keycloak assigns. **Delete role** removes it: anyone Keycloak
+still gives that client role stops getting anything from it, and if that leaves them with no
+TracePcap role they get the default. The four built-in roles, and whichever role is the default,
+can't be deleted. Creating, editing and deleting roles are all in the audit log.
+
 Giving someone a role
 ---------------------
 
@@ -152,8 +174,12 @@ For API clients
 ---------------
 
 - ``GET /api/v1/roles`` lists the roles and what each may do.
-- ``PATCH /api/v1/roles/{key}`` changes a role: ``permissions`` replaces its set, and
-  ``defaultRole: true`` makes it the default. Admin only.
+- ``POST /api/v1/roles`` creates a custom role: ``key`` (the Keycloak client role), ``label``,
+  ``description``, and ``copyFrom`` to start from another role's permissions. Admin only.
+- ``PATCH /api/v1/roles/{key}`` changes a role: ``permissions`` replaces its set,
+  ``defaultRole: true`` makes it the default, and ``label`` and ``description`` rename a custom
+  role. Admin only.
+- ``DELETE /api/v1/roles/{key}`` deletes a custom role. Admin only.
 - ``GET /api/v1/permissions`` lists every permission, grouped, and whether you have it.
 - ``GET /api/v1/me`` includes ``roles``, the roles that apply to you.
 

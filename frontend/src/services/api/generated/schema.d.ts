@@ -581,7 +581,7 @@ export interface paths {
          * Set a custom private range in the shared default
          * @description Adds it, or changes the classification of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.
          */
-        post: operations["create_6"];
+        post: operations["create_7"];
         delete?: never;
         options?: never;
         head?: never;
@@ -602,7 +602,7 @@ export interface paths {
          * Delete a custom private range from the shared default
          * @description Needs ADDRESS_DEFAULTS. Audited.
          */
-        delete: operations["delete_8"];
+        delete: operations["delete_9"];
         options?: never;
         head?: never;
         patch?: never;
@@ -622,7 +622,7 @@ export interface paths {
         get: operations["list_13"];
         put?: never;
         /** Create a global detection rule (audited) */
-        post: operations["create_5"];
+        post: operations["create_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -736,7 +736,7 @@ export interface paths {
         put: operations["update"];
         post?: never;
         /** Delete a detection rule (audited) */
-        delete: operations["delete_7"];
+        delete: operations["delete_8"];
         options?: never;
         head?: never;
         patch?: never;
@@ -775,7 +775,7 @@ export interface paths {
         put: operations["upsert_1"];
         post?: never;
         /** Delete an entity's note */
-        delete: operations["delete_6"];
+        delete: operations["delete_7"];
         options?: never;
         head?: never;
         patch?: never;
@@ -932,7 +932,7 @@ export interface paths {
         put: operations["put_1"];
         post?: never;
         /** Clear the human override, letting the machine vote decide again */
-        delete: operations["delete_5"];
+        delete: operations["delete_6"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1006,7 +1006,7 @@ export interface paths {
         get: operations["list_12"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
-        post: operations["create_4"];
+        post: operations["create_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1643,7 +1643,7 @@ export interface paths {
          * Set an IP organization rule in the shared default
          * @description Adds it, or changes the label of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.
          */
-        post: operations["create_3"];
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1664,7 +1664,7 @@ export interface paths {
          * Delete an IP organization rule from the shared default
          * @description Needs ADDRESS_DEFAULTS. Audited.
          */
-        delete: operations["delete_4"];
+        delete: operations["delete_5"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1735,7 +1735,7 @@ export interface paths {
         get: operations["list_8"];
         put?: never;
         /** Create an annotation */
-        post: operations["create_2"];
+        post: operations["create_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1753,7 +1753,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** Delete an annotation */
-        delete: operations["delete_3"];
+        delete: operations["delete_4"];
         options?: never;
         head?: never;
         /** Update an annotation's body */
@@ -1884,7 +1884,7 @@ export interface paths {
          * Add a rule to this network (audited)
          * @description Checked against each capture that joins the network from now on, and against the network's existing captures on Re-apply.
          */
-        post: operations["create_1"];
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2037,7 +2037,7 @@ export interface paths {
         get: operations["list_5"];
         put?: never;
         /** Create an external event */
-        post: operations["create"];
+        post: operations["create_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2056,7 +2056,7 @@ export interface paths {
         put: operations["updateExternalEvent"];
         post?: never;
         /** Delete an external event */
-        delete: operations["delete_2"];
+        delete: operations["delete_3"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2342,7 +2342,7 @@ export interface paths {
         put: operations["upsert"];
         post?: never;
         /** Remove an entity's role in a file */
-        delete: operations["delete_1"];
+        delete: operations["delete_2"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2470,7 +2470,11 @@ export interface paths {
         /** List the roles and what each may do */
         get: operations["list_1"];
         put?: never;
-        post?: never;
+        /**
+         * Create a custom role (admin only; audited)
+         * @description Its key is the Keycloak client role that gives it, which your identity team creates and assigns in Keycloak. copyFrom starts it with another role's permissions.
+         */
+        post: operations["create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2487,10 +2491,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete a custom role (admin only; audited). Built-in roles and the default role can't be */
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
-        /** Change what a role may do, or make it the default role (admin only; audited) */
+        /** Change a role: what it may do, a custom role's name and description, or make it the default (admin only; audited) */
         patch: operations["update_1"];
         trace?: never;
     };
@@ -3541,6 +3546,12 @@ export interface components {
         CreateNetworkRequest: {
             description?: string;
             name: string;
+        };
+        CreateRoleRequest: {
+            copyFrom?: string;
+            description?: string;
+            key: string;
+            label: string;
         };
         CustomPrivateRangeDto: {
             cidr?: string;
@@ -5066,6 +5077,8 @@ export interface components {
         };
         UpdateRoleRequest: {
             defaultRole?: boolean;
+            description?: string;
+            label?: string;
             permissions?: ("SEE_CAPTURES" | "DOWNLOAD_REPORT" | "READ_AUDIT_LOG" | "UPLOAD_CAPTURES" | "ASK_AI" | "EXPORT_PACKETS" | "LABEL_HOSTS" | "OVERRIDE_ANSWERS" | "HOST_OCCUPANCY" | "NETWORK_MAP" | "DETECTION_RULES_CAPTURE" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_GLOBAL" | "NETWORK_CAPTURES" | "NETWORK_CREATE" | "NETWORK_SETTINGS" | "NETWORK_DELETE" | "KEEP_CAPTURES" | "DELETE_OWN_CAPTURES" | "DELETE_ANY_CAPTURES" | "RETENTION" | "ADDRESS_DEFAULTS" | "ANALYSIS_POLICY" | "LLM_CONNECTION" | "CANCEL_OTHERS_AI_JOBS" | "MANAGE_ROLES")[];
         };
         UpsertNodeRoleRequest: {
@@ -5974,7 +5987,7 @@ export interface operations {
             };
         };
     };
-    create_6: {
+    create_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -5998,7 +6011,7 @@ export interface operations {
             };
         };
     };
-    delete_8: {
+    delete_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -6042,7 +6055,7 @@ export interface operations {
             };
         };
     };
-    create_5: {
+    create_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -6222,7 +6235,7 @@ export interface operations {
             };
         };
     };
-    delete_7: {
+    delete_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -6315,7 +6328,7 @@ export interface operations {
             };
         };
     };
-    delete_6: {
+    delete_7: {
         parameters: {
             query: {
                 entityType: string;
@@ -6684,7 +6697,7 @@ export interface operations {
             };
         };
     };
-    delete_5: {
+    delete_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -6799,7 +6812,7 @@ export interface operations {
             };
         };
     };
-    create_4: {
+    create_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -7664,7 +7677,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -7688,7 +7701,7 @@ export interface operations {
             };
         };
     };
-    delete_4: {
+    delete_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -7862,7 +7875,7 @@ export interface operations {
             };
         };
     };
-    create_2: {
+    create_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -7888,7 +7901,7 @@ export interface operations {
             };
         };
     };
-    delete_3: {
+    delete_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -8150,7 +8163,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -8382,7 +8395,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    create_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -8435,7 +8448,7 @@ export interface operations {
             };
         };
     };
-    delete_2: {
+    delete_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -8966,7 +8979,7 @@ export interface operations {
             };
         };
     };
-    delete_1: {
+    delete_2: {
         parameters: {
             query: {
                 fileId: string;
@@ -9192,6 +9205,50 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["RoleDto"][];
                 };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RoleDto"];
+                };
+            };
+        };
+    };
+    delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

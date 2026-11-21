@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Form } from '@govtechsg/sgds-react';
+import { Button, Card, Dropdown, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { env } from '@/config/env';
@@ -9,7 +9,9 @@ import {
   type Permission,
   type PermissionAction,
   type Role,
+  type RoleChange,
 } from '@/features/me/meService';
+import { RoleFormModal, type RoleFormValues } from './RoleFormModal';
 import './PermissionsPanel.css';
 
 /** The catalogue's rows, grouped under their headings, in the server's order. */
@@ -36,6 +38,9 @@ export function PermissionsPanel() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [form, setForm] = useState<'new' | 'edit' | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = () =>
     Promise.all([meService.getMe(), meService.getRoles()])
@@ -70,10 +75,7 @@ export function PermissionsPanel() {
   const defaultRole = roles.find(r => r.defaultRole);
   const role = roles.find(r => r.key === selected) ?? roles[0];
 
-  const save = async (
-    key: string,
-    change: { permissions?: PermissionAction[]; defaultRole?: boolean }
-  ) => {
+  const save = async (key: string, change: RoleChange) => {
     setSaving(true);
     setError(null);
     try {
@@ -92,6 +94,46 @@ export function PermissionsPanel() {
       permissions: on ? [...r.permissions, action] : r.permissions.filter(a => a !== action),
     });
 
+  /** Replaces the role's permissions with another role's (the admin role's: everything it can hold). */
+  const startFrom = (source: Role) =>
+    save(role.key, {
+      permissions: source.editable
+        ? source.permissions
+        : source.permissions.filter(a => !me.permissions.find(p => p.action === a)?.fixed),
+    });
+
+  const submitForm = async (v: RoleFormValues) => {
+    if (form === 'edit') {
+      await meService.updateRole(role.key, { label: v.label, description: v.description });
+    } else {
+      await meService.createRole({
+        key: v.key,
+        label: v.label,
+        description: v.description || undefined,
+        copyFrom: v.copyFrom || undefined,
+      });
+      setSelected(v.key);
+    }
+    await load();
+  };
+
+  const remove = async () => {
+    setDeleting(true);
+    setError(null);
+    try {
+      await meService.deleteRole(role.key);
+      setConfirmDelete(false);
+      setSelected(null);
+      await load();
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setConfirmDelete(false);
+      setError(msg ?? "Couldn't delete the role. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const copyKey = async () => {
     try {
       await navigator.clipboard.writeText(role.key);
@@ -106,6 +148,18 @@ export function PermissionsPanel() {
     <div className="roles-layout">
       <Card className="roles-list-card">
         <Card.Body>
+          {canManage && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-primary"
+              className="w-100 mb-3"
+              onClick={() => setForm('new')}
+            >
+              <i className="bi bi-plus-lg me-1" aria-hidden="true" />
+              New role
+            </Button>
+          )}
           <p className="small text-muted mb-2">
             What each role may do.{' '}
             {me.authEnabled
@@ -184,7 +238,53 @@ export function PermissionsPanel() {
                 ? `${role.permissions.length} of ${total} permissions`
                 : `all ${total} permissions, always`}
             </span>
-            {saving && <Spinner animation="border" size="sm" className="ms-auto" />}
+            <span className="ms-auto d-flex align-items-center gap-2">
+              {saving && <Spinner animation="border" size="sm" />}
+              {canManage && role.editable && (
+                <Dropdown align="end">
+                  <Dropdown.Toggle
+                    variant="outline-secondary"
+                    size="sm"
+                    id="role-start-from"
+                    disabled={saving}
+                  >
+                    Start from…
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Header>Replace these permissions with</Dropdown.Header>
+                    {roles
+                      .filter(r => r.key !== role.key)
+                      .map(r => (
+                        <Dropdown.Item key={r.key} onClick={() => startFrom(r)}>
+                          {r.label}'s ({r.editable ? r.permissions.length : total - 1})
+                        </Dropdown.Item>
+                      ))}
+                  </Dropdown.Menu>
+                </Dropdown>
+              )}
+              {canManage && !role.builtIn && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-secondary"
+                    onClick={() => setForm('edit')}
+                  >
+                    <i className="bi bi-pencil me-1" aria-hidden="true" />
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-danger"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <i className="bi bi-trash me-1" aria-hidden="true" />
+                    Delete role
+                  </Button>
+                </>
+              )}
+            </span>
           </div>
           {role.description && <p className="small text-muted mt-1 mb-0">{role.description}</p>}
 
@@ -195,8 +295,15 @@ export function PermissionsPanel() {
                 <code className="roles-chip">{role.key}</code> on <code>{env.OIDC_CLIENT_ID}</code>
               </div>
               <div className="text-muted mt-1">
-                TracePcap doesn't give it to anyone. In Keycloak, assign it to a group: Groups › the
-                group › Role mapping › Assign role › Filter by clients.
+                TracePcap doesn't create it or give it to anyone. In Keycloak:{' '}
+                {!role.builtIn && (
+                  <>
+                    <strong>Clients › {env.OIDC_CLIENT_ID} › Roles › Create role</strong> with this
+                    name, then{' '}
+                  </>
+                )}
+                assign it to a group (Groups › the group › Role mapping › Assign role › Filter by
+                clients).
               </div>
               <button
                 type="button"
@@ -258,6 +365,44 @@ export function PermissionsPanel() {
           </div>
         </Card.Body>
       </Card>
+
+      <RoleFormModal
+        show={form !== null}
+        editing={form === 'edit' ? role : undefined}
+        roles={roles}
+        onHide={() => setForm(null)}
+        onSubmit={submitForm}
+      />
+      <Modal show={confirmDelete} onHide={() => !deleting && setConfirmDelete(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Delete {role.label}?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-2">
+            Anyone Keycloak gives <code>{role.key}</code> stops getting anything from it at their
+            next request. If that leaves them with no TracePcap role, they get the default role (
+            {defaultRole?.label ?? 'none'}).
+          </p>
+          <p className="small text-muted mb-0">
+            The client role stays in Keycloak; remove it there too if no other app uses it. The
+            deletion is recorded in the audit log.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            type="button"
+            variant="outline-secondary"
+            onClick={() => setConfirmDelete(false)}
+            disabled={deleting}
+          >
+            Cancel
+          </Button>
+          <Button type="button" variant="outline-danger" onClick={remove} disabled={deleting}>
+            {deleting && <Spinner animation="border" size="sm" className="me-1" />}
+            Delete role
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

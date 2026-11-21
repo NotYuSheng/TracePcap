@@ -1476,6 +1476,34 @@
         ],
         "type": "object"
       },
+      "CreateRoleRequest": {
+        "properties": {
+          "copyFrom": {
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 100,
+            "minLength": 0,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "type": "object"
+      },
       "CustomPrivateRangeDto": {
         "properties": {
           "cidr": {
@@ -5812,6 +5840,16 @@
           "defaultRole": {
             "type": "boolean"
           },
+          "description": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
           "permissions": {
             "items": {
               "enum": [
@@ -7858,7 +7896,7 @@
       },
       "post": {
         "description": "Adds it, or changes the classification of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.",
-        "operationId": "create_6",
+        "operationId": "create_7",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7890,7 +7928,7 @@
     "/api/v1/custom-private-ranges/{id}": {
       "delete": {
         "description": "Needs ADDRESS_DEFAULTS. Audited.",
-        "operationId": "delete_8",
+        "operationId": "delete_9",
         "parameters": [
           {
             "in": "path",
@@ -7959,7 +7997,7 @@
         ]
       },
       "post": {
-        "operationId": "create_5",
+        "operationId": "create_6",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8123,7 +8161,7 @@
     },
     "/api/v1/detection-rules/{id}": {
       "delete": {
-        "operationId": "delete_7",
+        "operationId": "delete_8",
         "parameters": [
           {
             "in": "path",
@@ -8260,7 +8298,7 @@
     },
     "/api/v1/entity-notes": {
       "delete": {
-        "operationId": "delete_6",
+        "operationId": "delete_7",
         "parameters": [
           {
             "in": "query",
@@ -9007,7 +9045,7 @@
     },
     "/api/v1/files/{fileId}/adjudications/{question}/{entityKey}/override": {
       "delete": {
-        "operationId": "delete_5",
+        "operationId": "delete_6",
         "parameters": [
           {
             "in": "path",
@@ -9313,7 +9351,7 @@
         ]
       },
       "post": {
-        "operationId": "create_4",
+        "operationId": "create_5",
         "parameters": [
           {
             "in": "path",
@@ -10755,7 +10793,7 @@
       },
       "post": {
         "description": "Adds it, or changes the label of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.",
-        "operationId": "create_3",
+        "operationId": "create_4",
         "requestBody": {
           "content": {
             "application/json": {
@@ -10787,7 +10825,7 @@
     "/api/v1/ip-org-rules/{id}": {
       "delete": {
         "description": "Needs ADDRESS_DEFAULTS. Audited.",
-        "operationId": "delete_4",
+        "operationId": "delete_5",
         "parameters": [
           {
             "in": "path",
@@ -11014,7 +11052,7 @@
         ]
       },
       "post": {
-        "operationId": "create_2",
+        "operationId": "create_3",
         "parameters": [
           {
             "in": "path",
@@ -11056,7 +11094,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations/{annotationId}": {
       "delete": {
-        "operationId": "delete_3",
+        "operationId": "delete_4",
         "parameters": [
           {
             "in": "path",
@@ -11498,7 +11536,7 @@
       },
       "post": {
         "description": "Checked against each capture that joins the network from now on, and against the network's existing captures on Re-apply.",
-        "operationId": "create_1",
+        "operationId": "create_2",
         "parameters": [
           {
             "in": "path",
@@ -11900,7 +11938,7 @@
         ]
       },
       "post": {
-        "operationId": "create",
+        "operationId": "create_1",
         "parameters": [
           {
             "in": "path",
@@ -11942,7 +11980,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/external-events/{eventId}": {
       "delete": {
-        "operationId": "delete_2",
+        "operationId": "delete_3",
         "parameters": [
           {
             "in": "path",
@@ -12760,7 +12798,7 @@
     },
     "/api/v1/node-roles": {
       "delete": {
-        "operationId": "delete_1",
+        "operationId": "delete_2",
         "parameters": [
           {
             "in": "query",
@@ -13188,9 +13226,61 @@
         "tags": [
           "Roles"
         ]
+      },
+      "post": {
+        "description": "Its key is the Keycloak client role that gives it, which your identity team creates and assigns in Keycloak. copyFrom starts it with another role's permissions.",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a custom role (admin only; audited)",
+        "tags": [
+          "Roles"
+        ]
       }
     },
     "/api/v1/roles/{key}": {
+      "delete": {
+        "operationId": "delete_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Delete a custom role (admin only; audited). Built-in roles and the default role can't be",
+        "tags": [
+          "Roles"
+        ]
+      },
       "patch": {
         "operationId": "update_1",
         "parameters": [
@@ -13225,7 +13315,7 @@
             "description": "OK"
           }
         },
-        "summary": "Change what a role may do, or make it the default role (admin only; audited)",
+        "summary": "Change a role: what it may do, a custom role's name and description, or make it the default (admin only; audited)",
         "tags": [
           "Roles"
         ]

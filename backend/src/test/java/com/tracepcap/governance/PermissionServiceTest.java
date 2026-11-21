@@ -185,6 +185,70 @@ class PermissionServiceTest {
     assertThat(ai.getReason()).contains("Viewer");
   }
 
+  @Test
+  void anAdminCreatesACustomRole_startingFromAnother_andItListsAfterTheBuiltIns() {
+    loginWith("admin");
+    when(repo.existsById("incident-responder")).thenReturn(false);
+    RoleDto dto = service.createRole(" incident-responder ", " Incident responder ", "On call", "lead");
+    assertThat(dto.getKey()).isEqualTo("incident-responder");
+    assertThat(dto.getLabel()).isEqualTo("Incident responder");
+    assertThat(dto.isBuiltIn()).isFalse();
+    assertThat(dto.isEditable()).isTrue();
+    assertThat(dto.getPermissions())
+        .containsExactly(PermissionAction.SEE_CAPTURES, PermissionAction.READ_AUDIT_LOG, PermissionAction.DELETE_ANY_CAPTURES);
+    org.mockito.ArgumentCaptor<RoleEntity> saved = org.mockito.ArgumentCaptor.forClass(RoleEntity.class);
+    verify(repo).save(saved.capture());
+    assertThat(saved.getValue().getPosition()).isEqualTo(PermissionService.CUSTOM_ROLE_POSITION);
+    verify(audit).record(eq("role.create"), eq("role"), eq("incident-responder"), any(), any(Map.class));
+  }
+
+  @Test
+  void copyingTheAdminRole_givesEverythingButManagingRoles() {
+    loginWith("admin");
+    RoleDto dto = service.createRole("deputy", "Deputy", null, "admin");
+    assertThat(dto.getPermissions()).doesNotContain(PermissionAction.MANAGE_ROLES);
+    assertThat(dto.getPermissions()).hasSize(PermissionAction.values().length - 1);
+  }
+
+  @Test
+  void aNewRoleNeedsAFreeValidKeyAndAName_andOnlyAdminsCreateThem() {
+    loginWith("admin");
+    when(repo.existsById("lead")).thenReturn(true);
+    assertThatThrownBy(() -> service.createRole("lead", "Lead 2", null, null))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already");
+    assertThatThrownBy(() -> service.createRole("has space", "X", null, null))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> service.createRole("ok", "  ", null, null))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    loginWith("lead");
+    assertThatThrownBy(() -> service.createRole("ok", "Ok", null, null)).isInstanceOf(ForbiddenException.class);
+    verify(repo, never()).save(any());
+  }
+
+  @Test
+  void customRolesCanBeRenamedAndDeleted_builtInsAndTheDefaultCant() {
+    RoleEntity custom = role("responder", 0, false, PermissionAction.SEE_CAPTURES);
+    custom.setBuiltIn(false);
+    when(repo.findById("responder")).thenReturn(Optional.of(custom));
+    loginWith("admin");
+
+    service.setDetails("responder", "Responder", "On call");
+    assertThat(custom.getLabel()).isEqualTo("Responder");
+    assertThat(custom.getDescription()).isEqualTo("On call");
+    verify(audit).record(eq("role.update"), eq("role"), eq("responder"), any(Map.class), any(Map.class));
+    assertThatThrownBy(() -> service.setDetails("viewer", "Looker", null))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThatThrownBy(() -> service.deleteRole("viewer")).isInstanceOf(IllegalArgumentException.class);
+    custom.setDefaultRole(true);
+    assertThatThrownBy(() -> service.deleteRole("responder")).hasMessageContaining("default");
+    custom.setDefaultRole(false);
+    service.deleteRole("responder");
+    verify(repo).delete(custom);
+    verify(audit).record(eq("role.delete"), eq("role"), eq("responder"), any(Map.class), any());
+  }
+
   private static RoleEntity role(String key, int position, boolean isDefault, PermissionAction... perms) {
     return RoleEntity.builder()
         .key(key)

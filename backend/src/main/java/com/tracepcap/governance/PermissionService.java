@@ -35,6 +35,12 @@ public class PermissionService {
 
   static final String AUDIT_TARGET = "role";
 
+  /** What a role key (a Keycloak client role name) may look like. */
+  public static final String ROLE_KEY_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._-]*$";
+
+  /** Custom roles list after the built-in ones (Settings lists the highest position first). */
+  static final int CUSTOM_ROLE_POSITION = 0;
+
   private final RoleRepository roleRepository;
   private final CurrentActor currentActor;
   private final AuditLogService auditLog;
@@ -175,6 +181,106 @@ public class PermissionService {
     was.put("defaultRole", before == null ? null : before.getKey());
     auditLog.record("role.default.set", AUDIT_TARGET, key, was, Map.of("defaultRole", key));
     return toDto(role);
+  }
+
+  /**
+   * Creates a custom role, optionally starting from another role's permissions. Admin only,
+   * audited. Who has it is still decided in Keycloak, by the client role named {@code key}.
+   */
+  @Transactional
+  public RoleDto createRole(String key, String label, String description, String copyFrom) {
+    requireManage();
+    String k = key == null ? "" : key.trim();
+    if (!k.matches(ROLE_KEY_PATTERN) || k.length() > 100) {
+      throw new IllegalArgumentException(
+          "A role's Keycloak name may use letters, digits, '-', '_' and '.', starting with a letter or digit.");
+    }
+    if (roleRepository.existsById(k)) {
+      throw new IllegalArgumentException("There is already a role named " + k + ".");
+    }
+    String name = label == null ? "" : label.trim();
+    if (name.isEmpty()) throw new IllegalArgumentException("A role needs a name.");
+    Set<String> perms = new TreeSet<>();
+    if (copyFrom != null && !copyFrom.isBlank()) {
+      RoleEntity source = find(copyFrom);
+      // The admin role's stored set is empty: copying it means everything a role can hold.
+      if (isAdminRole(source)) {
+        Arrays.stream(PermissionAction.values()).filter(a -> !a.fixed()).forEach(a -> perms.add(a.name()));
+      } else {
+        source.getPermissions().stream().filter(n -> parse(n) != null && !parse(n).fixed()).forEach(perms::add);
+      }
+    }
+    perms.add(PermissionAction.SEE_CAPTURES.name());
+    RoleEntity role = RoleEntity.builder()
+        .key(k)
+        .label(name)
+        .description(blankToNull(description))
+        .builtIn(false)
+        .position(CUSTOM_ROLE_POSITION)
+        .defaultRole(false)
+        .permissions(perms)
+        .build();
+    touch(role);
+    roleRepository.save(role);
+    Map<String, Object> after = new LinkedHashMap<>();
+    after.put("label", role.getLabel());
+    after.put("description", role.getDescription());
+    after.put("copyFrom", blankToNull(copyFrom));
+    after.put("permissions", perms);
+    auditLog.record("role.create", AUDIT_TARGET, k, null, after);
+    return toDto(role);
+  }
+
+  /** Renames a custom role or changes its description. Admin only, audited. */
+  @Transactional
+  public RoleDto setDetails(String key, String label, String description) {
+    requireManage();
+    RoleEntity role = find(key);
+    if (role.isBuiltIn()) {
+      throw new IllegalArgumentException("Built-in roles keep their name and description.");
+    }
+    Map<String, Object> before = new LinkedHashMap<>();
+    before.put("label", role.getLabel());
+    before.put("description", role.getDescription());
+    if (label != null) {
+      if (label.isBlank()) throw new IllegalArgumentException("A role needs a name.");
+      role.setLabel(label.trim());
+    }
+    if (description != null) role.setDescription(blankToNull(description));
+    Map<String, Object> after = new LinkedHashMap<>();
+    after.put("label", role.getLabel());
+    after.put("description", role.getDescription());
+    if (!before.equals(after)) {
+      touch(role);
+      roleRepository.save(role);
+      auditLog.record("role.update", AUDIT_TARGET, key, before, after);
+    }
+    return toDto(role);
+  }
+
+  /**
+   * Deletes a custom role. Admin only, audited. Built-in roles and the default role can't be
+   * deleted. Anyone Keycloak still gives the client role simply stops getting anything from it.
+   */
+  @Transactional
+  public void deleteRole(String key) {
+    requireManage();
+    RoleEntity role = find(key);
+    if (role.isBuiltIn()) throw new IllegalArgumentException("Built-in roles can't be deleted.");
+    if (role.isDefaultRole()) {
+      throw new IllegalArgumentException(
+          "This is the default role. Make another role the default before deleting it.");
+    }
+    Map<String, Object> before = new LinkedHashMap<>();
+    before.put("label", role.getLabel());
+    before.put("description", role.getDescription());
+    before.put("permissions", new TreeSet<>(role.getPermissions()));
+    roleRepository.delete(role);
+    auditLog.record("role.delete", AUDIT_TARGET, key, before, null);
+  }
+
+  private static String blankToNull(String s) {
+    return s == null || s.isBlank() ? null : s.trim();
   }
 
   private Set<PermissionAction> permissionsOf(List<RoleEntity> roles) {
