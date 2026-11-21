@@ -213,7 +213,10 @@ describe('PermissionsPanel: custom roles', () => {
     await waitFor(() =>
       expect(screen.queryByRole('option', { name: /Responder/ })).not.toBeInTheDocument()
     );
-    expect(screen.queryByRole('button', { name: /Delete role/ })).not.toBeInTheDocument();
+    // The confirm dialog fades out; on a slow runner its button is still there for a moment.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Delete role/ })).not.toBeInTheDocument()
+    );
   });
 });
 
