@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { insightsService } from '@/features/insights/services/insightsService';
@@ -42,6 +44,7 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
   }, `subnet:${subnetId}:${snapshot.fileId}`);
   const suggesting = starting || labelJob.active;
 
+  const ai = usePermission('ASK_AI');
   const suggest = async () => {
     setStarting(true);
     setError(null);
@@ -127,13 +130,13 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
           variant="outline-primary"
           size="sm"
           onClick={suggest}
-          disabled={suggesting || saving}
-          title="Ask the AI to infer this subnet's label from this snapshot's member behaviour"
+          disabled={suggesting || saving || !ai.allowed}
         >
           {suggesting
             ? <><Spinner size="sm" className="me-1" />Suggesting…</>
             : <><i className="bi bi-stars me-1" />Suggest with AI</>}
         </Button>
+        <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
         {labelJob.active && labelJob.job && (
           <div className="mt-2">
             <AiJobStatus

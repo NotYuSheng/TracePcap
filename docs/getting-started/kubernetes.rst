@@ -66,7 +66,8 @@ Mirror these images into your registry, keeping their repository paths:
 ``library/postgres:15-alpine``, ``chainguard/minio:latest`` and ``library/busybox:1.37``.
 Download the chart ``.tgz`` from the chart repository's GitHub releases, then install with
 ``--set global.imageRegistry=<your-registry>``. ``backend.geoForceOffline`` defaults to
-``true``, so the backend makes no ipinfo.io calls (see :doc:`offline-deployment`).
+``true``, as in every TracePcap stack, so the backend makes no ipinfo.io calls (see
+:doc:`offline-deployment`).
 
 Limitations
 -----------

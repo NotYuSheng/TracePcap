@@ -108,6 +108,17 @@ public class FileServiceImpl implements FileService {
    * the boundary is visible at the call site.
    */
   private final TransactionTemplate persistTx;
+  /** Who is uploading, for "delete your own captures"; absent in unit tests. */
+  private com.tracepcap.config.security.CurrentActor currentActor;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setCurrentActor(com.tracepcap.config.security.CurrentActor currentActor) {
+    this.currentActor = currentActor;
+  }
+
+  private String uploader() {
+    return currentActor == null ? null : currentActor.username();
+  }
 
   public FileServiceImpl(
       FileRepository fileRepository,
@@ -191,6 +202,7 @@ public class FileServiceImpl implements FileService {
             .packetCount(source.getPacketCount())
             .minioPath(objectName)
             .uploadedAt(LocalDateTime.now())
+            .uploadedBy(uploader())
             .status(FileEntity.FileStatus.PROCESSING)
             .fileHash(source.getFileHash())
             .source(source.getSource())
@@ -352,6 +364,7 @@ public class FileServiceImpl implements FileService {
               .packetCount(toStoredPacketCount(packetCount))
               .minioPath(minioPath)
               .uploadedAt(LocalDateTime.now())
+            .uploadedBy(uploader())
               .status(FileEntity.FileStatus.PROCESSING)
               .fileHash(fileHash)
               .source(source != null ? source : FileSource.ANALYSIS)
@@ -646,6 +659,7 @@ public class FileServiceImpl implements FileService {
               .packetCount(toStoredPacketCount(mergedPacketCount))
               .minioPath(storedName)
               .uploadedAt(LocalDateTime.now())
+            .uploadedBy(uploader())
               .status(FileEntity.FileStatus.PROCESSING)
               .fileHash(fileHash)
               .enableNdpi(enableNdpi)

@@ -210,6 +210,9 @@ services:
       # Authentication off by default — the app runs fully open. To enable OIDC,
       # use docker-compose.prod.yml (bundles Keycloak) or set TRACEPCAP_AUTH_ENABLED + KEYCLOAK_* envs.
       TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
+      # With login on: the Keycloak client whose client roles are TracePcap's roles. Must match the
+      # frontend's VITE_OIDC_CLIENT_ID (the prod overlays build it from this too).
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-tracepcap}
       # Login off only: allow admin-only actions (#915) for everyone. Default false.
       SYSTEM_SETTINGS_EDITABLE: ${SYSTEM_SETTINGS_EDITABLE:-false}
       # Must resolve to the same values as the postgres service above.
@@ -247,9 +250,9 @@ services:
       EXTRACTION_MAX_MATCHES_PER_STREAM: ${EXTRACTION_MAX_MATCHES_PER_STREAM:-20}
       EXTRACTION_MAX_STREAM_CONVERSATIONS: ${EXTRACTION_MAX_STREAM_CONVERSATIONS:-50}
       EXTRACTION_MAX_FILE_SIZE_MB: ${EXTRACTION_MAX_FILE_SIZE_MB:-50}
-      # Suppress ipinfo.io runtime egress (the one intentional external call). true = MMDB-only
-      # geo, no probe/lookups — for air-gapped deployments. See .env.example.
-      GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-false}
+      # Geo from the bundled MMDB only, with no ipinfo.io probe or lookups (no runtime egress).
+      # Set false to opt in to ipinfo.io when reachable. See .env.example.
+      GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       # Global Suricata IDS kill-switch. false = skip Suricata for every file (biggest throughput
       # lever, ~94% of per-file analysis cost). See .env.example.
       SURICATA_ENABLED: ${SURICATA_ENABLED:-true}

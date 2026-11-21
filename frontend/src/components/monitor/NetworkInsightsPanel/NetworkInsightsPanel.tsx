@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Badge, Button } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import type { NetworkInsight, InsightAudience, InsightFocus, InsightOptions } from '@/features/insights/types/insights.types';
@@ -47,6 +49,7 @@ export const NetworkInsightsPanel = ({
   onCancelJob,
 }: NetworkInsightsPanelProps) => {
   const [starting, setStarting] = useState(false);
+  const ai = usePermission('ASK_AI');
   const jobActive = isActive(job);
   const generating = starting || jobActive;
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +99,7 @@ export const NetworkInsightsPanel = ({
           size="sm"
           variant={insight ? 'outline-secondary' : 'primary'}
           onClick={handleGenerate}
-          disabled={generating || !llmAvailable}
+          disabled={generating || !llmAvailable || !ai.allowed}
         >
           {generating ? (
             <><Spinner animation="border" size="sm" className="me-1" />{job?.status === 'WAITING' ? 'Queued…' : 'Generating…'}</>
@@ -104,6 +107,7 @@ export const NetworkInsightsPanel = ({
             <><i className="bi bi-stars me-1" />{insight ? 'Regenerate' : 'Generate Insights'}</>
           )}
         </Button>
+        <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
       </div>
 
       {/* Options panel */}

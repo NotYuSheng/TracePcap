@@ -3,7 +3,13 @@ import { Button, Form } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { meService, type AuditLogEntry, type Paged } from '@/features/me/meService';
-import { AUDIT_KINDS, describeAction, diffValues, kindOf, summarize } from '@/features/me/auditDiff';
+import {
+  AUDIT_KINDS,
+  describeAction,
+  diffValues,
+  kindOf,
+  summarize,
+} from '@/features/me/auditDiff';
 import { useEscapeLayer } from '@utils/useEscapeLayer';
 import './AuditLogPanel.css';
 
@@ -34,7 +40,12 @@ function Details({ entry, onClose }: { entry: AuditLogEntry; onClose: () => void
             {summarize(entry)}
           </h3>
         </div>
-        <button type="button" className="audit-details-close" onClick={onClose} aria-label="Close the details">
+        <button
+          type="button"
+          className="audit-details-close"
+          onClick={onClose}
+          aria-label="Close the details"
+        >
           <i className="bi bi-x-lg" aria-hidden="true" />
         </button>
       </div>
@@ -54,9 +65,7 @@ function Details({ entry, onClose }: { entry: AuditLogEntry; onClose: () => void
           )}
         </dd>
       </dl>
-      <div className="audit-details-section">
-        {whole ?? 'What changed'}
-      </div>
+      <div className="audit-details-section">{whole ?? 'What changed'}</div>
       {changes.length === 0 ? (
         <p className="text-muted small mb-0">No field changed.</p>
       ) : (
@@ -73,8 +82,18 @@ function Details({ entry, onClose }: { entry: AuditLogEntry; onClose: () => void
                 </div>
               ) : (
                 <div className="audit-change-values">
-                  <span className="audit-change-label">{c.kind === 'added' ? (whole ? 'Value' : 'Added') : whole ? 'Value' : 'Removed'}</span>
-                  <span className={c.kind === 'added' && !whole ? 'audit-new-text' : c.kind === 'removed' && !whole ? 'audit-old-text' : ''}>
+                  <span className="audit-change-label">
+                    {c.kind === 'added' ? (whole ? 'Value' : 'Added') : whole ? 'Value' : 'Removed'}
+                  </span>
+                  <span
+                    className={
+                      c.kind === 'added' && !whole
+                        ? 'audit-new-text'
+                        : c.kind === 'removed' && !whole
+                          ? 'audit-old-text'
+                          : ''
+                    }
+                  >
                     {c.after ?? c.before}
                   </span>
                 </div>
@@ -83,10 +102,24 @@ function Details({ entry, onClose }: { entry: AuditLogEntry; onClose: () => void
           ))}
         </div>
       )}
-      <Button variant="outline-secondary" size="sm" className="align-self-start" onClick={() => setRaw(r => !r)} aria-expanded={raw}>
+      <Button
+        variant="outline-secondary"
+        size="sm"
+        className="align-self-start"
+        onClick={() => setRaw(r => !r)}
+        aria-expanded={raw}
+      >
         {raw ? 'Hide the raw record' : 'Show the raw record'}
       </Button>
-      {raw && <pre className="audit-raw">{JSON.stringify({ action: entry.action, before: entry.before, after: entry.after }, null, 2)}</pre>}
+      {raw && (
+        <pre className="audit-raw">
+          {JSON.stringify(
+            { action: entry.action, before: entry.before, after: entry.after },
+            null,
+            2
+          )}
+        </pre>
+      )}
     </aside>
   );
 }
@@ -98,7 +131,7 @@ export function AuditLogPanel() {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<string | null>(null);
   const [result, setResult] = useState<Paged<AuditLogEntry> | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
@@ -118,10 +151,14 @@ export function AuditLogPanel() {
       .then(r => {
         if (!active) return;
         setResult(r);
-        setError(false);
+        setError(null);
       })
-      .catch(() => {
-        if (active) setError(true);
+      .catch(err => {
+        if (!active) return;
+        // Refused by the caller's roles: say why, so they know whom to ask.
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message;
+        setError(msg ?? "Couldn't load the audit log.");
       });
     return () => {
       active = false;
@@ -152,7 +189,10 @@ export function AuditLogPanel() {
           onChange={e => setSearch(e.target.value)}
         />
         <div className="audit-chips" role="group" aria-label="Show">
-          {[{ key: null as string | null, label: 'All' }, ...AUDIT_KINDS.map(k => ({ key: k.key as string | null, label: k.label }))].map(c => (
+          {[
+            { key: null as string | null, label: 'All' },
+            ...AUDIT_KINDS.map(k => ({ key: k.key as string | null, label: k.label })),
+          ].map(c => (
             <button
               key={c.label}
               type="button"
@@ -165,7 +205,12 @@ export function AuditLogPanel() {
           ))}
         </div>
       </div>
-      {error && <p className="text-danger small">Couldn't load the audit log.</p>}
+      {error && (
+        <p className="small text-muted" data-testid="audit-error">
+          <i className="bi bi-lock me-1" aria-hidden="true" />
+          {error}
+        </p>
+      )}
       {!error && !result && (
         <div className="text-muted small py-3">
           <Spinner animation="border" size="sm" className="me-2" />
@@ -198,8 +243,16 @@ export function AuditLogPanel() {
                     <td className="text-nowrap text-muted">{when(e.at)}</td>
                     <td>{e.actor}</td>
                     <td>
-                      <button type="button" className="audit-row-button" onClick={() => setSelected(s => (s === e.id ? null : e.id))}>
-                        <span className={`audit-kind audit-kind-${kindOf(e.targetType).toLowerCase()}`}>{kindOf(e.targetType)}</span>
+                      <button
+                        type="button"
+                        className="audit-row-button"
+                        onClick={() => setSelected(s => (s === e.id ? null : e.id))}
+                      >
+                        <span
+                          className={`audit-kind audit-kind-${kindOf(e.targetType).toLowerCase()}`}
+                        >
+                          {kindOf(e.targetType)}
+                        </span>
                         {summarize(e)}
                       </button>
                     </td>

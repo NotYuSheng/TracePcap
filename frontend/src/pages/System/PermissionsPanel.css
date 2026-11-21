@@ -1,0 +1,139 @@
+/* Settings › Roles: the roles on the left, the selected role on the right. */
+.roles-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 991px) {
+  .roles-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.roles-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--tp-text);
+  text-align: left;
+  font-size: 0.875rem;
+}
+.roles-list-item:hover {
+  background: var(--tp-surface-hover);
+}
+.roles-list-item.active {
+  background: var(--tp-primary-subtle);
+  color: var(--tp-primary-emphasis);
+}
+.roles-list-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* What the role is for, in a line or two; the full text and the Keycloak name are on the right. */
+.roles-list-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--tp-text-muted);
+}
+.roles-list-item.active .roles-list-desc {
+  color: inherit;
+  opacity: 0.8;
+}
+.roles-list-count {
+  font-size: 0.75rem;
+  color: var(--tp-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.roles-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--tp-bg-subtle);
+  color: var(--tp-text-muted);
+  white-space: nowrap;
+}
+.roles-tag-default {
+  background: var(--tp-info-subtle);
+  color: var(--tp-info-emphasis);
+}
+
+.roles-default {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--tp-bg-subtle);
+  font-size: 0.8rem;
+}
+
+.roles-keycloak {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--tp-border);
+  border-radius: 10px;
+  background: var(--tp-bg-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.roles-chip {
+  padding: 1px 7px;
+  border: 1px solid var(--tp-border);
+  border-radius: 6px;
+  background: var(--tp-surface);
+}
+
+.roles-perms {
+  columns: 2 320px;
+  column-gap: 32px;
+  margin-top: 8px;
+}
+.roles-perm-group {
+  break-inside: avoid;
+  padding-top: 12px;
+}
+.roles-perm-heading {
+  margin: 0 0 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tp-text-muted);
+}
+.roles-perm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.8125rem;
+}
+.roles-perm .form-check {
+  margin: 1px 0 0;
+  min-height: 0;
+  padding-left: 0;
+}
+.roles-perm .form-check-input {
+  margin-left: 0;
+}
+.roles-perm-text {
+  margin: 0;
+  line-height: 1.35;
+}

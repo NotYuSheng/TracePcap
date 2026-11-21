@@ -50,13 +50,13 @@ const GEO_SOURCE_INFO: Record<string, { label: string; title: string; descriptio
   ipinfo: {
     label: 'ipinfo.io',
     title: 'Geo source: ipinfo.io',
-    description: 'Location was resolved by calling the ipinfo.io API. This is an online feature — an internet connection is required. Results are cached locally so repeat lookups do not require another API call.',
+    description: 'Location was resolved by calling the ipinfo.io API, which this install has opted in to (GEO_FORCE_OFFLINE=false). Results are cached locally so repeat lookups do not require another API call.',
     bg: '#198754',
   },
   mmdb: {
     label: 'Offline DB',
     title: 'Geo source: Offline database',
-    description: 'Location was resolved using the bundled DB-IP Lite database. This happens when the app is offline or ipinfo.io could not be reached. Accuracy may be lower, especially for cloud provider IPs.',
+    description: 'Location was resolved using the bundled DB-IP Lite database, the default: nothing leaves this machine. Accuracy may be lower, especially for cloud provider IPs.',
     bg: '#6c757d',
   },
 };

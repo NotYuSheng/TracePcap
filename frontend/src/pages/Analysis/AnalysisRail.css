@@ -11,6 +11,45 @@
   display: flex;
   flex-direction: column;
 }
+/* The capture bar and the section, one above the other. */
+.analysis-main-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A section with a column of its own (Story's chat): beside the capture bar and the section, the
+   window's full height under the header, like the rail on the other side. */
+.analysis-main-with-aside {
+  flex-direction: row;
+}
+.analysis-aside {
+  position: sticky;
+  top: var(--tp-header-h, 81px);
+  align-self: flex-start;
+  flex: 0 0 440px;
+  height: calc(100vh - var(--tp-header-h, 81px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--tp-border, #d8dce5);
+  background: var(--tp-surface, #ffffff);
+}
+/* Too narrow for two columns: the chat goes under the section, at a fixed height. */
+@media (max-width: 1199.98px) {
+  .analysis-main-with-aside {
+    flex-direction: column;
+  }
+  .analysis-aside {
+    position: static;
+    flex: none;
+    height: 640px;
+    border-left: 0;
+    border-top: 1px solid var(--tp-border, #d8dce5);
+  }
+}
+
 /* The content keeps a readable width beside the rail, centred in the space that's left. */
 .analysis-body {
   box-sizing: border-box;

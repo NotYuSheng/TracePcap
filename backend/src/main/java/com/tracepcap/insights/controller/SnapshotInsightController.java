@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.insights.dto.GenerateInsightRequest;
 import com.tracepcap.insights.dto.NetworkInsightDto;
 import com.tracepcap.insights.service.SnapshotInsightService;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "Snapshot Insights", description = "AI-generated insights for a single snapshot")
 public class SnapshotInsightController {
+
+  private final PermissionService permissionService;
 
   private final SnapshotInsightService service;
 
@@ -33,6 +37,7 @@ public class SnapshotInsightController {
       @PathVariable UUID networkId,
       @PathVariable UUID snapshotId,
       @RequestBody(required = false) GenerateInsightRequest req) {
+    permissionService.require(PermissionAction.ASK_AI);
     return ResponseEntity.ok(service.generateInsight(networkId, snapshotId, req));
   }
 }

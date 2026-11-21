@@ -111,6 +111,18 @@ documented in its own section below with the surrounding detail.
    * - Variable
      - Default
      - Effect
+   * - ``KEYCLOAK_REALM``
+     - ``tracepcap``
+     - The Keycloak realm people sign in through. The bundled Keycloak creates
+       ``tracepcap``; set this to use a realm of your own, such as your
+       organisation's shared realm. Baked into the frontend, so changing it
+       needs a rebuild.
+   * - ``KEYCLOAK_CLIENT_ID``
+     - ``tracepcap``
+     - TracePcap's client in that realm. Its client roles are TracePcap's roles
+       (see :doc:`../features/roles-and-permissions`). Baked into the frontend,
+       so changing it needs a rebuild. Up to v0.4 the client was called
+       ``tracepcap-frontend``: see :ref:`renamed-client`.
    * - ``TRACEPCAP_AUTH_ENABLED``
      - ``false``
      - Gates the API behind a Keycloak JWT and adds a login flow. Set to
@@ -146,12 +158,11 @@ documented in its own section below with the surrounding detail.
        Distinct from ``GEO_FORCE_OFFLINE``, which keeps enrichment but stops it
        reaching the network. Not retroactive. See `Geolocation`_.
    * - ``GEO_FORCE_OFFLINE``
-     - ``false`` / ``true``
-     - Suppresses the ``ipinfo.io`` connectivity probe and lookups, resolving
-       geolocation from the bundled database only. Defaults to ``false`` in the
-       base stack and ``true`` in the offline stack and both production
-       overlays. This is the one intentional outbound call at runtime. See
-       `Geolocation`_.
+     - ``true``
+     - Resolves geolocation from the bundled database only, with no ``ipinfo.io``
+       connectivity probe and no lookups, in every stack. ``false`` opts in to
+       ipinfo.io when it's reachable, the only outbound call TracePcap makes at
+       runtime. See `Geolocation`_.
 
 .. note::
 
@@ -379,6 +390,18 @@ walkthrough. They are ignored by the base stack.
        the app via this same origin. Include the port only if non-standard
        (e.g. ``:8888``); omit for standard 80/443. **Does not track**
        ``NGINX_PORT`` — set it to match your actual port.
+   * - ``KEYCLOAK_REALM``
+     - ``tracepcap``
+     - The Keycloak realm people sign in through. The bundled Keycloak creates
+       ``tracepcap``; set this to use a realm of your own, such as your
+       organisation's shared realm. Baked into the frontend, so changing it
+       needs a rebuild.
+   * - ``KEYCLOAK_CLIENT_ID``
+     - ``tracepcap``
+     - TracePcap's client in that realm. Its client roles are TracePcap's roles
+       (see :doc:`../features/roles-and-permissions`). Baked into the frontend,
+       so changing it needs a rebuild. Up to v0.4 the client was called
+       ``tracepcap-frontend``: see :ref:`renamed-client`.
    * - ``TRACEPCAP_AUTH_ENABLED``
      - ``false``
      - Backend toggle. When ``false`` (default, base stack) the API is
@@ -396,7 +419,8 @@ walkthrough. They are ignored by the base stack.
 .. note::
    ``KEYCLOAK_ISSUER_URI``, ``KEYCLOAK_JWK_SET_URI``, and the ``VITE_AUTH_*``
    build args are set automatically by ``docker-compose.prod.yml`` and derived
-   from ``PUBLIC_URL`` — you normally do not set them by hand.
+   from ``PUBLIC_URL``, ``KEYCLOAK_REALM`` and ``KEYCLOAK_CLIENT_ID``: you
+   normally do not set them by hand.
 
 Spring Profile & CORS
 ---------------------
@@ -491,13 +515,13 @@ the answer comes from. They are easy to confuse.
 .. code-block:: text
 
    GEO_ENRICHMENT_ENABLED=false  ->  no geo data at all (no lookups of any kind)
-   GEO_FORCE_OFFLINE=true        ->  geo data from the bundled MMDB only, zero egress
-   GEO_FORCE_OFFLINE=false       ->  ipinfo.io when reachable, MMDB when not
+   GEO_FORCE_OFFLINE=true        ->  geo data from the bundled MMDB only, zero egress (default)
+   GEO_FORCE_OFFLINE=false       ->  ipinfo.io when reachable, MMDB when not (opt-in)
 
-For an air-gapped deployment you want ``GEO_FORCE_OFFLINE=true``, **not**
-``GEO_ENRICHMENT_ENABLED=false`` — the MMDB lookup is local to the container and
-never touches the network, so disabling enrichment outright loses the map, the
-country columns and the geo-based scanning signals for no egress benefit. See
+To stop geolocation reaching the network, leave ``GEO_FORCE_OFFLINE=true`` (the default);
+**don't** set ``GEO_ENRICHMENT_ENABLED=false``. The MMDB lookup is local to the container and
+never touches the network, so disabling enrichment outright loses the map, the country
+columns and the geo-based scanning signals for no egress benefit. See
 :doc:`../getting-started/offline-deployment`.
 
 .. list-table::
@@ -516,12 +540,12 @@ country columns and the geo-based scanning signals for no egress benefit. See
        the cache directly (subnet label suggestions, host identity evidence,
        change detection). Clear the cache table if you need the data gone.
    * - ``GEO_FORCE_OFFLINE``
-     - ``false`` / ``true``
-     - Suppresses the ``ipinfo.io`` connectivity probe and all lookups,
-       resolving from the bundled DB-IP Lite MMDB only (``geo_source = mmdb``).
-       ``false`` in the base stack; ``true`` in the offline stack and both
-       production overlays. ASN and organisation are unavailable from the MMDB,
-       so those fields stay empty offline.
+     - ``true``
+     - ``true`` (every stack) resolves from the bundled DB-IP Lite MMDB only
+       (``geo_source = mmdb``), with no ``ipinfo.io`` connectivity probe and no
+       lookups. ``false`` opts in to ipinfo.io when reachable, which adds ASN and
+       organisation; the MMDB doesn't have them, so those fields stay empty by
+       default.
    * - ``GEO_MMDB_PATH``
      - *(bundled)*
      - Override the location of the offline MMDB. Empty (the default) uses the

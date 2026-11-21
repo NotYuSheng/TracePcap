@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Card, Container, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { Alert } from '@components/common/Alert';
 import { SnapshotMap } from '@/components/monitor/SnapshotMap';
@@ -58,6 +60,7 @@ export const NetworkDetailPage = () => {
     () => new URLSearchParams(window.location.search).get('add') === '1'
   );
   const [showManage, setShowManage] = useState(false);
+  const addCaptures = usePermission('NETWORK_CAPTURES');
   // Set up moved into the Settings drawer; its old links open it.
   const [showSettings, setShowSettings] = useState(() =>
     ['setup', 'expected', 'subnets'].includes(new URLSearchParams(window.location.search).get('section') ?? '')
@@ -228,9 +231,11 @@ export const NetworkDetailPage = () => {
                 size="sm"
                 variant="primary"
                 onClick={() => setShowAddSnapshot(true)}
+                disabled={!addCaptures.allowed}
               >
                 <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a capture
               </Button>
+              <PermissionLock action="NETWORK_CAPTURES" className="align-self-center" />
             </div>
           </header>
           <main
@@ -655,7 +660,7 @@ export const NetworkDetailPage = () => {
       />
 
       <AddSnapshotModal
-        show={showAddSnapshot}
+        show={showAddSnapshot && addCaptures.allowed}
         onHide={() => setShowAddSnapshot(false)}
         existingFileIds={snapshots.map(s => s.fileId)}
         networkId={networkId}

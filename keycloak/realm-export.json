@@ -8,7 +8,7 @@
   "accessTokenLifespan": 900,
   "clients": [
     {
-      "clientId": "tracepcap-frontend",
+      "clientId": "tracepcap",
       "name": "TracePcap Frontend (SPA)",
       "enabled": true,
       "protocol": "openid-connect",
@@ -47,10 +47,28 @@
   ],
   "roles": {
     "client": {
-      "tracepcap-frontend": [
+      "tracepcap": [
+        {
+          "name": "viewer",
+          "description": "TracePcap viewer: reads captures, networks, findings and reports. What it may do is set in TracePcap, Settings > Permissions. Assign it to groups here.",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "name": "analyst",
+          "description": "TracePcap analyst: investigates (upload, ask the AI, label, override, capture and network rules). What it may do is set in TracePcap, Settings > Permissions. Assign it to groups here.",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "name": "lead",
+          "description": "TracePcap lead: curates what everyone shares (global rules, network settings, anyone's captures, the audit log). What it may do is set in TracePcap, Settings > Permissions. Assign it to groups here.",
+          "composite": false,
+          "clientRole": true
+        },
         {
           "name": "admin",
-          "description": "TracePcap admin: may change settings marked admin-only (#915). Grant via Users > Role mapping > Filter by clients.",
+          "description": "TracePcap admin: every permission, always, including changing roles. What it may do is set in TracePcap, Settings > Permissions. Assign it to groups here.",
           "composite": false,
           "clientRole": true
         }

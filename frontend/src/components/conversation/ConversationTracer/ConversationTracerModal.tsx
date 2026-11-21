@@ -2,6 +2,7 @@ import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrig
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Badge, Button, Modal, Popover } from '@govtechsg/sgds-react';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { tracerService, type TracerExplainResponse, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
 import { aiJobsService } from '@/features/aiJobs/aiJobsService';
@@ -104,6 +105,8 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const [isPlaying, setIsPlaying] = useState(false);
   const [explanations, setExplanations] = useState<Map<number, string>>(new Map());
   const [explainStarting, setExplainStarting] = useState(false);
+  // Roles (#915): without Ask the AI the steps still play, just without the AI's explanations.
+  const ai = usePermission('ASK_AI');
   const [explainError, setExplainError] = useState<string | null>(null);
 
   // Explanations are written in the background (one job at a time for the model); ones already
@@ -168,6 +171,14 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const hasSteps = !!tracer && tracer.steps.length > 0;
   useEffect(() => {
     if (!hasSteps) return;
+    if (!ai.allowed) {
+      setExplainError(
+        ai.reason
+          ? `No AI explanations: ${ai.reason}`
+          : "Your roles don't include asking the AI, so the steps have no explanations."
+      );
+      return;
+    }
     let alive = true;
     const run = async () => {
       setExplainStarting(true);
@@ -182,8 +193,10 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
       }
     };
     run();
-    return () => { alive = false; };
-  }, [hasSteps, conversationId, startExplainJob]);
+    return () => {
+      alive = false;
+    };
+  }, [hasSteps, conversationId, startExplainJob, ai.allowed, ai.reason]);
 
   // Auto-play
   useEffect(() => {

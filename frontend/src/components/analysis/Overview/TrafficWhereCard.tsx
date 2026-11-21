@@ -93,7 +93,7 @@ export function TrafficWhereCard({ fileId, networkId, byOrg }: Props) {
         <SourceTag id="src-where" source="GeoIP" title="How the traffic is grouped">
           <p className="mb-2">
             Each host is put in its organisation (the network's ASN) or its country, from the GeoIP
-            data: ipinfo.io when the internet is reachable, the bundled DB-IP database when not.
+            data: the bundled DB-IP database, or ipinfo.io if the install has opted in to it.
             Private addresses are your networks.
           </p>
           <p className="mb-0">

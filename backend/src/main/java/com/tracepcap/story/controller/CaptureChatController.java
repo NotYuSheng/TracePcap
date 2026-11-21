@@ -1,5 +1,7 @@
 package com.tracepcap.story.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.story.chat.CaptureChatService;
 import com.tracepcap.story.chat.dto.ChatToolsResponse;
 import com.tracepcap.story.chat.dto.ChatTurnDto;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Capture chat", description = "Ask about a capture; the LLM may call read-only tools to look things up")
 public class CaptureChatController {
 
+  private final PermissionService permissionService;
+
   private final CaptureChatService chat;
 
   @GetMapping("/chat-tools")
@@ -39,6 +43,7 @@ public class CaptureChatController {
       summary = "Ask a question about a capture",
       description = "Starts answering and returns at once with the turn RUNNING. Poll the turn: its steps grow as tools run, and it ends DONE with the answer or FAILED with the error.")
   public ChatTurnDto ask(@PathVariable UUID fileId, @Valid @RequestBody ChatTurnRequest request) {
+    permissionService.require(PermissionAction.ASK_AI);
     return chat.start(fileId, request);
   }
 
