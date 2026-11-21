@@ -68,6 +68,9 @@ default). The first start takes a minute while the database and storage initiali
 - **Turn on login** (Keycloak, with Viewer, Analyst, Lead and Admin roles) before more than one
   person uses it. See [Authentication](https://notyusheng.github.io/TracePcap/configuration/authentication.html).
 - **Air-gapped machine?** See [Offline deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html).
+- **Kubernetes?** There's a Helm chart, [tracepcap-helm](https://github.com/NotYuSheng/tracepcap-helm):
+  `helm install tracepcap oci://ghcr.io/notyusheng/charts/tracepcap`. See
+  [Kubernetes (Helm)](https://notyusheng.github.io/TracePcap/getting-started/kubernetes.html).
 
 <details>
 <summary>Hardware sizing</summary>
@@ -173,7 +176,7 @@ More in [System architecture](docs/architecture/c4.rst) and the
 
 Everything is at **https://notyusheng.github.io/TracePcap**:
 
-- **Getting started:** [installation](https://notyusheng.github.io/TracePcap/getting-started/installation.html), [offline deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html)
+- **Getting started:** [installation](https://notyusheng.github.io/TracePcap/getting-started/installation.html), [offline deployment](https://notyusheng.github.io/TracePcap/getting-started/offline-deployment.html), [Kubernetes (Helm)](https://notyusheng.github.io/TracePcap/getting-started/kubernetes.html)
 - **Configuration:** [environment variables](https://notyusheng.github.io/TracePcap/configuration/environment-variables.html), [LLM setup](https://notyusheng.github.io/TracePcap/configuration/llm-setup.html), [authentication](https://notyusheng.github.io/TracePcap/configuration/authentication.html), [users and roles](https://notyusheng.github.io/TracePcap/configuration/user-management.html), [detection rules](https://notyusheng.github.io/TracePcap/configuration/signature-rules.html)
 - **Operations:** [production hardening](https://notyusheng.github.io/TracePcap/operations/production-hardening.html), [backup and restore](https://notyusheng.github.io/TracePcap/operations/backup-restore.html), [logs and monitoring](https://notyusheng.github.io/TracePcap/operations/logs-monitoring.html)
 
