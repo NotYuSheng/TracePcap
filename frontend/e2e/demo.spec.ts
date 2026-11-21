@@ -239,8 +239,11 @@ test('README demo walkthrough', async ({ page, request }) => {
   await showType(ask, process.env.DEMO_QUESTION ?? 'What is the most serious thing here? Give me a Wireshark filter for it.');
   await beat(page);
   await ask.press('Enter');
-  // The first steps at real speed, then the rest of the work fast.
-  await expect(page.getByText('Looking things up…')).toBeVisible({ timeout: 300_000 });
+  // The wait for the first tool fast (a local model thinks for a while first), the first steps at
+  // real speed, then the rest of the work fast.
+  await timeline.fastForward('The chat thinking', 2, async () => {
+    await expect(page.getByText('Looking things up…')).toBeVisible({ timeout: 300_000 });
+  });
   await page.waitForTimeout(2_500);
   await timeline.fastForward('The chat looking things up', 2, async () => {
     await expect(page.getByRole('button', { name: /^Used \d+ tools?/ }).last()).toBeVisible({ timeout: 10 * 60_000 });
