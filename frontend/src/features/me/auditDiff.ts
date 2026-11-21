@@ -135,7 +135,7 @@ export const AUDIT_KINDS: { key: string; label: string; types: string[] }[] = [
   { key: 'maps', label: 'Maps', types: ['network-map'] },
   { key: 'devices', label: 'Devices', types: ['host-occupancy', 'network-device', 'host-classification'] },
   { key: 'addresses', label: 'Addresses', types: ['network-subnet', 'network-private-range', 'network-ip-org-rule', 'subnet', 'private-range', 'ip-org-rule'] },
-  { key: 'access', label: 'Settings and access', types: ['system-setting', 'permission', 'network'] },
+  { key: 'access', label: 'Settings and access', types: ['system-setting', 'role', 'permission', 'network'] },
 ];
 
 /** The kind of thing an entry is about, as a short tag. */

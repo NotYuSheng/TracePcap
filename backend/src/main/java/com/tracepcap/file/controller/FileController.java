@@ -1,5 +1,7 @@
 package com.tracepcap.file.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
@@ -43,6 +45,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(name = "File Management", description = "APIs for PCAP file upload, download, and management")
 public class FileController {
 
+  private final PermissionService permissionService;
+
   private final FileService fileService;
   private final FileFavouriteService favouriteService;
   private final RuntimePolicy runtimePolicy;
@@ -58,6 +62,7 @@ public class FileController {
       @RequestParam(value = "source", defaultValue = "ANALYSIS") FileSource source,
       @RequestParam(value = "generateStory", defaultValue = "false") boolean generateStory,
       @RequestParam(value = "expires", defaultValue = "true") boolean expires) {
+    permissionService.require(PermissionAction.UPLOAD_CAPTURES);
     log.info(
         "Received file upload request: {} (ndpi={}, suricata={}, extraction={}, source={}, story={},"
             + " expires={})",
@@ -173,6 +178,7 @@ public class FileController {
           "keepForever: never. Else expiresAt (epoch ms, in the future, at most a year away) keeps it"
               + " until then; null puts it back on the retention window.")
   public FileMetadataDto setExpiry(@PathVariable UUID fileId, @RequestBody ExpiryRequest request) {
+    permissionService.require(PermissionAction.KEEP_CAPTURES);
     LocalDateTime at =
         request.getExpiresAt() == null
             ? null
@@ -192,6 +198,7 @@ public class FileController {
               + " detection rules are copied to the version.")
   public com.tracepcap.file.dto.FileUploadResponse reanalyse(
       @PathVariable UUID fileId, @RequestBody com.tracepcap.file.dto.ReanalyseRequest request) {
+    permissionService.require(PermissionAction.UPLOAD_CAPTURES);
     return fileService.reanalyse(
         fileId, request.isEnableNdpi(), request.isEnableSuricata(), request.isEnableFileExtraction());
   }
@@ -205,6 +212,7 @@ public class FileController {
   @GetMapping("/{fileId}/download")
   @Operation(summary = "Download file", description = "Download a PCAP file")
   public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String fileId) {
+    permissionService.require(PermissionAction.EXPORT_PACKETS);
 
     UUID uuid = UUID.fromString(fileId);
     InputStream fileStream = fileService.downloadFile(uuid);
@@ -220,8 +228,9 @@ public class FileController {
   @DeleteMapping("/{fileId}")
   @Operation(summary = "Delete file", description = "Delete a PCAP file")
   public ResponseEntity<Void> deleteFile(@PathVariable String fileId) {
-
-    fileService.deleteFile(UUID.fromString(fileId));
+    UUID id = UUID.fromString(fileId);
+    permissionService.requireDeleteCapture(fileService.getFileMetadata(id).getUploadedBy());
+    fileService.deleteFile(id);
 
     return ResponseEntity.noContent().build();
   }
@@ -236,6 +245,7 @@ public class FileController {
       @RequestParam(value = "enableSuricata", defaultValue = "true") boolean enableSuricata,
       @RequestParam(value = "enableFileExtraction", defaultValue = "true")
           boolean enableFileExtraction) {
+    permissionService.require(PermissionAction.UPLOAD_CAPTURES);
 
     log.info(
         "Received merge request for {} files",

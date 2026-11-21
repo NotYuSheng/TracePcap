@@ -1,5 +1,7 @@
 package com.tracepcap.story.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.story.dto.GenerateStoryRequest;
 import com.tracepcap.story.dto.StoryAnswerResponse;
 import com.tracepcap.story.dto.StoryQuestionRequest;
@@ -26,6 +28,8 @@ import org.springframework.web.bind.annotation.*;
     description = "APIs for AI-powered network traffic story generation")
 public class StoryController {
 
+  private final PermissionService permissionService;
+
   private final StoryService storyService;
 
   @PostMapping
@@ -34,6 +38,7 @@ public class StoryController {
       description = "Generate an AI-powered narrative story for a PCAP file")
   public ResponseEntity<StoryResponse> generateStory(
       @Valid @RequestBody GenerateStoryRequest request) {
+    permissionService.require(PermissionAction.ASK_AI);
     UUID fileId = request.getFileId();
     log.info("Received story generation request for file: {}", fileId);
 
@@ -65,6 +70,7 @@ public class StoryController {
       description = "Ask the LLM a question about an existing story")
   public ResponseEntity<StoryAnswerResponse> askQuestion(
       @PathVariable UUID storyId, @RequestBody StoryQuestionRequest request) {
+    permissionService.require(PermissionAction.ASK_AI);
     log.info("Received question for story: {}", storyId);
 
     StoryAnswerResponse answer =

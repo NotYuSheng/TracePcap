@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Audit Log", description = "Who changed which setting or rule, when, before and after")
 public class AuditLogController {
 
+  private final PermissionService permissionService;
+
   private final AuditLogService auditLogService;
 
   @GetMapping
@@ -28,6 +30,7 @@ public class AuditLogController {
       @RequestParam(defaultValue = "50") int pageSize,
       @RequestParam(required = false) String search,
       @RequestParam(required = false) java.util.List<String> targetTypes) {
+    permissionService.require(PermissionAction.READ_AUDIT_LOG);
     return auditLogService.list(page, pageSize, search, targetTypes);
   }
 }

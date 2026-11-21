@@ -43,6 +43,8 @@ public class FileMetadataDto {
 
   /** Kept until deleted: the retention cleanup skips it. */
   private boolean keepForever;
+  /** Who uploaded it, or null for captures from before this was recorded. */
+  private String uploadedBy;
 
   /**
    * When it is deleted, if someone extended it past the retention window (serialised like

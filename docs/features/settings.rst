@@ -55,7 +55,7 @@ For Everyone
 ------------
 
 The **Settings** page's other sections, under *This install*: **System**, **Detection
-rules**, **Address defaults**, **Permissions**, **Audit log** and **Users**.
+rules**, **Address defaults**, **Roles**, **Audit log** and **Users**.
 
 **System.** Every deploy-time setting (each environment variable in :doc:`../configuration/environment-variables`)
 is listed with its **effective value**, including values derived from ``APP_MEMORY_MB``
@@ -84,18 +84,18 @@ redeploy, by whoever has the permission for them (see :ref:`settings-permissions
      - Takes effect
    * - ``FILE_RETENTION_HOURS``, ``MONITOR_FILE_RETENTION_HOURS``,
        ``PACKET_RETENTION_HOURS``
-     - Retention (admins)
+     - Edit retention
      - From the next hourly cleanup run.
    * - ``DNS_NXDOMAIN_SUSPICIOUS_RATIO``, ``DNS_NXDOMAIN_MIN_QUERIES``
-     - Analysis policy (analysts)
+     - Edit analysis policy
      - At once in a DNS server's DNS tab (its host details); host DNS logs use
        it from the next analysis.
    * - ``HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO``, ``HTTP_MIN_REQUESTS``
-     - Analysis policy (analysts)
+     - Edit analysis policy
      - At once in a web server's HTTP tab (its host details).
    * - ``LLM_API_BASE_URL``, ``LLM_API_KEY``, ``LLM_MODEL``, ``LLM_TEMPERATURE``,
        ``LLM_MAX_TOKENS``, ``LLM_TIMEOUT``, ``LLM_TOOL_CALLING``
-     - LLM connection (admins)
+     - Edit the LLM connection
      - From the next LLM call (tool calling: the next story). The key is never shown
        again once saved.
 
@@ -113,49 +113,10 @@ changing them means starting or stopping a component, which needs a restart.
 Who can change what
 -------------------
 
-Some settings and rule sets are open to every analyst, and some need an **admin**. Which
-is which is configurable per item, and **every change is recorded in the audit log**, so
-the defaults favour analysts:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 40 20
-
-   * - Item
-     - Default
-   * - Global, network and capture detection rules
-     - analysts
-   * - Splitting, merging or linking devices (:doc:`address-reuse`, :doc:`network-devices`)
-     - analysts
-   * - Network settings, including a network's own address entries
-       (:doc:`network-address-config`)
-     - analysts
-   * - Address defaults: subnet labels, internal/external ranges and
-       organisations shared by every network
-     - analysts
-   * - Analysis policy
-     - analysts
-   * - Retention
-     - admins
-   * - The LLM connection (server, key, model)
-     - admins
-   * - Which items need an admin (this table)
-     - admins, always
-
-**Who is an admin:**
-
-- **Login on**: users with the Keycloak client role ``admin`` (see
-  :doc:`../configuration/user-management`). Everyone else is an analyst.
-- **Login off**: everyone is an analyst. Admin-only items can be changed by everyone if
-  the server sets ``SYSTEM_SETTINGS_EDITABLE=true``, and by no one otherwise (the
-  default).
-
-Change these on the Settings page's **Permissions** tab. An admin picks *Analysts* or
-*Admins only* for each item; an item changed from its default is marked *changed*. For
-everyone else the tab is read-only, and clicking an item says why.
-
-An item you can't change is still shown, greyed out, with the reason. Network settings
-work this way today.
+What someone may do comes from their roles: Viewer, Analyst, Lead and Admin. Who has a
+role is set in Keycloak; what each role may do is set on this page's **Roles** tab,
+one role at a time. Only the admin role can change it; everyone else
+sees it locked. See :doc:`roles-and-permissions`.
 
 Audit log
 ---------

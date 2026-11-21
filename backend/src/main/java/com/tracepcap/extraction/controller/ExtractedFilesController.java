@@ -1,5 +1,7 @@
 package com.tracepcap.extraction.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.extraction.dto.ExtractedFileResponse;
 import com.tracepcap.extraction.dto.ExtractionWarningsResponse;
 import com.tracepcap.extraction.entity.ExtractedFileEntity;
@@ -33,6 +35,8 @@ public class ExtractedFilesController {
 
   /** Upper bound on size-skipped files returned in the warnings response. */
   private static final int MAX_SIZE_LIMIT_FILES = 100;
+
+  private final PermissionService permissionService;
 
   private final ExtractedFileRepository extractedFileRepository;
   private final FileRepository fileRepository;
@@ -169,6 +173,7 @@ public class ExtractedFilesController {
   @Operation(summary = "Download an extracted file")
   public ResponseEntity<StreamingResponseBody> download(
       @PathVariable UUID fileId, @PathVariable UUID extractionId) {
+    permissionService.require(PermissionAction.EXPORT_PACKETS);
 
     ExtractedFileEntity entity =
         extractedFileRepository

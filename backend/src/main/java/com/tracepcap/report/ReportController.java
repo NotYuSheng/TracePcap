@@ -1,5 +1,7 @@
 package com.tracepcap.report;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
@@ -19,6 +21,8 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @Tag(name = "Reports", description = "Generate single-file and comparison PDF reports")
 public class ReportController {
 
+  private final PermissionService permissionService;
+
   private final ReportService reportService;
   private final CompareReportService compareReportService;
 
@@ -26,6 +30,7 @@ public class ReportController {
   @Operation(summary = "Generate and download a PDF analysis report for a PCAP file")
   public ResponseEntity<StreamingResponseBody> downloadReport(
       @PathVariable UUID fileId, @RequestBody(required = false) ReportRequest request) {
+    permissionService.require(PermissionAction.DOWNLOAD_REPORT);
 
     log.info("POST /api/files/{}/report", fileId);
 
@@ -47,6 +52,7 @@ public class ReportController {
   @Operation(summary = "Generate and download a PDF compare-topology report for multiple PCAP files")
   public ResponseEntity<StreamingResponseBody> downloadCompareReport(
       @RequestBody CompareReportRequest request) {
+    permissionService.require(PermissionAction.DOWNLOAD_REPORT);
 
     log.info("POST /api/files/compare/report — {} files", request.getFileIds() != null ? request.getFileIds().size() : 0);
 

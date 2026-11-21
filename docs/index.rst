@@ -60,6 +60,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/label-staleness
    features/streaming-upload
    features/settings
+   features/roles-and-permissions
 
 .. toctree::
    :maxdepth: 2

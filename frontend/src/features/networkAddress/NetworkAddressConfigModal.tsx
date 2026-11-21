@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { usePermission } from '@/features/me/useMe';
 import {
@@ -30,13 +31,15 @@ const KINDS: KindConfig[] = [
     kind: 'custom-private-ranges',
     title: 'Internal / external ranges',
     valueLabel: 'Treat as',
-    intro: 'Ranges forced to count as internal or external, overriding the usual private-address rules.',
+    intro:
+      'Ranges forced to count as internal or external, overriding the usual private-address rules.',
   },
   {
     kind: 'ip-org-rules',
     title: 'Organisations',
     valueLabel: 'Organisation',
-    intro: 'Network labels: which organisation owns a range. A labelled range shows as that organisation in the Overview’s “Where the traffic goes”, ahead of its ISP.',
+    intro:
+      'Network labels: which organisation owns a range. A labelled range shows as that organisation in the Overview’s “Where the traffic goes”, ahead of its ISP.',
   },
 ];
 
@@ -45,7 +48,8 @@ function apiMessage(err: unknown): string | null {
 }
 
 function valueOf(e: AddressEntry, kind: AddressKind): string {
-  if (kind === 'custom-private-ranges') return e.classification === 'PUBLIC' ? 'External' : 'Internal';
+  if (kind === 'custom-private-ranges')
+    return e.classification === 'PUBLIC' ? 'External' : 'Internal';
   return e.label ?? '';
 }
 
@@ -64,18 +68,26 @@ interface Props {
  * per CIDR: override a default entry here, hide it here, add one only this network has, or revert
  * to the default.
  */
-export function NetworkAddressConfigModal({ show, networkId, networkName, onHide, onChanged }: Props) {
+export function NetworkAddressConfigModal({
+  show,
+  networkId,
+  networkName,
+  onHide,
+  onChanged,
+}: Props) {
   const source = useMemo(() => networkSource(networkId), [networkId]);
   return (
     <Modal show={show} onHide={onHide} size="lg" centered>
       <Modal.Header closeButton>
-        <Modal.Title style={{ fontSize: '1rem' }}>Address configuration · {networkName}</Modal.Title>
+        <Modal.Title style={{ fontSize: '1rem' }}>
+          Address configuration · {networkName}
+        </Modal.Title>
       </Modal.Header>
       <Modal.Body style={{ fontSize: '0.85rem' }}>
         <p className="text-muted small">
-          Each list starts from the shared default, which applies to every network. Entries you set here
-          apply in this network only, to its existing snapshots too: override a default entry, hide it,
-          or add one only this network has.
+          Each list starts from the shared default, which applies to every network. Entries you set
+          here apply in this network only, to its existing snapshots too: override a default entry,
+          hide it, or add one only this network has.
         </p>
         <AddressTabs source={source} idPrefix="network-address" onChanged={onChanged} />
       </Modal.Body>
@@ -117,8 +129,17 @@ export function AddressTabs({
           </Button>
         ))}
       </div>
-      <div role="tabpanel" id={`${idPrefix}-panel-${active}`} aria-labelledby={`${idPrefix}-tab-${active}`}>
-        <AddressList key={active} config={KINDS.find(k => k.kind === active)!} source={source} onChanged={onChanged} />
+      <div
+        role="tabpanel"
+        id={`${idPrefix}-panel-${active}`}
+        aria-labelledby={`${idPrefix}-tab-${active}`}
+      >
+        <AddressList
+          key={active}
+          config={KINDS.find(k => k.kind === active)!}
+          source={source}
+          onChanged={onChanged}
+        />
       </div>
     </>
   );
@@ -166,7 +187,7 @@ function AddressList({
     if (!entries) return [];
     if (!q) return entries;
     return entries.filter(
-      e => e.cidr.toLowerCase().includes(q) || valueOf(e, kind).toLowerCase().includes(q),
+      e => e.cidr.toLowerCase().includes(q) || valueOf(e, kind).toLowerCase().includes(q)
     );
   }, [entries, search, kind]);
 
@@ -202,7 +223,13 @@ function AddressList({
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <Button size="sm" variant="primary" disabled={!allowed} onClick={() => setEditing({})} className="text-nowrap">
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!allowed}
+          onClick={() => setEditing({})}
+          className="text-nowrap"
+        >
           <i className="bi bi-plus-lg me-1" aria-hidden="true" />
           {inNetwork ? 'Add for this network' : 'Add'}
         </Button>
@@ -234,24 +261,43 @@ function AddressList({
           </thead>
           <tbody>
             {shown.map(e => (
-              <tr key={`${e.scope}-${e.id}`} data-testid="address-row" className={e.hidden ? 'text-muted' : undefined}>
+              <tr
+                key={`${e.scope}-${e.id}`}
+                data-testid="address-row"
+                className={e.hidden ? 'text-muted' : undefined}
+              >
                 <td className="font-monospace">{e.hidden ? <s>{e.cidr}</s> : e.cidr}</td>
-                <td>{e.hidden ? <s>{valueOf(e, kind)}</s> : valueOf(e, kind) || <span className="text-muted">—</span>}</td>
-                {inNetwork && <td>
-                  {e.scope === 'default' ? (
-                    <Badge bg="secondary">default</Badge>
-                  ) : e.hidden ? (
-                    <Badge bg="warning" text="dark">hidden here</Badge>
-                  ) : e.overridesDefault ? (
-                    <Badge bg="primary">overridden here</Badge>
+                <td>
+                  {e.hidden ? (
+                    <s>{valueOf(e, kind)}</s>
                   ) : (
-                    <Badge bg="primary">this network</Badge>
+                    valueOf(e, kind) || <span className="text-muted">—</span>
                   )}
-                </td>}
+                </td>
+                {inNetwork && (
+                  <td>
+                    {e.scope === 'default' ? (
+                      <Badge bg="secondary">default</Badge>
+                    ) : e.hidden ? (
+                      <Badge bg="warning" text="dark">
+                        hidden here
+                      </Badge>
+                    ) : e.overridesDefault ? (
+                      <Badge bg="primary">overridden here</Badge>
+                    ) : (
+                      <Badge bg="primary">this network</Badge>
+                    )}
+                  </td>
+                )}
                 <td className="text-end text-nowrap">
                   {!inNetwork ? (
                     <>
-                      <Button size="sm" variant="link" disabled={!allowed} onClick={() => setEditing({ entry: e })}>
+                      <Button
+                        size="sm"
+                        variant="link"
+                        disabled={!allowed}
+                        onClick={() => setEditing({ entry: e })}
+                      >
                         Edit
                       </Button>
                       <Button
@@ -266,7 +312,12 @@ function AddressList({
                     </>
                   ) : e.scope === 'default' ? (
                     <>
-                      <Button size="sm" variant="link" disabled={!allowed} onClick={() => setEditing({ entry: e })}>
+                      <Button
+                        size="sm"
+                        variant="link"
+                        disabled={!allowed}
+                        onClick={() => setEditing({ entry: e })}
+                      >
                         Override
                       </Button>
                       <Button
@@ -274,7 +325,10 @@ function AddressList({
                         variant="link"
                         disabled={!allowed}
                         onClick={() =>
-                          run(() => source.put(kind, { cidr: e.cidr, hidden: true }), "Couldn't hide it.")
+                          run(
+                            () => source.put(kind, { cidr: e.cidr, hidden: true }),
+                            "Couldn't hide it."
+                          )
                         }
                       >
                         Hide here
@@ -283,7 +337,12 @@ function AddressList({
                   ) : (
                     <>
                       {!e.hidden && (
-                        <Button size="sm" variant="link" disabled={!allowed} onClick={() => setEditing({ entry: e })}>
+                        <Button
+                          size="sm"
+                          variant="link"
+                          disabled={!allowed}
+                          onClick={() => setEditing({ entry: e })}
+                        >
                           Edit
                         </Button>
                       )}
@@ -293,7 +352,11 @@ function AddressList({
                         disabled={!allowed}
                         onClick={() => run(() => source.remove(kind, e), "Couldn't revert it.")}
                       >
-                        {e.hidden ? 'Show again' : e.overridesDefault ? 'Revert to default' : 'Remove'}
+                        {e.hidden
+                          ? 'Show again'
+                          : e.overridesDefault
+                            ? 'Revert to default'
+                            : 'Remove'}
                       </Button>
                     </>
                   )}
@@ -351,19 +414,25 @@ function EntryModal({
 
   const overriding = inNetwork && entry?.scope === 'default';
   const title = !entry
-    ? inNetwork ? 'Add for this network' : 'Add to the default'
-    : overriding ? `Override ${entry.cidr} here` : `Edit ${entry.cidr}`;
+    ? inNetwork
+      ? 'Add for this network'
+      : 'Add to the default'
+    : overriding
+      ? `Override ${entry.cidr} here`
+      : `Edit ${entry.cidr}`;
   const needsLabel = kind !== 'custom-private-ranges';
   const valid = cidr.trim() !== '' && (!needsLabel || label.trim() !== '' || kind === 'subnets');
 
-  const submit = async () => {
+  const submit = async (ev?: React.FormEvent) => {
+    ev?.preventDefault();
+    if (busy || !valid) return;
     setBusy(true);
     setError(null);
     try {
       await onSave(
         kind === 'custom-private-ranges'
           ? { cidr: cidr.trim(), classification }
-          : { cidr: cidr.trim(), label: label.trim() || null },
+          : { cidr: cidr.trim(), label: label.trim() || null }
       );
     } catch (e) {
       setError(apiMessage(e) ?? "Couldn't save it.");
@@ -373,15 +442,33 @@ function EntryModal({
   };
 
   return (
-    <Modal show={!!editing} onHide={busy ? undefined : onHide} centered>
-      <Modal.Header closeButton={!busy}>
-        <Modal.Title style={{ fontSize: '1rem' }}>{title}</Modal.Title>
-      </Modal.Header>
-      <Modal.Body style={{ fontSize: '0.85rem' }}>
+    <SideDrawer
+      show={!!editing}
+      onHide={() => !busy && onHide()}
+      title={title}
+      titleId="address-entry-title"
+      footer={
+        <>
+          <Button type="button" variant="outline-secondary" onClick={onHide} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="address-entry-form"
+            variant="primary"
+            disabled={busy || !valid}
+          >
+            {busy && <Spinner animation="border" size="sm" className="me-1" />}
+            Save
+          </Button>
+        </>
+      }
+    >
+      <Form id="address-entry-form" onSubmit={submit}>
         {overriding && (
           <p className="text-muted small">
-            The default says <strong>{valueOf(entry!, kind) || '—'}</strong>. What you set here applies in this
-            network only; the default stays as it is everywhere else.
+            The default says <strong>{valueOf(entry!, kind) || '—'}</strong>. What you set here
+            applies in this network only; the default stays as it is everywhere else.
           </p>
         )}
         <Form.Group className="mb-3">
@@ -436,15 +523,7 @@ function EntryModal({
             {error}
           </Alert>
         )}
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide} disabled={busy}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={submit} disabled={busy || !valid}>
-          Save
-        </Button>
-      </Modal.Footer>
-    </Modal>
+      </Form>
+    </SideDrawer>
   );
 }

@@ -1,5 +1,7 @@
 package com.tracepcap.conversation.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationFacetCountsResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
@@ -34,6 +36,8 @@ import org.springframework.web.bind.annotation.*;
     name = "Conversations",
     description = "Per-file conversation listing, facets, export, and session reconstruction")
 public class ConversationsController {
+
+  private final PermissionService permissionService;
 
   private final ConversationQueryService conversationQueryService;
   private final SessionReconstructionService sessionReconstructionService;
@@ -282,6 +286,7 @@ public class ConversationsController {
       @RequestParam(required = false) String dstIp,
       HttpServletResponse response)
       throws IOException {
+    permissionService.require(PermissionAction.EXPORT_PACKETS);
 
     ConversationFilterParams params =
         buildFilterParams(
@@ -366,6 +371,7 @@ public class ConversationsController {
       @RequestParam(required = false) String dstIp,
       HttpServletResponse response)
       throws IOException {
+    permissionService.require(PermissionAction.EXPORT_PACKETS);
 
     ConversationFilterParams params =
         buildFilterParams(
@@ -423,6 +429,7 @@ public class ConversationsController {
   @Operation(summary = "Export a single conversation as PCAP")
   public void exportConversationAsPcap(
       @PathVariable UUID conversationId, HttpServletResponse response) throws IOException {
+    permissionService.require(PermissionAction.EXPORT_PACKETS);
     log.info("GET /api/conversations/detail/{}/export-pcap", conversationId);
     String filename = conversationQueryService.getConversationPcapFilename(conversationId);
     response.setContentType("application/vnd.tcpdump.pcap");

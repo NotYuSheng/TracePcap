@@ -40,6 +40,8 @@ import org.springframework.web.bind.annotation.RestController;
     description = "A human's final answer to an adjudicated question — outranks the machine vote")
 public class AdjudicationOverrideController {
 
+  private final AdjudicationEditGate editGate;
+
   private final HumanOverrideService overrideService;
   private final ManualEvidenceService evidenceService;
 
@@ -66,6 +68,7 @@ public class AdjudicationOverrideController {
       @PathVariable String question,
       @PathVariable String entityKey,
       @Valid @RequestBody OverrideRequest request) {
+    editGate.requireEdit();
     HumanOverrideEntity saved =
         overrideService.override(question, fileId, entityKey, request.getLabel(), request.getRationale());
     return ResponseEntity.ok(toDto(saved));
@@ -78,6 +81,7 @@ public class AdjudicationOverrideController {
       @PathVariable UUID fileId,
       @PathVariable String question,
       @PathVariable String entityKey) {
+    editGate.requireEdit();
     overrideService.clear(question, fileId, entityKey);
     return ResponseEntity.noContent().build();
   }
@@ -103,6 +107,7 @@ public class AdjudicationOverrideController {
       @PathVariable String question,
       @PathVariable String entityKey,
       @Valid @RequestBody EvidenceRequest request) {
+    editGate.requireEdit();
     ManualEvidenceEntity saved =
         evidenceService.append(
             question, fileId, entityKey, request.getLabel(), request.getWeight(), request.getReason());
@@ -117,6 +122,7 @@ public class AdjudicationOverrideController {
       @PathVariable String entityKey,
       @PathVariable Long evidenceId,
       @Valid @RequestBody EvidenceRequest request) {
+    editGate.requireEdit();
     ManualEvidenceEntity saved =
         evidenceService.update(
             question, fileId, entityKey, evidenceId,
@@ -132,6 +138,7 @@ public class AdjudicationOverrideController {
       @PathVariable String question,
       @PathVariable String entityKey,
       @PathVariable Long evidenceId) {
+    editGate.requireEdit();
     evidenceService.delete(question, fileId, entityKey, evidenceId);
   }
 

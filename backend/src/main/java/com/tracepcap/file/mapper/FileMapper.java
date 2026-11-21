@@ -136,6 +136,7 @@ public class FileMapper {
         .storyStatus(entity.getStoryStatus())
         .storyError(entity.getStoryError())
         .keepForever(entity.isKeepForever())
+        .uploadedBy(entity.getUploadedBy())
         .expiresAt(entity.getExpiresAt())
         .estimatedAnalysisSeconds(
             estimateAnalysisSeconds(

@@ -130,18 +130,30 @@ container, so re-import requires recreating it:
    be lost and the realm re-seeded from the export. Back up first if needed —
    see :doc:`../operations/backup-restore`.
 
-Making someone an admin
------------------------
+Giving someone a role
+---------------------
 
-``admin`` is a client role, so it's listed under the client, not the realm:
+TracePcap's four roles, ``viewer``, ``analyst``, ``lead`` and ``admin``, are **client
+roles** on the ``tracepcap-frontend`` client. What each may do is set in TracePcap (see
+:doc:`../features/roles-and-permissions`); who has which is set here.
 
-1. In the admin console, open **Users** and select the user.
+The usual way is to give the role to a **group**, so everyone in it has it:
+
+1. In the admin console, open **Groups** and select the group (or create one).
 2. Open **Role mapping** → **Assign role**.
-3. Change the filter to **Filter by clients**, select
-   ``tracepcap-frontend`` ``admin``, and click **Assign**.
+3. Change the filter to **Filter by clients**, select ``tracepcap-frontend`` and the role
+   (for example ``analyst``), and click **Assign**.
 
-The change takes effect at the user's next sign-in (or token refresh, within
-minutes). To remove it, unassign the role the same way.
+To give one person a role directly, do the same from **Users** → the user → **Role
+mapping**. Groups that come from AD/LDAP work the same way: Keycloak assigns their roles.
+
+The change takes effect at the user's next sign-in (or token refresh, within minutes).
+Someone with none of the four roles gets the default role set in TracePcap (*Analyst* unless
+an admin changes it).
+
+**Upgrading an existing install:** the realm import only runs when Keycloak first starts, so an
+existing realm has only ``admin``. Create ``viewer``, ``analyst`` and ``lead`` yourself:
+**Clients** → ``tracepcap-frontend`` → **Roles** → **Create role**, one for each name.
 
 With login off there are no accounts and no roles. Whether admin-only settings
 can be changed is then set for everyone by ``SYSTEM_SETTINGS_EDITABLE`` (see
@@ -150,10 +162,9 @@ can be changed is then set for everyone by ``SYSTEM_SETTINGS_EDITABLE`` (see
 Notes
 -----
 
-- Every signed-in realm user is an **analyst**. The realm defines one role,
-  the **client role** ``admin`` on the ``tracepcap-frontend`` client. An admin
-  can change settings marked admin-only and decide which settings need an admin
-  (see :ref:`settings-permissions`).
+- The realm defines four **client roles** on the ``tracepcap-frontend`` client:
+  ``viewer``, ``analyst``, ``lead`` and ``admin``. A signed-in user with none of them
+  gets TracePcap's default role (see :doc:`../features/roles-and-permissions`).
 - Self-service registration and email-based password recovery are off by design
   for offline/air-gapped use. User creation and password resets go through the
   admin console.
