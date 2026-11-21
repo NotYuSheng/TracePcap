@@ -1,6 +1,8 @@
 @startuml container
 ' TracePcap: C4 level 2, containers. Render: scripts/render-diagrams.sh
 ' What runs where: docker-compose.yml (base stack), plus docker-compose.prod.yml for login on.
+' One box per Docker container, on purpose: the React app ships inside the nginx image, so it's
+' drawn with nginx rather than as its own (in-browser) C4 container.
 !include <C4/C4_Container>
 
 LAYOUT_WITH_LEGEND()
@@ -9,8 +11,7 @@ title TracePcap: containers
 Person(analyst, "Analyst / Admin", "Uses TracePcap in a browser")
 
 System_Boundary(tracepcap, "TracePcap (Docker Compose)") {
-  Container(spa, "Web app", "React, TypeScript, Vite", "Every page: upload, analysis, story, network map, monitor, settings. Runs in the browser.")
-  Container(nginx, "Web server", "nginx", "Serves the web app, and is the one origin: proxies /api to the backend and, with login on, /realms and /admin to Keycloak.")
+  Container(web, "Web app", "nginx serving React, TypeScript, Vite", "Every page of the UI, served to the browser. The one origin: proxies /api to the backend and, with login on, /realms and /admin to Keycloak.")
   Container(backend, "Backend", "Spring Boot 3, Java 21, with tshark, ndpiReader, Suricata and mergecap", "REST API under /api/v1. Runs the analysis pipeline, calling the packet tools bundled in its image as subprocesses; background AI jobs one at a time; roles and the audit log.")
   ContainerDb(postgres, "Database", "PostgreSQL 15, Flyway", "Analysis results, findings, labels, networks, roles, audit log, settings.")
   ContainerDb(minio, "Object storage", "MinIO", "The captures and the files extracted from them.")
@@ -20,11 +21,9 @@ System_Boundary(tracepcap, "TracePcap (Docker Compose)") {
 System_Ext(llm, "LLM server", "OpenAI-compatible, local (LLM_BASE_URL)")
 System_Ext(ipinfo, "ipinfo.io", "Optional online geolocation. Off by default (GEO_FORCE_OFFLINE=true): geo comes from a bundled database")
 
-Rel(analyst, nginx, "Opens the app", "HTTPS")
-Rel(nginx, spa, "Serves")
-Rel(spa, nginx, "Calls the API with the user's token", "JSON, /api/v1")
-Rel(spa, keycloak, "Signs in (via nginx)", "OpenID Connect, PKCE")
-Rel(nginx, backend, "Proxies /api", "HTTP")
+Rel(analyst, web, "Uses", "HTTPS, browser")
+Rel(web, backend, "API calls with the user's token", "JSON, /api/v1")
+Rel(web, keycloak, "Sign-in", "OpenID Connect, PKCE")
 Rel(backend, keycloak, "Fetches the token signing keys", "JWKS")
 Rel(backend, postgres, "Reads and writes", "JDBC")
 Rel(backend, minio, "Stores and reads captures", "S3 API")
