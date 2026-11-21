@@ -69,7 +69,7 @@ The permissions
      - See captures, networks and findings (every role, always); download a report
      - Viewer and up
    * -
-     - Read the audit log
+     - Read the audit log and who has signed in (the **Users** tab)
      - Lead, Admin
    * - Investigate
      - Upload and analyse captures (including merge and re-analyse); ask the AI (story,
@@ -162,6 +162,26 @@ In Keycloak, not TracePcap: see :doc:`../configuration/user-management`. In shor
 client role (``viewer``, ``analyst``, ``lead`` or ``admin`` on ``tracepcap``) to a
 group, and everyone in the group has it from their next sign-in.
 
+Who has signed in
+-----------------
+
+With login on, Settings › **Users** lists everyone who has signed in, most recent first: the
+TracePcap roles their last sign-in carried, how many permissions those add up to, and when.
+It's read-only; people and role assignments stay in Keycloak. Seeing it needs *Read the audit
+log and who has signed in* (Lead and Admin at first).
+
+It also catches mistakes in Keycloak:
+
+- Someone whose sign-in carried a client role TracePcap has **no role for** (a typo, or a role
+  deleted here) is flagged: that role gives them nothing.
+- Someone with **none** of TracePcap's roles is marked as getting the default role.
+- On the **Roles** tab, each role says when a sign-in last carried it, or *No sign-in has
+  carried this role yet*. For a new custom role, that usually means its client role hasn't been
+  created or assigned in Keycloak.
+
+A sign-in is recorded when the app loads, so the list and the roles show what Keycloak gave
+someone the last time they opened TracePcap. Nothing is recorded with login off.
+
 Login off
 ---------
 
@@ -181,7 +201,11 @@ For API clients
   role. Admin only.
 - ``DELETE /api/v1/roles/{key}`` deletes a custom role. Admin only.
 - ``GET /api/v1/permissions`` lists every permission, grouped, and whether you have it.
-- ``GET /api/v1/me`` includes ``roles``, the roles that apply to you.
+- ``GET /api/v1/me`` includes ``roles``, the roles that apply to you, and with login on records
+  your sign-in.
+- ``GET /api/v1/users`` lists who has signed in (paged, with ``search``). Needs *Read the audit
+  log and who has signed in*.
+- Each role in ``GET /api/v1/roles`` has ``lastSignInAt``: when a sign-in last carried it.
 
 A request your roles don't allow gets **403**, with the permission and the reason in the
 message.

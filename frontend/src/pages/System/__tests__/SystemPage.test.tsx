@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { server } from '@/test/msw';
 import { PermissionsPanel } from '../PermissionsPanel';
 import { AuditLogPanel } from '../AuditLogPanel';
+import { UsersPanel } from '../UsersPanel';
 import { SystemPage } from '../SystemPage';
 
 const PERMS = [
@@ -213,6 +214,94 @@ describe('PermissionsPanel: custom roles', () => {
       expect(screen.queryByRole('option', { name: /Responder/ })).not.toBeInTheDocument()
     );
     expect(screen.queryByRole('button', { name: /Delete role/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('UsersPanel: who has signed in', () => {
+  it('lists people with their roles, flags roles TracePcap has no role for, and searches', async () => {
+    const searches: (string | null)[] = [];
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(true))),
+      http.get('*/roles', () => HttpResponse.json(roles())),
+      http.get('*/users', ({ request }) => {
+        searches.push(new URL(request.url).searchParams.get('search'));
+        return HttpResponse.json({
+          data: [
+            {
+              username: 'ana',
+              displayName: 'Ana Analyst',
+              roles: ['analyst'],
+              defaultRole: false,
+              unknownRoles: ['typo-role'],
+              permissionCount: 19,
+              firstSeen: '2026-11-01T09:00:00',
+              lastSeen: '2026-11-20T09:00:00',
+            },
+            {
+              username: 'bob',
+              displayName: null,
+              roles: ['analyst'],
+              defaultRole: true,
+              unknownRoles: [],
+              permissionCount: 19,
+              firstSeen: '2026-11-01T09:00:00',
+              lastSeen: '2026-11-19T09:00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 25,
+          total: 2,
+          totalPages: 1,
+        });
+      })
+    );
+    render(<UsersPanel />);
+
+    expect(await screen.findByText('Ana Analyst')).toBeInTheDocument();
+    expect(screen.getByTestId('unknown-roles')).toHaveTextContent('typo-role');
+    expect(screen.getByText(/the default: no role in Keycloak/)).toBeInTheDocument();
+    expect(screen.getAllByText(/19 of 2 permissions/)).toHaveLength(2);
+
+    await userEvent.type(screen.getByLabelText('Search users'), 'ana');
+    await waitFor(() => expect(searches).toContain('ana'));
+  });
+
+  it('says why when the caller may not see who has signed in', async () => {
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(false))),
+      http.get('*/roles', () => HttpResponse.json(roles())),
+      http.get('*/users', () =>
+        HttpResponse.json(
+          {
+            message:
+              "Read the audit log and who has signed in: your role (Viewer) doesn't include this.",
+          },
+          { status: 403 }
+        )
+      )
+    );
+    render(<UsersPanel />);
+    expect(await screen.findByText(/your role \(Viewer\)/)).toBeInTheDocument();
+  });
+});
+
+describe('PermissionsPanel: whether a role has been seen', () => {
+  it('says when a sign-in last carried the role, or that none has', async () => {
+    const list = roles().map(r =>
+      r.key === 'admin' ? { ...r, lastSignInAt: '2026-11-20T09:00:00' } : r
+    );
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(true))),
+      http.get('*/roles', () => HttpResponse.json(list))
+    );
+    render(<PermissionsPanel />);
+    expect(await screen.findByTestId('role-signin')).toHaveTextContent('Last carried by a sign-in');
+    await userEvent.click(
+      within(screen.getByRole('listbox', { name: 'Roles' })).getByRole('option', { name: /Viewer/ })
+    );
+    expect(screen.getByTestId('role-signin')).toHaveTextContent(
+      'No sign-in has carried this role yet.'
+    );
   });
 });
 

@@ -141,7 +141,10 @@ gives the stored before/after as JSON. Escape closes the details.
 Users
 -----
 
-With login on, the **Users** tab links to the Keycloak admin console, where users,
-passwords and the ``admin`` role are managed (see :doc:`../configuration/user-management`).
-With login off there are no accounts, and the tab says so.
+With login on, the **Users** tab lists everyone who has signed in, with the roles their last
+sign-in carried and what those add up to, and flags roles Keycloak gave that TracePcap doesn't
+know (see :doc:`roles-and-permissions`). It's read-only: users, passwords and role assignments
+are managed in the Keycloak admin console, which the tab links to (see
+:doc:`../configuration/user-management`). With login off there are no accounts, and the tab
+says so.
 

@@ -11,8 +11,8 @@ public enum PermissionAction {
       "Every page, the map, the story and the conversations. Every role has it."),
   DOWNLOAD_REPORT(Group.LOOK, BuiltInRole.VIEWER, "Download a report",
       "The PDF briefing or full report of a capture."),
-  READ_AUDIT_LOG(Group.LOOK, BuiltInRole.LEAD, "Read the audit log",
-      "Who changed what, across the install."),
+  READ_AUDIT_LOG(Group.LOOK, BuiltInRole.LEAD, "Read the audit log and who has signed in",
+      "Who changed what across the install, and who has signed in with which roles."),
 
   // Investigate
   UPLOAD_CAPTURES(Group.INVESTIGATE, BuiltInRole.ANALYST, "Upload and analyse captures",

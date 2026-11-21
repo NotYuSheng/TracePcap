@@ -10,14 +10,8 @@ import { AddressDefaultsPanel } from './AddressDefaultsPanel';
 import { AuditLogPanel } from './AuditLogPanel';
 import { DetectionRulesPanel } from './DetectionRulesPanel';
 import { PermissionsPanel } from './PermissionsPanel';
+import { UsersPanel } from './UsersPanel';
 import './SystemPage.css';
-
-/** The Keycloak admin console's user list for this realm. Keycloak is proxied same-origin by default. */
-function keycloakUsersUrl(): string {
-  const authority = env.OIDC_AUTHORITY || `${window.location.origin}/realms/${env.OIDC_REALM}`;
-  const base = authority.replace(/\/realms\/[^/]+\/?$/, '');
-  return `${base}/admin/master/console/#/${env.OIDC_REALM}/users`;
-}
 
 /**
  * The Settings page: your own settings, and (#915) everything that applies to the whole install.
@@ -113,24 +107,7 @@ export function SystemPage() {
               {tab === 'audit' && <AuditLogPanel />}
               {tab === 'users' &&
                 (env.AUTH_ENABLED ? (
-                  <div className="small">
-                    <p>
-                      Users, groups and who has which role are managed in Keycloak. To give a group
-                      (or one person) a role, open it, then Role mapping, Assign role, Filter by
-                      clients, and pick <span className="font-monospace">{env.OIDC_CLIENT_ID}</span>{' '}
-                      and the role: viewer, analyst, lead or admin. What each role may do is on the
-                      Roles tab.
-                    </p>
-                    <a
-                      href={keycloakUsersUrl()}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-outline-primary btn-sm"
-                    >
-                      <i className="bi bi-box-arrow-up-right me-1" aria-hidden="true" />
-                      Open users in Keycloak
-                    </a>
-                  </div>
+                  <UsersPanel />
                 ) : (
                   <p className="small text-muted mb-0">
                     Login is off, so there are no user accounts: everyone shares one profile and

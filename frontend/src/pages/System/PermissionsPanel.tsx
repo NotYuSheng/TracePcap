@@ -12,6 +12,7 @@ import {
   type RoleChange,
 } from '@/features/me/meService';
 import { RoleFormModal, type RoleFormValues } from './RoleFormModal';
+import { signInTime } from './signInTime';
 import './PermissionsPanel.css';
 
 /** The catalogue's rows, grouped under their headings, in the server's order. */
@@ -305,6 +306,21 @@ export function PermissionsPanel() {
                 )}
                 assign it to a group (Groups › the group › Role mapping › Assign role › Filter by
                 clients).
+              </div>
+              <div className="roles-signin mt-2" data-testid="role-signin">
+                {role.lastSignInAt ? (
+                  <>
+                    <i className="bi bi-check-circle text-success me-1" aria-hidden="true" />
+                    Last carried by a sign-in: {signInTime(role.lastSignInAt)}.
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-exclamation-circle text-warning me-1" aria-hidden="true" />
+                    No sign-in has carried this role yet.
+                    {role.defaultRole &&
+                      ' People with no role in Keycloak still get it, as the default.'}
+                  </>
+                )}
               </div>
               <button
                 type="button"

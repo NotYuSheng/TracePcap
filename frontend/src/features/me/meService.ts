@@ -59,6 +59,26 @@ export interface Role {
   /** False for the admin role, which always has every permission. */
   editable: boolean;
   permissions: PermissionAction[];
+  /**
+   * When a sign-in last carried this role's Keycloak client role; null if none has. With login on,
+   * that often means the client role is missing in Keycloak. Always null with login off.
+   */
+  lastSignInAt?: string | null;
+}
+
+/** Mirrors UserDto: someone who has signed in, and what their roles add up to. */
+export interface SignedInUser {
+  username: string;
+  displayName?: string | null;
+  /** TracePcap roles their last sign-in carried (or the default role, see {@link defaultRole}). */
+  roles: string[];
+  /** True when their sign-in carried none of TracePcap's roles, so they get the default. */
+  defaultRole: boolean;
+  /** Client roles they carried that TracePcap has no role for. They give nothing. */
+  unknownRoles: string[];
+  permissionCount: number;
+  firstSeen: string;
+  lastSeen: string;
 }
 
 /** A change to a role; omitted fields stay as they are. Name and description: custom roles only. */
@@ -123,6 +143,13 @@ export const meService = {
   deleteRole: async (key: string): Promise<void> => {
     await apiClient.delete(API_ENDPOINTS.ROLE(key));
   },
+  /** Everyone who has signed in, most recent first. Needs Read the audit log. */
+  getUsers: async (page: number, pageSize: number, search?: string): Promise<Paged<SignedInUser>> =>
+    (
+      await apiClient.get<Paged<SignedInUser>>(API_ENDPOINTS.USERS, {
+        params: { page, pageSize, search },
+      })
+    ).data,
   getAuditLog: async (
     page: number,
     pageSize: number,

@@ -98,6 +98,24 @@ public class CurrentActor {
     return (name == null || name.isBlank()) ? SYSTEM : name;
   }
 
+  /** The token's subject (Keycloak's stable user id), or null without an account. */
+  public String subject() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !auth.isAuthenticated() || isAnonymous(auth)) return null;
+    if (auth.getPrincipal() instanceof Jwt jwt && jwt.getSubject() != null && !jwt.getSubject().isBlank()) {
+      return jwt.getSubject();
+    }
+    return null;
+  }
+
+  /** The caller's full name from the token ({@code name}), or null when it carries none. */
+  public String displayName() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) return null;
+    String name = jwt.getClaimAsString("name");
+    return name == null || name.isBlank() ? null : name;
+  }
+
   /** The profile everyone shares when there is no logged-in account (login off). */
   public static final String SHARED_PROFILE = "shared";
 
