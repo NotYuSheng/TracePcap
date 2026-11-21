@@ -7,6 +7,7 @@
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
+  <a href="#feature-tour">Feature tour</a> •
   <a href="#usage">Usage</a> •
   <a href="#documentation">Documentation</a>
 </p>
@@ -22,7 +23,9 @@
 
 <div align="center">
 
-![TracePcap network diagram: an office capture's devices grouped by network and played back over time, two phones that held the same address in turn, one phone's identity card, and the map filtered down to a flagged telnet login to a camera](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
+[![TracePcap network diagram: an office capture's devices grouped by network and played back over time, two phones that held the same address in turn, one phone's identity card, and the map filtered down to a flagged telnet login to a camera](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
+
+**[▶ Watch the demo on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI)** (1 min 22 s)
 
 </div>
 
@@ -134,17 +137,25 @@ docker compose up -d
 
 > **Note:** First startup may take a minute while PostgreSQL and MinIO initialise. AI features require a running LLM server pointed to by `LLM_API_BASE_URL`; all other features work without it. TracePcap is built to run fully offline — `LLM_API_BASE_URL` must point to a self- or LAN-hosted server, never a public/internet API.
 
-## Walkthrough
+## Feature tour
 
-The full tour, on a real incident (a STRRAT remote-access trojan on a corporate LAN, from
-malware-traffic-analysis.net's training exercises): upload, the Overview, the flagged
-conversations, the network map played back and one host's card, the story's four answers
-(victim, user, malware, C2), the chat finding the victim and writing a checked filter for the
-C2 traffic, the report drawer, and a monitored network changing over eight weeks.
+Two minutes through the app's main features: upload, the Overview, the flagged conversations,
+the network map played back and one host's card, the story's four answers (victim, user, malware,
+C2), the chat finding the victim and writing a checked filter for the C2 traffic, the report
+drawer, and a monitored network changing over eight weeks.
+
+The capture it runs on is a real incident: a STRRAT remote-access trojan on a corporate LAN, from
+malware-traffic-analysis.net's training exercises. The investigation itself, step by step and
+checked against the exercise's answer key, is in the docs:
+[STRRAT infection: "You dirty rat!"](https://notyusheng.github.io/TracePcap/demos/strrat-you-dirty-rat.html).
+Two more worked cases: [Devices on a DHCP network: "Who was 10.0.0.50?"](https://notyusheng.github.io/TracePcap/demos/devices-on-a-dhcp-network.html) and
+[Two sites, one range: telling networks apart](https://notyusheng.github.io/TracePcap/demos/two-sites-one-range.html).
 
 <div align="center">
 
-![TracePcap walkthrough](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
+[![TracePcap feature tour](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)](https://www.youtube.com/watch?v=9SYQsxG4QjI)
+
+Click the GIF for the [full-quality video on YouTube](https://www.youtube.com/watch?v=9SYQsxG4QjI), with chapters and captions.
 
 </div>
 
