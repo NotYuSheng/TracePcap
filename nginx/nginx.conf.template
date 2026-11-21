@@ -5,12 +5,16 @@ server {
     index index.html;
     client_max_body_size ${NGINX_MAX_BODY_SIZE};
 
-    # Use Docker's internal DNS so backend IP is re-resolved after container restarts
-    resolver 127.0.0.11 valid=5s ipv6=off;
-    set $backend http://backend:8080;
+    # Upstreams are variables so nginx re-resolves them (a restarted backend gets a new IP) and
+    # starts even when one isn't deployed. That needs an explicit resolver; the entrypoint fills
+    # these in: the resolver from /etc/resolv.conf (Docker's 127.0.0.11, or the cluster DNS on
+    # Kubernetes), the upstreams from NGINX_BACKEND_URL / NGINX_KEYCLOAK_URL. nginx's resolver
+    # ignores resolv.conf search domains, so on Kubernetes the URLs must be fully qualified.
+    resolver ${NGINX_RESOLVER} valid=5s ipv6=off;
+    set $backend ${NGINX_BACKEND_URL};
     # Keycloak upstream as a variable so nginx starts even when the IdP isn't deployed
     # (default/auth-off stack never hits the /realms paths below).
-    set $keycloak http://keycloak:8080;
+    set $keycloak ${NGINX_KEYCLOAK_URL};
 
     # Gzip compression
     gzip on;

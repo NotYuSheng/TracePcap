@@ -41,8 +41,26 @@ LLM_TIMEOUT_S=${LLM_TIMEOUT:-300}
 LLM_PROXY_TIMEOUT=$(( LLM_TIMEOUT_S + 60 ))
 if [ "$NGINX_PROXY_TIMEOUT" -lt "$LLM_PROXY_TIMEOUT" ]; then NGINX_PROXY_TIMEOUT=$LLM_PROXY_TIMEOUT; fi
 
+# Upstreams and the DNS server that resolves them. Defaults keep the Compose stack unchanged:
+# service names on the compose network, and the first nameserver in resolv.conf, which Docker
+# sets to its embedded DNS (127.0.0.11). On Kubernetes resolv.conf names the cluster DNS, and the
+# Helm chart passes fully qualified Service URLs (nginx's resolver does not apply search domains).
+NGINX_BACKEND_URL=${NGINX_BACKEND_URL:-http://backend:8080}
+NGINX_KEYCLOAK_URL=${NGINX_KEYCLOAK_URL:-http://keycloak:8080}
+if [ -z "${NGINX_RESOLVER}" ]; then
+  NGINX_RESOLVER=$(awk '$1 == "nameserver" { print $2; exit }' /etc/resolv.conf 2>/dev/null)
+  # An IPv6 nameserver must be bracketed for nginx's resolver directive.
+  case "${NGINX_RESOLVER}" in
+    *:*) NGINX_RESOLVER="[${NGINX_RESOLVER}]" ;;
+  esac
+  NGINX_RESOLVER=${NGINX_RESOLVER:-127.0.0.11}
+fi
+
 export NGINX_MAX_BODY_SIZE
 export NGINX_PROXY_TIMEOUT
+export NGINX_BACKEND_URL
+export NGINX_KEYCLOAK_URL
+export NGINX_RESOLVER
 
 echo "TracePcap nginx starting:"
 echo "  APP_MEMORY_MB    = ${MEM} MB"
@@ -54,8 +72,9 @@ fi
 echo "  Max upload size  = ${MAX_UPLOAD_MB} MB"
 echo "  Nginx body limit = ${NGINX_MAX_BODY_SIZE}"
 echo "  Proxy timeout    = ${NGINX_PROXY_TIMEOUT} s"
+echo "  Backend upstream = ${NGINX_BACKEND_URL} (resolver ${NGINX_RESOLVER})"
 
-envsubst '${NGINX_MAX_BODY_SIZE} ${NGINX_PROXY_TIMEOUT}' \
+envsubst '${NGINX_MAX_BODY_SIZE} ${NGINX_PROXY_TIMEOUT} ${NGINX_RESOLVER} ${NGINX_BACKEND_URL} ${NGINX_KEYCLOAK_URL}' \
   < /etc/nginx/templates/nginx.conf.template \
   > /etc/nginx/conf.d/default.conf
 
