@@ -1,5 +1,7 @@
 package com.tracepcap.monitor.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.monitor.dto.AddSnapshotRequest;
 import com.tracepcap.monitor.dto.NetworkSnapshotDto;
 import com.tracepcap.monitor.dto.PatchSnapshotRequest;
@@ -19,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Monitor Snapshots", description = "Capture snapshots attached to a monitored network")
 public class NetworkSnapshotController {
 
+  private final PermissionService permissionService;
+
   private final SnapshotService snapshotService;
 
   @GetMapping
@@ -32,6 +36,7 @@ public class NetworkSnapshotController {
   @Operation(summary = "Add a snapshot to a network")
   public NetworkSnapshotDto addSnapshot(
       @PathVariable UUID networkId, @Valid @RequestBody AddSnapshotRequest request) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     return snapshotService.addSnapshot(networkId, request.getFileId(), request.getSubnetOverrides());
   }
 
@@ -41,6 +46,7 @@ public class NetworkSnapshotController {
       @PathVariable UUID networkId,
       @PathVariable UUID snapshotId,
       @Valid @RequestBody PatchSnapshotRequest request) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     return snapshotService.patchSnapshot(networkId, snapshotId, request);
   }
 
@@ -48,6 +54,7 @@ public class NetworkSnapshotController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Remove a snapshot from a network")
   public void removeSnapshot(@PathVariable UUID networkId, @PathVariable UUID snapshotId) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     snapshotService.removeSnapshot(networkId, snapshotId);
   }
 }

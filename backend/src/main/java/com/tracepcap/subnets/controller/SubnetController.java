@@ -1,5 +1,7 @@
 package com.tracepcap.subnets.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.subnets.dto.SubnetDefinitionDto;
 import com.tracepcap.subnets.dto.SubnetLabelSuggestionDto;
 import com.tracepcap.subnets.dto.SubnetOverlapWarningDto;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "Subnets", description = "User-defined subnet labels and auto-detection")
 public class SubnetController {
+
+  private final PermissionService permissionService;
 
   private final SubnetService subnetService;
   private final SubnetLabelSuggestionService subnetLabelSuggestionService;
@@ -99,6 +103,7 @@ public class SubnetController {
       @PathVariable Long id,
       @RequestParam(required = false) UUID networkId,
       @RequestParam(required = false) UUID fileId) {
+    permissionService.require(PermissionAction.ASK_AI);
     return ResponseEntity.ok(subnetLabelSuggestionService.suggest(id, networkId, fileId));
   }
 
@@ -123,6 +128,7 @@ public class SubnetController {
   @Operation(summary = "Mark a stale subnet label as still correct and re-baseline its composition")
   public ResponseEntity<SubnetDefinitionDto> dismissSubnetStaleness(
       @PathVariable Long id, @RequestParam(required = false) UUID networkId) {
+    permissionService.require(PermissionAction.LABEL_HOSTS);
     return ResponseEntity.ok(subnetService.dismissStaleness(id, networkId));
   }
 }

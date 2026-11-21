@@ -1,5 +1,7 @@
 package com.tracepcap.monitor.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.monitor.dto.ChangeEventDto;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "Monitor Change Events", description = "Detected drift events for a monitored network")
 public class ChangeEventController {
+
+  private final PermissionService permissionService;
 
   private final NetworkChangeEventRepository changeEventRepository;
 
@@ -46,6 +50,7 @@ public class ChangeEventController {
       @PathVariable UUID networkId,
       @PathVariable UUID eventId,
       @RequestBody Map<String, Object> body) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
 
     return changeEventRepository.findById(eventId)
         .filter(e -> e.getNetwork().getId().equals(networkId))

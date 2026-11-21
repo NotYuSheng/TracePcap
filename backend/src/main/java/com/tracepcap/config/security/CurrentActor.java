@@ -50,15 +50,27 @@ public class CurrentActor {
    */
   public boolean isAdmin() {
     if (!authProperties.isEnabled()) return authProperties.isSystemSettingsEditable();
+    return roles().contains(ADMIN_ROLE);
+  }
+
+  /**
+   * The client roles the caller's token carries on the configured client ({@code
+   * resource_access.<client-id>.roles}): which TracePcap roles Keycloak gave them, whether directly
+   * or through a group. Empty with login off, or for a caller without a token.
+   */
+  public java.util.Set<String> roles() {
+    if (!authProperties.isEnabled()) return java.util.Set.of();
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || !auth.isAuthenticated() || isAnonymous(auth)) return false;
-    if (!(auth.getPrincipal() instanceof Jwt jwt)) return false;
+    if (auth == null || !auth.isAuthenticated() || isAnonymous(auth)) return java.util.Set.of();
+    if (!(auth.getPrincipal() instanceof Jwt jwt)) return java.util.Set.of();
     Object resourceAccess = jwt.getClaims().get("resource_access");
-    if (!(resourceAccess instanceof java.util.Map<?, ?> clients)) return false;
+    if (!(resourceAccess instanceof java.util.Map<?, ?> clients)) return java.util.Set.of();
     Object client = clients.get(authProperties.getClientId());
-    if (!(client instanceof java.util.Map<?, ?> clientClaims)) return false;
-    Object roles = clientClaims.get("roles");
-    return roles instanceof java.util.Collection<?> list && list.contains(ADMIN_ROLE);
+    if (!(client instanceof java.util.Map<?, ?> clientClaims)) return java.util.Set.of();
+    if (!(clientClaims.get("roles") instanceof java.util.Collection<?> list)) return java.util.Set.of();
+    java.util.Set<String> out = new java.util.LinkedHashSet<>();
+    for (Object r : list) if (r instanceof String role && !role.isBlank()) out.add(role);
+    return out;
   }
 
   /** Recorded when there is no authenticated principal (auth disabled, or an internal caller). */

@@ -1,5 +1,7 @@
 package com.tracepcap.monitor.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.monitor.dto.BaselineDefinitionDto;
 import com.tracepcap.monitor.dto.CreateBaselineDefinitionRequest;
 import com.tracepcap.monitor.service.BaselineService;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
     description = "Baseline rules used to detect drift in a monitored network")
 public class BaselineDefinitionController {
 
+  private final PermissionService permissionService;
+
   private final BaselineService baselineService;
 
   @GetMapping
@@ -34,6 +38,7 @@ public class BaselineDefinitionController {
   public BaselineDefinitionDto createDefinition(
       @PathVariable UUID networkId,
       @Valid @RequestBody CreateBaselineDefinitionRequest request) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     return baselineService.createDefinition(networkId, request);
   }
 
@@ -42,6 +47,7 @@ public class BaselineDefinitionController {
   @Operation(summary = "Delete a baseline definition")
   public void deleteDefinition(
       @PathVariable UUID networkId, @PathVariable UUID definitionId) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     baselineService.deleteDefinition(networkId, definitionId);
   }
 }

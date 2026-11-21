@@ -60,4 +60,15 @@ class CurrentActorIsAdminTest {
     login(Map.of("tracepcap", Map.of("roles", List.of("viewer"))));
     assertThat(actor.isAdmin()).as("other role").isFalse();
   }
+
+  @Test
+  void roles_areTheClientRolesOnThisClientOnly() {
+    CurrentActor actor = new CurrentActor(props(true, false));
+    login(
+        Map.of(
+            "tracepcap", Map.of("roles", List.of("analyst", "incident-responder")),
+            "other-app", Map.of("roles", List.of("lead"))));
+    assertThat(actor.roles()).containsExactly("analyst", "incident-responder");
+    assertThat(new CurrentActor(props(false, true)).roles()).as("login off").isEmpty();
+  }
 }
