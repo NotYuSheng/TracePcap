@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import type { GraphNode } from '@/features/network/types';
 import type { DeviceType } from '@/types';
 import { deviceTypeIcon, deviceTypeLabel, nodeIdentityKey } from '@/utils/deviceType';
@@ -44,6 +46,7 @@ export function GraphNodeIdentityCard({
     d.identityBasis === 'HUMAN' ? (d.identityLabel ?? null) : null
   );
   const [busy, setBusy] = useState(false);
+  const canOverride = usePermission('OVERRIDE_ANSWERS');
   const [error, setError] = useState(false);
   useEffect(() => {
     setConfirmed(d.identityBasis === 'HUMAN' ? (d.identityLabel ?? null) : null);
@@ -177,7 +180,7 @@ export function GraphNodeIdentityCard({
                 key={c.label}
                 size="sm"
                 variant="outline-primary"
-                disabled={busy}
+                disabled={busy || !canOverride.allowed}
                 onClick={() => confirm(c.label)}
               >
                 {deviceTypeLabel(c.label as DeviceType)}
@@ -186,6 +189,9 @@ export function GraphNodeIdentityCard({
             <Button size="sm" variant="outline-secondary" onClick={onShowEvidence}>
               {candidates.length > 0 ? 'Other…' : 'See the evidence'}
             </Button>
+            {candidates.length > 0 && (
+              <PermissionLock action="OVERRIDE_ANSWERS" className="align-self-center" />
+            )}
           </div>
           {error && (
             <span className="text-danger">Couldn’t save that. Try again from Identity.</span>

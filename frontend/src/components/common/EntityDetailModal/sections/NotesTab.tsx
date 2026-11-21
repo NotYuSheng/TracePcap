@@ -1,5 +1,7 @@
 import { Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import type { EntityNote } from '@/features/notes/services/entityNotesService';
 
 interface NotesTabProps {
@@ -28,6 +30,7 @@ export function NotesTab({
   onSave,
   onDelete,
 }: NotesTabProps) {
+  const labels = usePermission('LABEL_HOSTS');
   return (
     <div>
       <p className="text-muted small mb-2">
@@ -56,25 +59,36 @@ export function NotesTab({
           variant="primary"
           size="sm"
           onClick={onSave}
-          disabled={noteSaving || noteDeleting || !noteChanged}
+          disabled={noteSaving || noteDeleting || !noteChanged || !labels.allowed}
         >
           {noteSaving ? (
-            <><Spinner size="sm" className="me-1" />Saving…</>
+            <>
+              <Spinner size="sm" className="me-1" />
+              Saving…
+            </>
           ) : (
-            <><i className="bi bi-floppy me-1" />Save Note</>
+            <>
+              <i className="bi bi-floppy me-1" />
+              Save Note
+            </>
           )}
         </Button>
+        <PermissionLock action="LABEL_HOSTS" className="align-self-center" />
         {savedNote && (
           <Button
             variant="outline-danger"
             size="sm"
             onClick={onDelete}
-            disabled={noteDeleting || noteSaving}
+            disabled={noteDeleting || noteSaving || !labels.allowed}
           >
-            {noteDeleting
-              ? <Spinner size="sm" />
-              : <><i className="bi bi-trash me-1" />Delete</>
-            }
+            {noteDeleting ? (
+              <Spinner size="sm" />
+            ) : (
+              <>
+                <i className="bi bi-trash me-1" />
+                Delete
+              </>
+            )}
           </Button>
         )}
       </div>

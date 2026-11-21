@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { insightsService } from '@/features/insights/services/insightsService';
@@ -23,7 +25,14 @@ interface SubnetSnapshotEditModalProps {
  * Snapshot History row; sets this subnet's label/description *for that snapshot only* via a
  * snapshot subnet override, leaving the global definition and other snapshots untouched.
  */
-export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, onClose, onSaved }: SubnetSnapshotEditModalProps) {
+export function SubnetSnapshotEditModal({
+  subnetId,
+  networkId,
+  cidr,
+  snapshot,
+  onClose,
+  onSaved,
+}: SubnetSnapshotEditModalProps) {
   const existing = (snapshot.subnetOverrides ?? []).find(o => o.cidr === cidr);
   const [label, setLabel] = useState(existing?.label ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
@@ -33,24 +42,42 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
 
   // The suggestion runs in the background (one job at a time for the model): closing this doesn't
   // lose it, and reopening picks it up. Scoped to THIS snapshot's traffic, like the role editor.
-  const labelJob = useAiJob<{ label?: string; description?: string }>('SUBNET_LABEL', networkId, {
-    onDone: s => {
-      if (s?.label) setLabel(s.label);
-      if (s?.description) setDescription(s.description);
+  const labelJob = useAiJob<{ label?: string; description?: string }>(
+    'SUBNET_LABEL',
+    networkId,
+    {
+      onDone: s => {
+        if (s?.label) setLabel(s.label);
+        if (s?.description) setDescription(s.description);
+      },
+      onFailed: job =>
+        setError(
+          job.error?.message ||
+            'Suggestion failed. Check that the LLM server is reachable (LLM_BASE_URL).'
+        ),
     },
-    onFailed: job => setError(job.error?.message || 'Suggestion failed. Check that the LLM server is reachable (LLM_BASE_URL).'),
-  }, `subnet:${subnetId}:${snapshot.fileId}`);
+    `subnet:${subnetId}:${snapshot.fileId}`
+  );
   const suggesting = starting || labelJob.active;
 
+  const ai = usePermission('ASK_AI');
   const suggest = async () => {
     setStarting(true);
     setError(null);
     try {
-      await labelJob.start(() => aiJobsService.startSubnetLabel(subnetId, networkId, snapshot.fileId));
+      await labelJob.start(() =>
+        aiJobsService.startSubnetLabel(subnetId, networkId, snapshot.fileId)
+      );
     } catch (err: unknown) {
       // e.g. 422 straight away: no member nodes seen in this capture.
-      const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(apiMsg ?? (err instanceof Error ? err.message : 'Suggestion failed. Check that the LLM server is reachable (LLM_BASE_URL).'));
+      const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message;
+      setError(
+        apiMsg ??
+          (err instanceof Error
+            ? err.message
+            : 'Suggestion failed. Check that the LLM server is reachable (LLM_BASE_URL).')
+      );
     } finally {
       setStarting(false);
     }
@@ -63,7 +90,12 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
       // patchSnapshot replaces the whole override set, so merge this CIDR into the existing rows.
       const others: SubnetOverrideInput[] = (snapshot.subnetOverrides ?? [])
         .filter(o => o.cidr !== cidr)
-        .map(o => ({ cidr: o.cidr, label: o.label, description: o.description, inherited: o.inherited }));
+        .map(o => ({
+          cidr: o.cidr,
+          label: o.label,
+          description: o.description,
+          inherited: o.inherited,
+        }));
       // Clearing both fields removes the direct override entirely, so the subnet falls back to a
       // carried-forward label (or the global definition) rather than pinning a blank direct override.
       const merged: SubnetOverrideInput[] = [...others];
@@ -90,7 +122,9 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
       <Modal.Header closeButton>
         <Modal.Title style={{ fontSize: '1rem' }}>
           Edit label for this snapshot
-          <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshot.fileName}</span>
+          <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>
+            · {snapshot.fileName}
+          </span>
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
@@ -101,7 +135,8 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
         </p>
         {error && (
           <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
-            <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
+            <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
+            <span>{error}</span>
           </Alert>
         )}
         <Form.Label className="small mb-1">Label</Form.Label>
@@ -127,13 +162,21 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
           variant="outline-primary"
           size="sm"
           onClick={suggest}
-          disabled={suggesting || saving}
-          title="Ask the AI to infer this subnet's label from this snapshot's member behaviour"
+          disabled={suggesting || saving || !ai.allowed}
         >
-          {suggesting
-            ? <><Spinner size="sm" className="me-1" />Suggesting…</>
-            : <><i className="bi bi-stars me-1" />Suggest with AI</>}
+          {suggesting ? (
+            <>
+              <Spinner size="sm" className="me-1" />
+              Suggesting…
+            </>
+          ) : (
+            <>
+              <i className="bi bi-stars me-1" />
+              Suggest with AI
+            </>
+          )}
         </Button>
+        <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
         {labelJob.active && labelJob.job && (
           <div className="mt-2">
             <AiJobStatus
@@ -141,15 +184,26 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
               job={labelJob.job}
               doing="Suggesting a label"
               whenDone="You can close this; the suggestion fills in here when you're back."
-              onCancel={() => { labelJob.cancel().catch(() => {}); }}
+              onCancel={() => {
+                labelJob.cancel().catch(() => {});
+              }}
             />
           </div>
         )}
       </Modal.Body>
       <Modal.Footer className="d-flex justify-content-end gap-2">
-        <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
         <Button variant="primary" size="sm" onClick={save} disabled={saving}>
-          {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
+          {saving ? (
+            <>
+              <Spinner size="sm" className="me-1" />
+              Saving…
+            </>
+          ) : (
+            'Save'
+          )}
         </Button>
       </Modal.Footer>
     </Modal>

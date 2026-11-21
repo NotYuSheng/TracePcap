@@ -15,6 +15,8 @@ import { Pagination } from '@components/common/Pagination/Pagination';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { SideDrawer, FilterDrawerFooter, FilterPillCount } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import { formatBytes } from '@/utils/formatters';
@@ -73,7 +75,9 @@ const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb?: number }) => {
             rendering occurs. A safety disclaimer is shown before each download. Individual files
             larger than {maxFileSizeMb != null ? `${maxFileSizeMb} MB` : 'the configured limit'} are
             not stored; they appear in this list with a{' '}
-            <Badge bg="warning" text="dark" style={{ fontSize: '0.85em' }}>Too large</Badge>{' '}
+            <Badge bg="warning" text="dark" style={{ fontSize: '0.85em' }}>
+              Too large
+            </Badge>{' '}
             badge so you can see they were detected but skipped.
           </p>
         </Card.Body>
@@ -101,14 +105,29 @@ function mimeIcon(mimeType: string | null): string {
 function nativePreviewMode(mimeType: string | null): 'audio' | 'video' | 'image' | null {
   if (!mimeType) return null;
   // Images — always natively renderable
-  if (mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/gif'
-      || mimeType === 'image/webp' || mimeType === 'image/svg+xml') return 'image';
+  if (
+    mimeType === 'image/jpeg' ||
+    mimeType === 'image/png' ||
+    mimeType === 'image/gif' ||
+    mimeType === 'image/webp' ||
+    mimeType === 'image/svg+xml'
+  )
+    return 'image';
   // Audio — widely supported
-  if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3' || mimeType === 'audio/wav'
-      || mimeType === 'audio/ogg' || mimeType === 'audio/flac' || mimeType === 'audio/aac'
-      || mimeType === 'audio/webm' || mimeType === 'audio/mp4') return 'audio';
+  if (
+    mimeType === 'audio/mpeg' ||
+    mimeType === 'audio/mp3' ||
+    mimeType === 'audio/wav' ||
+    mimeType === 'audio/ogg' ||
+    mimeType === 'audio/flac' ||
+    mimeType === 'audio/aac' ||
+    mimeType === 'audio/webm' ||
+    mimeType === 'audio/mp4'
+  )
+    return 'audio';
   // Video — widely supported
-  if (mimeType === 'video/mp4' || mimeType === 'video/webm' || mimeType === 'video/ogg') return 'video';
+  if (mimeType === 'video/mp4' || mimeType === 'video/webm' || mimeType === 'video/ogg')
+    return 'video';
   return null;
 }
 
@@ -159,7 +178,11 @@ function toggleIn<T>(list: T[], v: T): T[] {
 function methodBadge(method: string | null) {
   if (method === 'tshark_http') return <Badge bg="primary">HTTP</Badge>;
   if (method === 'magic_bytes') return <Badge bg="secondary">Raw stream</Badge>;
-  return <Badge bg="light" text="dark">{method ?? '—'}</Badge>;
+  return (
+    <Badge bg="light" text="dark">
+      {method ?? '—'}
+    </Badge>
+  );
 }
 
 /** Returns a copy of `files` sorted by the given field/direction (unchanged when no field). */
@@ -217,6 +240,7 @@ export const ExtractedFilesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDownload, setPendingDownload] = useState<ExtractedFile | null>(null);
+  const exportPackets = usePermission('EXPORT_PACKETS');
   const [previewFile, setPreviewFile] = useState<ExtractedFile | null>(null);
   const [sortBy, setSortBy] = useState<SortField | ''>('');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -229,8 +253,7 @@ export const ExtractedFilesPage = () => {
   const [pageSize, setPageSize] = useState(25);
 
   const allMimeTypes = useMemo(
-    () =>
-      [...new Set(files.map(f => f.mimeType).filter((m): m is string => m !== null))].sort(),
+    () => [...new Set(files.map(f => f.mimeType).filter((m): m is string => m !== null))].sort(),
     [files]
   );
 
@@ -305,15 +328,24 @@ export const ExtractedFilesPage = () => {
   // Each drawer section narrows by its own field; the search box by name or hash.
   const q = query.trim().toLowerCase();
   const passes = (f: ExtractedFile, skip?: 'mime' | 'method' | 'stored') =>
-    (skip === 'mime' || mimeTypeFilter.length === 0 || (f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))) &&
-    (skip === 'method' || methodFilter.length === 0 || methodFilter.includes(f.extractionMethod ?? '')) &&
+    (skip === 'mime' ||
+      mimeTypeFilter.length === 0 ||
+      (f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))) &&
+    (skip === 'method' ||
+      methodFilter.length === 0 ||
+      methodFilter.includes(f.extractionMethod ?? '')) &&
     (skip === 'stored' || storedFilter.length === 0 || storedFilter.includes(storedOf(f))) &&
-    (!q || (f.filename ?? '').toLowerCase().includes(q) || (f.sha256 ?? '').toLowerCase().includes(q));
+    (!q ||
+      (f.filename ?? '').toLowerCase().includes(q) ||
+      (f.sha256 ?? '').toLowerCase().includes(q));
   const filtered = files.filter(f => passes(f));
   const sorted = sortFiles(filtered, sortBy, sortDir);
   const activeFilterCount = mimeTypeFilter.length + methodFilter.length + storedFilter.length;
   // A chip's count: the files it would add, with every other section's choice applied.
-  const countBy = <K extends string>(skip: 'mime' | 'method' | 'stored', key: (f: ExtractedFile) => K | null) => {
+  const countBy = <K extends string>(
+    skip: 'mime' | 'method' | 'stored',
+    key: (f: ExtractedFile) => K | null
+  ) => {
     const m = new Map<K, number>();
     for (const f of files) {
       if (!passes(f, skip)) continue;
@@ -325,7 +357,9 @@ export const ExtractedFilesPage = () => {
   const mimeCounts = countBy('mime', f => f.mimeType);
   const methodCounts = countBy('method', f => f.extractionMethod);
   const storedCounts = countBy('stored', storedOf);
-  const allMethods = [...new Set(files.map(f => f.extractionMethod).filter((m): m is string => !!m))].sort();
+  const allMethods = [
+    ...new Set(files.map(f => f.extractionMethod).filter((m): m is string => !!m)),
+  ].sort();
   const clearFilters = () => {
     setMimeTypeFilter([]);
     setMethodFilter([]);
@@ -351,10 +385,8 @@ export const ExtractedFilesPage = () => {
           </small>
         </div>
         <Badge bg="secondary" className="fs-6">
-          {activeFilterCount > 0 || q
-            ? `${sorted.length} / ${files.length}`
-            : files.length}{' '}
-          file{files.length !== 1 ? 's' : ''}
+          {activeFilterCount > 0 || q ? `${sorted.length} / ${files.length}` : files.length} file
+          {files.length !== 1 ? 's' : ''}
         </Badge>
       </div>
 
@@ -475,7 +507,11 @@ export const ExtractedFilesPage = () => {
             >
               <i className="bi bi-funnel me-1" aria-hidden="true"></i>
               Filters
-              {activeFilterCount > 0 && <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>}
+              {activeFilterCount > 0 && (
+                <Badge bg="primary" className="ms-2">
+                  {activeFilterCount}
+                </Badge>
+              )}
             </Button>
           )}
         </Card.Header>
@@ -505,95 +541,100 @@ export const ExtractedFilesPage = () => {
                   {paginated.map(file => {
                     const isSkipped = file.skippedReason != null;
                     return (
-                    <tr key={file.id} className={isSkipped ? 'text-muted' : undefined}>
-                      <td>
-                        <i className={`bi ${mimeIcon(file.mimeType)} me-2 text-secondary`}></i>
-                        <span className="font-monospace" style={{ fontSize: '0.85em' }}>
-                          {file.filename ?? '(unnamed)'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-muted" style={{ fontSize: '0.85em' }}>
-                          {file.mimeType ?? '—'}
-                        </span>
-                      </td>
-                      <td className="text-nowrap">
-                        {file.fileSize != null ? formatBytes(file.fileSize) : '—'}
-                      </td>
-                      <td>
-                        {file.sha256 ? (
-                          <CopyHash hash={file.sha256} />
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {file.conversationId ? (
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0"
-                            style={{ fontSize: '0.8em' }}
-                            onClick={() =>
-                              navigate(
-                                `/analysis/${fileId}/conversations?highlight=${file.conversationId}`
-                              )
-                            }
-                          >
-                            View conversation
-                          </Button>
-                        ) : (
-                          <span
-                            className="text-muted"
-                            style={{ fontSize: '0.8em' }}
-                            title="tshark --export-objects does not expose which TCP stream each HTTP object came from"
-                          >
-                            —
+                      <tr key={file.id} className={isSkipped ? 'text-muted' : undefined}>
+                        <td>
+                          <i className={`bi ${mimeIcon(file.mimeType)} me-2 text-secondary`}></i>
+                          <span className="font-monospace" style={{ fontSize: '0.85em' }}>
+                            {file.filename ?? '(unnamed)'}
                           </span>
-                        )}
-                      </td>
-                      <td>{methodBadge(file.extractionMethod)}</td>
-                      <td>
-                        {isSkipped ? (
-                          <Badge
-                            bg="warning"
-                            text="dark"
-                            title={
-                              warnings?.maxFileSizeMb != null
-                                ? `File exceeds the ${warnings.maxFileSizeMb} MB size limit and was not stored`
-                                : 'File exceeds the configured size limit and was not stored'
-                            }
-                          >
-                            <i className="bi bi-slash-circle me-1"></i>
-                            Too large
-                          </Badge>
-                        ) : (
-                          <div className="d-flex gap-1">
-                            {nativePreviewMode(file.mimeType) && (
+                        </td>
+                        <td>
+                          <span className="text-muted" style={{ fontSize: '0.85em' }}>
+                            {file.mimeType ?? '—'}
+                          </span>
+                        </td>
+                        <td className="text-nowrap">
+                          {file.fileSize != null ? formatBytes(file.fileSize) : '—'}
+                        </td>
+                        <td>
+                          {file.sha256 ? (
+                            <CopyHash hash={file.sha256} />
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {file.conversationId ? (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0"
+                              style={{ fontSize: '0.8em' }}
+                              onClick={() =>
+                                navigate(
+                                  `/analysis/${fileId}/conversations?highlight=${file.conversationId}`
+                                )
+                              }
+                            >
+                              View conversation
+                            </Button>
+                          ) : (
+                            <span
+                              className="text-muted"
+                              style={{ fontSize: '0.8em' }}
+                              title="tshark --export-objects does not expose which TCP stream each HTTP object came from"
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                        <td>{methodBadge(file.extractionMethod)}</td>
+                        <td>
+                          {isSkipped ? (
+                            <Badge
+                              bg="warning"
+                              text="dark"
+                              title={
+                                warnings?.maxFileSizeMb != null
+                                  ? `File exceeds the ${warnings.maxFileSizeMb} MB size limit and was not stored`
+                                  : 'File exceeds the configured size limit and was not stored'
+                              }
+                            >
+                              <i className="bi bi-slash-circle me-1"></i>
+                              Too large
+                            </Badge>
+                          ) : (
+                            <div className="d-flex gap-1">
+                              {nativePreviewMode(file.mimeType) && (
+                                <Button
+                                  variant="outline-secondary"
+                                  size="sm"
+                                  className="text-nowrap"
+                                  onClick={() => setPreviewFile(file)}
+                                  title="Preview in browser"
+                                >
+                                  <i className="bi bi-play-circle me-1"></i>
+                                  Preview
+                                </Button>
+                              )}
                               <Button
-                                variant="outline-secondary"
+                                variant="outline-primary"
                                 size="sm"
                                 className="text-nowrap"
-                                onClick={() => setPreviewFile(file)}
-                                title="Preview in browser"
+                                onClick={() => handleDownloadRequest(file)}
+                                disabled={!exportPackets.allowed}
                               >
-                                <i className="bi bi-play-circle me-1"></i>
-                                Preview
+                                <i className="bi bi-download me-1"></i>
+                                Download
                               </Button>
-                            )}
-                            <Button
-                              variant="outline-primary"
-                              size="sm"
-                              className="text-nowrap"
-                              onClick={() => handleDownloadRequest(file)}
-                            >
-                              <i className="bi bi-download me-1"></i>
-                              Download
-                            </Button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                              <PermissionLock
+                                action="EXPORT_PACKETS"
+                                className="align-self-center"
+                              />
+                            </div>
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -608,7 +649,10 @@ export const ExtractedFilesPage = () => {
                 totalItems={sorted.length}
                 pageSize={pageSize}
                 onPageChange={setPage}
-                onPageSizeChange={ps => { setPageSize(ps); setPage(1); }}
+                onPageSizeChange={ps => {
+                  setPageSize(ps);
+                  setPage(1);
+                }}
               />
             </div>
           )}
@@ -710,34 +754,35 @@ export const ExtractedFilesPage = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
-          {previewFile && (() => {
-            const mode = nativePreviewMode(previewFile.mimeType);
-            const url = getPreviewUrl(fileId, previewFile.id);
-            if (mode === 'audio') {
-              return (
-                <audio controls src={url} style={{ width: '100%' }}>
-                  Your browser does not support audio playback.
-                </audio>
-              );
-            }
-            if (mode === 'video') {
-              return (
-                <video controls src={url} style={{ maxWidth: '100%', maxHeight: '60vh' }}>
-                  Your browser does not support video playback.
-                </video>
-              );
-            }
-            if (mode === 'image') {
-              return (
-                <img
-                  src={url}
-                  alt={previewFile.filename ?? 'preview'}
-                  style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }}
-                />
-              );
-            }
-            return null;
-          })()}
+          {previewFile &&
+            (() => {
+              const mode = nativePreviewMode(previewFile.mimeType);
+              const url = getPreviewUrl(fileId, previewFile.id);
+              if (mode === 'audio') {
+                return (
+                  <audio controls src={url} style={{ width: '100%' }}>
+                    Your browser does not support audio playback.
+                  </audio>
+                );
+              }
+              if (mode === 'video') {
+                return (
+                  <video controls src={url} style={{ maxWidth: '100%', maxHeight: '60vh' }}>
+                    Your browser does not support video playback.
+                  </video>
+                );
+              }
+              if (mode === 'image') {
+                return (
+                  <img
+                    src={url}
+                    alt={previewFile.filename ?? 'preview'}
+                    style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }}
+                  />
+                );
+              }
+              return null;
+            })()}
           <Alert variant="warning" className="mt-3 mb-0 text-start" style={{ fontSize: '0.8rem' }}>
             <i className="bi bi-exclamation-triangle-fill me-1"></i>
             Content rendered from a packet capture. Do not interact with active content on a
@@ -750,7 +795,11 @@ export const ExtractedFilesPage = () => {
           </Button>
           <Button
             variant="outline-primary"
-            onClick={() => { setPreviewFile(null); handleDownloadRequest(previewFile!); }}
+            onClick={() => {
+              setPreviewFile(null);
+              handleDownloadRequest(previewFile!);
+            }}
+            disabled={!exportPackets.allowed}
           >
             <i className="bi bi-download me-1"></i>
             Download

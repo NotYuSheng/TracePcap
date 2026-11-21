@@ -2,8 +2,15 @@ import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrig
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Badge, Button, Modal, Popover } from '@govtechsg/sgds-react';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
-import { tracerService, type TracerExplainResponse, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
+import {
+  tracerService,
+  type TracerExplainResponse,
+  type TracerStep,
+  type TracerStepsResponse,
+  type TracerPeer,
+} from '@/features/tracer/tracerService';
 import { aiJobsService } from '@/features/aiJobs/aiJobsService';
 import { useAiJob } from '@/features/aiJobs/useAiJob';
 import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
@@ -18,8 +25,8 @@ function AiExplanationInfoPopover() {
           string, and up to 64 bytes of payload decoded as ASCII (where readable).
         </p>
         <p className="mb-2">
-          <strong>Works well for:</strong> TCP handshakes, HTTP requests, DNS queries, TLS
-          handshake phases — where the info field or payload is descriptive.
+          <strong>Works well for:</strong> TCP handshakes, HTTP requests, DNS queries, TLS handshake
+          phases — where the info field or payload is descriptive.
         </p>
         <p className="mb-0">
           <strong>Limited for:</strong> encrypted traffic (TLS data, RDP) where only size and
@@ -55,20 +62,28 @@ const SVG_H = 380;
 const CX = SVG_W / 2;
 const CY = SVG_H / 2;
 const PEER_R = 150; // radius of the peer ring
-const NODE_R = 26;  // node circle radius
+const NODE_R = 26; // node circle radius
 
 // Node state colors
-const COLOR_ACTIVE = '#0072c6';   // traced peer (blue)
+const COLOR_ACTIVE = '#0072c6'; // traced peer (blue)
 const COLOR_RESPONDED = '#107c10'; // peer that replied (green)
-const COLOR_SILENT = '#9aa0a6';    // peer that never replied (muted gray)
+const COLOR_SILENT = '#9aa0a6'; // peer that never replied (muted gray)
 
 /** Legend swatch — defined at module scope to avoid recreating the component each render. */
 function Swatch({ color, dashed, text }: { color: string; dashed?: boolean; text: string }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       <svg width={16} height={10} aria-hidden="true">
-        <circle cx={5} cy={5} r={4} fill="none" stroke={color} strokeWidth={1.5}
-          strokeDasharray={dashed ? '2 2' : undefined} opacity={dashed ? 0.7 : 1} />
+        <circle
+          cx={5}
+          cy={5}
+          r={4}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeDasharray={dashed ? '2 2' : undefined}
+          opacity={dashed ? 0.7 : 1}
+        />
       </svg>
       {text}
     </span>
@@ -94,7 +109,10 @@ function shortIp(ip: string): string {
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 
-export const ConversationTracerModal = ({ conversationId, onClose }: ConversationTracerModalProps) => {
+export const ConversationTracerModal = ({
+  conversationId,
+  onClose,
+}: ConversationTracerModalProps) => {
   const [tracer, setTracer] = useState<TracerStepsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,23 +122,34 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const [isPlaying, setIsPlaying] = useState(false);
   const [explanations, setExplanations] = useState<Map<number, string>>(new Map());
   const [explainStarting, setExplainStarting] = useState(false);
+  // Roles (#915): without Ask the AI the steps still play, just without the AI's explanations.
+  const ai = usePermission('ASK_AI');
   const [explainError, setExplainError] = useState<string | null>(null);
 
   // Explanations are written in the background (one job at a time for the model); ones already
   // worked out come back at once. Closing the tracer doesn't lose them.
-  const explainJob = useAiJob<TracerExplainResponse>('TRACE_EXPLANATIONS', null, {
-    onDone: data => {
-      if (!data) return;
-      if (data.error) {
-        setExplainError(data.error);
-        return;
-      }
-      const map = new Map<number, string>();
-      data.explanations.forEach(e => map.set(e.stepIndex, e.explanation));
-      setExplanations(map);
+  const explainJob = useAiJob<TracerExplainResponse>(
+    'TRACE_EXPLANATIONS',
+    null,
+    {
+      onDone: data => {
+        if (!data) return;
+        if (data.error) {
+          setExplainError(data.error);
+          return;
+        }
+        const map = new Map<number, string>();
+        data.explanations.forEach(e => map.set(e.stepIndex, e.explanation));
+        setExplanations(map);
+      },
+      onFailed: job =>
+        setExplainError(
+          job.error?.message ||
+            'AI explanation unavailable — could not reach the language model. Check your LLM configuration.'
+        ),
     },
-    onFailed: job => setExplainError(job.error?.message || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.'),
-  }, conversationId);
+    conversationId
+  );
   const startExplainJob = explainJob.start;
   const explainLoading = explainStarting || explainJob.active;
 
@@ -134,7 +163,8 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   // Fetch tracer steps
   useEffect(() => {
     setLoading(true);
-    tracerService.getSteps(conversationId)
+    tracerService
+      .getSteps(conversationId)
       .then(data => {
         setTracer(data);
         setCurrentStep(0);
@@ -147,8 +177,17 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   useEffect(() => {
     if (!tracer) return;
     let cancelled = false;
-    const fallback = [{ ip: tracer.dstIp, conversationId, protocol: tracer.protocol, packetCount: 0, responded: false }];
-    tracerService.getPeers(conversationId)
+    const fallback = [
+      {
+        ip: tracer.dstIp,
+        conversationId,
+        protocol: tracer.protocol,
+        packetCount: 0,
+        responded: false,
+      },
+    ];
+    tracerService
+      .getPeers(conversationId)
       .then(result => {
         if (cancelled) return;
         // Keep the ring readable: always include the traced peer, then fill up to 12.
@@ -161,13 +200,23 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
         if (cancelled) return;
         setPeers(fallback);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tracer, conversationId]);
 
   // Ask for the explanations once the steps are in
   const hasSteps = !!tracer && tracer.steps.length > 0;
   useEffect(() => {
     if (!hasSteps) return;
+    if (!ai.allowed) {
+      setExplainError(
+        ai.reason
+          ? `No AI explanations: ${ai.reason}`
+          : "Your roles don't include asking the AI, so the steps have no explanations."
+      );
+      return;
+    }
     let alive = true;
     const run = async () => {
       setExplainStarting(true);
@@ -175,26 +224,38 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
       try {
         await startExplainJob(() => aiJobsService.startExplanations(conversationId));
       } catch (err) {
-        const backendError = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        if (alive) setExplainError(backendError || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.');
+        const backendError = (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message;
+        if (alive)
+          setExplainError(
+            backendError ||
+              'AI explanation unavailable — could not reach the language model. Check your LLM configuration.'
+          );
       } finally {
         if (alive) setExplainStarting(false);
       }
     };
     run();
-    return () => { alive = false; };
-  }, [hasSteps, conversationId, startExplainJob]);
+    return () => {
+      alive = false;
+    };
+  }, [hasSteps, conversationId, startExplainJob, ai.allowed, ai.reason]);
 
   // Auto-play
   useEffect(() => {
     if (!isPlaying || !tracer) return;
     playInterval.current = setInterval(() => {
       setCurrentStep(prev => {
-        if (prev >= tracer.steps.length - 1) { setIsPlaying(false); return prev; }
+        if (prev >= tracer.steps.length - 1) {
+          setIsPlaying(false);
+          return prev;
+        }
         return prev + 1;
       });
     }, 1500);
-    return () => { if (playInterval.current) clearInterval(playInterval.current); };
+    return () => {
+      if (playInterval.current) clearInterval(playInterval.current);
+    };
   }, [isPlaying, tracer]);
 
   // Animate dot along edge on step change
@@ -210,7 +271,9 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
   }, [currentStep]);
 
   // Scroll current step into view
@@ -234,8 +297,14 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   // Step navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') { e.stopPropagation(); next(); }
-      if (e.key === 'ArrowLeft') { e.stopPropagation(); prev(); }
+      if (e.key === 'ArrowRight') {
+        e.stopPropagation();
+        next();
+      }
+      if (e.key === 'ArrowLeft') {
+        e.stopPropagation();
+        prev();
+      }
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
@@ -253,9 +322,8 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const dotPos = useMemo(() => {
     if (!step || activePeerIdx < 0) return null;
     const pos = peerPos(activePeerIdx, peers.length);
-    const [fx, fy, tx, ty] = step.direction === 'CLIENT'
-      ? [CX, CY, pos.x, pos.y]
-      : [pos.x, pos.y, CX, CY];
+    const [fx, fy, tx, ty] =
+      step.direction === 'CLIENT' ? [CX, CY, pos.x, pos.y] : [pos.x, pos.y, CX, CY];
     return {
       x: fx + (tx - fx) * dotT,
       y: fy + (ty - fy) * dotT,
@@ -265,137 +333,194 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
 
   return (
     <Modal show onHide={onClose} size="lg" centered>
-      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh', overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh', overflow: 'hidden' }}
+      >
         {/* Header */}
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div className="fw-semibold" style={{ fontSize: 14 }}>Conversation Tracer</div>
-              <div style={{ fontSize: 11, color: 'var(--tp-text-muted)', fontFamily: 'monospace' }}>{title}</div>
-              {tracer?.protocol && (
-                <Badge bg="secondary" className="ms-0 mt-1" style={{ fontSize: 10 }}>
-                  {tracer.protocol}{tracer.appName ? ` / ${tracer.appName}` : ''}
-                </Badge>
-              )}
+        <div
+          style={{
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--tp-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div className="fw-semibold" style={{ fontSize: 14 }}>
+              Conversation Tracer
             </div>
-            <button className="btn-close" onClick={onClose} />
+            <div style={{ fontSize: 11, color: 'var(--tp-text-muted)', fontFamily: 'monospace' }}>
+              {title}
+            </div>
+            {tracer?.protocol && (
+              <Badge bg="secondary" className="ms-0 mt-1" style={{ fontSize: 10 }}>
+                {tracer.protocol}
+                {tracer.appName ? ` / ${tracer.appName}` : ''}
+              </Badge>
+            )}
           </div>
+          <button className="btn-close" onClick={onClose} />
+        </div>
 
-          {loading && (
-            <div className="d-flex align-items-center justify-content-center p-5">
-              <Spinner animation="border" className="text-primary me-2" />
-              <span>Loading packets…</span>
-            </div>
-          )}
+        {loading && (
+          <div className="d-flex align-items-center justify-content-center p-5">
+            <Spinner animation="border" className="text-primary me-2" />
+            <span>Loading packets…</span>
+          </div>
+        )}
 
-          {error && <Alert variant="danger" className="m-3">{error}</Alert>}
+        {error && (
+          <Alert variant="danger" className="m-3">
+            {error}
+          </Alert>
+        )}
 
-          {!loading && !error && tracer && (
-            <>
-              {/* Star-graph visualization */}
-              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--tp-border)' }}>
-                <svg
-                  viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                  style={{ width: '100%', height: 'auto', maxHeight: 260, display: 'block' }}
-                >
-                  {/* Edges */}
-                  {peers.map((peer, i) => {
-                    const pos = peerPos(i, peers.length);
-                    const isActive = peer.ip === activePeerIp;
-                    const color = isActive
-                      ? COLOR_ACTIVE
-                      : peer.responded ? COLOR_RESPONDED : COLOR_SILENT;
-                    // Silent peers: dashed + dimmed; responded/active: solid edge.
-                    return (
-                      <line
-                        key={peer.ip}
-                        x1={CX} y1={CY}
-                        x2={pos.x} y2={pos.y}
-                        stroke={color}
-                        strokeWidth={isActive ? 2.5 : 1.5}
-                        strokeDasharray={peer.responded || isActive ? undefined : '5 4'}
-                        opacity={peer.responded || isActive ? 1 : 0.5}
-                      />
-                    );
-                  })}
-
-                  {/* Animated dot */}
-                  {dotPos && (
-                    <circle
-                      cx={dotPos.x}
-                      cy={dotPos.y}
-                      r={7}
-                      fill={dotPos.color}
-                      stroke="#fff"
-                      strokeWidth={2}
+        {!loading && !error && tracer && (
+          <>
+            {/* Star-graph visualization */}
+            <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--tp-border)' }}>
+              <svg
+                viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+                style={{ width: '100%', height: 'auto', maxHeight: 260, display: 'block' }}
+              >
+                {/* Edges */}
+                {peers.map((peer, i) => {
+                  const pos = peerPos(i, peers.length);
+                  const isActive = peer.ip === activePeerIp;
+                  const color = isActive
+                    ? COLOR_ACTIVE
+                    : peer.responded
+                      ? COLOR_RESPONDED
+                      : COLOR_SILENT;
+                  // Silent peers: dashed + dimmed; responded/active: solid edge.
+                  return (
+                    <line
+                      key={peer.ip}
+                      x1={CX}
+                      y1={CY}
+                      x2={pos.x}
+                      y2={pos.y}
+                      stroke={color}
+                      strokeWidth={isActive ? 2.5 : 1.5}
+                      strokeDasharray={peer.responded || isActive ? undefined : '5 4'}
+                      opacity={peer.responded || isActive ? 1 : 0.5}
                     />
-                  )}
+                  );
+                })}
 
-                  {/* Center node (srcIp / host) */}
-                  <circle cx={CX} cy={CY} r={NODE_R} fill="var(--tp-bg-subtle)" stroke="#0072c6" strokeWidth={2} />
-                  <text
-                    x={CX} y={CY + 4}
-                    textAnchor="middle" dominantBaseline="middle"
-                    fontSize={8} fontFamily="monospace" fill="#0050a0"
-                  >
-                    {shortIp(tracer.srcIp)}
-                  </text>
-                  <text x={CX} y={CY + NODE_R + 13} textAnchor="middle" fontSize={10} fill="var(--tp-text-muted)">
-                    Host
-                  </text>
+                {/* Animated dot */}
+                {dotPos && (
+                  <circle
+                    cx={dotPos.x}
+                    cy={dotPos.y}
+                    r={7}
+                    fill={dotPos.color}
+                    stroke="#fff"
+                    strokeWidth={2}
+                  />
+                )}
 
-                  {/* Peer nodes */}
-                  {peers.map((peer, i) => {
-                    const pos = peerPos(i, peers.length);
-                    const isActive = peer.ip === activePeerIp;
-                    const silent = !peer.responded && !isActive;
-                    const color = isActive
-                      ? COLOR_ACTIVE
-                      : peer.responded ? COLOR_RESPONDED : COLOR_SILENT;
-                    const label = isActive
-                      ? 'Traced'
-                      : peer.responded ? 'Responded' : 'No response';
-                    // Place label above or below based on y position
-                    const labelY = pos.y < CY
-                      ? pos.y - NODE_R - 6
-                      : pos.y + NODE_R + 13;
-                    return (
-                      <g key={peer.ip} opacity={silent ? 0.55 : 1}>
-                        <circle
-                          cx={pos.x} cy={pos.y} r={NODE_R}
-                          fill={isActive ? 'var(--tp-surface-hover)' : 'var(--tp-bg-subtle)'}
-                          stroke={color}
-                          strokeWidth={isActive ? 2 : 1.5}
-                          strokeDasharray={silent ? '4 3' : undefined}
-                        />
-                        <text
-                          x={pos.x} y={pos.y + 4}
-                          textAnchor="middle" dominantBaseline="middle"
-                          fontSize={8} fontFamily="monospace"
-                          fill={color}
-                        >
-                          {shortIp(peer.ip)}
-                        </text>
-                        <text
-                          x={pos.x} y={labelY}
-                          textAnchor="middle" fontSize={10}
-                          fill={color}
-                          fontWeight={isActive ? 600 : 400}
-                        >
-                          {label}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </svg>
+                {/* Center node (srcIp / host) */}
+                <circle
+                  cx={CX}
+                  cy={CY}
+                  r={NODE_R}
+                  fill="var(--tp-bg-subtle)"
+                  stroke="#0072c6"
+                  strokeWidth={2}
+                />
+                <text
+                  x={CX}
+                  y={CY + 4}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={8}
+                  fontFamily="monospace"
+                  fill="#0050a0"
+                >
+                  {shortIp(tracer.srcIp)}
+                </text>
+                <text
+                  x={CX}
+                  y={CY + NODE_R + 13}
+                  textAnchor="middle"
+                  fontSize={10}
+                  fill="var(--tp-text-muted)"
+                >
+                  Host
+                </text>
 
-                {/* Legend + scan summary — only meaningful when probing multiple peers */}
-                {peers.length > 1 && (() => {
+                {/* Peer nodes */}
+                {peers.map((peer, i) => {
+                  const pos = peerPos(i, peers.length);
+                  const isActive = peer.ip === activePeerIp;
+                  const silent = !peer.responded && !isActive;
+                  const color = isActive
+                    ? COLOR_ACTIVE
+                    : peer.responded
+                      ? COLOR_RESPONDED
+                      : COLOR_SILENT;
+                  const label = isActive ? 'Traced' : peer.responded ? 'Responded' : 'No response';
+                  // Place label above or below based on y position
+                  const labelY = pos.y < CY ? pos.y - NODE_R - 6 : pos.y + NODE_R + 13;
+                  return (
+                    <g key={peer.ip} opacity={silent ? 0.55 : 1}>
+                      <circle
+                        cx={pos.x}
+                        cy={pos.y}
+                        r={NODE_R}
+                        fill={isActive ? 'var(--tp-surface-hover)' : 'var(--tp-bg-subtle)'}
+                        stroke={color}
+                        strokeWidth={isActive ? 2 : 1.5}
+                        strokeDasharray={silent ? '4 3' : undefined}
+                      />
+                      <text
+                        x={pos.x}
+                        y={pos.y + 4}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize={8}
+                        fontFamily="monospace"
+                        fill={color}
+                      >
+                        {shortIp(peer.ip)}
+                      </text>
+                      <text
+                        x={pos.x}
+                        y={labelY}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fill={color}
+                        fontWeight={isActive ? 600 : 400}
+                      >
+                        {label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+
+              {/* Legend + scan summary — only meaningful when probing multiple peers */}
+              {peers.length > 1 &&
+                (() => {
                   // Counts exclude the traced peer, which is shown as its own state.
                   const nonTraced = peers.filter(p => p.ip !== activePeerIp);
                   const respondedCount = nonTraced.filter(p => p.responded).length;
                   const silentCount = nonTraced.length - respondedCount;
                   return (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 10, color: 'var(--tp-text-muted)', marginBottom: 4 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 12,
+                        fontSize: 10,
+                        color: 'var(--tp-text-muted)',
+                        marginBottom: 4,
+                      }}
+                    >
                       <Swatch color={COLOR_RESPONDED} text={`Responded (${respondedCount})`} />
                       <Swatch color={COLOR_SILENT} dashed text={`No response (${silentCount})`} />
                       <Swatch color={COLOR_ACTIVE} text="Traced" />
@@ -403,121 +528,170 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
                   );
                 })()}
 
-                {/* Step info */}
-                {step?.info && (
-                  <div style={{ fontSize: 10, color: 'var(--tp-text-muted)', textAlign: 'center', marginBottom: 6, fontStyle: 'italic' }}>
-                    {step.direction === 'CLIENT' ? '→' : '←'} {step.protocol} · {step.size}B
-                    {' — '}
-                    {step.info.length > 100 ? step.info.slice(0, 100) + '…' : step.info}
-                  </div>
-                )}
+              {/* Step info */}
+              {step?.info && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--tp-text-muted)',
+                    textAlign: 'center',
+                    marginBottom: 6,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {step.direction === 'CLIENT' ? '→' : '←'} {step.protocol} · {step.size}B{' — '}
+                  {step.info.length > 100 ? step.info.slice(0, 100) + '…' : step.info}
+                </div>
+              )}
 
-                {/* LLM explanation */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AiExplanationInfoPopover />
-                  <div
-                    style={{
-                      flex: 1,
-                      minHeight: 44,
-                      background: 'var(--tp-bg-subtle)',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      fontSize: 12,
-                      color: 'var(--tp-text)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <i className="bi bi-stars" style={{ color: '#6c757d', flexShrink: 0 }} />
-                    {explainLoading ? (
-                      explainJob.active && explainJob.job ? (
-                        <AiJobStatus
-                          compact
-                          job={explainJob.job}
-                          doing="Explaining each packet"
-                          whenDone="They fill in here when they're ready."
-                          onCancel={() => { explainJob.cancel().catch(() => {}); }}
-                        />
-                      ) : (
-                        <span className="text-muted">Generating AI explanation…</span>
-                      )
-                    ) : explainError ? (
-                      <span style={{ color: 'var(--bs-danger)' }}>{explainError}</span>
-                    ) : explanations.has(currentStep) ? (
-                      <span>{explanations.get(currentStep)}</span>
+              {/* LLM explanation */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AiExplanationInfoPopover />
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 44,
+                    background: 'var(--tp-bg-subtle)',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    color: 'var(--tp-text)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <i className="bi bi-stars" style={{ color: '#6c757d', flexShrink: 0 }} />
+                  {explainLoading ? (
+                    explainJob.active && explainJob.job ? (
+                      <AiJobStatus
+                        compact
+                        job={explainJob.job}
+                        doing="Explaining each packet"
+                        whenDone="They fill in here when they're ready."
+                        onCancel={() => {
+                          explainJob.cancel().catch(() => {});
+                        }}
+                      />
                     ) : (
-                      <span className="text-muted">No explanation available for this packet.</span>
-                    )}
-                  </div>
+                      <span className="text-muted">Generating AI explanation…</span>
+                    )
+                  ) : explainError ? (
+                    <span style={{ color: 'var(--bs-danger)' }}>{explainError}</span>
+                  ) : explanations.has(currentStep) ? (
+                    <span>{explanations.get(currentStep)}</span>
+                  ) : (
+                    <span className="text-muted">No explanation available for this packet.</span>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Navigation */}
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <Button size="sm" variant="outline-secondary" onClick={prev} disabled={currentStep === 0}>‹ Prev</Button>
-                <span style={{ fontSize: 12, color: 'var(--tp-text-muted)', minWidth: 90, textAlign: 'center' }}>
-                  Step {currentStep + 1} / {tracer.steps.length}
-                </span>
-                <Button size="sm" variant="outline-secondary" onClick={next} disabled={currentStep >= tracer.steps.length - 1}>Next ›</Button>
-                <Button
-                  size="sm"
-                  variant={isPlaying ? 'warning' : 'outline-primary'}
-                  onClick={togglePlay}
-                  disabled={currentStep >= tracer.steps.length - 1}
-                  title={isPlaying ? 'Pause' : 'Auto-play'}
-                >
-                  <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'}`} />
-                </Button>
-              </div>
+            {/* Navigation */}
+            <div
+              style={{
+                padding: '10px 16px',
+                borderBottom: '1px solid var(--tp-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 12,
+              }}
+            >
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={prev}
+                disabled={currentStep === 0}
+              >
+                ‹ Prev
+              </Button>
+              <span
+                style={{
+                  fontSize: 12,
+                  color: 'var(--tp-text-muted)',
+                  minWidth: 90,
+                  textAlign: 'center',
+                }}
+              >
+                Step {currentStep + 1} / {tracer.steps.length}
+              </span>
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={next}
+                disabled={currentStep >= tracer.steps.length - 1}
+              >
+                Next ›
+              </Button>
+              <Button
+                size="sm"
+                variant={isPlaying ? 'warning' : 'outline-primary'}
+                onClick={togglePlay}
+                disabled={currentStep >= tracer.steps.length - 1}
+                title={isPlaying ? 'Pause' : 'Auto-play'}
+              >
+                <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'}`} />
+              </Button>
+            </div>
 
-              {/* Packet list */}
-              <div ref={listRef} style={{ overflowY: 'auto', flex: 1, maxHeight: 200 }}>
-                <table className="table table-sm table-hover mb-0" style={{ fontSize: 11 }}>
-                  <thead className="table-light sticky-top">
-                    <tr>
-                      <th>#</th>
-                      <th>Dir</th>
-                      <th>Protocol</th>
-                      <th>Size</th>
-                      <th>Timestamp</th>
-                      <th>Info</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tracer.steps.map(s => (
-                      <tr
-                        key={s.stepIndex}
-                        data-step={s.stepIndex}
-                        onClick={() => goTo(s.stepIndex)}
-                        style={{ cursor: 'pointer' }}
-                        className={s.stepIndex === currentStep ? 'table-primary' : ''}
-                      >
-                        <td className="text-muted">{s.stepIndex + 1}</td>
-                        <td>
-                          <span style={{ color: s.direction === 'CLIENT' ? '#0072c6' : '#107c10', fontWeight: 600 }}>
-                            {s.direction === 'CLIENT' ? '→' : '←'}
-                          </span>
-                        </td>
-                        <td>{s.protocol}</td>
-                        <td>{s.size}B</td>
-                        <td style={{ fontFamily: 'monospace', fontSize: 10 }}>
-                          {s.timestamp ? s.timestamp.split(' ')[1] : '—'}
-                        </td>
-                        <td
-                          style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          title={s.info ?? ''}
+            {/* Packet list */}
+            <div ref={listRef} style={{ overflowY: 'auto', flex: 1, maxHeight: 200 }}>
+              <table className="table table-sm table-hover mb-0" style={{ fontSize: 11 }}>
+                <thead className="table-light sticky-top">
+                  <tr>
+                    <th>#</th>
+                    <th>Dir</th>
+                    <th>Protocol</th>
+                    <th>Size</th>
+                    <th>Timestamp</th>
+                    <th>Info</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tracer.steps.map(s => (
+                    <tr
+                      key={s.stepIndex}
+                      data-step={s.stepIndex}
+                      onClick={() => goTo(s.stepIndex)}
+                      style={{ cursor: 'pointer' }}
+                      className={s.stepIndex === currentStep ? 'table-primary' : ''}
+                    >
+                      <td className="text-muted">{s.stepIndex + 1}</td>
+                      <td>
+                        <span
+                          style={{
+                            color: s.direction === 'CLIENT' ? '#0072c6' : '#107c10',
+                            fontWeight: 600,
+                          }}
                         >
-                          {s.info ?? '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
+                          {s.direction === 'CLIENT' ? '→' : '←'}
+                        </span>
+                      </td>
+                      <td>{s.protocol}</td>
+                      <td>{s.size}B</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: 10 }}>
+                        {s.timestamp ? s.timestamp.split(' ')[1] : '—'}
+                      </td>
+                      <td
+                        style={{
+                          maxWidth: 200,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={s.info ?? ''}
+                      >
+                        {s.info ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
     </Modal>
   );
 };

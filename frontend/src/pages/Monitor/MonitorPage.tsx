@@ -2,6 +2,8 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Container, Dropdown, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import type { Network } from '@/features/monitor/types/monitor.types';
@@ -27,6 +29,10 @@ export const MonitorPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const create = usePermission('NETWORK_CREATE');
+  const rename = usePermission('NETWORK_SETTINGS');
+  const remove = usePermission('NETWORK_DELETE');
+  const addCaptures = usePermission('NETWORK_CAPTURES');
   const [editNetwork, setEditNetwork] = useState<Network | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -120,9 +126,17 @@ export const MonitorPage = () => {
             Captures of the same network over time, each compared with the one before.
           </p>
         </div>
-        <Button type="button" variant="primary" onClick={() => setShowCreate(true)}>
-          <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>New network
-        </Button>
+        <div className="d-flex align-items-center">
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => setShowCreate(true)}
+            disabled={!create.allowed}
+          >
+            <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>New network
+          </Button>
+          <PermissionLock action="NETWORK_CREATE" />
+        </div>
       </div>
 
       {error && (
@@ -256,20 +270,29 @@ export const MonitorPage = () => {
                           {deviceCounts[n.id] ?? (caps.length === 0 ? 0 : '…')}
                         </td>
                         <td className="text-end text-nowrap">
-                          <Link
-                            to={st.to}
-                            className={`btn btn-sm ${st.key === 'review' || st.key === 'critical' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                          >
-                            {st.action}
-                          </Link>
-                          {(st.key === 'review' || st.key === 'critical' || st.key === 'clear') && (
+                          {st.to.includes('add=1') && !addCaptures.allowed ? (
+                            <Button size="sm" variant="outline-secondary" disabled>
+                              {st.action}
+                            </Button>
+                          ) : (
                             <Link
-                              to={`/monitor/${n.id}?add=1`}
-                              className="btn btn-sm btn-outline-secondary ms-2"
+                              to={st.to}
+                              className={`btn btn-sm ${st.key === 'review' || st.key === 'critical' ? 'btn-primary' : 'btn-outline-secondary'}`}
                             >
-                              Add a capture
+                              {st.action}
                             </Link>
                           )}
+                          {addCaptures.allowed &&
+                            (st.key === 'review' ||
+                              st.key === 'critical' ||
+                              st.key === 'clear') && (
+                              <Link
+                                to={`/monitor/${n.id}?add=1`}
+                                className="btn btn-sm btn-outline-secondary ms-2"
+                              >
+                                Add a capture
+                              </Link>
+                            )}
                           <Dropdown align="end" className="d-inline-block ms-2">
                             <Dropdown.Toggle
                               variant="outline-secondary"
@@ -281,14 +304,23 @@ export const MonitorPage = () => {
                               <i className="bi bi-three-dots" aria-hidden="true"></i>
                             </Dropdown.Toggle>
                             <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
-                              <Dropdown.Item onClick={() => setEditNetwork(n)}>
+                              <Dropdown.Item
+                                onClick={() => setEditNetwork(n)}
+                                disabled={!rename.allowed}
+                              >
                                 Rename
                               </Dropdown.Item>
                               <Dropdown.Item
-                                className="text-danger"
+                                className={remove.allowed ? 'text-danger' : undefined}
+                                disabled={!remove.allowed}
                                 onClick={() => setConfirmDeleteId(n.id)}
                               >
                                 Delete
+                                {!remove.allowed && (
+                                  <span className="d-block small text-muted">
+                                    Your roles can't delete networks
+                                  </span>
+                                )}
                               </Dropdown.Item>
                             </Dropdown.Menu>
                           </Dropdown>

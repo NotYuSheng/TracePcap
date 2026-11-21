@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import {
   adjudicationService,
   type AdjudicationOverride,
@@ -65,7 +67,13 @@ function LabelField({
   const mode = otherSelected || isOtherValue ? OTHER : value;
   if (!options || options.length === 0) {
     return (
-      <Form.Control size="sm" className="mb-2" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+      <Form.Control
+        size="sm"
+        className="mb-2"
+        placeholder={placeholder}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
     );
   }
   return (
@@ -82,12 +90,20 @@ function LabelField({
       >
         <option value="">Select a label…</option>
         {options.map(o => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o} value={o}>
+            {o}
+          </option>
         ))}
         <option value={OTHER}>Other…</option>
       </Form.Select>
       {mode === OTHER && (
-        <Form.Control size="sm" className="mb-2" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+        <Form.Control
+          size="sm"
+          className="mb-2"
+          placeholder={placeholder}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        />
       )}
     </>
   );
@@ -99,8 +115,19 @@ function LabelField({
  * by `question`, so the same component serves host-identity today and any future adjudicated
  * question with no changes.
  */
-export function AdjudicationPanel({ fileId, question, entityKey, title, verdict, onChanged, labelOptions }: Props) {
+export function AdjudicationPanel({
+  fileId,
+  question,
+  entityKey,
+  title,
+  verdict,
+  onChanged,
+  labelOptions,
+}: Props) {
   const [override, setOverride] = useState<AdjudicationOverride | null>(null);
+  // Roles (#915): without Override an answer, the answer and its evidence stay visible, read-only.
+  const canOverride = usePermission('OVERRIDE_ANSWERS');
+  const locked = !canOverride.allowed;
   const [evidence, setEvidence] = useState<AdjudicationEvidence[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -175,7 +202,9 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
       await action();
     } catch (err) {
       console.error(`${label} failed:`, err);
-      setActionError(`${label} failed${err instanceof Error && err.message ? `: ${err.message}` : ''}. Please retry.`);
+      setActionError(
+        `${label} failed${err instanceof Error && err.message ? `: ${err.message}` : ''}. Please retry.`
+      );
     } finally {
       setBusy(false);
     }
@@ -184,7 +213,13 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
   const handleSaveOverride = () => {
     if (!overrideLabel.trim()) return;
     return runAction('Saving the override', async () => {
-      await adjudicationService.setOverride(fileId, question, entityKey, overrideLabel.trim(), overrideRationale.trim() || undefined);
+      await adjudicationService.setOverride(
+        fileId,
+        question,
+        entityKey,
+        overrideLabel.trim(),
+        overrideRationale.trim() || undefined
+      );
       setOverriding(false);
       setOverrideLabel('');
       setOverrideRationale('');
@@ -197,7 +232,13 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
    *  the label and clears the contested flag (#499). */
   const handleResolve = (label: string) =>
     runAction('Confirming the label', async () => {
-      await adjudicationService.setOverride(fileId, question, entityKey, label, 'Resolved a contested verdict');
+      await adjudicationService.setOverride(
+        fileId,
+        question,
+        entityKey,
+        label,
+        'Resolved a contested verdict'
+      );
       refresh();
       onChanged();
     });
@@ -214,10 +255,23 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
     return runAction('Saving evidence', async () => {
       if (editingEvidenceId != null) {
         await adjudicationService.updateEvidence(
-          fileId, question, entityKey, editingEvidenceId, evLabel.trim(), evWeight, evReason.trim());
+          fileId,
+          question,
+          entityKey,
+          editingEvidenceId,
+          evLabel.trim(),
+          evWeight,
+          evReason.trim()
+        );
       } else {
         await adjudicationService.appendEvidence(
-          fileId, question, entityKey, evLabel.trim(), evWeight, evReason.trim());
+          fileId,
+          question,
+          entityKey,
+          evLabel.trim(),
+          evWeight,
+          evReason.trim()
+        );
       }
       resetEvidenceForm();
       refresh();
@@ -252,12 +306,23 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
             size="sm"
             className="py-0"
             style={{ fontSize: '0.75rem' }}
-            onClick={() => { setOverriding(true); setOverrideLabel(''); }}
+            onClick={() => {
+              setOverriding(true);
+              setOverrideLabel('');
+            }}
+            disabled={locked}
           >
             <i className="bi bi-pencil me-1" />I disagree
           </Button>
         )}
       </h6>
+      {locked && (
+        <p className="small text-muted mb-2" data-testid="override-locked">
+          <i className="bi bi-lock me-1" aria-hidden="true" />
+          You can see this answer and its evidence but not change them.
+          <PermissionLock action="OVERRIDE_ANSWERS" />
+        </p>
+      )}
 
       {loading && <div className="text-muted small fst-italic">Loading…</div>}
 
@@ -286,7 +351,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                         : 'Adjudicated from classification'
               }
             >
-              {(override || verdict.basis === 'HUMAN') ? '✓ ' : ''}
+              {override || verdict.basis === 'HUMAN' ? '✓ ' : ''}
               {/* An override wins the label outright — show what the analyst chose, not the stale
                   machine verdict (the per-axis panels don't re-fetch their verdict). */}
               {override ? override.label : verdict.label}
@@ -319,9 +384,10 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                     className="py-0"
                     style={{ fontSize: '0.72rem' }}
                     onClick={() => handleResolve(label)}
-                    disabled={busy}
+                    disabled={busy || locked}
                   >
-                    <i className="bi bi-check2 me-1" />{label}
+                    <i className="bi bi-check2 me-1" />
+                    {label}
                   </Button>
                 ))}
                 {/* None of the candidates is right — set a different answer via the override editor. */}
@@ -330,10 +396,14 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                   size="sm"
                   className="py-0"
                   style={{ fontSize: '0.72rem' }}
-                  onClick={() => { setOverriding(true); setOverrideLabel(''); }}
-                  disabled={busy}
+                  onClick={() => {
+                    setOverriding(true);
+                    setOverrideLabel('');
+                  }}
+                  disabled={busy || locked}
                 >
-                  <i className="bi bi-pencil me-1" />Other…
+                  <i className="bi bi-pencil me-1" />
+                  Other…
                 </Button>
               </div>
             </Alert>
@@ -361,14 +431,20 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                     // Re-saving the same answer flips the row to MANUAL server-side, clearing the
                     // stale flags and re-baselining drift from this snapshot.
                     await adjudicationService.setOverride(
-                      fileId, question, entityKey, override.label, override.rationale ?? undefined);
+                      fileId,
+                      question,
+                      entityKey,
+                      override.label,
+                      override.rationale ?? undefined
+                    );
                     refresh();
                     onChanged();
                   })
                 }
-                disabled={busy}
+                disabled={busy || locked}
               >
-                <i className="bi bi-check-lg me-1" />Re-affirm “{override.label}”
+                <i className="bi bi-check-lg me-1" />
+                Re-affirm “{override.label}”
               </Button>
             </Alert>
           )}
@@ -387,9 +463,10 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 className="p-0 mt-1 text-muted"
                 style={{ fontSize: '0.72rem' }}
                 onClick={handleClearOverride}
-                disabled={busy}
+                disabled={busy || locked}
               >
-                <i className="bi bi-arrow-counterclockwise me-1" />Revert to machine verdict
+                <i className="bi bi-arrow-counterclockwise me-1" />
+                Revert to machine verdict
               </Button>
             </Alert>
           )}
@@ -413,10 +490,34 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 onChange={e => setOverrideRationale(e.target.value)}
               />
               <div className="d-flex gap-2">
-                <Button variant="primary" size="sm" className="py-0" style={{ fontSize: '0.75rem' }} onClick={handleSaveOverride} disabled={busy || !overrideLabel.trim()}>
-                  {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-floppy me-1" />Save override</>}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="py-0"
+                  style={{ fontSize: '0.75rem' }}
+                  onClick={handleSaveOverride}
+                  disabled={busy || locked || !overrideLabel.trim()}
+                >
+                  {busy ? (
+                    <>
+                      <Spinner size="sm" className="me-1" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-floppy me-1" />
+                      Save override
+                    </>
+                  )}
                 </Button>
-                <Button variant="outline-secondary" size="sm" className="py-0" style={{ fontSize: '0.75rem' }} onClick={() => setOverriding(false)} disabled={busy}>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  className="py-0"
+                  style={{ fontSize: '0.75rem' }}
+                  onClick={() => setOverriding(false)}
+                  disabled={busy || locked}
+                >
                   Cancel
                 </Button>
               </div>
@@ -426,7 +527,9 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
           {/* Why — candidates + reasons */}
           {verdict.candidates && verdict.candidates.length > 0 && (
             <div className="mb-2">
-              <div className="text-muted mb-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>Why</div>
+              <div className="text-muted mb-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+                Why
+              </div>
               {verdict.candidates.map(c => (
                 <div key={c.label} style={{ fontSize: '0.72rem' }} className="mb-1">
                   <span className="fw-semibold">{c.label}</span>
@@ -455,9 +558,17 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                   size="sm"
                   className="p-0 text-muted"
                   style={{ fontSize: '0.72rem' }}
-                  onClick={() => { setEditingEvidenceId(null); setEvLabel(''); setEvWeight(40); setEvReason(''); setAddingEvidence(true); }}
+                  onClick={() => {
+                    setEditingEvidenceId(null);
+                    setEvLabel('');
+                    setEvWeight(40);
+                    setEvReason('');
+                    setAddingEvidence(true);
+                  }}
+                  disabled={locked}
                 >
-                  <i className="bi bi-plus-circle me-1" />Add evidence
+                  <i className="bi bi-plus-circle me-1" />
+                  Add evidence
                 </Button>
               )}
             </div>
@@ -468,13 +579,12 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                   <li key={ev.id}>
                     <strong>{ev.label}</strong> (+{ev.weight}) — {ev.reason}
                     <span className="fst-italic"> · {attributed(ev.actor)}</span>
-                    {ev.actor === me && (
+                    {ev.actor === me && !locked && (
                       <>
                         {' '}
                         <button
                           type="button"
                           aria-label="Edit evidence"
-                          title="Edit"
                           className="btn btn-link p-0 ms-1 text-muted align-baseline"
                           style={{ fontSize: 'inherit' }}
                           onClick={() => handleEditEvidence(ev)}
@@ -484,7 +594,6 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                         <button
                           type="button"
                           aria-label="Delete evidence"
-                          title="Delete"
                           className="btn btn-link p-0 ms-1 text-muted align-baseline"
                           style={{ fontSize: 'inherit' }}
                           onClick={() => handleDeleteEvidence(ev)}
@@ -501,15 +610,10 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 No analyst evidence added.
               </p>
             )}
-
           </div>
 
           {/* Add-evidence popup — shared by Identity and every per-axis panel (#499). */}
-          <Modal
-            show={addingEvidence}
-            onHide={() => !busy && resetEvidenceForm()}
-            centered
-          >
+          <Modal show={addingEvidence} onHide={() => !busy && resetEvidenceForm()} centered>
             <Modal.Header closeButton={!busy}>
               <Modal.Title style={{ fontSize: '1rem' }}>
                 {editingEvidenceId != null ? 'Edit' : 'Add'} evidence · {title}
@@ -554,11 +658,31 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="outline-secondary" size="sm" onClick={resetEvidenceForm} disabled={busy}>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={resetEvidenceForm}
+                disabled={busy || locked}
+              >
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSaveEvidence} disabled={busy || !evLabel.trim() || !evReason.trim()}>
-                {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-check-lg me-1" />{editingEvidenceId != null ? 'Save changes' : 'Add evidence'}</>}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveEvidence}
+                disabled={busy || locked || !evLabel.trim() || !evReason.trim()}
+              >
+                {busy ? (
+                  <>
+                    <Spinner size="sm" className="me-1" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1" />
+                    {editingEvidenceId != null ? 'Save changes' : 'Add evidence'}
+                  </>
+                )}
               </Button>
             </Modal.Footer>
           </Modal>

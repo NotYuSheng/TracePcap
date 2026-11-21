@@ -130,8 +130,11 @@ Keycloak client role that gives it. An admin ticks or clears a box, and it appli
 Everyone else sees the same page, locked. Two rows can't change: every role may see captures, and only the admin role
 may change roles. Every change, and every change of the default role, is in the audit log.
 
-When someone tries something their roles don't allow, the app says which permission it needs
-and which roles they have, so they know whom to ask.
+What your roles don't allow stays on screen, greyed out, so you can see it exists. Next to it is
+a lock: click it for the permission it needs, why you haven't got it (which roles you have), and
+whom to ask. A page you can only partly use says so at the top (for example *You can see this
+answer and its evidence but not change them*). If something slips through, the server refuses it
+with the same reason.
 
 Your own roles
 --------------

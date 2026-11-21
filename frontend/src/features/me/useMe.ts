@@ -41,6 +41,11 @@ export interface PermissionState {
 }
 
 /** Whether the caller may perform {@code action}, and why not. */
+/** A server reason ("your role (Viewer) doesn't…") as a sentence of its own. */
+export function asSentence(reason: string): string {
+  return reason.charAt(0).toUpperCase() + reason.slice(1);
+}
+
 export function usePermission(action: PermissionAction): PermissionState {
   const me = useMe();
   const permission = me?.permissions.find(p => p.action === action) ?? null;

@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
@@ -29,7 +31,12 @@ import './StoryPage.css';
 type EvidenceTab = 'findings' | 'aggregates' | 'investigation' | 'traffic';
 
 const written = (ms: number) =>
-  new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  new Date(ms).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 /**
  * Story mode, laid out as an investigation (design B): the four standing questions first, the
@@ -43,14 +50,22 @@ export const StoryPage = () => {
   const { fileId, storyState, asideSlot } = useOutletContext<AnalysisOutletContext>();
   const [networkContext] = useNetworkContext();
   const {
-    story, generating, error,
-    contextError, setContextError,
-    editablePrompt, setEditablePrompt,
-    elapsedSeconds, llmTimeoutMs,
+    story,
+    generating,
+    error,
+    contextError,
+    setContextError,
+    editablePrompt,
+    setEditablePrompt,
+    elapsedSeconds,
+    llmTimeoutMs,
     generateStory: handleGenerateStory,
-    additionalContext, setAdditionalContext,
-    maxFindings, setMaxFindings,
-    maxRiskMatrix, setMaxRiskMatrix,
+    additionalContext,
+    setAdditionalContext,
+    maxFindings,
+    setMaxFindings,
+    maxRiskMatrix,
+    setMaxRiskMatrix,
     totalFindings,
     totalRiskMatrix,
     background,
@@ -65,6 +80,7 @@ export const StoryPage = () => {
   const [additional, setAdditional] = useState<Answer[]>([]);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [showRegenerate, setShowRegenerate] = useState(false);
+  const ai = usePermission('ASK_AI');
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab | null>(null);
 
@@ -104,10 +120,24 @@ export const StoryPage = () => {
     setGoalsLoaded(false);
     storyService
       .getInvestigationReport(fileId)
-      .then(r => { if (alive) { setGoals(r.goals); setAdditional(r.additional); } })
-      .catch(() => { if (alive) { setGoals([]); setAdditional([]); } })
-      .finally(() => { if (alive) setGoalsLoaded(true); });
-    return () => { alive = false; };
+      .then(r => {
+        if (alive) {
+          setGoals(r.goals);
+          setAdditional(r.additional);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setGoals([]);
+          setAdditional([]);
+        }
+      })
+      .finally(() => {
+        if (alive) setGoalsLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, [fileId]);
 
   useEffect(() => {
@@ -116,7 +146,11 @@ export const StoryPage = () => {
         setLoadingTimeline(true);
         const data =
           granularity === 'auto'
-            ? await timelineService.getTimelineData(fileId, AUTO_GRANULARITY_INTERVAL, AUTO_GRANULARITY_MAX_DATAPOINTS)
+            ? await timelineService.getTimelineData(
+                fileId,
+                AUTO_GRANULARITY_INTERVAL,
+                AUTO_GRANULARITY_MAX_DATAPOINTS
+              )
             : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {
@@ -131,11 +165,17 @@ export const StoryPage = () => {
   // The evidence tabs that have something in them (above the early returns: hooks can't follow them).
   const tabs = useMemo(() => {
     const t: { id: EvidenceTab; label: string; count?: number }[] = [];
-    if (story?.findings?.length) t.push({ id: 'findings', label: 'Findings', count: story.findings.length });
+    if (story?.findings?.length)
+      t.push({ id: 'findings', label: 'Findings', count: story.findings.length });
     if (story?.aggregates) t.push({ id: 'aggregates', label: 'Traffic intelligence' });
     if (story?.investigationSteps?.length)
-      t.push({ id: 'investigation', label: 'LLM investigation', count: story.investigationSteps.length });
-    if (!loadingTimeline && timelineData.length > 0) t.push({ id: 'traffic', label: 'Traffic over time' });
+      t.push({
+        id: 'investigation',
+        label: 'LLM investigation',
+        count: story.investigationSteps.length,
+      });
+    if (!loadingTimeline && timelineData.length > 0)
+      t.push({ id: 'traffic', label: 'Traffic over time' });
     return t;
   }, [story, loadingTimeline, timelineData.length]);
   const activeTab = tabs.find(t => t.id === evidenceTab)?.id ?? tabs[0]?.id;
@@ -173,9 +213,7 @@ export const StoryPage = () => {
             <span className="story-pill story-pill-writing">Queued</span>
             <h1 className="story-start-title">The story is waiting its turn</h1>
             <p className="text-muted">
-              {job.trigger === 'UPLOAD'
-                ? 'It was asked for when this capture was uploaded. '
-                : ''}
+              {job.trigger === 'UPLOAD' ? 'It was asked for when this capture was uploaded. ' : ''}
               The model writes one thing at a time and this is {placeInLine(job.position)}. You can
               leave this page; it shows here when it is ready.
             </p>
@@ -206,8 +244,8 @@ export const StoryPage = () => {
             Prompt Too Large for Model
           </Alert.Heading>
           <p className="mb-0">
-            The prompt used <strong>{contextError.promptTokens.toLocaleString()}</strong> tokens
-            but the model's context window is{' '}
+            The prompt used <strong>{contextError.promptTokens.toLocaleString()}</strong> tokens but
+            the model's context window is{' '}
             <strong>{contextError.contextLength.toLocaleString()}</strong> tokens, leaving only{' '}
             <strong>{remaining.toLocaleString()}</strong> for the response.
           </p>
@@ -235,7 +273,10 @@ export const StoryPage = () => {
           </Button>
           <Button
             variant="outline-secondary"
-            onClick={() => { setContextError(null); setEditablePrompt(''); }}
+            onClick={() => {
+              setContextError(null);
+              setEditablePrompt('');
+            }}
             disabled={generating}
           >
             Start over
@@ -302,34 +343,45 @@ export const StoryPage = () => {
   if (!story) {
     return (
       <div className={gridClass}>
-      <div className="story-start">
-        {background?.status === 'FAILED' && (
-          <Alert variant="warning" className="mb-3">
-            The story asked for at upload couldn&apos;t be written
-            {background.error ? <>: {background.error.replace(/\.?\s*$/, '')}</> : ''}. Try again below.
-          </Alert>
-        )}
-        <Card className="story-start-card">
-          <Card.Body>
-            <span className="story-pill">No story yet</span>
-            <h1 className="story-start-title">Have the LLM write this capture's story</h1>
-            <p className="text-muted">
-              It reads the findings TracePcap measured (not raw packets) and tells you what happened, in
-              order, with what to look at next. A few minutes on a local model.{' '}
-              <Button variant="link" className="p-0 align-baseline" onClick={() => setShowHowItWorks(true)}>
-                How it works
+        <div className="story-start">
+          {background?.status === 'FAILED' && (
+            <Alert variant="warning" className="mb-3">
+              The story asked for at upload couldn&apos;t be written
+              {background.error ? <>: {background.error.replace(/\.?\s*$/, '')}</> : ''}. Try again
+              below.
+            </Alert>
+          )}
+          <Card className="story-start-card">
+            <Card.Body>
+              <span className="story-pill">No story yet</span>
+              <h1 className="story-start-title">Have the LLM write this capture's story</h1>
+              <p className="text-muted">
+                It reads the findings TracePcap measured (not raw packets) and tells you what
+                happened, in order, with what to look at next. A few minutes on a local model.{' '}
+                <Button
+                  variant="link"
+                  className="p-0 align-baseline"
+                  onClick={() => setShowHowItWorks(true)}
+                >
+                  How it works
+                </Button>
+              </p>
+              {settings}
+              <Button
+                variant="primary"
+                className="mt-3"
+                onClick={() => handleGenerateStory()}
+                disabled={!ai.allowed}
+              >
+                <i className="bi bi-stars me-2" aria-hidden="true"></i>
+                Write the story
               </Button>
-            </p>
-            {settings}
-            <Button variant="primary" className="mt-3" onClick={() => handleGenerateStory()}>
-              <i className="bi bi-stars me-2" aria-hidden="true"></i>
-              Write the story
-            </Button>
-          </Card.Body>
-        </Card>
-        {howItWorks}
-      </div>
-      {chat}
+              <PermissionLock action="ASK_AI" className="ms-2 mt-3" />
+            </Card.Body>
+          </Card>
+          {howItWorks}
+        </div>
+        {chat}
       </div>
     );
   }
@@ -341,18 +393,35 @@ export const StoryPage = () => {
           <h1 className="story-title">Story</h1>
           <small className="text-muted" data-testid="story-rules-scope">
             Written {written(story.generatedAt)} ·{' '}
-            {story.networkId
-              ? <>uses the shared detection rules and <strong>{story.networkName ?? 'a network'}</strong>'s own.</>
-              : <>Uses the shared detection rules. Pick a network under “Custom detection rules” and regenerate to include its rules.</>}
+            {story.networkId ? (
+              <>
+                uses the shared detection rules and{' '}
+                <strong>{story.networkName ?? 'a network'}</strong>'s own.
+              </>
+            ) : (
+              <>
+                Uses the shared detection rules. Pick a network under “Custom detection rules” and
+                regenerate to include its rules.
+              </>
+            )}
           </small>
         </div>
         <Button variant="link" size="sm" onClick={() => setShowHowItWorks(true)}>
           How it works
         </Button>
-        <Button variant="outline-primary" size="sm" onClick={() => setShowRegenerate(true)} disabled={generating}>
-          <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`} aria-hidden="true"></i>
+        <Button
+          variant="outline-primary"
+          size="sm"
+          onClick={() => setShowRegenerate(true)}
+          disabled={generating || !ai.allowed}
+        >
+          <i
+            className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`}
+            aria-hidden="true"
+          ></i>
           {generating ? 'Writing…' : 'Regenerate…'}
         </Button>
+        <PermissionLock action="ASK_AI" />
       </div>
 
       {error && (
@@ -400,13 +469,21 @@ export const StoryPage = () => {
                 ))}
               </div>
               <div className="story-tab-body" role="tabpanel">
-                {activeTab === 'findings' && story.findings && <FindingsPanel findings={story.findings} />}
-                {activeTab === 'aggregates' && story.aggregates && <AggregatesPanel aggregates={story.aggregates} />}
+                {activeTab === 'findings' && story.findings && (
+                  <FindingsPanel findings={story.findings} />
+                )}
+                {activeTab === 'aggregates' && story.aggregates && (
+                  <AggregatesPanel aggregates={story.aggregates} />
+                )}
                 {activeTab === 'investigation' && story.investigationSteps && (
                   <InvestigationPanel steps={story.investigationSteps} />
                 )}
                 {activeTab === 'traffic' && (
-                  <TrafficTimeline data={timelineData} granularity={granularity} onGranularityChange={setGranularity} />
+                  <TrafficTimeline
+                    data={timelineData}
+                    granularity={granularity}
+                    onGranularityChange={setGranularity}
+                  />
                 )}
               </div>
             </Card>
@@ -422,8 +499,8 @@ export const StoryPage = () => {
         </Modal.Header>
         <Modal.Body>
           <p className="text-muted small mb-0">
-            The LLM writes the story again from the current findings. Tell it anything it can't see, or
-            lower the limits if the last attempt ran out of context.
+            The LLM writes the story again from the current findings. Tell it anything it can't see,
+            or lower the limits if the last attempt ran out of context.
           </p>
           {settings}
         </Modal.Body>

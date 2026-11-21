@@ -1,6 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useRef, useEffect } from 'react';
 import { Button, Card, Form } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { chatService, type ChatTurn } from '@/features/chat/chatService';
 import { ChatToolsPopover } from './ChatToolsPopover';
@@ -32,7 +34,11 @@ function AnswerText({ text }: { text: string }) {
   return (
     <div className="chat-msg-text">
       {parts.map((p, i) =>
-        p.length > 2 && p.startsWith('`') && p.endsWith('`') ? <code key={i}>{p.slice(1, -1)}</code> : p
+        p.length > 2 && p.startsWith('`') && p.endsWith('`') ? (
+          <code key={i}>{p.slice(1, -1)}</code>
+        ) : (
+          p
+        )
       )}
     </div>
   );
@@ -84,6 +90,7 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
   }, [messages, working]);
 
   const busy = sending || working !== null;
+  const ai = usePermission('ASK_AI');
 
   const submit = async () => {
     const question = input.trim();
@@ -154,14 +161,22 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
         )}
         {messages.map((m, i) =>
           m.role === 'user' ? (
-            <div key={i} className="chat-msg chat-msg-user">{m.text}</div>
+            <div key={i} className="chat-msg chat-msg-user">
+              {m.text}
+            </div>
           ) : (
             <div key={i} className="chat-msg chat-msg-ai">
-              {m.turn && <ChatSteps steps={m.turn.steps} running={false} elapsedMs={m.turn.elapsedMs} />}
+              {m.turn && (
+                <ChatSteps steps={m.turn.steps} running={false} elapsedMs={m.turn.elapsedMs} />
+              )}
               <AnswerText text={m.text} />
-              {m.turn?.filters.map(f => <FilterCard key={f.expression} fileId={fileId} filter={f} />)}
+              {m.turn?.filters.map(f => (
+                <FilterCard key={f.expression} fileId={fileId} filter={f} />
+              ))}
               {m.turn && !m.turn.toolsOffered && (
-                <div className="chat-msg-note">Answered without tools: the LLM server didn’t take them.</div>
+                <div className="chat-msg-note">
+                  Answered without tools: the LLM server didn’t take them.
+                </div>
               )}
               {m.turn?.modelNote && <div className="chat-msg-note">{m.turn.modelNote}</div>}
             </div>
@@ -173,7 +188,12 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
               <ChatSteps steps={working.steps} running elapsedMs={working.elapsedMs} />
             ) : (
               <div className="text-muted small">
-                <Spinner animation="border" size="sm" className="me-2" style={{ width: '0.7rem', height: '0.7rem' }} />
+                <Spinner
+                  animation="border"
+                  size="sm"
+                  className="me-2"
+                  style={{ width: '0.7rem', height: '0.7rem' }}
+                />
                 Thinking…{working ? ` ${Math.round(working.elapsedMs / 1000)} s` : ''}
               </div>
             )}
@@ -182,8 +202,12 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
       </div>
 
       <div className="story-chat-foot">
-        {error && <Alert variant="danger" className="small py-2 mb-2">{error}</Alert>}
-        {suggestions.length > 0 && !busy && (
+        {error && (
+          <Alert variant="danger" className="small py-2 mb-2">
+            {error}
+          </Alert>
+        )}
+        {suggestions.length > 0 && !busy && ai.allowed && (
           <div className="story-chat-suggestions">
             {suggestions.map((q, i) => (
               <button
@@ -206,12 +230,16 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
             as="textarea"
             size="sm"
             rows={2}
-            placeholder="Ask a question… (Enter to send)"
+            placeholder={
+              ai.allowed
+                ? 'Ask a question… (Enter to send)'
+                : "Your roles don't allow asking the AI"
+            }
             aria-label="Ask a question about this capture"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            disabled={busy}
+            disabled={busy || !ai.allowed}
             style={{ resize: 'none' }}
           />
           <Button
@@ -219,10 +247,11 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
             size="sm"
             className="flex-shrink-0"
             onClick={() => void submit()}
-            disabled={busy || !input.trim()}
+            disabled={busy || !input.trim() || !ai.allowed}
           >
             {busy ? <Spinner animation="border" size="sm" /> : 'Ask'}
           </Button>
+          <PermissionLock action="ASK_AI" className="align-self-center" />
         </div>
       </div>
     </Card>

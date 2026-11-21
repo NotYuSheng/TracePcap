@@ -4,6 +4,8 @@ import { isAxiosError } from 'axios';
 import { Button, Dropdown, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { useMe, usePermission } from '@/features/me/useMe';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
@@ -38,6 +40,8 @@ export interface FileMetadata {
   expiresAt?: string | number[] | null;
   /** One of the caller's favourites. */
   favourite?: boolean;
+  /** Who uploaded it; null for captures from before uploaders were recorded. */
+  uploadedBy?: string | null;
 }
 
 type Membership = { networkId: string; networkName: string };
@@ -134,6 +138,15 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
   // Selection survives paging: remember each picked capture's name for the merge name.
   const [selected, setSelected] = useState<Map<string, string>>(new Map());
   const [pendingDelete, setPendingDelete] = useState<FileMetadata[] | null>(null);
+  // Roles (#915): what the caller may do to captures. Controls they can't use stay visible, greyed.
+  const me = useMe();
+  const upload = usePermission('UPLOAD_CAPTURES');
+  const keep = usePermission('KEEP_CAPTURES');
+  const deleteOwn = usePermission('DELETE_OWN_CAPTURES');
+  const deleteAny = usePermission('DELETE_ANY_CAPTURES');
+  /** Whether the caller may delete this capture: anyone's, or their own (one with a recorded uploader). */
+  const canDelete = (f: FileMetadata) =>
+    deleteAny.allowed || (deleteOwn.allowed && !!f.uploadedBy && f.uploadedBy === me?.username);
   const [showMerge, setShowMerge] = useState(false);
   const [mergeName, setMergeName] = useState('');
   const [merging, setMerging] = useState(false);
@@ -314,9 +327,18 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
 
   const doDelete = async () => {
     if (!pendingDelete) return;
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       pendingDelete.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.fileId)))
     );
+    // A capture the caller may not delete (someone else's) is refused: say so, with the reason.
+    const refused = results.flatMap(r =>
+      r.status === 'rejected' && isAxiosError(r.reason) && r.reason.response?.status === 403
+        ? [String(r.reason.response?.data?.message ?? "Your roles don't allow deleting it.")]
+        : []
+    );
+    if (refused.length > 0) {
+      setKeepError(`Couldn't delete ${refused.length} of ${pendingDelete.length}: ${refused[0]}`);
+    }
     setSelected(prev => {
       const next = new Map(prev);
       pendingDelete.forEach(f => next.delete(f.fileId));
@@ -379,7 +401,12 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
       </div>
 
       {keepError && (
-        <Alert variant="warning" className="py-2 small" onClose={() => setKeepError(null)} dismissible>
+        <Alert
+          variant="warning"
+          className="py-2 small"
+          onClose={() => setKeepError(null)}
+          dismissible
+        >
           {keepError}
         </Alert>
       )}
@@ -449,7 +476,10 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         aria-label={`${file.favourite ? 'Unfavourite' : 'Favourite'} ${file.fileName}`}
                         onClick={() => setFavourite(file, !file.favourite)}
                       >
-                        <i className={`bi ${file.favourite ? 'bi-star-fill' : 'bi-star'}`} aria-hidden="true" />
+                        <i
+                          className={`bi ${file.favourite ? 'bi-star-fill' : 'bi-star'}`}
+                          aria-hidden="true"
+                        />
                       </button>
                       <Link to={`/analysis/${file.fileId}`} className="captures-name">
                         {file.fileName}
@@ -502,7 +532,12 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         <Button
                           variant="outline-warning"
                           size="sm"
-                          onClick={() => changeExpiry(file, { keepForever: false, expiresAt: extendedTo(expiry, 7, now) })}
+                          onClick={() =>
+                            changeExpiry(file, {
+                              keepForever: false,
+                              expiresAt: extendedTo(expiry, 7, now),
+                            })
+                          }
                         >
                           Keep 7 days longer
                         </Button>
@@ -528,17 +563,24 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                           <Dropdown.Item as={Link} to={`/analysis/${file.fileId}`}>
                             Open
                           </Dropdown.Item>
-                          <Dropdown.Item as={Link} to={`/analysis/${file.fileId}/file`}>
+                          <Dropdown.Item
+                            as={Link}
+                            to={`/analysis/${file.fileId}/file`}
+                            disabled={!upload.allowed}
+                          >
                             Re-analyse…
                           </Dropdown.Item>
-                          {file.source !== 'MONITOR' &&
+                          {keep.allowed &&
+                            file.source !== 'MONITOR' &&
                             (memberships.get(file.fileId) ?? []).length === 0 &&
                             retentionHours != null &&
                             retentionHours > 0 && (
                               <>
                                 <Dropdown.Divider />
                                 {file.keepForever ? (
-                                  <Dropdown.Item onClick={() => changeExpiry(file, { keepForever: false })}>
+                                  <Dropdown.Item
+                                    onClick={() => changeExpiry(file, { keepForever: false })}
+                                  >
                                     Let it expire
                                   </Dropdown.Item>
                                 ) : (
@@ -547,13 +589,18 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                                       <Dropdown.Item
                                         key={d}
                                         onClick={() =>
-                                          changeExpiry(file, { keepForever: false, expiresAt: extendedTo(expiry, d, now) })
+                                          changeExpiry(file, {
+                                            keepForever: false,
+                                            expiresAt: extendedTo(expiry, d, now),
+                                          })
                                         }
                                       >
                                         Keep {d} {d === 1 ? 'day' : 'days'} longer
                                       </Dropdown.Item>
                                     ))}
-                                    <Dropdown.Item onClick={() => changeExpiry(file, { keepForever: true })}>
+                                    <Dropdown.Item
+                                      onClick={() => changeExpiry(file, { keepForever: true })}
+                                    >
                                       Keep forever
                                     </Dropdown.Item>
                                   </>
@@ -562,10 +609,18 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                             )}
                           <Dropdown.Divider />
                           <Dropdown.Item
-                            className="text-danger"
+                            className={canDelete(file) ? 'text-danger' : undefined}
+                            disabled={!canDelete(file)}
                             onClick={() => setPendingDelete([file])}
                           >
                             Delete
+                            {!canDelete(file) && (
+                              <span className="d-block small text-muted">
+                                {file.uploadedBy && file.uploadedBy !== me?.username
+                                  ? `Uploaded by ${file.uploadedBy}: your roles can't delete it`
+                                  : "Your roles can't delete it"}
+                              </span>
+                            )}
                           </Dropdown.Item>
                         </Dropdown.Menu>
                       </Dropdown>
@@ -592,7 +647,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
           <Button
             size="sm"
             variant="outline-light"
-            disabled={selectedCount < 2}
+            disabled={selectedCount < 2 || !upload.allowed}
             onClick={() => {
               setMergeName(autoMergeName());
               setShowMerge(true);
@@ -600,10 +655,12 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
           >
             Merge into one
           </Button>
+          <PermissionLock action="UPLOAD_CAPTURES" className="text-white" />
           <Button
             size="sm"
             variant="outline-danger"
             className="captures-delete-selected"
+            disabled={!deleteOwn.allowed && !deleteAny.allowed}
             onClick={() =>
               setPendingDelete(
                 [...selected.entries()].map(
