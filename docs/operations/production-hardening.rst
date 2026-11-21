@@ -559,10 +559,10 @@ vLLM):
 
 Do **not** configure a cloud API endpoint if your PCAP data is sensitive.
 
-The production overlays also default ``GEO_FORCE_OFFLINE`` to ``true``, resolving
-geolocation from the bundled DB-IP Lite MMDB instead of probing ``ipinfo.io`` at
-runtime. Set ``GEO_FORCE_OFFLINE=false`` only if outbound lookups are acceptable
-and the deployment has internet access.
+``GEO_FORCE_OFFLINE`` defaults to ``true`` in every stack, so geolocation comes from
+the bundled DB-IP Lite MMDB and TracePcap never probes ``ipinfo.io`` at runtime. Set
+``GEO_FORCE_OFFLINE=false`` only if outbound lookups are acceptable and the deployment
+has internet access.
 
 Restrict MinIO Console Access
 -------------------------------

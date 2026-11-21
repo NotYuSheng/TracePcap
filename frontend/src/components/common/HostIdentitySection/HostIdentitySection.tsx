@@ -47,11 +47,11 @@ function countryFlag(code: string): string {
 const GEO_SOURCE_LABEL: Record<string, { label: string; title: string }> = {
   ipinfo: {
     label: 'ipinfo.io',
-    title: 'Resolved online via the ipinfo.io API (cached locally). Includes ASN/org.',
+    title: 'Resolved online via the ipinfo.io API, which this install has opted in to (cached locally). Includes ASN/org.',
   },
   mmdb: {
     label: 'Offline DB',
-    title: 'Resolved from the bundled DB-IP Lite database (offline, or ipinfo unreachable). Accuracy may be lower, especially for cloud IPs.',
+    title: 'Resolved from the bundled DB-IP Lite database, the default (nothing leaves this machine). Accuracy may be lower, especially for cloud IPs.',
   },
 };
 /**

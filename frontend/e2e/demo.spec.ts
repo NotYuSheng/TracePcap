@@ -61,12 +61,13 @@ async function disableSmoothScroll(page: Page) {
   });
 }
 
-/** Height of the top bar: content scrolled to y=0 sits under it. */
-const TOPBAR = 96;
-
-/** Put an element's top just under the top bar. */
-async function frameTop(target: Locator) {
-  await target.evaluate((el, bar) => window.scrollBy(0, el.getBoundingClientRect().top - bar), TOPBAR);
+/**
+ * Bring a component into view the way an in-page link does: the card (or section) holding
+ * `target` scrolls to the top, and the page's scroll-padding-top stops it just below the sticky
+ * header. Every component lands at the same height, with its top edge showing.
+ */
+async function showComponent(target: Locator) {
+  await target.evaluate(el => (el.closest('.card, .ov-card, section') ?? el).scrollIntoView({ block: 'start' }));
   await target.page().waitForTimeout(120);
 }
 
@@ -182,9 +183,9 @@ test('README demo walkthrough', async ({ page, request }) => {
   await showClick(page, source);
   await beat(page, FEATURE);
   await page.keyboard.press('Escape');
-  await frameTop(page.getByRole('heading', { name: 'Where the traffic goes' }));
+  await showComponent(page.getByRole('heading', { name: 'Where the traffic goes' }));
   await beat(page, FEATURE);
-  await frameTop(page.getByRole('heading', { name: 'Flows between organisations' }));
+  await showComponent(page.getByRole('heading', { name: 'Flows between organisations' }));
   await beat(page, FEATURE);
   await page.evaluate(() => window.scrollTo(0, 0));
 
@@ -208,7 +209,7 @@ test('README demo walkthrough', async ({ page, request }) => {
   await openSection(page, 'Network Visualization');
   await expect(page.getByRole('button', { name: 'Fit view' })).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(2_000);
-  await frameTop(page.getByRole('heading', { name: 'Traffic' }));
+  await showComponent(page.getByRole('heading', { name: 'Traffic' }));
   await beat(page, FEATURE);
   const play = page.getByRole('button', { name: 'Play through the capture' });
   if (await play.isVisible().catch(() => false)) {
@@ -239,8 +240,11 @@ test('README demo walkthrough', async ({ page, request }) => {
   await showType(ask, process.env.DEMO_QUESTION ?? 'What is the most serious thing here? Give me a Wireshark filter for it.');
   await beat(page);
   await ask.press('Enter');
-  // The first steps at real speed, then the rest of the work fast.
-  await expect(page.getByText('Looking things up…')).toBeVisible({ timeout: 300_000 });
+  // The wait for the first tool fast (a local model thinks for a while first), the first steps at
+  // real speed, then the rest of the work fast.
+  await timeline.fastForward('The chat thinking', 2, async () => {
+    await expect(page.getByText('Looking things up…')).toBeVisible({ timeout: 300_000 });
+  });
   await page.waitForTimeout(2_500);
   await timeline.fastForward('The chat looking things up', 2, async () => {
     await expect(page.getByRole('button', { name: /^Used \d+ tools?/ }).last()).toBeVisible({ timeout: 10 * 60_000 });
@@ -287,10 +291,10 @@ test('README demo walkthrough', async ({ page, request }) => {
   await expect(page.getByRole('heading', { name: NETWORK_NAME })).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(2_000);
   await beat(page, FEATURE);
-  await frameTop(page.getByRole('heading', { name: /What changed in the latest capture/ }));
+  await showComponent(page.getByRole('heading', { name: /What changed in the latest capture/ }));
   await page.waitForTimeout(800);
   await beat(page, FEATURE);
-  await frameTop(page.getByRole('heading', { name: /Network map/ }));
+  await showComponent(page.getByRole('heading', { name: /Network map/ }));
   await page.waitForTimeout(1_500);
   await beat(page, FEATURE);
   await openSection(page, /^Timeline/);
@@ -300,6 +304,10 @@ test('README demo walkthrough', async ({ page, request }) => {
   // It reads every capture's devices first, which can hold the page before it paints.
   await timeline.fastForward('Inventory loading', 2, async () => {
     await expect(page.getByPlaceholder('Search MAC addresses…')).toBeVisible({ timeout: 120_000 });
+    // In the DOM isn't on screen: a page this size can hold the paint while the recorder competes for
+    // the CPU, and a take ended on the Timeline with the rail already on Inventory. Wait for two
+    // painted frames, which only come once the browser has drawn it.
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))));
   });
   await page.waitForTimeout(1_000);
   await beat(page, FEATURE * 1.5);

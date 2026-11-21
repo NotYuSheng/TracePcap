@@ -210,24 +210,101 @@ public class CaptureChatService {
 
   record Parsed(String answer, List<String> followUps) {}
 
-  /** The answer JSON, leniently: reasoning tags dropped, a fenced or embedded object found, else the text. */
+  /**
+   * The answer JSON, leniently: reasoning tags dropped, a fenced or embedded object found, then a
+   * strict parse, a lenient one (raw line breaks in strings, unknown escapes, trailing commas), and
+   * last the "answer" string pulled out on its own (a reply cut off before its closing brace). Only
+   * text with no "answer" in it is taken as the answer as it stands.
+   */
   Parsed parse(String raw) {
     if (raw == null) return new Parsed(null, List.of());
-    String text = raw.replaceAll("(?s)<think>.*?</think>", "").trim();
+    String text = raw.replaceAll("(?s)<think>.*?</think>", "").replaceAll("(?s)^.*</think>", "").trim();
     int a = text.indexOf('{');
     int b = text.lastIndexOf('}');
     if (a >= 0 && b > a) {
-      try {
-        JsonNode n = json.readTree(text.substring(a, b + 1));
-        String answer = n.path("answer").asText(null);
-        List<String> follow = new ArrayList<>();
-        n.path("followUpQuestions").forEach(q -> { if (q.isTextual() && !q.asText().isBlank()) follow.add(q.asText()); });
-        if (answer != null) return new Parsed(answer, follow.subList(0, Math.min(3, follow.size())));
-      } catch (Exception ignored) {
-        // Not JSON after all: fall through to the plain text.
+      String object = text.substring(a, b + 1);
+      for (ObjectMapper mapper : List.of(json, LENIENT)) {
+        try {
+          JsonNode n = mapper.readTree(object);
+          String answer = n.path("answer").asText(null);
+          if (answer != null) return new Parsed(unescapeLineBreaks(answer), followUps(n));
+        } catch (Exception ignored) {
+          // Try the next, more lenient reading.
+        }
       }
     }
+    String pulled = answerField(text);
+    if (pulled != null) {
+      log.warn("Chat answer wasn't valid JSON; took its \"answer\" field. Raw reply: {}", abbreviate(raw));
+      return new Parsed(unescapeLineBreaks(pulled), List.of());
+    }
     return new Parsed(text.replaceAll("(?s)^```\\w*|```$", "").trim(), List.of());
+  }
+
+  /** Reads model JSON as written, not as specified: control characters, any escape, trailing commas. */
+  private static final ObjectMapper LENIENT =
+      com.fasterxml.jackson.databind.json.JsonMapper.builder()
+          .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
+          .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER)
+          .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_TRAILING_COMMA)
+          .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_SINGLE_QUOTES)
+          .build();
+
+  private static List<String> followUps(JsonNode n) {
+    List<String> follow = new ArrayList<>();
+    n.path("followUpQuestions").forEach(q -> { if (q.isTextual() && !q.asText().isBlank()) follow.add(q.asText()); });
+    return follow.subList(0, Math.min(3, follow.size()));
+  }
+
+  /**
+   * The value of {@code "answer": "…"}, unescaped, read up to its closing quote or the end of the
+   * text (a reply cut off mid-answer). Null when there's no such field.
+   */
+  static String answerField(String text) {
+    java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"answer\"\\s*:\\s*\"").matcher(text);
+    if (!m.find()) return null;
+    StringBuilder out = new StringBuilder();
+    for (int i = m.end(); i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c == '"') break;
+      if (c != '\\' || i + 1 >= text.length()) {
+        out.append(c);
+        continue;
+      }
+      char e = text.charAt(++i);
+      switch (e) {
+        case 'n' -> out.append('\n');
+        case 't' -> out.append('\t');
+        case 'r' -> { }
+        case 'u' -> {
+          if (i + 4 < text.length()) {
+            try {
+              out.append((char) Integer.parseInt(text.substring(i + 1, i + 5), 16));
+              i += 4;
+            } catch (NumberFormatException bad) {
+              out.append('u');
+            }
+          }
+        }
+        default -> out.append(e);
+      }
+    }
+    String answer = out.toString().trim();
+    return answer.isEmpty() ? null : answer;
+  }
+
+  private static String abbreviate(String s) {
+    return s.length() <= 2000 ? s : s.substring(0, 2000) + "…";
+  }
+
+  /**
+   * Some models escape their line breaks twice inside the JSON, so the parsed answer reads
+   * "…destinations.\\n\\nWhat is talking to:\\n• C2…" with the backslashes on screen. Only when the
+   * answer has no real line break at all: then a literal backslash-n is that, not part of a filter.
+   */
+  static String unescapeLineBreaks(String answer) {
+    if (answer.indexOf('\n') >= 0 || !answer.contains("\\n")) return answer;
+    return answer.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t");
   }
 
   private String quote(String s) {

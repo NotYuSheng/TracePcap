@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.insights.dto.CreateExternalEventRequest;
 import com.tracepcap.insights.dto.NetworkExternalEventDto;
 import com.tracepcap.insights.service.NetworkExternalEventService;
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
     description = "User-recorded external events correlated with a monitored network")
 public class NetworkExternalEventController {
 
+  private final PermissionService permissionService;
+
   private final NetworkExternalEventService service;
 
   @GetMapping
@@ -34,6 +38,7 @@ public class NetworkExternalEventController {
   public ResponseEntity<NetworkExternalEventDto> create(
       @PathVariable UUID networkId,
       @Valid @RequestBody CreateExternalEventRequest req) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     return ResponseEntity.status(HttpStatus.CREATED).body(service.createEvent(networkId, req));
   }
 
@@ -43,6 +48,7 @@ public class NetworkExternalEventController {
       @PathVariable UUID networkId,
       @PathVariable UUID eventId,
       @Valid @RequestBody CreateExternalEventRequest req) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     return ResponseEntity.ok(service.updateEvent(networkId, eventId, req));
   }
 
@@ -51,6 +57,7 @@ public class NetworkExternalEventController {
   public ResponseEntity<Void> delete(
       @PathVariable UUID networkId,
       @PathVariable UUID eventId) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     service.deleteEvent(networkId, eventId);
     return ResponseEntity.noContent().build();
   }

@@ -1,5 +1,7 @@
 package com.tracepcap.subnets.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.common.aijob.AiJobDto;
 import com.tracepcap.common.aijob.AiJobService;
 import com.tracepcap.subnets.service.SubnetLabelSuggestionService;
@@ -22,6 +24,8 @@ public class SubnetLabelJobController {
 
   public static final String KIND = "SUBNET_LABEL";
 
+  private final PermissionService permissionService;
+
   private final AiJobService jobs;
   private final SubnetLabelSuggestionService suggestions;
 
@@ -34,6 +38,7 @@ public class SubnetLabelJobController {
       @PathVariable Long id,
       @RequestParam(required = false) UUID networkId,
       @RequestParam(required = false) UUID fileId) {
+    permissionService.require(PermissionAction.ASK_AI);
     SubnetLabelSuggestionService.Prepared p = suggestions.prepare(id, networkId, fileId);
     String key = "subnet:" + id + (fileId != null ? ":" + fileId : "");
     return jobs.submitFor(KIND, networkId, key, p.cidr(), p.suggestion());

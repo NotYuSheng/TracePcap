@@ -1,5 +1,7 @@
 package com.tracepcap.tracer.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.tracer.dto.TracerExplainResponse;
 import com.tracepcap.tracer.dto.TracerPeersResponse;
 import com.tracepcap.tracer.dto.TracerStepsResponse;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "Conversation Tracer", description = "Packet-level conversation trace with AI explanations")
 public class ConversationTracerController {
+
+  private final PermissionService permissionService;
 
   private final ConversationTracerService tracerService;
 
@@ -44,6 +48,7 @@ public class ConversationTracerController {
       summary = "Generate AI explanations",
       description = "Generates a plain-English explanation for each packet in the conversation using the configured LLM. Results are cached per conversation.")
   public ResponseEntity<TracerExplainResponse> explainSteps(@PathVariable UUID conversationId) {
+    permissionService.require(PermissionAction.ASK_AI);
     log.info("POST /api/tracer/{}/explain", conversationId);
     TracerExplainResponse response = tracerService.explainSteps(conversationId);
     if (response.getError() != null) {

@@ -112,14 +112,15 @@ services:
       # REQUIRED, so the endpoint is always a deliberate choice — point it at a local inference
       # server (LM Studio, Ollama, vLLM) for an offline deployment.
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:?set LLM_API_BASE_URL in .env (e.g. http://<host>:1234/v1) — see .env.example}
-      # Resolve GeoIP from the bundled MMDB instead of probing ipinfo.io at runtime, matching
-      # docker-compose.offline.yml. Set GEO_FORCE_OFFLINE=false to opt back into online lookups.
+      # Restated so a hardened deployment's no-egress guarantee doesn't rest on the base file's
+      # default (also true): GeoIP from the bundled MMDB, never probing ipinfo.io. Set
+      # GEO_FORCE_OFFLINE=false to opt in to online lookups.
       GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
-      # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
-      KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
+      # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/<realm>.
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/${KEYCLOAK_REALM:-tracepcap}
       # Backend-reachable JWKS endpoint (internal docker network). Decouples key fetch from the
       # public issuer and is fetched lazily, so the backend need not wait for Keycloak to be ready.
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/tracepcap/protocol/openid-connect/certs
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-tracepcap}/protocol/openid-connect/certs
     depends_on:
       keycloak:
         condition: service_started
@@ -130,8 +131,8 @@ services:
         # Enable the OIDC flow in the SPA. The authority is derived from window.location at runtime
         # (Keycloak is proxied same-origin), so no host needs to be baked into the build.
         VITE_AUTH_ENABLED: "true"
-        VITE_OIDC_CLIENT_ID: tracepcap-frontend
-        VITE_OIDC_REALM: tracepcap
+        VITE_OIDC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-tracepcap}
+        VITE_OIDC_REALM: ${KEYCLOAK_REALM:-tracepcap}
     depends_on:
       - backend
       - keycloak

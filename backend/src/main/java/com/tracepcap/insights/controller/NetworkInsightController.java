@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.insights.dto.GenerateInsightRequest;
 import com.tracepcap.insights.dto.NetworkInsightDto;
 import com.tracepcap.insights.service.NetworkInsightService;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Network Insights", description = "AI-generated insights for a monitored network")
 public class NetworkInsightController {
 
+  private final PermissionService permissionService;
+
   private final NetworkInsightService service;
 
   @GetMapping("/latest")
@@ -31,6 +35,7 @@ public class NetworkInsightController {
   public ResponseEntity<NetworkInsightDto> generate(
       @PathVariable UUID networkId,
       @RequestBody(required = false) GenerateInsightRequest req) {
+    permissionService.require(PermissionAction.ASK_AI);
     return ResponseEntity.ok(service.generateInsights(networkId, req));
   }
 }

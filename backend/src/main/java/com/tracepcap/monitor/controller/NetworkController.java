@@ -1,5 +1,7 @@
 package com.tracepcap.monitor.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.monitor.dto.NetworkSettingsDto;
 import com.tracepcap.monitor.dto.CreateNetworkRequest;
 import com.tracepcap.monitor.dto.NetworkDto;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Monitor Networks", description = "Manage monitored networks")
 public class NetworkController {
 
+  private final PermissionService permissionService;
+
   private final NetworkService networkService;
 
   @GetMapping
@@ -38,6 +42,7 @@ public class NetworkController {
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new monitored network")
   public NetworkDto createNetwork(@Valid @RequestBody CreateNetworkRequest request) {
+    permissionService.require(PermissionAction.NETWORK_CREATE);
     return networkService.createNetwork(request);
   }
 
@@ -45,6 +50,7 @@ public class NetworkController {
   @Operation(summary = "Update a network's metadata")
   public NetworkDto updateNetwork(
       @PathVariable UUID networkId, @Valid @RequestBody UpdateNetworkRequest request) {
+    permissionService.require(PermissionAction.NETWORK_SETTINGS);
     return networkService.updateNetwork(networkId, request);
   }
 
@@ -71,6 +77,7 @@ public class NetworkController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete a network")
   public void deleteNetwork(@PathVariable UUID networkId) {
+    permissionService.require(PermissionAction.NETWORK_DELETE);
     networkService.deleteNetwork(networkId);
   }
 }

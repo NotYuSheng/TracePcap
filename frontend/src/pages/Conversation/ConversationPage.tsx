@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation, HostClassification } from '@/types';
 import type { ConversationFacetCounts, SortField } from '@/features/conversation/types';
@@ -33,6 +35,7 @@ export const ConversationPage = () => {
   const { filters, activeFilterCount, setFilters, clearAll } = useConversationFilters();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const exportPackets = usePermission('EXPORT_PACKETS');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -359,26 +362,42 @@ export const ConversationPage = () => {
               </span>
             </h4>
             <div className="d-flex gap-2 align-items-center">
-              <a
-                href={exportUrl}
-                download={exportFilename}
-                className="btn btn-sm btn-outline-secondary"
-                role="button"
-                title="Export current filtered results as CSV"
-              >
-                <i className="bi bi-download me-1"></i>
-                Export CSV
-              </a>
-              <a
-                href={pcapExportUrl}
-                download={pcapExportFilename}
-                className="btn btn-sm btn-outline-secondary"
-                role="button"
-                title="Export current filtered results as PCAP"
-              >
-                <i className="bi bi-download me-1"></i>
-                Export PCAP
-              </a>
+              {exportPackets.allowed ? (
+                <>
+                  <a
+                    href={exportUrl}
+                    download={exportFilename}
+                    className="btn btn-sm btn-outline-secondary"
+                    role="button"
+                    aria-label="Export the filtered conversations as CSV"
+                  >
+                    <i className="bi bi-download me-1"></i>
+                    Export CSV
+                  </a>
+                  <a
+                    href={pcapExportUrl}
+                    download={pcapExportFilename}
+                    className="btn btn-sm btn-outline-secondary"
+                    role="button"
+                    aria-label="Export the filtered conversations as PCAP"
+                  >
+                    <i className="bi bi-download me-1"></i>
+                    Export PCAP
+                  </a>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline-secondary" disabled>
+                    <i className="bi bi-download me-1"></i>
+                    Export CSV
+                  </Button>
+                  <Button size="sm" variant="outline-secondary" disabled>
+                    <i className="bi bi-download me-1"></i>
+                    Export PCAP
+                  </Button>
+                  <PermissionLock action="EXPORT_PACKETS" />
+                </>
+              )}
             </div>
           </div>
 

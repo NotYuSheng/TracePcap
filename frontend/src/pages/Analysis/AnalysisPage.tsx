@@ -13,6 +13,8 @@ import {
   type SetStateAction,
 } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Link, useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { useNetworkDiagramFilterState } from '@/features/network/hooks/useNetworkDiagramFilterState';
@@ -112,6 +114,11 @@ export interface AnalysisOutletContext {
   storyState: StoryGenerationState;
   /** Reloads the summary without blanking the page, e.g. after a rule change (#925). */
   refreshSummary: () => void;
+  /**
+   * The column beside the whole page, the capture bar included, on sections that have one (Story's
+   * chat). A section portals into it; null where there's no such column.
+   */
+  asideSlot: HTMLElement | null;
 }
 
 // Re-export so NetworkDiagramPage can import from one place
@@ -165,7 +172,11 @@ export const AnalysisPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   // The "Viewing with" network (#925): the report includes its rules' matches.
   const [networkContext] = useNetworkContext();
+  // Story's chat gets a column of its own beside the capture bar and the story, the window's full
+  // height. Rendered only on the Story tab; null elsewhere.
+  const [asideSlot, setAsideSlot] = useState<HTMLElement | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const report = usePermission('DOWNLOAD_REPORT');
 
   // ── Story generation state (lifted here so it survives tab switches) ──────
   const [story, setStory] = useState<Story | null>(null);
@@ -423,7 +434,8 @@ export const AnalysisPage = () => {
           active={activeTab}
           onSelect={handleTabChange}
         />
-        <div className="analysis-main">
+        <div className={`analysis-main${activeTab === 'story' ? ' analysis-main-with-aside' : ''}`}>
+          <div className="analysis-main-column">
           {/* The capture bar: which capture, and the page-wide controls. */}
           <div className="analysis-capture-bar">
             <div className="analysis-capture-id">
@@ -453,10 +465,13 @@ export const AnalysisPage = () => {
                   <div className="d-flex flex-wrap align-items-start gap-3">
                     <NetworkContextPicker fileId={fileId!} />
                     <div className="d-flex flex-column align-items-end gap-1">
-                      <Button variant="outline-primary" size="sm" onClick={() => setShowReport(true)}>
-                        <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
-                        Download report
-                      </Button>
+                      <div className="d-flex align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setShowReport(true)} disabled={!report.allowed}>
+                          <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
+                          Download report
+                        </Button>
+                        <PermissionLock action="DOWNLOAD_REPORT" />
+                      </div>
                     </div>
                   </div>
                 </Card.Body>
@@ -483,10 +498,13 @@ export const AnalysisPage = () => {
                   networkDiagramFilters,
                   storyState,
                   refreshSummary: () => void refetch({ silent: true }),
+                  asideSlot: activeTab === 'story' ? asideSlot : null,
                 } satisfies AnalysisOutletContext
               }
             />
           </div>
+          </div>
+          {activeTab === 'story' && <div className="analysis-aside" ref={setAsideSlot} />}
         </div>
       </div>
     </div>

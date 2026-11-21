@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone';
 import { Link } from 'react-router-dom';
 import type { UploadEntry } from '@features/upload/hooks/useFileUpload';
 import { UploadQueue, type Rejected } from './UploadQueue';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { asSentence, usePermission } from '@/features/me/useMe';
 import type { AnalysisOptions } from '@features/upload/services/uploadService';
 
 const STAGES: {
@@ -88,6 +90,8 @@ export function StartPanel({
   const [dragCount, setDragCount] = useState(0);
   const [rejected, setRejected] = useState<Rejected[]>([]);
   const mb = Math.round(maxBytes / 1024 / 1024);
+  // Roles (#915): someone whose roles don't allow uploading sees the panel, greyed out, and why.
+  const upload = usePermission('UPLOAD_CAPTURES');
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDragEnter: e => setDragCount(e.dataTransfer?.items?.length ?? 0),
     onDrop: (files, rejections) => {
@@ -108,6 +112,7 @@ export function StartPanel({
     multiple: true,
     noClick: true,
     noKeyboard: true,
+    disabled: !upload.allowed,
   });
 
   return (
@@ -128,13 +133,17 @@ export function StartPanel({
         </div>
       )}
       {/* The drop box is the button: click it to choose files, or drop them anywhere on the panel. */}
-      <button type="button" className="home-drop" onClick={open}>
+      <button type="button" className="home-drop" onClick={open} disabled={!upload.allowed}>
         <span className="home-drop-icon" aria-hidden="true">
           <i className="bi bi-upload" />
         </span>
         <span className="home-drop-text">
           <span className="home-drop-title">
-            {uploads.length > 0 ? 'Add more captures' : 'Drop captures here, or click to choose'}
+            {!upload.allowed
+              ? "Your roles don't allow uploading"
+              : uploads.length > 0
+                ? 'Add more captures'
+                : 'Drop captures here, or click to choose'}
           </span>
           <span className="home-drop-hint">
             {acceptedTypes.join(', ')} · {mb} MB
@@ -142,6 +151,15 @@ export function StartPanel({
           </span>
         </span>
       </button>
+
+      {!upload.allowed && (
+        <p className="small text-muted mb-2" data-testid="upload-locked">
+          {upload.reason
+            ? asSentence(upload.reason)
+            : "Your roles don't include uploading captures."}
+          <PermissionLock action="UPLOAD_CAPTURES" />
+        </p>
+      )}
 
       <UploadQueue
         uploads={uploads}

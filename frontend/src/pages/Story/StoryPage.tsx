@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
+import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import type { Answer, GoalOutcome, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
@@ -39,7 +42,7 @@ const written = (ms: number) =>
 const STICKY_TOP = 96;
 
 export const StoryPage = () => {
-  const { fileId, storyState } = useOutletContext<AnalysisOutletContext>();
+  const { fileId, storyState, asideSlot } = useOutletContext<AnalysisOutletContext>();
   const [networkContext] = useNetworkContext();
   const {
     story, generating, error,
@@ -64,6 +67,7 @@ export const StoryPage = () => {
   const [additional, setAdditional] = useState<Answer[]>([]);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [showRegenerate, setShowRegenerate] = useState(false);
+  const ai = usePermission('ASK_AI');
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab | null>(null);
 
@@ -74,7 +78,8 @@ export const StoryPage = () => {
   const hasStory = !!story;
   useEffect(() => {
     const el = asideRef.current;
-    if (!el) return;
+    // Docked in the page's own column, the chat is that column's height: nothing to measure.
+    if (!el || asideSlot) return;
     let frame = 0;
     const fit = () => {
       cancelAnimationFrame(frame);
@@ -93,7 +98,7 @@ export const StoryPage = () => {
       window.removeEventListener('scroll', fit);
       window.removeEventListener('resize', fit);
     };
-  }, [hasStory]);
+  }, [hasStory, asideSlot]);
 
   // The investigation as reported — every goal with its outcome — so a conclusion reached by
   // following a lead (a beacon classified as a C2 with no IDS rule) shows on its card too.
@@ -278,20 +283,28 @@ export const StoryPage = () => {
   }
 
   // The chat is there before a story is: it answers from the findings and its tools (#1161).
-  const chat = (
+  // On a wide screen it sits in the analysis page's own column, beside the capture bar and the
+  // story and the window's full height; otherwise beside or under the story, as before.
+  const chatPanel = (
+    <StoryChat
+      fileId={fileId}
+      networkId={networkContext}
+      suggestedQuestions={story?.suggestedQuestions}
+      hasStory={!!story}
+    />
+  );
+  const chat = asideSlot ? (
+    createPortal(<aside className="story-aside story-aside-docked">{chatPanel}</aside>, asideSlot)
+  ) : (
     <aside className="story-aside" ref={asideRef}>
-      <StoryChat
-        fileId={fileId}
-        networkId={networkContext}
-        suggestedQuestions={story?.suggestedQuestions}
-        hasStory={!!story}
-      />
+      {chatPanel}
     </aside>
   );
+  const gridClass = asideSlot ? 'story-grid story-grid-docked' : 'story-grid';
 
   if (!story) {
     return (
-      <div className="story-grid">
+      <div className={gridClass}>
       <div className="story-start">
         {background?.status === 'FAILED' && (
           <Alert variant="warning" className="mb-3">
@@ -311,10 +324,11 @@ export const StoryPage = () => {
               </Button>
             </p>
             {settings}
-            <Button variant="primary" className="mt-3" onClick={() => handleGenerateStory()}>
+            <Button variant="primary" className="mt-3" onClick={() => handleGenerateStory()} disabled={!ai.allowed}>
               <i className="bi bi-stars me-2" aria-hidden="true"></i>
               Write the story
             </Button>
+            <PermissionLock action="ASK_AI" className="ms-2 mt-3" />
           </Card.Body>
         </Card>
         {howItWorks}
@@ -339,10 +353,11 @@ export const StoryPage = () => {
         <Button variant="link" size="sm" onClick={() => setShowHowItWorks(true)}>
           How it works
         </Button>
-        <Button variant="outline-primary" size="sm" onClick={() => setShowRegenerate(true)} disabled={generating}>
+        <Button variant="outline-primary" size="sm" onClick={() => setShowRegenerate(true)} disabled={generating || !ai.allowed}>
           <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`} aria-hidden="true"></i>
           {generating ? 'Writing…' : 'Regenerate…'}
         </Button>
+        <PermissionLock action="ASK_AI" />
       </div>
 
       {error && (
@@ -352,7 +367,7 @@ export const StoryPage = () => {
         </Alert>
       )}
 
-      <div className="story-grid">
+      <div className={gridClass}>
         <div className="story-main">
           <StoryGoals goals={goals} additional={additional} loading={!goalsLoaded} />
 
