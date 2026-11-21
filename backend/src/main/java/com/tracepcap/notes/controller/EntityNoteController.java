@@ -1,5 +1,7 @@
 package com.tracepcap.notes.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.notes.dto.EntityHistoryEntry;
 import com.tracepcap.notes.dto.EntityNoteDto;
 import com.tracepcap.notes.dto.UpsertNoteRequest;
@@ -17,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Entity Notes", description = "User notes attached to network entities, with history")
 public class EntityNoteController {
 
+  private final PermissionService permissionService;
+
   private final EntityNoteService service;
 
   @GetMapping
@@ -33,6 +37,7 @@ public class EntityNoteController {
   @PutMapping
   @Operation(summary = "Create or update an entity's note")
   public ResponseEntity<EntityNoteDto> upsert(@RequestBody UpsertNoteRequest req) {
+    permissionService.require(PermissionAction.LABEL_HOSTS);
     if (req.getEntityType() == null || req.getEntityType().isBlank()) {
       return ResponseEntity.badRequest().build();
     }
@@ -50,6 +55,7 @@ public class EntityNoteController {
   public ResponseEntity<Void> delete(
       @RequestParam String entityType,
       @RequestParam String entityKey) {
+    permissionService.require(PermissionAction.LABEL_HOSTS);
     service.delete(entityType, entityKey);
     return ResponseEntity.noContent().build();
   }

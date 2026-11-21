@@ -1,30 +1,64 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 
-/** A configurable action (#915). Mirrors the backend PermissionAction enum. */
+/** A permission in the catalogue. Mirrors the backend PermissionAction enum. */
 export type PermissionAction =
-  | 'DETECTION_RULES_GLOBAL'
-  | 'DETECTION_RULES_NETWORK'
-  | 'DETECTION_RULES_CAPTURE'
+  | 'SEE_CAPTURES'
+  | 'DOWNLOAD_REPORT'
+  | 'READ_AUDIT_LOG'
+  | 'UPLOAD_CAPTURES'
+  | 'ASK_AI'
+  | 'EXPORT_PACKETS'
+  | 'LABEL_HOSTS'
+  | 'OVERRIDE_ANSWERS'
   | 'HOST_OCCUPANCY'
-  | 'ADDRESS_DEFAULTS'
-  | 'NETWORK_SETTINGS'
   | 'NETWORK_MAP'
+  | 'DETECTION_RULES_CAPTURE'
+  | 'DETECTION_RULES_NETWORK'
+  | 'DETECTION_RULES_GLOBAL'
+  | 'NETWORK_CAPTURES'
+  | 'NETWORK_CREATE'
+  | 'NETWORK_SETTINGS'
+  | 'NETWORK_DELETE'
+  | 'KEEP_CAPTURES'
+  | 'DELETE_OWN_CAPTURES'
+  | 'DELETE_ANY_CAPTURES'
+  | 'RETENTION'
+  | 'ADDRESS_DEFAULTS'
   | 'ANALYSIS_POLICY'
-  | 'RETENTION';
+  | 'LLM_CONNECTION'
+  | 'CANCEL_OTHERS_AI_JOBS'
+  | 'MANAGE_ROLES';
 
-export type PermissionLevel = 'ANALYST' | 'ADMIN';
-
-/** Mirrors PermissionDto: one action as it applies to the caller. */
+/** Mirrors PermissionDto: one permission, and whether the caller has it. */
 export interface Permission {
   action: PermissionAction;
   label: string;
   description: string;
-  level: PermissionLevel;
-  defaultLevel: PermissionLevel;
+  group: string;
+  /** The group's heading, e.g. "Detection rules". */
+  groupLabel: string;
+  /** The catalogue's suggested lowest built-in role: viewer, analyst, lead or admin. */
+  suggestedRole: string;
+  /** Everyone sees captures and only admin manages roles: no role's set can change these. */
+  fixed: boolean;
   allowed: boolean;
   /** Why not, shown next to the greyed-out control. Null when allowed. */
   reason?: string | null;
+}
+
+/** Mirrors RoleDto: a role and what it may do. Who has it is set in Keycloak, by its key. */
+export interface Role {
+  /** The Keycloak client role (on the app's client) that gives this role. */
+  key: string;
+  label: string;
+  description?: string | null;
+  builtIn: boolean;
+  /** The role for someone whose sign-in carries none of TracePcap's roles. */
+  defaultRole: boolean;
+  /** False for the admin role, which always has every permission. */
+  editable: boolean;
+  permissions: PermissionAction[];
 }
 
 /** Mirrors MeDto. */
@@ -33,6 +67,8 @@ export interface Me {
   authEnabled: boolean;
   admin: boolean;
   canManagePermissions: boolean;
+  /** The TracePcap roles that apply to the caller: from their sign-in, or the default role. */
+  roles: string[];
   permissions: Permission[];
 }
 
@@ -59,8 +95,12 @@ export interface Paged<T> {
 
 export const meService = {
   getMe: async (): Promise<Me> => (await apiClient.get<Me>(API_ENDPOINTS.ME)).data,
-  setPermissionLevel: async (action: PermissionAction, level: PermissionLevel): Promise<Permission> =>
-    (await apiClient.put<Permission>(API_ENDPOINTS.PERMISSION(action), { level })).data,
+  getRoles: async (): Promise<Role[]> => (await apiClient.get<Role[]>(API_ENDPOINTS.ROLES)).data,
+  /** Replaces what a role may do, and/or makes it the default role. Admin only. */
+  updateRole: async (
+    key: string,
+    change: { permissions?: PermissionAction[]; defaultRole?: boolean },
+  ): Promise<Role> => (await apiClient.patch<Role>(API_ENDPOINTS.ROLE(key), change)).data,
   getAuditLog: async (
     page: number,
     pageSize: number,

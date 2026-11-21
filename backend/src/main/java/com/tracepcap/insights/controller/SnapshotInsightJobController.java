@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.common.aijob.AiJobDto;
 import com.tracepcap.common.aijob.AiJobService;
 import com.tracepcap.insights.dto.GenerateInsightRequest;
@@ -24,6 +26,8 @@ public class SnapshotInsightJobController {
 
   public static final String KIND = "SNAPSHOT_INSIGHTS";
 
+  private final PermissionService permissionService;
+
   private final AiJobService jobs;
   private final SnapshotInsightService snapshots;
   private final NetworkInsightService networks;
@@ -37,6 +41,7 @@ public class SnapshotInsightJobController {
       @PathVariable UUID networkId,
       @PathVariable UUID snapshotId,
       @RequestBody(required = false) GenerateInsightRequest request) {
+    permissionService.require(PermissionAction.ASK_AI);
     String name = networks.networkName(networkId);
     return jobs.submitFor(KIND, networkId, snapshotId.toString(), name,
         () -> snapshots.generateInsight(networkId, snapshotId, request));

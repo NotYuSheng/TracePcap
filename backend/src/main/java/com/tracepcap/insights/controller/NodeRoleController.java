@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.dto.RoleSuggestionDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "Node Roles", description = "User-assigned roles for network entities (hosts/subnets)")
 public class NodeRoleController {
+
+  private final PermissionService permissionService;
 
   private final NodeRoleService service;
 
@@ -38,6 +42,7 @@ public class NodeRoleController {
   @PutMapping
   @Operation(summary = "Create or update an entity's role in a file")
   public ResponseEntity<NodeRoleDto> upsert(@RequestBody UpsertNodeRoleRequest req) {
+    permissionService.require(PermissionAction.LABEL_HOSTS);
     if (req.getFileId() == null) {
       return ResponseEntity.badRequest().build();
     }
@@ -54,6 +59,7 @@ public class NodeRoleController {
   @Operation(summary = "Remove an entity's role in a file")
   public ResponseEntity<Void> delete(
       @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    permissionService.require(PermissionAction.LABEL_HOSTS);
     service.delete(fileId, entityType, entityKey);
     return ResponseEntity.noContent().build();
   }
@@ -70,6 +76,7 @@ public class NodeRoleController {
   })
   public ResponseEntity<NodeRoleDto> dismissStaleness(
       @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    permissionService.require(PermissionAction.LABEL_HOSTS);
     return service
         .dismissStaleness(fileId, entityType, entityKey)
         .map(ResponseEntity::ok)
@@ -84,6 +91,7 @@ public class NodeRoleController {
   })
   public NodeRoleDto suggest(
       @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
+    permissionService.require(PermissionAction.ASK_AI);
     return service.suggestRole(entityType, entityKey, fileId);
   }
 
@@ -99,6 +107,7 @@ public class NodeRoleController {
   })
   public RoleSuggestionDto suggestPreview(
       @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
+    permissionService.require(PermissionAction.ASK_AI);
     return service.suggestRolePreview(entityType, entityKey, fileId);
   }
 }

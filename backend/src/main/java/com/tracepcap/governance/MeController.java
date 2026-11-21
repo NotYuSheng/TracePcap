@@ -25,6 +25,7 @@ public class MeController {
         .authEnabled(currentActor.authEnabled())
         .admin(currentActor.isAdmin())
         .canManagePermissions(permissionService.canManage())
+        .roles(permissionService.callerRoles().stream().map(RoleEntity::getKey).toList())
         .permissions(permissionService.list())
         .build();
   }

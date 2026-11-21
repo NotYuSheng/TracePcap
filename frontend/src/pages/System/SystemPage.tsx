@@ -97,10 +97,12 @@ export function SystemPage() {
                 (env.AUTH_ENABLED ? (
                   <div className="small">
                     <p>
-                      Users, passwords and the <strong>admin</strong> role are managed in Keycloak.
-                      To make someone an admin, open the user, then Role mapping, Assign role,
+                      Users, groups and who has which role are managed in Keycloak. To give a
+                      group (or one person) a role, open it, then Role mapping, Assign role,
                       Filter by clients, and pick{' '}
-                      <span className="font-monospace">{env.OIDC_CLIENT_ID}</span> admin.
+                      <span className="font-monospace">{env.OIDC_CLIENT_ID}</span> and the role:
+                      viewer, analyst, lead or admin. What each role may do is on the Permissions
+                      tab.
                     </p>
                     <a
                       href={keycloakUsersUrl()}

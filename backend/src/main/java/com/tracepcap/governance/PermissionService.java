@@ -1,125 +1,264 @@
 package com.tracepcap.governance;
 
 import com.tracepcap.common.exception.ForbiddenException;
+import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.config.security.CurrentActor;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Decides who may perform each configurable action (#915), and lets an admin change that.
+ * Decides what the caller may do, from their roles, and lets an admin change what each role may do.
  *
- * <p>An ANALYST action is open to anyone using the app. An ADMIN action needs {@link
- * CurrentActor#isAdmin()}: the Keycloak client role with login on, or {@code
- * SYSTEM_SETTINGS_EDITABLE} with login off.
+ * <p><b>Whose roles.</b> Login on: the TracePcap roles among the Keycloak client roles in the
+ * caller's token ({@link CurrentActor#roles()}); someone whose token carries none of them gets the
+ * default role. Login off: there are no accounts, so everyone has every role but admin, as before
+ * roles existed (everything open except admin-only items), and admin too when {@code
+ * SYSTEM_SETTINGS_EDITABLE=true}.
+ *
+ * <p><b>What they may do.</b> Everything any of their roles allows. The admin role always has every
+ * permission, so no one can lock the admins out from inside TracePcap. Everyone may see captures;
+ * only admins may change roles.
  */
 @Service
 @RequiredArgsConstructor
 public class PermissionService {
 
-  static final String AUDIT_TARGET = "permission";
+  static final String AUDIT_TARGET = "role";
 
-  private final PermissionRepository repository;
+  private final RoleRepository roleRepository;
   private final CurrentActor currentActor;
   private final AuditLogService auditLog;
 
+  /** The roles that apply to the caller, in the order Settings lists them. */
   @Transactional(readOnly = true)
-  public PermissionLevel level(PermissionAction action) {
-    return repository
-        .findById(action.name())
-        .map(PermissionEntity::getLevel)
-        .orElse(action.defaultLevel());
+  public List<RoleEntity> callerRoles() {
+    List<RoleEntity> all = roleRepository.findAllByOrderByPositionAscKeyAsc();
+    if (!currentActor.authEnabled()) {
+      boolean admin = currentActor.isAdmin();
+      return all.stream().filter(r -> admin || !isAdminRole(r)).toList();
+    }
+    Set<String> fromToken = currentActor.roles();
+    List<RoleEntity> mine = all.stream().filter(r -> fromToken.contains(r.getKey())).toList();
+    if (!mine.isEmpty()) return mine;
+    return all.stream().filter(RoleEntity::isDefaultRole).toList();
+  }
+
+  /** Every permission the caller has. */
+  @Transactional(readOnly = true)
+  public Set<PermissionAction> callerPermissions() {
+    return permissionsOf(callerRoles());
   }
 
   @Transactional(readOnly = true)
   public boolean can(PermissionAction action) {
-    return allowed(level(action));
+    return callerPermissions().contains(action);
   }
 
   /** Throws a 403 with the reason unless the caller may perform {@code action}. */
   @Transactional(readOnly = true)
   public void require(PermissionAction action) {
-    PermissionLevel level = level(action);
-    if (!allowed(level)) throw new ForbiddenException(action.label() + ": " + reasonFor(level));
+    if (!can(action)) throw new ForbiddenException(action.label() + ": " + reasonFor(action));
   }
 
   /** Why the caller may not perform {@code action}, or null when they may. */
   @Transactional(readOnly = true)
   public String reason(PermissionAction action) {
-    PermissionLevel level = level(action);
-    return allowed(level) ? null : reasonFor(level);
+    return can(action) ? null : reasonFor(action);
   }
 
-  /** Every configurable action, as it applies to the caller. */
+  /**
+   * Deleting a capture: the caller's own needs {@link PermissionAction#DELETE_OWN_CAPTURES}, anyone
+   * else's (or one with no recorded uploader) {@link PermissionAction#DELETE_ANY_CAPTURES}.
+   */
+  @Transactional(readOnly = true)
+  public void requireDeleteCapture(String uploadedBy) {
+    Set<PermissionAction> mine = callerPermissions();
+    if (mine.contains(PermissionAction.DELETE_ANY_CAPTURES)) return;
+    boolean own = uploadedBy != null && uploadedBy.equals(currentActor.username());
+    if (own) {
+      require(PermissionAction.DELETE_OWN_CAPTURES);
+      return;
+    }
+    throw new ForbiddenException(
+        PermissionAction.DELETE_ANY_CAPTURES.label()
+            + ": "
+            + (uploadedBy == null
+                ? "this capture has no recorded uploader, so deleting it needs a role that may delete"
+                    + " anyone's captures."
+                : "it was uploaded by " + uploadedBy + ". " + reasonFor(PermissionAction.DELETE_ANY_CAPTURES)));
+  }
+
+  /** The whole catalogue, as it applies to the caller. */
   @Transactional(readOnly = true)
   public List<PermissionDto> list() {
-    Map<String, PermissionLevel> overrides =
-        repository.findAll().stream()
-            .collect(Collectors.toMap(PermissionEntity::getAction, PermissionEntity::getLevel));
+    Set<PermissionAction> mine = callerPermissions();
     return Arrays.stream(PermissionAction.values())
-        .map(a -> toDto(a, overrides.getOrDefault(a.name(), a.defaultLevel())))
+        .map(a -> toDto(a, mine.contains(a)))
         .toList();
   }
 
-  /** Whether the caller may change the levels themselves. Always admin-only. */
+  /** Whether the caller may change roles. Only the admin role may. */
   public boolean canManage() {
     return currentActor.isAdmin();
   }
 
-  /** The reason the caller can't change levels, or null when they can. */
+  /** Why the caller can't change roles, or null when they can. */
   public String manageReason() {
-    return canManage() ? null : reasonFor(PermissionLevel.ADMIN);
+    return canManage() ? null : reasonFor(PermissionAction.MANAGE_ROLES);
   }
 
-  /** Sets the level an action requires. Admin-only, audited. */
+  /** Every role and what it may do. */
+  @Transactional(readOnly = true)
+  public List<RoleDto> listRoles() {
+    return roleRepository.findAllByOrderByPositionAscKeyAsc().stream().map(this::toDto).toList();
+  }
+
+  /**
+   * Sets what a role may do. Admin only, audited. The admin role can't be changed (it always has
+   * everything); everyone keeps {@link PermissionAction#SEE_CAPTURES}; {@link
+   * PermissionAction#MANAGE_ROLES} stays the admin role's alone.
+   */
   @Transactional
-  public PermissionDto update(PermissionAction action, PermissionLevel newLevel) {
-    if (!canManage()) {
-      throw new ForbiddenException("Changing permissions: " + manageReason());
+  public RoleDto setPermissions(String key, Set<PermissionAction> requested) {
+    requireManage();
+    RoleEntity role = find(key);
+    if (isAdminRole(role)) {
+      throw new IllegalArgumentException("The admin role always has every permission and can't be changed.");
     }
-    PermissionLevel before = level(action);
-    repository.save(
-        PermissionEntity.builder()
-            .action(action.name())
-            .level(newLevel)
-            .updatedAt(LocalDateTime.now())
-            .updatedBy(currentActor.username())
-            .build());
-    if (before != newLevel) {
+    Set<String> next = requested.stream()
+        .filter(a -> !a.fixed())
+        .map(Enum::name)
+        .collect(Collectors.toCollection(TreeSet::new));
+    next.add(PermissionAction.SEE_CAPTURES.name());
+    Set<String> before = new TreeSet<>(role.getPermissions());
+    if (!before.equals(next)) {
+      role.getPermissions().clear();
+      role.getPermissions().addAll(next);
+      touch(role);
+      roleRepository.save(role);
       auditLog.record(
-          "permission.update", AUDIT_TARGET, action.name(), Map.of("level", before), Map.of("level", newLevel));
+          "role.permissions.update", AUDIT_TARGET, key, Map.of("permissions", before), Map.of("permissions", next));
     }
-    return toDto(action, newLevel);
+    return toDto(role);
   }
 
-  private boolean allowed(PermissionLevel level) {
-    return level == PermissionLevel.ANALYST || currentActor.isAdmin();
+  /** Makes {@code key} the role for someone whose sign-in carries none. Admin only, audited. */
+  @Transactional
+  public RoleDto setDefault(String key) {
+    requireManage();
+    RoleEntity role = find(key);
+    if (isAdminRole(role)) {
+      throw new IllegalArgumentException(
+          "The admin role can't be the default: everyone who signs in would be an admin.");
+    }
+    RoleEntity before = roleRepository.findFirstByDefaultRoleTrue().orElse(null);
+    if (before != null && before.getKey().equals(key)) return toDto(role);
+    if (before != null) {
+      before.setDefaultRole(false);
+      touch(before);
+      roleRepository.saveAndFlush(before);
+    }
+    role.setDefaultRole(true);
+    touch(role);
+    roleRepository.save(role);
+    Map<String, Object> was = new LinkedHashMap<>();
+    was.put("defaultRole", before == null ? null : before.getKey());
+    auditLog.record("role.default.set", AUDIT_TARGET, key, was, Map.of("defaultRole", key));
+    return toDto(role);
   }
 
-  private String reasonFor(PermissionLevel level) {
-    if (level == PermissionLevel.ANALYST) return null;
-    return currentActor.authEnabled()
-        ? "only admins can change this. Ask an admin, or for the admin role in Keycloak."
-        : "only admins can change this, and with login off that needs"
-            + " SYSTEM_SETTINGS_EDITABLE=true on the server.";
+  private Set<PermissionAction> permissionsOf(List<RoleEntity> roles) {
+    if (roles.stream().anyMatch(this::isAdminRole)) return EnumSet.allOf(PermissionAction.class);
+    Set<PermissionAction> out = EnumSet.of(PermissionAction.SEE_CAPTURES);
+    for (RoleEntity role : roles) {
+      for (String name : role.getPermissions()) {
+        PermissionAction action = parse(name);
+        if (action != null && action != PermissionAction.MANAGE_ROLES) out.add(action);
+      }
+    }
+    return out;
   }
 
-  private PermissionDto toDto(PermissionAction a, PermissionLevel level) {
-    boolean allowed = allowed(level);
+  private boolean isAdminRole(RoleEntity role) {
+    return BuiltInRole.ADMIN.key().equals(role.getKey());
+  }
+
+  private void requireManage() {
+    if (!canManage()) throw new ForbiddenException("Changing roles: " + manageReason());
+  }
+
+  private RoleEntity find(String key) {
+    return roleRepository.findById(key).orElseThrow(() -> new ResourceNotFoundException("Role", "key", key));
+  }
+
+  private void touch(RoleEntity role) {
+    role.setUpdatedAt(LocalDateTime.now());
+    role.setUpdatedBy(currentActor.username());
+  }
+
+  private static PermissionAction parse(String name) {
+    try {
+      return PermissionAction.valueOf(name);
+    } catch (IllegalArgumentException retired) {
+      return null; // a permission a later version removed: it gives nothing
+    }
+  }
+
+  private String reasonFor(PermissionAction action) {
+    if (action == PermissionAction.MANAGE_ROLES) {
+      return currentActor.authEnabled()
+          ? "only the admin role can change this. Ask an admin, or for the admin role in Keycloak."
+          : "only admins can change this, and with login off that needs SYSTEM_SETTINGS_EDITABLE=true on the server.";
+    }
+    if (!currentActor.authEnabled()) {
+      return "only admins can change this, and with login off that needs SYSTEM_SETTINGS_EDITABLE=true on"
+          + " the server.";
+    }
+    String names = callerRoles().stream().map(RoleEntity::getLabel).collect(Collectors.joining(", "));
+    return "your role" + (names.contains(",") ? "s (" : " (") + names
+        + ") doesn't include this. Ask an admin to add it to your role, or for a role in Keycloak that has it.";
+  }
+
+  private PermissionDto toDto(PermissionAction a, boolean allowed) {
     return PermissionDto.builder()
         .action(a)
         .label(a.label())
         .description(a.description())
-        .level(level)
-        .defaultLevel(a.defaultLevel())
+        .group(a.group())
+        .groupLabel(a.group().label())
+        .suggestedRole(a.lowest().key())
+        .fixed(a.fixed())
         .allowed(allowed)
-        .reason(allowed ? null : reasonFor(level))
+        .reason(allowed ? null : reasonFor(a))
         .build();
   }
 
+  private RoleDto toDto(RoleEntity role) {
+    boolean admin = isAdminRole(role);
+    List<PermissionAction> perms = admin
+        ? List.of(PermissionAction.values())
+        : Arrays.stream(PermissionAction.values())
+            .filter(a -> a == PermissionAction.SEE_CAPTURES || role.getPermissions().contains(a.name()))
+            .filter(a -> a != PermissionAction.MANAGE_ROLES)
+            .toList();
+    return RoleDto.builder()
+        .key(role.getKey())
+        .label(role.getLabel())
+        .description(role.getDescription())
+        .builtIn(role.isBuiltIn())
+        .defaultRole(role.isDefaultRole())
+        .editable(!admin)
+        .permissions(perms)
+        .build();
+  }
 }

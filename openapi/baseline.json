@@ -2188,6 +2188,9 @@
             "format": "date-time",
             "type": "string"
           },
+          "uploadedBy": {
+            "type": "string"
+          },
           "version": {
             "type": "boolean"
           }
@@ -3193,6 +3196,12 @@
           "permissions": {
             "items": {
               "$ref": "#/components/schemas/PermissionDto"
+            },
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },
@@ -4230,43 +4239,66 @@
         "properties": {
           "action": {
             "enum": [
-              "DETECTION_RULES_GLOBAL",
-              "DETECTION_RULES_NETWORK",
-              "DETECTION_RULES_CAPTURE",
+              "SEE_CAPTURES",
+              "DOWNLOAD_REPORT",
+              "READ_AUDIT_LOG",
+              "UPLOAD_CAPTURES",
+              "ASK_AI",
+              "EXPORT_PACKETS",
+              "LABEL_HOSTS",
+              "OVERRIDE_ANSWERS",
               "HOST_OCCUPANCY",
-              "ADDRESS_DEFAULTS",
-              "NETWORK_SETTINGS",
               "NETWORK_MAP",
-              "ANALYSIS_POLICY",
+              "DETECTION_RULES_CAPTURE",
+              "DETECTION_RULES_NETWORK",
+              "DETECTION_RULES_GLOBAL",
+              "NETWORK_CAPTURES",
+              "NETWORK_CREATE",
+              "NETWORK_SETTINGS",
+              "NETWORK_DELETE",
+              "KEEP_CAPTURES",
+              "DELETE_OWN_CAPTURES",
+              "DELETE_ANY_CAPTURES",
               "RETENTION",
-              "LLM_CONNECTION"
+              "ADDRESS_DEFAULTS",
+              "ANALYSIS_POLICY",
+              "LLM_CONNECTION",
+              "CANCEL_OTHERS_AI_JOBS",
+              "MANAGE_ROLES"
             ],
             "type": "string"
           },
           "allowed": {
             "type": "boolean"
           },
-          "defaultLevel": {
+          "description": {
+            "type": "string"
+          },
+          "fixed": {
+            "type": "boolean"
+          },
+          "group": {
             "enum": [
-              "ANALYST",
-              "ADMIN"
+              "LOOK",
+              "INVESTIGATE",
+              "CURATE",
+              "RULES",
+              "MONITOR",
+              "DATA",
+              "INSTALL"
             ],
             "type": "string"
           },
-          "description": {
+          "groupLabel": {
             "type": "string"
           },
           "label": {
             "type": "string"
           },
-          "level": {
-            "enum": [
-              "ANALYST",
-              "ADMIN"
-            ],
+          "reason": {
             "type": "string"
           },
-          "reason": {
+          "suggestedRole": {
             "type": "string"
           }
         },
@@ -4526,6 +4558,63 @@
           "occupancies": {
             "items": {
               "$ref": "#/components/schemas/Occupancy"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RoleDto": {
+        "properties": {
+          "builtIn": {
+            "type": "boolean"
+          },
+          "defaultRole": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "SEE_CAPTURES",
+                "DOWNLOAD_REPORT",
+                "READ_AUDIT_LOG",
+                "UPLOAD_CAPTURES",
+                "ASK_AI",
+                "EXPORT_PACKETS",
+                "LABEL_HOSTS",
+                "OVERRIDE_ANSWERS",
+                "HOST_OCCUPANCY",
+                "NETWORK_MAP",
+                "DETECTION_RULES_CAPTURE",
+                "DETECTION_RULES_NETWORK",
+                "DETECTION_RULES_GLOBAL",
+                "NETWORK_CAPTURES",
+                "NETWORK_CREATE",
+                "NETWORK_SETTINGS",
+                "NETWORK_DELETE",
+                "KEEP_CAPTURES",
+                "DELETE_OWN_CAPTURES",
+                "DELETE_ANY_CAPTURES",
+                "RETENTION",
+                "ADDRESS_DEFAULTS",
+                "ANALYSIS_POLICY",
+                "LLM_CONNECTION",
+                "CANCEL_OTHERS_AI_JOBS",
+                "MANAGE_ROLES"
+              ],
+              "type": "string"
             },
             "type": "array"
           }
@@ -5718,19 +5807,47 @@
         ],
         "type": "object"
       },
-      "UpdatePermissionRequest": {
+      "UpdateRoleRequest": {
         "properties": {
-          "level": {
-            "enum": [
-              "ANALYST",
-              "ADMIN"
-            ],
-            "type": "string"
+          "defaultRole": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "SEE_CAPTURES",
+                "DOWNLOAD_REPORT",
+                "READ_AUDIT_LOG",
+                "UPLOAD_CAPTURES",
+                "ASK_AI",
+                "EXPORT_PACKETS",
+                "LABEL_HOSTS",
+                "OVERRIDE_ANSWERS",
+                "HOST_OCCUPANCY",
+                "NETWORK_MAP",
+                "DETECTION_RULES_CAPTURE",
+                "DETECTION_RULES_NETWORK",
+                "DETECTION_RULES_GLOBAL",
+                "NETWORK_CAPTURES",
+                "NETWORK_CREATE",
+                "NETWORK_SETTINGS",
+                "NETWORK_DELETE",
+                "KEEP_CAPTURES",
+                "DELETE_OWN_CAPTURES",
+                "DELETE_ANY_CAPTURES",
+                "RETENTION",
+                "ADDRESS_DEFAULTS",
+                "ANALYSIS_POLICY",
+                "LLM_CONNECTION",
+                "CANCEL_OTHERS_AI_JOBS",
+                "MANAGE_ROLES"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
           }
         },
-        "required": [
-          "level"
-        ],
         "type": "object"
       },
       "UpsertNodeRoleRequest": {
@@ -5929,7 +6046,7 @@
     "/api/v1/ai-jobs": {
       "get": {
         "description": "Waiting and running jobs first, in the order they'll run, then those finished in the last 30 minutes. Results are left out; get a job by id for its result.",
-        "operationId": "list_15",
+        "operationId": "list_16",
         "parameters": [
           {
             "in": "query",
@@ -6143,7 +6260,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.",
-        "operationId": "list_14",
+        "operationId": "list_15",
         "parameters": [
           {
             "in": "query",
@@ -7718,7 +7835,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_13",
+        "operationId": "list_14",
         "responses": {
           "200": {
             "content": {
@@ -7799,7 +7916,7 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_12",
+        "operationId": "list_13",
         "parameters": [
           {
             "in": "query",
@@ -8059,7 +8176,7 @@
         ]
       },
       "put": {
-        "operationId": "update_1",
+        "operationId": "update",
         "parameters": [
           {
             "in": "path",
@@ -9163,7 +9280,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_11",
+        "operationId": "list_12",
         "parameters": [
           {
             "in": "path",
@@ -10110,7 +10227,7 @@
     },
     "/api/v1/files/{fileId}/networks": {
       "get": {
-        "operationId": "list_10",
+        "operationId": "list_11",
         "parameters": [
           {
             "in": "path",
@@ -10183,7 +10300,7 @@
     "/api/v1/files/{fileId}/occupancies": {
       "get": {
         "description": "Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.",
-        "operationId": "list_9",
+        "operationId": "list_10",
         "parameters": [
           {
             "in": "path",
@@ -10615,7 +10732,7 @@
     },
     "/api/v1/ip-org-rules": {
       "get": {
-        "operationId": "list_8",
+        "operationId": "list_9",
         "responses": {
           "200": {
             "content": {
@@ -10864,7 +10981,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations": {
       "get": {
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "path",
@@ -11347,7 +11464,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/detection-rules": {
       "get": {
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "in": "path",
@@ -11682,7 +11799,7 @@
     "/api/v1/monitor/networks/{networkId}/devices": {
       "get": {
         "description": "One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.",
-        "operationId": "list_5",
+        "operationId": "list_6",
         "parameters": [
           {
             "in": "path",
@@ -11750,7 +11867,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/external-events": {
       "get": {
-        "operationId": "list_4",
+        "operationId": "list_5",
         "parameters": [
           {
             "in": "path",
@@ -12508,7 +12625,7 @@
     "/api/v1/monitor/networks/{networkId}/subnets": {
       "get": {
         "description": "Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.",
-        "operationId": "list_3",
+        "operationId": "list_4",
         "parameters": [
           {
             "in": "path",
@@ -12619,7 +12736,7 @@
     },
     "/api/v1/network-memberships": {
       "get": {
-        "operationId": "list_2",
+        "operationId": "list_3",
         "responses": {
           "200": {
             "content": {
@@ -12977,7 +13094,7 @@
     },
     "/api/v1/permissions": {
       "get": {
-        "operationId": "list_1",
+        "operationId": "list_2",
         "responses": {
           "200": {
             "content": {
@@ -12993,60 +13110,7 @@
             "description": "OK"
           }
         },
-        "summary": "List configurable actions, the level each requires, and whether I may do it",
-        "tags": [
-          "Permissions"
-        ]
-      }
-    },
-    "/api/v1/permissions/{action}": {
-      "put": {
-        "operationId": "update",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "action",
-            "required": true,
-            "schema": {
-              "enum": [
-                "DETECTION_RULES_GLOBAL",
-                "DETECTION_RULES_NETWORK",
-                "DETECTION_RULES_CAPTURE",
-                "HOST_OCCUPANCY",
-                "ADDRESS_DEFAULTS",
-                "NETWORK_SETTINGS",
-                "NETWORK_MAP",
-                "ANALYSIS_POLICY",
-                "RETENTION",
-                "LLM_CONNECTION"
-              ],
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePermissionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/PermissionDto"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Set the level an action requires (admin only; audited)",
+        "summary": "List every permission, grouped, and whether I have it",
         "tags": [
           "Permissions"
         ]
@@ -13099,6 +13163,71 @@
         "summary": "Replace my preferences (shared by everyone when login is off)",
         "tags": [
           "Preferences"
+        ]
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "operationId": "list_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List the roles and what each may do",
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/api/v1/roles/{key}": {
+      "patch": {
+        "operationId": "update_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Change what a role may do, or make it the default role (admin only; audited)",
+        "tags": [
+          "Roles"
         ]
       }
     },
@@ -14190,8 +14319,92 @@
       "name": "Network Detection Rules"
     },
     {
-      "description": "Who may change each setting or rule set (analysts or admins)",
-      "name": "Permissions"
+      "description": "PCAP analysis summary and protocol statistics",
+      "name": "Analysis"
+    },
+    {
+      "description": "Per-file device-type classifications for hosts",
+      "name": "Host Classifications"
+    },
+    {
+      "description": "Per-file nDPI security alerts",
+      "name": "Security Alerts"
+    },
+    {
+      "description": "Devices that held one address at different times in a capture",
+      "name": "Host Occupancy"
+    },
+    {
+      "description": "User-defined CIDR-to-organization label mappings",
+      "name": "IP Org Rules"
+    },
+    {
+      "description": "Per-file conversation listing, facets, export, and session reconstruction",
+      "name": "Conversations"
+    },
+    {
+      "description": "AI work running in the background, one job at a time",
+      "name": "AI jobs"
+    },
+    {
+      "description": "User-defined subnet labels and auto-detection",
+      "name": "Subnets"
+    },
+    {
+      "description": "Binned traffic statistics over time for a file",
+      "name": "Timeline"
+    },
+    {
+      "description": "Generate single-file and comparison PDF reports",
+      "name": "Reports"
+    },
+    {
+      "description": "Baseline rules used to detect drift in a monitored network",
+      "name": "Monitor Baseline Definitions"
+    },
+    {
+      "description": "Ask about a capture; the LLM may call read-only tools to look things up",
+      "name": "Capture chat"
+    },
+    {
+      "description": "Staleness of rule matches, and re-applying rules",
+      "name": "Detection Rule Sync"
+    },
+    {
+      "description": "The assembled knowledge board for a file — entities, relationships, and findings",
+      "name": "Knowledge"
+    },
+    {
+      "description": "Free-text annotations on a monitored network",
+      "name": "Network Annotations"
+    },
+    {
+      "description": "Large-scale network topology clustering and host analytics",
+      "name": "Network Cluster"
+    },
+    {
+      "description": "A human's final answer to an adjudicated question — outranks the machine vote",
+      "name": "Adjudication Overrides"
+    },
+    {
+      "description": "Networks in a capture, told apart by their DHCP leases",
+      "name": "Network Segments"
+    },
+    {
+      "description": "The current caller: identity, admin status and permissions",
+      "name": "Me"
+    },
+    {
+      "description": "Packet-level conversation trace with AI explanations",
+      "name": "Conversation Tracer"
+    },
+    {
+      "description": "Who changed which setting or rule, when, before and after",
+      "name": "Audit Log"
+    },
+    {
+      "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",
+      "name": "Host Identities"
     },
     {
       "description": "AI-generated insights for a monitored network",
@@ -14218,22 +14431,6 @@
       "name": "Node Roles"
     },
     {
-      "description": "PCAP analysis summary and protocol statistics",
-      "name": "Analysis"
-    },
-    {
-      "description": "Per-file device-type classifications for hosts",
-      "name": "Host Classifications"
-    },
-    {
-      "description": "Per-file nDPI security alerts",
-      "name": "Security Alerts"
-    },
-    {
-      "description": "Devices that held one address at different times in a capture",
-      "name": "Host Occupancy"
-    },
-    {
       "description": "Detection rules that belong to one capture",
       "name": "Capture Detection Rules"
     },
@@ -14246,24 +14443,12 @@
       "name": "Detection Rules"
     },
     {
-      "description": "User-defined CIDR-to-organization label mappings",
-      "name": "IP Org Rules"
-    },
-    {
       "description": "User-defined CIDR ranges treated as private/internal",
       "name": "Custom Private Ranges"
     },
     {
-      "description": "Per-file conversation listing, facets, export, and session reconstruction",
-      "name": "Conversations"
-    },
-    {
       "description": "Change editable analysis policy in the app (audited)",
       "name": "Policy Settings"
-    },
-    {
-      "description": "AI work running in the background, one job at a time",
-      "name": "AI jobs"
     },
     {
       "description": "User notes attached to network entities, with history",
@@ -14274,24 +14459,12 @@
       "name": "Extracted Files"
     },
     {
-      "description": "User-defined subnet labels and auto-detection",
-      "name": "Subnets"
-    },
-    {
-      "description": "Binned traffic statistics over time for a file",
-      "name": "Timeline"
-    },
-    {
       "description": "A network's own entries on top of the shared default",
       "name": "Network address configuration"
     },
     {
       "description": "Manage monitored networks",
       "name": "Monitor Networks"
-    },
-    {
-      "description": "Generate single-file and comparison PDF reports",
-      "name": "Reports"
     },
     {
       "description": "APIs for natural language to pcap filter generation and execution",
@@ -14306,8 +14479,12 @@
       "name": "Monitor Snapshots"
     },
     {
-      "description": "Baseline rules used to detect drift in a monitored network",
-      "name": "Monitor Baseline Definitions"
+      "description": "The permission catalogue, and which permissions I have",
+      "name": "Permissions"
+    },
+    {
+      "description": "What each role may do. Who has a role is set in Keycloak, by the client role of the same key",
+      "name": "Roles"
     },
     {
       "description": "Deploy-time settings and why each can or can't be changed",
@@ -14318,64 +14495,20 @@
       "name": "Story Generation"
     },
     {
-      "description": "Ask about a capture; the LLM may call read-only tools to look things up",
-      "name": "Capture chat"
-    },
-    {
       "description": "APIs for PCAP file upload, download, and management",
       "name": "File Management"
-    },
-    {
-      "description": "Staleness of rule matches, and re-applying rules",
-      "name": "Detection Rule Sync"
-    },
-    {
-      "description": "The assembled knowledge board for a file — entities, relationships, and findings",
-      "name": "Knowledge"
     },
     {
       "description": "The analyst's edits to a capture's network map",
       "name": "Network Map"
     },
     {
-      "description": "Free-text annotations on a monitored network",
-      "name": "Network Annotations"
-    },
-    {
-      "description": "Large-scale network topology clustering and host analytics",
-      "name": "Network Cluster"
-    },
-    {
-      "description": "A human's final answer to an adjudicated question — outranks the machine vote",
-      "name": "Adjudication Overrides"
-    },
-    {
-      "description": "Networks in a capture, told apart by their DHCP leases",
-      "name": "Network Segments"
-    },
-    {
-      "description": "The current caller: identity, admin status and permissions",
-      "name": "Me"
-    },
-    {
       "description": "Devices across a monitored network's snapshots",
       "name": "Network Devices"
     },
     {
-      "description": "Packet-level conversation trace with AI explanations",
-      "name": "Conversation Tracer"
-    },
-    {
       "description": "Personal preferences (theme, node labels, table columns)",
       "name": "Preferences"
-    },
-    {
-      "description": "Who changed which setting or rule, when, before and after",
-      "name": "Audit Log"
-    },
-    {
-      "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",
-      "name": "Host Identities"
     }
   ]
 }

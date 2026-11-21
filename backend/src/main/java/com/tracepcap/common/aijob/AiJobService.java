@@ -47,6 +47,8 @@ public class AiJobService {
   private final Clock clock;
   private final ExecutorService worker;
   private final Map<UUID, Job> jobs = new ConcurrentHashMap<>();
+  /** Who may cancel others' jobs; without one (tests), only admins. */
+  private AiJobCancelGate cancelGate;
   private final Map<String, Deque<Long>> recentMs = new ConcurrentHashMap<>();
 
   @Autowired
@@ -146,14 +148,21 @@ public class AiJobService {
         .toList();
   }
 
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setCancelGate(AiJobCancelGate cancelGate) {
+    this.cancelGate = cancelGate;
+  }
+
   /**
    * Takes a waiting job out of line. A running one can't be stopped: the model is already
    * answering, and its answer is saved like any other.
    */
   public synchronized AiJobDto cancel(UUID id) {
     Job job = find(id);
-    if (!actor.isAdmin() && !job.requestedBy.equals(actor.username())) {
-      throw new ForbiddenException("Only whoever asked for this, or an admin, can cancel it.");
+    boolean mayCancelOthers = cancelGate != null ? cancelGate.mayCancelOthers() : actor.isAdmin();
+    if (!mayCancelOthers && !job.requestedBy.equals(actor.username())) {
+      throw new ForbiddenException(
+          "Only whoever asked for this, or someone whose role may cancel others' AI work, can cancel it.");
     }
     if (!"WAITING".equals(job.status)) {
       throw new IllegalArgumentException(

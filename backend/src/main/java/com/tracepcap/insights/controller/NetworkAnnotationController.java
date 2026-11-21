@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.insights.dto.CreateAnnotationRequest;
 import com.tracepcap.insights.dto.NetworkAnnotationDto;
 import com.tracepcap.insights.dto.UpdateAnnotationRequest;
@@ -19,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Network Annotations", description = "Free-text annotations on a monitored network")
 public class NetworkAnnotationController {
 
+  private final PermissionService permissionService;
+
   private final NetworkAnnotationService service;
 
   @GetMapping
@@ -32,6 +36,7 @@ public class NetworkAnnotationController {
   public ResponseEntity<NetworkAnnotationDto> create(
       @PathVariable UUID networkId,
       @RequestBody CreateAnnotationRequest req) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     if (req.getBody() == null || req.getBody().isBlank()) {
       return ResponseEntity.badRequest().build();
     }
@@ -44,6 +49,7 @@ public class NetworkAnnotationController {
       @PathVariable UUID networkId,
       @PathVariable UUID annotationId,
       @RequestBody UpdateAnnotationRequest req) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     if (req.getBody() == null || req.getBody().isBlank()) return ResponseEntity.badRequest().build();
     return ResponseEntity.ok(service.updateAnnotation(networkId, annotationId, req.getBody()));
   }
@@ -53,6 +59,7 @@ public class NetworkAnnotationController {
   public ResponseEntity<Void> delete(
       @PathVariable UUID networkId,
       @PathVariable UUID annotationId) {
+    permissionService.require(PermissionAction.NETWORK_CAPTURES);
     service.deleteAnnotation(networkId, annotationId);
     return ResponseEntity.noContent().build();
   }

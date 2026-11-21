@@ -49,8 +49,26 @@
     "client": {
       "tracepcap-frontend": [
         {
+          "name": "viewer",
+          "description": "TracePcap viewer: reads captures, networks, findings and reports. What each role may do is set in TracePcap (Settings > Permissions). Assign to a group: Groups > the group > Role mapping > Assign role > Filter by clients.",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "name": "analyst",
+          "description": "TracePcap analyst: investigates (upload, ask the AI, label, override, capture and network rules). What each role may do is set in TracePcap (Settings > Permissions). Assign to a group: Groups > the group > Role mapping > Assign role > Filter by clients.",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "name": "lead",
+          "description": "TracePcap lead: curates what everyone shares (global rules, address defaults, network settings, anyone's captures, the audit log). What each role may do is set in TracePcap (Settings > Permissions). Assign to a group: Groups > the group > Role mapping > Assign role > Filter by clients.",
+          "composite": false,
+          "clientRole": true
+        },
+        {
           "name": "admin",
-          "description": "TracePcap admin: may change settings marked admin-only (#915). Grant via Users > Role mapping > Filter by clients.",
+          "description": "TracePcap admin: every permission, always, including changing roles. What each role may do is set in TracePcap (Settings > Permissions). Assign to a group: Groups > the group > Role mapping > Assign role > Filter by clients.",
           "composite": false,
           "clientRole": true
         }

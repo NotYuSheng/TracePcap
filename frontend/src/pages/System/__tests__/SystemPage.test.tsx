@@ -8,59 +8,99 @@ import { PermissionsPanel } from '../PermissionsPanel';
 import { AuditLogPanel } from '../AuditLogPanel';
 import { SystemPage } from '../SystemPage';
 
-function me(admin: boolean, level: 'ANALYST' | 'ADMIN' = 'ANALYST') {
+const PERMS = [
+  {
+    action: 'SEE_CAPTURES',
+    label: 'See captures, networks and findings',
+    description: 'Every role has it.',
+    group: 'LOOK',
+    groupLabel: 'Look',
+    suggestedRole: 'viewer',
+    fixed: true,
+    allowed: true,
+    reason: null,
+  },
+  {
+    action: 'ASK_AI',
+    label: 'Ask the AI',
+    description: 'The story, the chat, insights.',
+    group: 'INVESTIGATE',
+    groupLabel: 'Investigate',
+    suggestedRole: 'analyst',
+    fixed: false,
+    allowed: true,
+    reason: null,
+  },
+];
+
+function me(admin: boolean) {
   return {
     username: admin ? 'alice' : 'system',
     authEnabled: admin,
     admin,
     canManagePermissions: admin,
-    permissions: [
-      {
-        action: 'NETWORK_SETTINGS',
-        label: 'Edit network settings',
-        description: 'Per-network settings.',
-        level,
-        defaultLevel: 'ANALYST',
-        allowed: admin || level === 'ANALYST',
-        reason: null,
-      },
-    ],
+    roles: admin ? ['admin'] : ['analyst'],
+    permissions: PERMS,
   };
 }
 
-describe('PermissionsPanel (#915)', () => {
-  it('shows every item to a non-admin, greyed out, and explains why when clicked', async () => {
-    server.use(http.get('*/me', () => HttpResponse.json(me(false))));
+function roles(viewerPerms: string[] = ['SEE_CAPTURES'], defaultKey = 'analyst') {
+  const role = (key: string, label: string, permissions: string[], editable = true) => ({
+    key,
+    label,
+    builtIn: true,
+    defaultRole: key === defaultKey,
+    editable,
+    permissions,
+  });
+  return [
+    role('viewer', 'Viewer', viewerPerms),
+    role('analyst', 'Analyst', ['SEE_CAPTURES', 'ASK_AI']),
+    role('admin', 'Admin', ['SEE_CAPTURES', 'ASK_AI'], false),
+  ];
+}
+
+describe('PermissionsPanel: what each role may do', () => {
+  it('shows the grid to a non-admin with every box locked, and says why', async () => {
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(false))),
+      http.get('*/roles', () => HttpResponse.json(roles()))
+    );
     render(<PermissionsPanel />);
 
-    expect(await screen.findByTestId('permissions-locked')).toHaveTextContent(
-      'SYSTEM_SETTINGS_EDITABLE'
-    );
-    expect(screen.getByLabelText('Who may: Edit network settings')).toBeDisabled();
-
-    await userEvent.click(screen.getByRole('button', { name: /Edit network settings/ }));
-    expect(screen.getByText(/Why the level is greyed out/)).toBeInTheDocument();
+    expect(await screen.findByTestId('permissions-locked')).toHaveTextContent('SYSTEM_SETTINGS_EDITABLE');
+    expect(screen.getByTestId('my-roles')).toHaveTextContent('Analyst');
+    expect(screen.getByLabelText('Viewer: Ask the AI')).toBeDisabled();
+    expect(screen.getByLabelText('Analyst: Ask the AI')).toBeChecked();
   });
 
-  it('lets an admin change a level, and shows it as changed', async () => {
-    let level: 'ANALYST' | 'ADMIN' = 'ANALYST';
-    let body: unknown = null;
+  it('lets an admin give a role a permission, and choose the default role', async () => {
+    let viewerPerms = ['SEE_CAPTURES'];
+    let defaultKey = 'analyst';
+    const bodies: { key: string; body: unknown }[] = [];
     server.use(
-      http.get('*/me', () => HttpResponse.json(me(true, level))),
-      http.put('*/permissions/NETWORK_SETTINGS', async ({ request }) => {
-        body = await request.json();
-        level = 'ADMIN';
+      http.get('*/me', () => HttpResponse.json(me(true))),
+      http.get('*/roles', () => HttpResponse.json(roles(viewerPerms, defaultKey))),
+      http.patch('*/roles/:key', async ({ request, params }) => {
+        const body = (await request.json()) as { permissions?: string[]; defaultRole?: boolean };
+        bodies.push({ key: String(params.key), body });
+        if (body.permissions) viewerPerms = body.permissions;
+        if (body.defaultRole) defaultKey = String(params.key);
         return HttpResponse.json({});
       })
     );
     render(<PermissionsPanel />);
 
-    const select = await screen.findByLabelText('Who may: Edit network settings');
-    expect(select).toBeEnabled();
-    await userEvent.selectOptions(select, 'ADMIN');
+    // The admin role always has everything; seeing captures is every role's.
+    expect(await screen.findByLabelText('Admin: Ask the AI')).toBeDisabled();
+    expect(screen.getByLabelText('Viewer: See captures, networks and findings')).toBeDisabled();
 
-    await waitFor(() => expect(screen.getByText('changed')).toBeInTheDocument());
-    expect(body).toEqual({ level: 'ADMIN' });
+    await userEvent.click(screen.getByLabelText('Viewer: Ask the AI'));
+    await waitFor(() => expect(screen.getByLabelText('Viewer: Ask the AI')).toBeChecked());
+    expect(bodies[0]).toEqual({ key: 'viewer', body: { permissions: ['SEE_CAPTURES', 'ASK_AI'] } });
+
+    await userEvent.selectOptions(screen.getByLabelText(/carries none of these roles/), 'viewer');
+    await waitFor(() => expect(bodies[1]).toEqual({ key: 'viewer', body: { defaultRole: true } }));
   });
 });
 

@@ -15,7 +15,7 @@ export interface paths {
          * What the model is working on
          * @description Waiting and running jobs first, in the order they'll run, then those finished in the last 30 minutes. Results are left out; get a job by id for its result.
          */
-        get: operations["list_15"];
+        get: operations["list_16"];
         put?: never;
         post?: never;
         delete?: never;
@@ -126,7 +126,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.
          */
-        get: operations["list_14"];
+        get: operations["list_15"];
         put?: never;
         post?: never;
         delete?: never;
@@ -575,7 +575,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_13"];
+        get: operations["list_14"];
         put?: never;
         /**
          * Set a custom private range in the shared default
@@ -619,7 +619,7 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_12"];
+        get: operations["list_13"];
         put?: never;
         /** Create a global detection rule (audited) */
         post: operations["create_5"];
@@ -733,7 +733,7 @@ export interface paths {
         /** Get one detection rule */
         get: operations["get_3"];
         /** Replace a detection rule (audited; bumps its version if anything changed) */
-        put: operations["update_1"];
+        put: operations["update"];
         post?: never;
         /** Delete a detection rule (audited) */
         delete: operations["delete_7"];
@@ -1003,7 +1003,7 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
         post: operations["create_4"];
@@ -1412,7 +1412,7 @@ export interface paths {
             cookie?: never;
         };
         /** The networks this capture is a snapshot of */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1452,7 +1452,7 @@ export interface paths {
          * Every address that more than one device held
          * @description Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.
          */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1637,7 +1637,7 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         /**
          * Set an IP organization rule in the shared default
@@ -1732,7 +1732,7 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /** Create an annotation */
         post: operations["create_2"];
@@ -1878,7 +1878,7 @@ export interface paths {
             cookie?: never;
         };
         /** This network's own rules */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         /**
          * Add a rule to this network (audited)
@@ -2017,7 +2017,7 @@ export interface paths {
          * A network's devices across its snapshots
          * @description One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.
          */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2034,7 +2034,7 @@ export interface paths {
             cookie?: never;
         };
         /** List external events for a network */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         /** Create an external event */
         post: operations["create"];
@@ -2279,7 +2279,7 @@ export interface paths {
          * A network's subnets: its own entries and the default's
          * @description Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.
          */
-        get: operations["list_3"];
+        get: operations["list_4"];
         put?: never;
         /**
          * Set the network's subnet for a CIDR, or hide the default's
@@ -2320,7 +2320,7 @@ export interface paths {
             cookie?: never;
         };
         /** Every capture that is a snapshot of a monitored network, with the network */
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2432,26 +2432,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List configurable actions, the level each requires, and whether I may do it */
-        get: operations["list_1"];
+        /** List every permission, grouped, and whether I have it */
+        get: operations["list_2"];
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/permissions/{action}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Set the level an action requires (admin only; audited) */
-        put: operations["update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2475,6 +2458,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the roles and what each may do */
+        get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change what a role may do, or make it the default role (admin only; audited) */
+        patch: operations["update_1"];
         trace?: never;
     };
     "/api/v1/rule-reapply-jobs": {
@@ -3786,6 +3803,7 @@ export interface components {
             storyStatus?: string;
             /** Format: date-time */
             uploadedAt?: string;
+            uploadedBy?: string;
             version?: boolean;
         };
         FileUploadResponse: {
@@ -4133,6 +4151,7 @@ export interface components {
             authEnabled?: boolean;
             canManagePermissions?: boolean;
             permissions?: components["schemas"]["PermissionDto"][];
+            roles?: string[];
             username?: string;
         };
         MediaInfo: {
@@ -4512,15 +4531,16 @@ export interface components {
         };
         PermissionDto: {
             /** @enum {string} */
-            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION" | "LLM_CONNECTION";
+            action?: "SEE_CAPTURES" | "DOWNLOAD_REPORT" | "READ_AUDIT_LOG" | "UPLOAD_CAPTURES" | "ASK_AI" | "EXPORT_PACKETS" | "LABEL_HOSTS" | "OVERRIDE_ANSWERS" | "HOST_OCCUPANCY" | "NETWORK_MAP" | "DETECTION_RULES_CAPTURE" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_GLOBAL" | "NETWORK_CAPTURES" | "NETWORK_CREATE" | "NETWORK_SETTINGS" | "NETWORK_DELETE" | "KEEP_CAPTURES" | "DELETE_OWN_CAPTURES" | "DELETE_ANY_CAPTURES" | "RETENTION" | "ADDRESS_DEFAULTS" | "ANALYSIS_POLICY" | "LLM_CONNECTION" | "CANCEL_OTHERS_AI_JOBS" | "MANAGE_ROLES";
             allowed?: boolean;
-            /** @enum {string} */
-            defaultLevel?: "ANALYST" | "ADMIN";
             description?: string;
-            label?: string;
+            fixed?: boolean;
             /** @enum {string} */
-            level?: "ANALYST" | "ADMIN";
+            group?: "LOOK" | "INVESTIGATE" | "CURATE" | "RULES" | "MONITOR" | "DATA" | "INSTALL";
+            groupLabel?: string;
+            label?: string;
             reason?: string;
+            suggestedRole?: string;
         };
         PreferencesDto: {
             conversationColumns?: string[];
@@ -4612,6 +4632,15 @@ export interface components {
         ReusedAddress: {
             ip?: string;
             occupancies?: components["schemas"]["Occupancy"][];
+        };
+        RoleDto: {
+            builtIn?: boolean;
+            defaultRole?: boolean;
+            description?: string;
+            editable?: boolean;
+            key?: string;
+            label?: string;
+            permissions?: ("SEE_CAPTURES" | "DOWNLOAD_REPORT" | "READ_AUDIT_LOG" | "UPLOAD_CAPTURES" | "ASK_AI" | "EXPORT_PACKETS" | "LABEL_HOSTS" | "OVERRIDE_ANSWERS" | "HOST_OCCUPANCY" | "NETWORK_MAP" | "DETECTION_RULES_CAPTURE" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_GLOBAL" | "NETWORK_CAPTURES" | "NETWORK_CREATE" | "NETWORK_SETTINGS" | "NETWORK_DELETE" | "KEEP_CAPTURES" | "DELETE_OWN_CAPTURES" | "DELETE_ANY_CAPTURES" | "RETENTION" | "ADDRESS_DEFAULTS" | "ANALYSIS_POLICY" | "LLM_CONNECTION" | "CANCEL_OTHERS_AI_JOBS" | "MANAGE_ROLES")[];
         };
         RoleSuggestionDto: {
             roleDescription?: string;
@@ -5035,9 +5064,9 @@ export interface components {
             description?: string;
             name: string;
         };
-        UpdatePermissionRequest: {
-            /** @enum {string} */
-            level: "ANALYST" | "ADMIN";
+        UpdateRoleRequest: {
+            defaultRole?: boolean;
+            permissions?: ("SEE_CAPTURES" | "DOWNLOAD_REPORT" | "READ_AUDIT_LOG" | "UPLOAD_CAPTURES" | "ASK_AI" | "EXPORT_PACKETS" | "LABEL_HOSTS" | "OVERRIDE_ANSWERS" | "HOST_OCCUPANCY" | "NETWORK_MAP" | "DETECTION_RULES_CAPTURE" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_GLOBAL" | "NETWORK_CAPTURES" | "NETWORK_CREATE" | "NETWORK_SETTINGS" | "NETWORK_DELETE" | "KEEP_CAPTURES" | "DELETE_OWN_CAPTURES" | "DELETE_ANY_CAPTURES" | "RETENTION" | "ADDRESS_DEFAULTS" | "ANALYSIS_POLICY" | "LLM_CONNECTION" | "CANCEL_OTHERS_AI_JOBS" | "MANAGE_ROLES")[];
         };
         UpsertNodeRoleRequest: {
             confirmedByHuman?: boolean;
@@ -5113,7 +5142,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_15: {
+    list_16: {
         parameters: {
             query?: {
                 kind?: string;
@@ -5247,7 +5276,7 @@ export interface operations {
             };
         };
     };
-    list_14: {
+    list_15: {
         parameters: {
             query?: {
                 page?: number;
@@ -5925,7 +5954,7 @@ export interface operations {
             };
         };
     };
-    list_13: {
+    list_14: {
         parameters: {
             query?: never;
             header?: never;
@@ -5989,7 +6018,7 @@ export interface operations {
             };
         };
     };
-    list_12: {
+    list_13: {
         parameters: {
             query?: {
                 fileId?: string;
@@ -6167,7 +6196,7 @@ export interface operations {
             };
         };
     };
-    update_1: {
+    update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6748,7 +6777,7 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    list_12: {
         parameters: {
             query?: never;
             header?: never;
@@ -7324,7 +7353,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: never;
             header?: never;
@@ -7368,7 +7397,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -7615,7 +7644,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -7811,7 +7840,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -8099,7 +8128,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -8304,7 +8333,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: {
                 q?: string;
@@ -8331,7 +8360,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -8791,7 +8820,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -8860,7 +8889,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -9082,7 +9111,7 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -9098,32 +9127,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PermissionDto"][];
-                };
-            };
-        };
-    };
-    update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION" | "LLM_CONNECTION";
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdatePermissionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PermissionDto"];
                 };
             };
         };
@@ -9168,6 +9171,52 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PreferencesDto"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RoleDto"][];
+                };
+            };
+        };
+    };
+    update_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RoleDto"];
                 };
             };
         };
