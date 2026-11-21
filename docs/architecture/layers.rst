@@ -32,12 +32,12 @@ its place by doing something determinism cannot, not by being easier to write.
    :depth: 2
 
 
-.. figure:: c4-container.png
-   :alt: TracePcap C4 container diagram, backend modules grouped by pipeline stage
-   :width: 100%
+.. figure:: c4/component-backend.svg
+   :alt: TracePcap backend components, grouped by pipeline stage
+   :width: 75%
 
-   Containers and backend stages. Regenerate with
-   ``plantuml docs/architecture/c4-container.puml``.
+   The backend's components by stage (C4 level 3). The other levels are in :doc:`c4`; to
+   edit the diagram, see :ref:`editing the diagrams <c4-editing>`.
 
 
 Stage contracts
