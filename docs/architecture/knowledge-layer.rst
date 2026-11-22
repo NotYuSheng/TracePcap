@@ -92,10 +92,13 @@ only through ``analysis.spi`` ports, never another module's repositories or enti
 answers one standard investigation question by querying the board and posting an ``Answer`` (a
 conclusion, distinct from a finding). Because input and output are both deterministic, each is
 unit-testable against a fixture board. Today: victim, command-and-control, malware, signed-in user,
-and data-transfer (a bulk transfer to a non-CDN external, for review). They are deliberately precise
+data-transfer (a bulk transfer to a non-CDN external, for review), and remote-access (a remote-admin
+tool such as NetSupport or AnyDesk talking to a server outside the network, for review: IT uses
+these tools and so do attackers, so it never calls the server a C2). They are deliberately precise
 — the victim and C2 checks key on the ``c2-of`` edge, not "any host or external in any IDS alert",
 so an informational alert never mislabels the domain controller as a victim or a benign CDN as a
-C2; and the data-transfer check excludes known CDN/cloud orgs by attribution, so an ordinary CDN
+C2. A malware rule about command and control that names no family still marks its server as a C2,
+for *unidentified malware*: the victim follows, but no family is claimed. The data-transfer check excludes known CDN/cloud orgs by attribution, so an ordinary CDN
 download is not mistaken for exfiltration — the exact error an LLM narrating from volume alone made.
 
 **The agent** is one final, additive knowledge source. The narrator and the Q&A consume the board's
