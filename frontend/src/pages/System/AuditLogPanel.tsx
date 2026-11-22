@@ -175,9 +175,11 @@ export function AuditLogPanel() {
   return (
     <div>
       <p className="small text-muted">
-        Every change to settings, rules, maps and permissions, with who made it. With login off the
-        actor is <span className="font-monospace">system</span>, because there are no accounts.
-        Select a row for the details.
+        Every action anyone takes, with who took it: changes to settings, rules, maps and
+        permissions, and uploads, deletes, downloads, labels and notes. Refused attempts are kept too.
+        Page views are not. With login off the actor is{' '}
+        <span className="font-monospace">system</span>, because there are no accounts. Select a row
+        for the details.
       </p>
       <div className="audit-toolbar">
         <Form.Control

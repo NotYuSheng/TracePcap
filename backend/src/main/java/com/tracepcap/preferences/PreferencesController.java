@@ -1,5 +1,6 @@
 package com.tracepcap.preferences;
 
+import com.tracepcap.governance.NotAudited;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ public class PreferencesController {
     return preferencesService.get();
   }
 
+  @NotAudited("the caller's own UI preferences (layout, theme): closer to navigation than to an action")
   @PutMapping
   @Operation(summary = "Replace my preferences (shared by everyone when login is off)")
   public PreferencesDto put(@Valid @RequestBody PreferencesDto preferences) {

@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.governance.AuditContext;
+import com.tracepcap.governance.NotAudited;
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.insights.dto.NodeRoleDto;
@@ -42,6 +44,9 @@ public class NodeRoleController {
   @PutMapping
   @Operation(summary = "Create or update an entity's role in a file")
   public ResponseEntity<NodeRoleDto> upsert(@RequestBody UpsertNodeRoleRequest req) {
+    AuditContext.describe(
+        req.getFileId() == null ? null : req.getFileId().toString(),
+        req.getEntityKey() + (req.getRoleLabel() == null ? "" : " → " + req.getRoleLabel()));
     permissionService.require(PermissionAction.LABEL_HOSTS);
     if (req.getFileId() == null) {
       return ResponseEntity.badRequest().build();
@@ -59,6 +64,7 @@ public class NodeRoleController {
   @Operation(summary = "Remove an entity's role in a file")
   public ResponseEntity<Void> delete(
       @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    AuditContext.describe(fileId.toString(), entityKey);
     permissionService.require(PermissionAction.LABEL_HOSTS);
     service.delete(fileId, entityType, entityKey);
     return ResponseEntity.noContent().build();
@@ -95,6 +101,7 @@ public class NodeRoleController {
     return service.suggestRole(entityType, entityKey, fileId);
   }
 
+  @NotAudited("a preview: the AI suggestion is shown, not saved")
   @PostMapping("/suggest-preview")
   @Operation(
       summary = "Preview an AI role suggestion without persisting",

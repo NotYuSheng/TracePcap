@@ -1,5 +1,7 @@
 package com.tracepcap.signatures.controller;
 
+import com.tracepcap.governance.NotAudited;
+import com.tracepcap.governance.AuditedAccess;
 import com.tracepcap.signatures.dto.DetectionRuleDto;
 import com.tracepcap.signatures.dto.DetectionRuleRequest;
 import com.tracepcap.signatures.dto.RuleImportRequest;
@@ -47,6 +49,7 @@ public class DetectionRulesController {
     return fileId == null ? service.listGlobal() : service.listForFile(fileId, networkId);
   }
 
+  @NotAudited("a preview: shows what a rule would match without saving anything")
   @PostMapping("/previews")
   @Operation(
       summary = "What a rule would match in one capture, without saving it",
@@ -95,6 +98,7 @@ public class DetectionRulesController {
     service.delete(id);
   }
 
+  @AuditedAccess
   @GetMapping(value = "/export", produces = "application/yaml")
   @Operation(
       summary = "Download every global rule as a YAML file",
