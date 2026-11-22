@@ -37,6 +37,11 @@ public class WindowsDomainAuthSignal implements DeviceClassificationSignal {
 
   static final int KERBEROS_WEIGHT = 40;
   static final int LDAP_WEIGHT = 15;
+  /**
+   * NTLM (#1234): the client signed in as this account, like Kerberos, but NTLM is also spoken by
+   * non-domain clients (a NAS share, a proxy, Samba on Linux), so it weighs a little less.
+   */
+  static final int NTLM_WEIGHT = 30;
 
   @Override
   public String name() {
@@ -47,6 +52,7 @@ public class WindowsDomainAuthSignal implements DeviceClassificationSignal {
   public void contribute(HostContext ctx, ScoreBoard board) {
     Set<String> kerberosNames = namesForSource(ctx, WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ);
     Set<String> ldapNames = namesForSource(ctx, WindowsIdentityResolverService.SOURCE_LDAP_DN);
+    Set<String> ntlmNames = namesForSource(ctx, WindowsIdentityResolverService.SOURCE_NTLM_AUTH);
 
     if (!kerberosNames.isEmpty()) {
       board.add(
@@ -56,6 +62,13 @@ public class WindowsDomainAuthSignal implements DeviceClassificationSignal {
               + quoteJoin(kerberosNames)
               + " (Kerberos AS-REQ) → +"
               + KERBEROS_WEIGHT);
+    }
+
+    if (!ntlmNames.isEmpty()) {
+      board.add(
+          DeviceTypes.LAPTOP_DESKTOP,
+          NTLM_WEIGHT,
+          "Windows sign-in as " + quoteJoin(ntlmNames) + " (NTLM) → +" + NTLM_WEIGHT);
     }
 
     if (!ldapNames.isEmpty()) {

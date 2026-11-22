@@ -1243,9 +1243,11 @@ public class AnalysisService {
     for (HostClassificationEntity host : hostClassifications) {
       List<WindowsIdentityResolverService.Claim> claims =
           windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of());
-      List<String> kerberos = claims.stream()
-          .filter(c -> WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source()))
-          .map(WindowsIdentityResolverService.Claim::username).distinct().toList();
+      // Kerberos and NTLM sign-ins (#1234) both mean the host signed in as the account.
+      List<WindowsIdentityResolverService.Claim> signIns = claims.stream()
+          .filter(c -> WindowsIdentityResolverService.isSignIn(c.source())).toList();
+      List<String> kerberos = distinctIgnoreCase(
+          signIns.stream().map(WindowsIdentityResolverService.Claim::username).toList());
       List<String> ldap = NO_LDAP_SIGN_IN.contains(host.getDeviceType())
           ? List.<String>of()
           : claims.stream()
@@ -1256,12 +1258,19 @@ public class AnalysisService {
       if (accounts.size() == 1) {
         host.setLoggedInUser(accounts.get(0));
         host.setLoggedInUserSource(!kerberos.isEmpty()
-            ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
+            ? (signIns.stream().anyMatch(c -> WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source()))
+                ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
+                : WindowsIdentityResolverService.SOURCE_NTLM_AUTH)
             : WindowsIdentityResolverService.SOURCE_LDAP_DN);
         if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
       }
     }
   }
 
-
+  /** Accounts once each, ignoring case: Kerberos and NTLM can spell the same account differently. */
+  private static List<String> distinctIgnoreCase(List<String> names) {
+    java.util.Map<String, String> seen = new java.util.LinkedHashMap<>();
+    for (String n : names) seen.putIfAbsent(n.toLowerCase(java.util.Locale.ROOT), n);
+    return List.copyOf(seen.values());
+  }
 }

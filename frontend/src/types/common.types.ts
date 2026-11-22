@@ -458,11 +458,11 @@ export interface HostClassification {
   manufacturer?: string;
   /** Passively-discovered hostname for the host (DHCP/mDNS/NBNS/reverse DNS). */
   hostname?: string;
-  /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
+  /** How `hostname` was discovered: reverse_dns | mdns | nbns | ntlm | dhcp | manual. */
   hostnameSource?: HostnameSource;
   /** Windows sign-in username observed from this host (Kerberos AS-REQ / LDAP); person-level (#809). */
   loggedInUser?: string;
-  /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
+  /** How `loggedInUser` was discovered: kerberos_as_req or ntlm_auth (signed in) | ldap_dn (weaker). */
   loggedInUserSource?: string;
   /**
    * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
@@ -539,7 +539,7 @@ export interface HostIdentityEvidence {
 }
 
 /** How a host's name was discovered from passive traffic. */
-export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'dhcp' | 'manual';
+export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'ntlm' | 'dhcp' | 'manual';
 
 // Filter Generator Types
 export interface FilterGenerationRequest {

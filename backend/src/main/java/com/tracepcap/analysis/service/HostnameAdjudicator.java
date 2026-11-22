@@ -32,6 +32,7 @@ public class HostnameAdjudicator {
           HostnameResolverService.SOURCE_DHCP, 1,
           HostnameResolverService.SOURCE_MDNS, 2,
           HostnameResolverService.SOURCE_NBNS, 3,
+          HostnameResolverService.SOURCE_NTLM, 3,
           HostnameResolverService.SOURCE_REVERSE_DNS, 4);
 
   /** The per-IP winners, preserving the old first-seen-wins tie behaviour. */

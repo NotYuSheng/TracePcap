@@ -2,6 +2,7 @@ package com.tracepcap.analysis.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -81,5 +82,77 @@ class WindowsIdentityResolverServiceTest {
             WindowsIdentityResolverService.personNameFromDn(
                 "CN=Van\\20Damme,CN=Users,DC=example,DC=com"))
         .isEqualTo("Van Damme");
+  }
+
+  // ── NTLM (#1234) ───────────────────────────────────────────────────────────
+  // Rows as tshark prints them: frame|src|dst|ldap.baseObject|krb msg_type|krb CName|epoch|
+  // ntlmssp.messagetype|ntlmssp.auth.username|ntlmssp.auth.domain
+
+  private final WindowsIdentityResolverService resolver = new WindowsIdentityResolverService();
+
+  @Test
+  void ntlmSignIn_isRecordedAsASignInWithItsDomain() {
+    var logons =
+        resolver.logonsFromRows(
+            List.of("412|10.1.17.215|10.1.17.2||||1722307129.43|3|jsmith|CONTOSO"));
+    assertThat(logons).singleElement().satisfies(l -> {
+      assertThat(l.ip()).isEqualTo("10.1.17.215");
+      assertThat(l.username()).isEqualTo("jsmith");
+      assertThat(l.source()).isEqualTo(WindowsIdentityResolverService.SOURCE_NTLM_AUTH);
+      assertThat(l.domain()).isEqualTo("CONTOSO");
+      assertThat(l.directoryEntry()).isNull();
+      assertThat(l.isCandidateOnly()).isFalse();
+    });
+    assertThat(WindowsIdentityResolverService.isSignIn(logons.get(0).source())).isTrue();
+  }
+
+  @Test
+  void ntlm_machineAccountsAndAnonymousSessions_areNotSignIns() {
+    // Verbatim from the 2024-07-30 training capture: one machine-account sign-in, then anonymous
+    // SMB sessions, which tshark prints as the literal NULL.
+    var logons =
+        resolver.logonsFromRows(
+            List.of(
+                "275|172.16.1.66|172.16.1.4||||1722307129.433463000|3|DESKTOP-SKBR25F$|WIRESHARKWORKSH",
+                "9913|172.16.1.66|172.16.1.4||||1722307270.497131000|3|NULL|NULL"));
+    assertThat(logons).isEmpty();
+  }
+
+  @Test
+  void ntlm_onlyTheAuthenticateMessageCounts_andRepeatsAggregate() {
+    var logons =
+        resolver.logonsFromRows(
+            List.of(
+                // A CHALLENGE (type 2) carries no client account.
+                "10|10.0.0.5|10.0.0.1||||1700000000.0|2||",
+                "11|10.0.0.5|10.0.0.1||||1700000001.0|3|ccollier|CORP",
+                "90|10.0.0.5|10.0.0.1||||1700000060.0|3|ccollier|CORP"));
+    assertThat(logons).singleElement().satisfies(l -> {
+      assertThat(l.username()).isEqualTo("ccollier");
+      assertThat(l.seenCount()).isEqualTo(2);
+      assertThat(l.firstSeen()).isBefore(l.lastSeen());
+    });
+  }
+
+  @Test
+  void ntlm_inTheSameFrameAsAnLdapSearch_bothAreRead() {
+    var logons =
+        resolver.logonsFromRows(
+            List.of(
+                "7|10.0.0.5|10.0.0.1|CN=Clark Collier,CN=Users,DC=corp,DC=local|||1700000000.0|3|ccollier|CORP"));
+    assertThat(logons)
+        .extracting(WindowsIdentityResolverService.Logon::source)
+        .containsExactlyInAnyOrder(
+            WindowsIdentityResolverService.SOURCE_NTLM_AUTH, WindowsIdentityResolverService.SOURCE_LDAP_DN);
+  }
+
+  @Test
+  void rowsWithoutTheNtlmColumns_stillParse() {
+    // Kerberos-only output, as before #1234.
+    var logons =
+        resolver.logonsFromRows(List.of("5|10.0.0.5|10.0.0.1||10|ccollier|1700000000.0"));
+    assertThat(logons).singleElement()
+        .extracting(WindowsIdentityResolverService.Logon::source)
+        .isEqualTo(WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ);
   }
 }

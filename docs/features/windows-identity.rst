@@ -3,8 +3,8 @@ Windows Sign-in Identity
 
 Most of what TracePcap tells you about a host answers *"what is this?"* — a device
 type, a manufacturer, a set of service roles. On a Windows/Active Directory network,
-two protocols also routinely name the human behind a workstation — Kerberos
-authentication and LDAP directory lookups. TracePcap reads that name automatically
+three protocols also routinely name the human behind a workstation — Kerberos
+authentication, NTLM authentication and LDAP directory lookups. TracePcap reads that name automatically
 wherever it is present, with no configuration required, and uses it two ways:
 
 - as **evidence that the host is a domain-joined Windows workstation**, contributing
@@ -23,14 +23,14 @@ wherever it is present, with no configuration required, and uses it two ways:
 .. important::
 
    Not every host has a signed-in user. Routers, IoT devices, external servers, and
-   any host that never appears in Kerberos or LDAP traffic simply have none — a
+   any host that never appears in Kerberos, NTLM or LDAP traffic simply have none — a
    normal, expected empty state, not a failure.
 
 
 How it works
 ------------
 
-TracePcap reads two signals from the capture, each with a different evidentiary
+TracePcap reads three signals from the capture, each with a different evidentiary
 weight, during the same analysis pass that classifies device types:
 
 1. **Kerberos AS-REQ** — the initial authentication request a Windows client sends
@@ -39,7 +39,17 @@ weight, during the same analysis pass that classifies device types:
    signed in at that IP. It contributes a strong vote toward the ``LAPTOP_DESKTOP``
    device type.
 
-2. **LDAP directory lookup** — a client asking Active Directory to resolve a display
+2. **NTLM sign-in** — when a client signs in with NTLM instead (a Windows file
+   share, an intranet site, an older application), its AUTHENTICATE message names the
+   account and its domain. NTLM rides inside other protocols, so it is read wherever
+   it appears: SMB, HTTP, LDAP, DCE-RPC. Like Kerberos, the client sends it about
+   *itself*, so it counts as a sign-in. It votes a little less than Kerberos, because
+   non-domain machines speak NTLM too (a Linux box mounting a NAS share, a proxy).
+   Anonymous NTLM sessions (no account) are skipped. The **workstation name** the
+   client gives in the same message is recorded as a hostname, with source ``NTLM``,
+   even when the session is anonymous.
+
+3. **LDAP directory lookup** — a client asking Active Directory to resolve a display
    name (for example, Explorer or the shell looking up the current user's full name)
    carries that name in the query itself. This is weaker evidence: the query is
    usually about the asking host's own identity, but the wire protocol gives no
@@ -51,8 +61,8 @@ host used by more than one person over a capture (a shift change, a shared PC, a
 admin signing in remotely) shows all of them. The host's **signed-in user** label
 follows from that:
 
-- **One account seen**: the label is that account. Kerberos logins decide when there
-  are any; otherwise LDAP lookups do.
+- **One account seen**: the label is that account. Kerberos and NTLM sign-ins decide
+  when there are any; otherwise LDAP lookups do.
 - **More than one account seen**: no name is picked. The host shows **"N accounts"**,
   and its detail view lists them on a timeline. A capture shows logins but rarely
   logouts, so picking one would be a guess.
@@ -62,7 +72,7 @@ follows from that:
 - **LDAP-only evidence** is worded as **"Looked-up user"**, not "Signed-in user": a
   lookup isn't proof of a sign-in.
 
-Both signals, when present, also appear as separate lines in the host's
+Each signal, when present, also appears as separate lines in the host's
 classification evidence, so an analyst sees each protocol's contribution and why their
 weights differ, rather than a single opaque number.
 

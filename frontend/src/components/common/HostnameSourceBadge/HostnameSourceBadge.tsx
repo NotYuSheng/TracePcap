@@ -17,6 +17,11 @@ const SOURCE_INFO: Record<HostnameSource, SourceInfo> = {
     tooltip: 'NetBIOS name observed from a NetBIOS Name Service registration or response.',
     color: '#b35900',
   },
+  ntlm: {
+    label: 'NTLM',
+    tooltip: 'Workstation name the host gave when it signed in with NTLM (e.g. to a Windows file share).',
+    color: '#8a6d00',
+  },
   reverse_dns: {
     label: 'rDNS',
     tooltip: 'Name resolved from a reverse DNS (PTR) lookup of the IP address.',
