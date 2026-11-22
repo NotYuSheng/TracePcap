@@ -37,7 +37,7 @@ class GeoOrgContributorTest {
     return new ConversationFacts(
         UUID.randomUUID(), FILE,
         new FlowIdentity(src, 49754, dst, 12132, src, 49754, "TCP", 411, 39064, null, null),
-        new TlsFacts(null, null, null, null, null, null, null),
+        new TlsFacts(null, null, null, null, null, null, null, null, null),
         new Findings(null, null, null, List.of(), suricata, List.of(), List.of()));
   }
 

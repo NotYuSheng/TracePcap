@@ -35,6 +35,8 @@ interface ConversationApiResponse {
   hostname?: string | null;
   ja3Client?: string | null;
   ja3Server?: string | null;
+  ja4Client?: string | null;
+  tlsVersion?: string | null;
   tlsIssuer?: string | null;
   tlsSubject?: string | null;
   tlsNotBefore?: string | number[] | null;
@@ -123,6 +125,8 @@ function transformConversation(
     hostname: apiData.hostname ?? undefined,
     ja3Client: apiData.ja3Client ?? undefined,
     ja3Server: apiData.ja3Server ?? undefined,
+    ja4Client: apiData.ja4Client ?? undefined,
+    tlsVersion: apiData.tlsVersion ?? undefined,
     tlsIssuer: apiData.tlsIssuer ?? undefined,
     tlsSubject: apiData.tlsSubject ?? undefined,
     tlsNotBefore: apiData.tlsNotBefore != null ? parseDateTime(apiData.tlsNotBefore) : undefined,

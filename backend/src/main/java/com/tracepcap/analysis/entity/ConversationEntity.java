@@ -28,6 +28,8 @@ public class ConversationEntity {
   public static final int CATEGORY_MAX_LENGTH = 50;
   public static final int HOSTNAME_MAX_LENGTH = 255;
   public static final int JA3_HASH_LENGTH = 32;
+  public static final int JA4_MAX_LENGTH = 36;
+  public static final int TLS_VERSION_MAX_LENGTH = 16;
   public static final int PROTOCOL_MAX_LENGTH = 100;
   public static final int SURICATA_ALERT_MAX_LENGTH = 512;
 
@@ -105,6 +107,14 @@ public class ConversationEntity {
 
   @Column(name = "ja3_server", length = JA3_HASH_LENGTH)
   private String ja3Server;
+
+  /** JA4 client fingerprint (#599), from nDPI 6, e.g. {@code t13d1516h2_8daaf6152771_02713d6af862}. */
+  @Column(name = "ja4_client", length = JA4_MAX_LENGTH)
+  private String ja4Client;
+
+  /** Negotiated TLS version (#599), from Suricata, e.g. {@code "TLS 1.2"}. */
+  @Column(name = "tls_version", length = TLS_VERSION_MAX_LENGTH)
+  private String tlsVersion;
 
   @Column(name = "tls_issuer", columnDefinition = "TEXT")
   private String tlsIssuer;

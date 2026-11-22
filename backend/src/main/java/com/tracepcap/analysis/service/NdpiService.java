@@ -125,6 +125,13 @@ public class NdpiService implements Extractor {
           "\\[JA3S:\\s*([0-9a-f]{" + ConversationEntity.JA3_HASH_LENGTH + "})\\]",
           Pattern.CASE_INSENSITIVE);
 
+  /**
+   * Matches the JA4 client fingerprint, e.g. [JA4: t13d1516h2_8daaf6152771_02713d6af862] (#599).
+   * nDPI 6 reports JA4 where nDPI 5 reported JA3C, so client JA3 now comes from Suricata.
+   */
+  private static final Pattern JA4 =
+      Pattern.compile("\\[JA4:\\s*([a-z0-9_]{1," + ConversationEntity.JA4_MAX_LENGTH + "})\\]", Pattern.CASE_INSENSITIVE);
+
   /** Matches TLS certificate issuer DN, e.g. [Issuer: CN=...] → group(1) = DN string. */
   private static final Pattern TLS_ISSUER =
       Pattern.compile("\\[Issuer:\\s*([^\\]]+)\\]", Pattern.CASE_INSENSITIVE);
@@ -185,6 +192,7 @@ public class NdpiService implements Extractor {
       if (data.hostname() != null) conv.setHostname(data.hostname());
       if (data.ja3Client() != null) conv.setJa3Client(data.ja3Client());
       if (data.ja3Server() != null) conv.setJa3Server(data.ja3Server());
+      if (data.ja4Client() != null) conv.setJa4Client(data.ja4Client());
       if (data.tlsIssuer() != null) conv.setTlsIssuer(data.tlsIssuer());
       if (data.tlsSubject() != null) conv.setTlsSubject(data.tlsSubject());
       if (data.tlsNotBefore() != null) conv.setTlsNotBefore(data.tlsNotBefore());
@@ -219,13 +227,14 @@ public class NdpiService implements Extractor {
   // ---------------------------------------------------------------------------
 
   /** Immutable holder for per-flow nDPI data extracted from one -v 2 line. */
-  private record FlowData(
+  record FlowData(
       String appName,
       List<String> risks,
       String category,
       String hostname,
       String ja3Client,
       String ja3Server,
+      String ja4Client,
       String tlsIssuer,
       String tlsSubject,
       LocalDateTime tlsNotBefore,
@@ -306,7 +315,7 @@ public class NdpiService implements Extractor {
    *
    * <p>Risk block example: {@code [Risk: ** Clear-Text Credentials **** Unsafe Protocol **]}
    */
-  private void parseFlowLine(String line, Map<String, FlowData> result) {
+  void parseFlowLine(String line, Map<String, FlowData> result) {
     Matcher m = FLOW_LINE.matcher(line);
     if (!m.find()) return;
 
@@ -359,6 +368,7 @@ public class NdpiService implements Extractor {
     // JA3 client/server fingerprint hashes
     String ja3Client = extractHash(JA3C, line);
     String ja3Server = extractHash(JA3S, line);
+    String ja4Client = extractHash(JA4, line);
 
     // TLS certificate metadata
     String tlsIssuer = extractText(TLS_ISSUER, line);
@@ -374,6 +384,7 @@ public class NdpiService implements Extractor {
             hostname,
             ja3Client,
             ja3Server,
+            ja4Client,
             tlsIssuer,
             tlsSubject,
             tlsNotBefore,

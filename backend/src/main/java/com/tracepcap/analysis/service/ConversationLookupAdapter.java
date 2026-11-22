@@ -350,7 +350,9 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getTlsNotBefore(),
             e.getTlsNotAfter(),
             e.getJa3Client(),
-            e.getJa3Server()),
+            e.getJa3Server(),
+            e.getJa4Client(),
+            e.getTlsVersion()),
         new Findings(
             e.getAppName(),
             e.getTsharkProtocol(),

@@ -3386,6 +3386,7 @@ export interface components {
             initiatorPort?: number;
             ja3Client?: string;
             ja3Server?: string;
+            ja4Client?: string;
             /** Format: int64 */
             packetCount?: number;
             packets?: components["schemas"]["PacketResponse"][];
@@ -3404,6 +3405,7 @@ export interface components {
             /** Format: date-time */
             tlsNotBefore?: string;
             tlsSubject?: string;
+            tlsVersion?: string;
             /** Format: int64 */
             totalBytes?: number;
             tsharkProtocol?: string;
@@ -3487,6 +3489,7 @@ export interface components {
             initiatorPort?: number;
             ja3Client?: string;
             ja3Server?: string;
+            ja4Client?: string;
             /** Format: int64 */
             packetCount?: number;
             protocol?: string;
@@ -3505,6 +3508,7 @@ export interface components {
             /** Format: date-time */
             tlsNotBefore?: string;
             tlsSubject?: string;
+            tlsVersion?: string;
             /** Format: int64 */
             totalBytes?: number;
             tsharkProtocol?: string;

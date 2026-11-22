@@ -484,15 +484,27 @@ export const ConversationDetail = ({
               </MetaGroup>
             )}
 
-            {(conversation.ja3Client || conversation.ja3Server || conversation.tlsIssuer ||
+            {(conversation.ja3Client || conversation.ja3Server || conversation.ja4Client ||
+              conversation.tlsVersion || conversation.tlsIssuer ||
               conversation.tlsSubject || conversation.tlsNotBefore != null ||
               conversation.tlsNotAfter != null) && (
               <MetaGroup
-                title="TLS Certificate"
+                title="TLS"
                 defaultOpen
                 note={conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now() ? 'expired' : undefined}
               >
                 <dl className="cd-kv">
+                  {conversation.tlsVersion && (
+                    <>
+                      <dt>Version</dt>
+                      <dd>
+                        <small>{conversation.tlsVersion}</small>
+                        {/^(SSL|TLS 1\.[01]$)/.test(conversation.tlsVersion) && (
+                          <Badge bg="warning" text="dark" className="ms-1">Legacy</Badge>
+                        )}
+                      </dd>
+                    </>
+                  )}
                   {conversation.tlsIssuer && (<><dt>Issuer</dt><dd><small>{conversation.tlsIssuer}</small></dd></>)}
                   {conversation.tlsSubject && (<><dt>Subject</dt><dd><small>{conversation.tlsSubject}</small></dd></>)}
                   {conversation.tlsNotBefore != null && (<><dt>Valid from</dt><dd><small>{formatTimestamp(conversation.tlsNotBefore)}</small></dd></>)}
@@ -509,6 +521,7 @@ export const ConversationDetail = ({
                   )}
                   {conversation.ja3Client && (<><dt>JA3</dt><dd><code className="small">{conversation.ja3Client}</code></dd></>)}
                   {conversation.ja3Server && (<><dt>JA3S</dt><dd><code className="small">{conversation.ja3Server}</code></dd></>)}
+                  {conversation.ja4Client && (<><dt>JA4</dt><dd><code className="small">{conversation.ja4Client}</code></dd></>)}
                 </dl>
               </MetaGroup>
             )}

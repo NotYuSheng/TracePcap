@@ -56,6 +56,10 @@ public class ConversationResponse {
   private String hostname;
   private String ja3Client;
   private String ja3Server;
+  /** JA4 client fingerprint, from nDPI (#599). */
+  private String ja4Client;
+  /** Negotiated TLS version, from Suricata (#599). */
+  private String tlsVersion;
   private String tlsIssuer;
   private String tlsSubject;
   private LocalDateTime tlsNotBefore;

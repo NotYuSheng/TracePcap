@@ -699,6 +699,8 @@ public class AnalysisService {
       conversation.setHostname(convInfo.getHostname());
       conversation.setJa3Client(convInfo.getJa3Client());
       conversation.setJa3Server(convInfo.getJa3Server());
+      conversation.setJa4Client(convInfo.getJa4Client());
+      conversation.setTlsVersion(convInfo.getTlsVersion());
       conversation.setTlsIssuer(convInfo.getTlsIssuer());
       conversation.setTlsSubject(convInfo.getTlsSubject());
       conversation.setTlsNotBefore(convInfo.getTlsNotBefore());
@@ -1070,6 +1072,8 @@ public class AnalysisService {
                   .hostname(conv.getHostname())
                   .ja3Client(conv.getJa3Client())
                   .ja3Server(conv.getJa3Server())
+                  .ja4Client(conv.getJa4Client())
+                  .tlsVersion(conv.getTlsVersion())
                   .tlsIssuer(conv.getTlsIssuer())
                   .tlsSubject(conv.getTlsSubject())
                   .tlsNotBefore(conv.getTlsNotBefore())
