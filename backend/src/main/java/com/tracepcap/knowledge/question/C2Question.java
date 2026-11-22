@@ -58,7 +58,10 @@ public class C2Question implements StandardQuestion {
               c2.key()
                   + (place != null ? " (" + place + ")" : "")
                   + " — C2 for "
-                  + String.join(", ", families),
+                  + String.join(", ", families.stream()
+                      .map(f -> EntityRef.UNIDENTIFIED_MALWARE.equals(f)
+                          ? "unidentified malware (the rule names no family)" : f)
+                      .toList()),
               Grade.INFERRED,
               subjects,
               alertSummaries(board, c2),

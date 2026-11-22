@@ -177,4 +177,55 @@ class IdsAlertContributorTest {
     assertThat(new IdsAlertContributor(ET).malwareFamily("ET MALWARE STRRAT CnC Checkin (sid:9999999 sev:1)"))
         .isEqualTo("STRRAT");
   }
+
+  // ── C2 without a named family ─────────────────────────────────────────────
+
+  private CaseKnowledge runWithEt(ConversationFacts... convs) {
+    when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
+    CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
+    new IdsAlertContributor(ET).contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    return board.build();
+  }
+
+  private static List<com.tracepcap.knowledge.spi.Answer> answers(
+      com.tracepcap.knowledge.spi.StandardQuestion q, CaseKnowledge k) {
+    return q.answer(k);
+  }
+
+  @Test
+  void aCncRuleWithoutAFamily_makesAnUnnamedC2_andItsVictim_butNoFamily() {
+    // 2025-01-22 fake Google Authenticator: the only malware rule names no family.
+    CaseKnowledge k =
+        runWithEt(conv("10.1.17.215", "5.252.153.241",
+            List.of("ET MALWARE Fake Microsoft Teams CnC Payload Request (GET) (sid:2059607 sev:1)")));
+    assertThat(k.relationshipsWithPredicate("c2-of")).singleElement()
+        .satisfies(r -> assertThat(r.to().key()).isEqualTo(EntityRef.UNIDENTIFIED_MALWARE));
+    assertThat(answers(new com.tracepcap.knowledge.question.MalwareQuestion(), k)).isEmpty();
+    assertThat(answers(new com.tracepcap.knowledge.question.C2Question(), k)).singleElement()
+        .satisfies(a -> assertThat(a.headline()).contains("5.252.153.241").contains("unidentified malware"));
+    assertThat(answers(new com.tracepcap.knowledge.question.VictimQuestion(), k)).singleElement()
+        .satisfies(a -> assertThat(a.attributes().get("host")).isEqualTo("10.1.17.215"));
+  }
+
+  @Test
+  void aFamilyLessC2Rule_besideANamedOne_addsNothing() {
+    // 2024-08-15 WarmCookie: the POST rule has no family, the GET rule names WarmCookie.
+    CaseKnowledge k =
+        runWithEt(conv("10.8.15.133", "72.5.43.29", List.of(
+            "ET MALWARE BadSpace/WarmCookie CnC Activity (GET) M1 (sid:2052557 sev:1)",
+            "ET MALWARE W32/Badspace.Backdoor CnC Activity (POST) (sid:2052558 sev:1)")));
+    assertThat(k.relationshipsWithPredicate("c2-of")).singleElement()
+        .satisfies(r -> assertThat(r.to().key()).isEqualTo("WarmCookie"));
+  }
+
+  @Test
+  void informationalAndReputationRules_neverMakeAC2() {
+    CaseKnowledge k =
+        runWithEt(
+            conv("10.11.10.147", "93.152.209.36",
+                List.of("ET INFO NetSupport Remote Admin Checkin (sid:2035892 sev:3)")),
+            conv("10.1.17.215", "45.125.66.32",
+                List.of("ET DROP Spamhaus DROP Listed Traffic Inbound group 7 (sid:2400006 sev:2)")));
+    assertThat(k.relationshipsWithPredicate("c2-of")).isEmpty();
+  }
 }
