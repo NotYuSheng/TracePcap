@@ -5,25 +5,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerTypePredicate;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /** Web configuration including CORS and the global API version prefix */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-
-  /** Optional so the config can be built on its own (tests, slices without the audit log). */
-  @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.tracepcap.governance.RequestAuditInterceptor requestAuditInterceptor;
-
-  /** Every API write, and every download, is audited: see RequestAuditInterceptor. */
-  @Override
-  public void addInterceptors(InterceptorRegistry registry) {
-    if (requestAuditInterceptor != null) {
-      registry.addInterceptor(requestAuditInterceptor).addPathPatterns(API_PREFIX + "/**");
-    }
-  }
 
   /** Single source of truth for the API base path + version. Bump here to cut a new version. */
   public static final String API_PREFIX = "/api/v1";
