@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 
 /** One protocol nDPI can detect, with a plain-English explanation (from the old reference page). */
 export interface NdpiProtocol {
@@ -71,16 +73,92 @@ export function useNdpiProtocols(enabled = true): NdpiProtocol[] | null {
 }
 
 /**
- * The reference entry for a name the analysis shows, ignoring case. nDPI's layered names
- * ("TLS.Discord", "QUIC.Google") match their most specific part first, then the transport.
+ * The analysis and the reference spell names differently: the analysis says "SMTP", "Outlook",
+ * "AppleiCloud", the reference "MAIL_SMTP", "MS_OUTLOOK", "APPLE_ICLOUD". A key that ignores case,
+ * punctuation and the MAIL_/MS_ prefixes matches them; these few still need naming by hand.
+ */
+const ALIASES: Record<string, string> = {
+  teams: 'msteams',
+  messagepack: 'msgpack',
+  postgresql: 'postgres',
+};
+
+/** A name as a matching key: "MAIL_SMTP" and "SMTP" both become "smtp". */
+export function protocolKey(name: string): string {
+  const key = name.trim().toLowerCase().replace(/^(mail_|ms_)/, '').replace(/[^a-z0-9]/g, '');
+  return ALIASES[key] ?? key;
+}
+
+/**
+ * The reference entry for a name the analysis shows. nDPI's layered names ("TLS.Discord",
+ * "QUIC.Google") match their most specific part first, then the transport.
  */
 export function findNdpiProtocol(protocols: NdpiProtocol[], name: string): NdpiProtocol | undefined {
-  const byName = (n: string) => protocols.find(p => p.name.toLowerCase() === n.trim().toLowerCase());
+  const byKey = (n: string) => protocols.find(p => protocolKey(p.name) === protocolKey(n));
   const parts = name.split('.');
-  return byName(name) ?? byName(parts[parts.length - 1]) ?? byName(parts[0]);
+  return byKey(name) ?? byKey(parts[parts.length - 1]) ?? byKey(parts[0]);
 }
 
 /** Where a protocol's reference entry opens in the app. */
 export function protocolReferenceUrl(name?: string): string {
   return name ? `/reference/protocols?protocol=${encodeURIComponent(name)}` : '/reference/protocols';
+}
+
+/** Mirrors ProtocolUsageDto: an nDPI app name as the analysis records it, and how much of it you have. */
+export interface ProtocolUsage {
+  appName: string;
+  captures: number;
+  conversations: number;
+}
+
+/** Mirrors ProtocolCaptureDto. */
+export interface ProtocolCapture {
+  fileId: string;
+  fileName: string;
+  conversations: number;
+}
+
+export const protocolUsageService = {
+  usage: async (): Promise<ProtocolUsage[]> =>
+    (await apiClient.get<ProtocolUsage[]>(API_ENDPOINTS.PROTOCOL_USAGE)).data,
+  captures: async (appName: string, limit = 20): Promise<ProtocolCapture[]> =>
+    (await apiClient.get<ProtocolCapture[]>(API_ENDPOINTS.PROTOCOL_USAGE_CAPTURES(appName), { params: { limit } }))
+      .data,
+};
+
+/**
+ * Usage per reference entry, keyed by the entry's nDPI name: the analysis's names folded onto the
+ * reference's (several analysis names can land on one entry, so they're added up).
+ */
+export function usageByProtocol(
+  protocols: NdpiProtocol[],
+  usage: ProtocolUsage[]
+): Map<string, { appNames: string[]; captures: number; conversations: number }> {
+  const out = new Map<string, { appNames: string[]; captures: number; conversations: number }>();
+  for (const u of usage) {
+    const p = findNdpiProtocol(protocols, u.appName);
+    if (!p) continue;
+    const cur = out.get(p.name) ?? { appNames: [], captures: 0, conversations: 0 };
+    cur.appNames.push(u.appName);
+    cur.captures = Math.max(cur.captures, u.captures);
+    cur.conversations += u.conversations;
+    out.set(p.name, cur);
+  }
+  return out;
+}
+
+/** Your protocol usage, or null while it loads (or if it couldn't). */
+export function useProtocolUsage(): ProtocolUsage[] | null {
+  const [usage, setUsage] = useState<ProtocolUsage[] | null>(null);
+  useEffect(() => {
+    let active = true;
+    protocolUsageService
+      .usage()
+      .then(u => active && setUsage(u))
+      .catch(() => active && setUsage([]));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return usage;
 }

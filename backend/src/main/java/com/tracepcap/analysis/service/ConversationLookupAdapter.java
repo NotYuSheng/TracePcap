@@ -372,4 +372,18 @@ public class ConversationLookupAdapter implements ConversationLookup {
     if (values == null || values.length == 0) return List.of();
     return Arrays.stream(values).filter(v -> v != null).toList();
   }
+
+  @Override
+  public List<AppUsage> appUsage() {
+    return repository.appUsage().stream()
+        .map(r -> new AppUsage((String) r[0], ((Number) r[1]).longValue(), ((Number) r[2]).longValue()))
+        .toList();
+  }
+
+  @Override
+  public List<AppCapture> appCaptures(String appName, int limit) {
+    return repository.appCaptures(appName, limit).stream()
+        .map(r -> new AppCapture((UUID) r[0], (String) r[1], ((Number) r[2]).longValue()))
+        .toList();
+  }
 }
