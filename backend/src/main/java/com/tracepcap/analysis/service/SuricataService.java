@@ -67,6 +67,10 @@ public class SuricataService implements Extractor {
   /** Warm engine (#569). Falls back to the per-file subprocess below when unavailable. */
   private final SuricataEngine engine;
 
+  /** Which ruleset to load (#600). Absent in unit tests, where the packaged default applies. */
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private SuricataRuleset ruleset;
+
   public SuricataService(SuricataEngine engine) {
     this.engine = engine;
   }
@@ -221,17 +225,20 @@ public class SuricataService implements Extractor {
         return result;
       }
 
-      ProcessBuilder pb =
-          new ProcessBuilder(
-              SURICATA_BINARY,
-              "-r",
-              pcapFile.getAbsolutePath(),
-              "-l",
-              outDir.toAbsolutePath().toString(),
-              "--runmode",
-              "single",
-              "--set",
-              "unix-command.enabled=no");
+      List<String> command =
+          new ArrayList<>(
+              List.of(
+                  SURICATA_BINARY,
+                  "-r",
+                  pcapFile.getAbsolutePath(),
+                  "-l",
+                  outDir.toAbsolutePath().toString(),
+                  "--runmode",
+                  "single",
+                  "--set",
+                  "unix-command.enabled=no"));
+      if (ruleset != null) command.addAll(ruleset.suricataArgs());
+      ProcessBuilder pb = new ProcessBuilder(command);
 
       Process process = pb.start();
       try {
