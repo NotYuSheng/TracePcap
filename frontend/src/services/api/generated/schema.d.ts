@@ -3420,9 +3420,19 @@ export interface components {
             /** Format: int32 */
             snapshotOrder?: number;
         };
+        ConnectionOutcomes: {
+            /** Format: int64 */
+            answered?: number;
+            /** Format: int64 */
+            noAnswer?: number;
+            /** Format: int64 */
+            rejected?: number;
+            topFailedTargets?: components["schemas"]["FailedTarget"][];
+        };
         ConversationDetailResponse: {
             appName?: string;
             category?: string;
+            connectionOutcome?: string;
             /** Format: uuid */
             conversationId?: string;
             customSignatures?: string[];
@@ -3511,6 +3521,9 @@ export interface components {
             l7Protocols?: {
                 [key: string]: number;
             };
+            outcomes?: {
+                [key: string]: number;
+            };
             protocols?: {
                 [key: string]: number;
             };
@@ -3524,6 +3537,7 @@ export interface components {
         ConversationResponse: {
             appName?: string;
             category?: string;
+            connectionOutcome?: string;
             /** Format: uuid */
             conversationId?: string;
             customSignatures?: string[];
@@ -3867,6 +3881,16 @@ export interface components {
             /** Format: int32 */
             maxStreamConversations?: number;
             sizeLimitFiles?: components["schemas"]["SkippedFile"][];
+        };
+        FailedTarget: {
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            /** Format: int64 */
+            noAnswer?: number;
+            /** Format: int64 */
+            rejected?: number;
+            srcIp?: string;
         };
         FileMetadataDto: {
             derivedFrom?: string;
@@ -4944,6 +4968,7 @@ export interface components {
         };
         StoryAggregates: {
             beaconCandidates?: components["schemas"]["BeaconCandidate"][];
+            connectionOutcomes?: components["schemas"]["ConnectionOutcomes"];
             coverage?: components["schemas"]["Coverage"];
             protocolRiskMatrix?: components["schemas"]["ProtocolRiskEntry"][];
             tlsAnomalySummary?: components["schemas"]["TlsAnomalySummary"];
@@ -5777,6 +5802,8 @@ export interface operations {
                 srcIp?: string;
                 /** @description Exact destination address (see srcIp) */
                 dstIp?: string;
+                /** @description Comma-separated connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN (not TCP, or the capture joined after the SYN) */
+                outcomes?: string;
                 /** @description View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter */
                 networkId?: string;
             };
@@ -5960,6 +5987,7 @@ export interface operations {
                 countries?: string;
                 srcIp?: string;
                 dstIp?: string;
+                outcomes?: string;
             };
             header?: never;
             path: {
@@ -6000,6 +6028,7 @@ export interface operations {
                 countries?: string;
                 srcIp?: string;
                 dstIp?: string;
+                outcomes?: string;
             };
             header?: never;
             path: {

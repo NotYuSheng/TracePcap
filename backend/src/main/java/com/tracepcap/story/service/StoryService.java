@@ -754,6 +754,23 @@ public class StoryService {
               tls.getSelfSigned(), tls.getExpired(), tls.getUnknownCa(), tls.getTotal()));
     }
 
+    StoryAggregates.ConnectionOutcomes outcomes = agg.getConnectionOutcomes();
+    if (outcomes != null && outcomes.getNoAnswer() + outcomes.getRejected() > 0) {
+      // #1233: failed connections are what scans and dead C2 servers look like.
+      prompt.append("### TCP Connection Outcomes\n");
+      prompt.append(
+          String.format(
+              "- Answered: %d, never answered: %d, refused (reset): %d\n",
+              outcomes.getAnswered(), outcomes.getNoAnswer(), outcomes.getRejected()));
+      for (StoryAggregates.FailedTarget t : outcomes.getTopFailedTargets()) {
+        prompt.append(
+            String.format(
+                "- %s -> %s:%s — %d unanswered, %d refused\n",
+                t.getSrcIp(), t.getDstIp(), t.getDstPort() != null ? t.getDstPort() : "*",
+                t.getNoAnswer(), t.getRejected()));
+      }
+    }
+
     if (agg.getBeaconCandidates() != null && !agg.getBeaconCandidates().isEmpty()) {
       prompt.append("### Beacon Candidates\n");
       for (StoryAggregates.BeaconCandidate b : agg.getBeaconCandidates()) {

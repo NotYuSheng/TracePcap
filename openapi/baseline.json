@@ -911,12 +911,38 @@
         },
         "type": "object"
       },
+      "ConnectionOutcomes": {
+        "properties": {
+          "answered": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "noAnswer": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rejected": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "topFailedTargets": {
+            "items": {
+              "$ref": "#/components/schemas/FailedTarget"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "ConversationDetailResponse": {
         "properties": {
           "appName": {
             "type": "string"
           },
           "category": {
+            "type": "string"
+          },
+          "connectionOutcome": {
             "type": "string"
           },
           "conversationId": {
@@ -1155,6 +1181,13 @@
             },
             "type": "object"
           },
+          "outcomes": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
           "protocols": {
             "additionalProperties": {
               "format": "int64",
@@ -1185,6 +1218,9 @@
             "type": "string"
           },
           "category": {
+            "type": "string"
+          },
+          "connectionOutcome": {
             "type": "string"
           },
           "conversationId": {
@@ -2151,6 +2187,29 @@
               "$ref": "#/components/schemas/SkippedFile"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "FailedTarget": {
+        "properties": {
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "noAnswer": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rejected": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "srcIp": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -5228,6 +5287,9 @@
             },
             "type": "array"
           },
+          "connectionOutcomes": {
+            "$ref": "#/components/schemas/ConnectionOutcomes"
+          },
           "coverage": {
             "$ref": "#/components/schemas/Coverage"
           },
@@ -7265,6 +7327,15 @@
             }
           },
           {
+            "description": "Comma-separated connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN (not TCP, or the capture joined after the SYN)",
+            "in": "query",
+            "name": "outcomes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter",
             "in": "query",
             "name": "networkId",
@@ -7692,6 +7763,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "outcomes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7866,6 +7945,14 @@
           {
             "in": "query",
             "name": "dstIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcomes",
             "required": false,
             "schema": {
               "type": "string"

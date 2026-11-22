@@ -42,15 +42,18 @@ public class StoryAggregatesService {
     try {
       long totalPackets = conversationLookup.sumPackets(fileId);
       long totalBytes = conversationLookup.sumBytes(fileId);
+      // Read once: the destinations and the connection outcomes both walk every conversation.
+      List<ConversationFacts> all = conversationLookup.conversationFacts(fileId);
 
       return StoryAggregates.builder()
           .coverage(
               computeCoverage(shownConversations, totalConversations, totalPackets, totalBytes))
-          .topExternalAsns(computeTopAsns(fileId, totalBytes))
+          .topExternalAsns(computeTopAsns(all, totalBytes))
           .protocolRiskMatrix(computeProtocolRiskMatrix(fileId))
           .tlsAnomalySummary(computeTlsSummary(fileId))
           .unknownAppPct(computeUnknownAppPct(fileId, totalConversations))
           .beaconCandidates(computeBeaconCandidates(fileId))
+          .connectionOutcomes(computeConnectionOutcomes(all))
           .build();
     } catch (Exception e) {
       log.error("Failed to compute story aggregates for file {}: {}", fileId, e.getMessage(), e);
@@ -68,6 +71,46 @@ public class StoryAggregatesService {
           .beaconCandidates(List.of())
           .build();
     }
+  }
+
+  // ── Connection outcomes (#1233) ───────────────────────────────────────────
+
+  static final int MAX_FAILED_TARGETS = 8;
+
+  /** Counts by outcome, and the targets most often left unanswered or refused. */
+  static StoryAggregates.ConnectionOutcomes computeConnectionOutcomes(List<ConversationFacts> all) {
+    long answered = 0, noAnswer = 0, rejected = 0;
+    Map<String, StoryAggregates.FailedTarget> targets = new java.util.LinkedHashMap<>();
+    for (ConversationFacts c : all) {
+      String outcome = c.flow().connectionOutcome();
+      if (outcome == null) continue;
+      switch (outcome) {
+        case "ANSWERED" -> answered++;
+        case "NO_ANSWER", "REJECTED" -> {
+          boolean refused = "REJECTED".equals(outcome);
+          if (refused) rejected++; else noAnswer++;
+          // The initiator is who tried; the other side is the target. Without one, src/dst as stored.
+          String src = c.flow().initiatorIp() != null ? c.flow().initiatorIp() : c.flow().srcIp();
+          boolean srcIsSrc = src.equals(c.flow().srcIp());
+          String dst = srcIsSrc ? c.flow().dstIp() : c.flow().srcIp();
+          Integer port = srcIsSrc ? c.flow().dstPort() : c.flow().srcPort();
+          StoryAggregates.FailedTarget t =
+              targets.computeIfAbsent(
+                  src + ">" + dst + ":" + port,
+                  k -> StoryAggregates.FailedTarget.builder().srcIp(src).dstIp(dst).dstPort(port).build());
+          if (refused) t.setRejected(t.getRejected() + 1); else t.setNoAnswer(t.getNoAnswer() + 1);
+        }
+        default -> {}
+      }
+    }
+    List<StoryAggregates.FailedTarget> top =
+        targets.values().stream()
+            .sorted(java.util.Comparator.comparingLong(
+                (StoryAggregates.FailedTarget t) -> t.getNoAnswer() + t.getRejected()).reversed())
+            .limit(MAX_FAILED_TARGETS)
+            .toList();
+    return StoryAggregates.ConnectionOutcomes.builder()
+        .answered(answered).noAnswer(noAnswer).rejected(rejected).topFailedTargets(top).build();
   }
 
   // ── Coverage ──────────────────────────────────────────────────────────────
@@ -89,9 +132,7 @@ public class StoryAggregatesService {
 
   // ── Top External ASNs ─────────────────────────────────────────────────────
 
-  private List<AsnEntry> computeTopAsns(UUID fileId, long totalBytes) {
-    // Fetch all conversations to get dst IPs and their byte counts
-    List<ConversationFacts> all = conversationLookup.conversationFacts(fileId);
+  private List<AsnEntry> computeTopAsns(List<ConversationFacts> all, long totalBytes) {
 
     // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();

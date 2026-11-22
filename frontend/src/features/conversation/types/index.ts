@@ -16,6 +16,8 @@ export interface ConversationFacetCounts {
   suricataAlerts: Record<string, number>;
   countries: Record<string, number>;
   deviceTypes: Record<string, number>;
+  /** Connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN. */
+  outcomes?: Record<string, number>;
 }
 
 export interface ConversationFilters {
@@ -45,6 +47,8 @@ export interface ConversationFilters {
   suricataAlerts: string[];
   deviceTypes: string[];
   countries: string[];
+  /** Connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN. */
+  outcomes?: string[];
   sortBy: SortField;
   sortDir: SortDir;
   page: number;

@@ -128,7 +128,8 @@ public class ConversationLookupAdapter implements ConversationLookup {
         counts(repository.countByCustomSignature(fileId)),
         counts(repository.countBySuricataAlert(fileId)),
         counts(repository.countByCountry(fileId)),
-        counts(repository.countByDeviceType(fileId)));
+        counts(repository.countByDeviceType(fileId)),
+        counts(repository.countByConnectionOutcome(fileId)));
   }
 
   /** (value, count) rows into a map; null or blank values dropped. */
@@ -342,7 +343,8 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getStartTime(),
             e.getEndTime(),
             e.getSrcMac(),
-            e.getDstMac()),
+            e.getDstMac(),
+            e.getConnectionOutcome()),
         new TlsFacts(
             e.getHostname(),
             e.getTlsIssuer(),
