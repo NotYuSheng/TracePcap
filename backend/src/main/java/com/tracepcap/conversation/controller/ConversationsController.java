@@ -1,4 +1,5 @@
 package com.tracepcap.conversation.controller;
+import com.tracepcap.governance.AuditedAccess;
 
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
@@ -268,6 +269,7 @@ public class ConversationsController {
   }
 
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
+  @AuditedAccess
   @GetMapping("/{fileId}/export")
   @Operation(summary = "Export filtered conversations as CSV")
   public void exportConversations(
@@ -355,6 +357,7 @@ public class ConversationsController {
   }
 
   /** Export all matching conversations as PCAP (no pagination, same filters as listing) */
+  @AuditedAccess
   @GetMapping("/{fileId}/export-pcap")
   @Operation(summary = "Export filtered conversations as PCAP")
   public void exportConversationsAsPcap(
@@ -436,6 +439,7 @@ public class ConversationsController {
   }
 
   /** Export a single conversation as a PCAP file filtered from the original capture. */
+  @AuditedAccess
   @GetMapping("/detail/{conversationId}/export-pcap")
   @Operation(summary = "Export a single conversation as PCAP")
   public void exportConversationAsPcap(

@@ -1,5 +1,6 @@
 package com.tracepcap.notes.controller;
 
+import com.tracepcap.governance.AuditContext;
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.notes.dto.EntityHistoryEntry;
@@ -37,6 +38,7 @@ public class EntityNoteController {
   @PutMapping
   @Operation(summary = "Create or update an entity's note")
   public ResponseEntity<EntityNoteDto> upsert(@RequestBody UpsertNoteRequest req) {
+    AuditContext.describe(req.getEntityKey(), req.getEntityKey());
     permissionService.require(PermissionAction.LABEL_HOSTS);
     if (req.getEntityType() == null || req.getEntityType().isBlank()) {
       return ResponseEntity.badRequest().build();
@@ -55,6 +57,7 @@ public class EntityNoteController {
   public ResponseEntity<Void> delete(
       @RequestParam String entityType,
       @RequestParam String entityKey) {
+    AuditContext.describe(entityKey, entityKey);
     permissionService.require(PermissionAction.LABEL_HOSTS);
     service.delete(entityType, entityKey);
     return ResponseEntity.noContent().build();

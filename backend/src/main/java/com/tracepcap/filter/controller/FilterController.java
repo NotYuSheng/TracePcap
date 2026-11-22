@@ -1,5 +1,6 @@
 package com.tracepcap.filter.controller;
 
+import com.tracepcap.governance.NotAudited;
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.filter.dto.*;
@@ -44,6 +45,7 @@ public class FilterController {
     return ResponseEntity.ok(response);
   }
 
+  @NotAudited("a query sent as POST: reads matching packets, changes nothing")
   @PostMapping("/{fileId}/execute")
   @Operation(
       summary = "Execute filter on PCAP file with pagination",

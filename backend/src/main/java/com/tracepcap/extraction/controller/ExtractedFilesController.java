@@ -1,4 +1,5 @@
 package com.tracepcap.extraction.controller;
+import com.tracepcap.governance.AuditedAccess;
 
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
@@ -169,6 +170,7 @@ public class ExtractedFilesController {
         .body(body);
   }
 
+  @AuditedAccess
   @GetMapping("/{extractionId}/download")
   @Operation(summary = "Download an extracted file")
   public ResponseEntity<StreamingResponseBody> download(

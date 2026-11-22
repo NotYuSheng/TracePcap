@@ -144,7 +144,8 @@ export function buildActivity(
   // session doesn't push every capture out of the feed. At most three such lines.
   const names = new Map(files.map(f => [f.fileId, f.fileName]));
   const groups: AuditLogEntry[][] = [];
-  for (const e of audit) {
+  // An upload already has its own line from the captures above; its audit entry would repeat it.
+  for (const e of audit.filter(x => x.action !== 'file.create')) {
     const last = groups[groups.length - 1]?.[0];
     if (
       last &&
@@ -171,7 +172,7 @@ export function buildActivity(
           label: names.get(latest.targetId) ?? 'a capture',
           to: `/analysis/${latest.targetId}/network-diagram`,
         },
-        meta: `${n === 1 ? summarize(latest) : `${n} changes, latest: ${summarize(latest)}`} · ${actorWords(latest.actor)}`,
+        meta: `${n === 1 ? summarize(latest, names) : `${n} changes, latest: ${summarize(latest, names)}`} · ${actorWords(latest.actor)}`,
       });
     } else {
       events.push({
@@ -180,8 +181,8 @@ export function buildActivity(
         tone: 'change',
         text:
           n === 1
-            ? summarize(latest)
-            : `${summarize(latest)}, and ${n - 1} more change${n === 2 ? '' : 's'}`,
+            ? summarize(latest, names)
+            : `${summarize(latest, names)}, and ${n - 1} more change${n === 2 ? '' : 's'}`,
         meta: `${kindOf(latest.targetType)} · ${actorWords(latest.actor)}`,
       });
     }

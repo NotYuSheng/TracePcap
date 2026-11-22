@@ -135,14 +135,22 @@ export const AUDIT_KINDS: { key: string; label: string; types: string[] }[] = [
   { key: 'maps', label: 'Maps', types: ['network-map'] },
   { key: 'devices', label: 'Devices', types: ['host-occupancy', 'network-device', 'host-classification'] },
   { key: 'addresses', label: 'Addresses', types: ['network-subnet', 'network-private-range', 'network-ip-org-rule', 'subnet', 'private-range', 'ip-org-rule'] },
-  { key: 'access', label: 'Settings and access', types: ['system-setting', 'role', 'permission', 'network'] },
+  { key: 'access', label: 'Settings and access', types: ['system-setting', 'role', 'permission'] },
+  // Recorded automatically for every action (RequestAuditInterceptor), by the endpoint's resource.
+  { key: 'captures', label: 'Captures', types: ['file', 'conversation', 'extracted-file', 'filter', 'story', 'ai-job', 'rule-reapply-job'] },
+  { key: 'monitoring', label: 'Monitoring', types: ['network'] },
+  { key: 'labels', label: 'Labels and notes', types: ['node-role', 'entity-note'] },
 ];
 
 /** The kind of thing an entry is about, as a short tag. */
 export function kindOf(targetType: string): string {
   const k = AUDIT_KINDS.find(x => x.types.includes(targetType));
   if (!k) return humanize(targetType);
-  return { rules: 'Rule', maps: 'Map', devices: 'Device', addresses: 'Address', access: 'Setting' }[k.key] ?? k.label;
+  return (
+    { rules: 'Rule', maps: 'Map', devices: 'Device', addresses: 'Address', access: 'Setting', captures: 'Capture', monitoring: 'Network', labels: 'Label' }[
+      k.key
+    ] ?? k.label
+  );
 }
 
 const VERBS: Record<string, string> = {
@@ -194,13 +202,58 @@ function summarizeMapEdit(before?: Record<string, unknown> | null, after?: Recor
   return text.charAt(0) + text.slice(1).replace(/(, )([A-Z])/g, (_m, sep, c) => sep + c.toLowerCase());
 }
 
-export function summarize(e: {
-  action: string;
-  targetId?: string | null;
-  before?: Record<string, unknown> | null;
-  after?: Record<string, unknown> | null;
-}): string {
+/** First words of an endpoint summary, in the past tense: "Add a snapshot" → "Added a snapshot". */
+const PAST: Record<string, string> = {
+  add: 'Added', append: 'Appended', ask: 'Asked', cancel: 'Cancelled', change: 'Changed', clear: 'Cleared',
+  create: 'Created', delete: 'Deleted', dismiss: 'Dismissed', download: 'Downloaded', edit: 'Edited',
+  explain: 'Explained', export: 'Exported', generate: 'Generated', import: 'Imported', mark: 'Marked',
+  merge: 'Merged', persist: 'Saved', preview: 'Previewed', promote: 'Promoted', 're-analyse': 'Re-analysed',
+  'reanalyse': 'Re-analysed', record: 'Recorded', remove: 'Removed', replace: 'Replaced', reset: 'Reset',
+  save: 'Saved', set: 'Set', split: 'Split', suggest: 'Suggested', switch: 'Switched', test: 'Tested',
+  undo: 'Undid', unmark: 'Unmarked', update: 'Updated', upload: 'Uploaded', write: 'Wrote',
+};
+
+function pastTense(summary: string): string {
+  const words = summary.split(' ');
+  const past = (w: string) => PAST[w.toLowerCase()];
+  if (!past(words[0])) return summary;
+  words[0] = past(words[0]);
+  // "Create or update a role" → "Created or updated a role".
+  if (words[1] === 'or' && words[2] && past(words[2])) words[2] = past(words[2]).toLowerCase();
+  return words.join(' ');
+}
+
+/**
+ * An entry recorded automatically for an action no service described itself
+ * (RequestAuditInterceptor): it carries the endpoint's summary, the request, and maybe a name.
+ */
+export function isAutomaticEntry(after?: Record<string, unknown> | null): boolean {
+  return !!after && typeof after.request === 'string';
+}
+
+export function summarize(
+  e: {
+    action: string;
+    targetId?: string | null;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
+  },
+  /** Names for ids the entry can't name itself, e.g. capture id → file name. */
+  names?: Map<string, string>
+): string {
   if (e.action.startsWith('network-map.')) return summarizeMapEdit(e.before, e.after);
+  if (isAutomaticEntry(e.after)) {
+    const a = e.after!;
+    const what =
+      typeof a.summary === 'string' && a.summary ? pastTense(a.summary) : describeAction(e.action);
+    const name = typeof a.name === 'string' && a.name ? a.name : e.targetId ? names?.get(e.targetId) : undefined;
+    if (a.denied) {
+      const tried = typeof a.summary === 'string' && a.summary ? a.summary : describeAction(e.action);
+      const t = `Tried to ${tried.charAt(0).toLowerCase()}${tried.slice(1)}`;
+      return `${name ? `${t}: ${name}` : t} (refused, no permission)`;
+    }
+    return name ? `${what}: ${name}` : what;
+  }
   const verbKey = e.action.split('.').pop() ?? e.action;
   const verb = VERBS[verbKey] ?? humanize(verbKey);
   const subject = subjectOf(e.before, e.after, e.targetId);
