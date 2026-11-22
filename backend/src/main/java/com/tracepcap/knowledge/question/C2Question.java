@@ -52,6 +52,8 @@ public class C2Question implements StandardQuestion {
       attrs.put("malware", new ArrayList<>(families));
       // Geo attribution (posted by GeoOrgContributor) if present — names where the C2 is hosted.
       String place = geoAttribution(board, c2, attrs);
+      Object first = board.entity(c2).map(e -> e.attributes().get("firstSeen")).orElse(null);
+      if (first != null) attrs.put("firstSeen", first);
       answers.add(
           new Answer(
               QUESTION,
@@ -61,7 +63,11 @@ public class C2Question implements StandardQuestion {
                   + String.join(", ", families.stream()
                       .map(f -> EntityRef.UNIDENTIFIED_MALWARE.equals(f)
                           ? "unidentified malware (the rule names no family)" : f)
-                      .toList()),
+                      .toList())
+                  + (first != null
+                      ? ", first contacted "
+                          + com.tracepcap.knowledge.contributor.TrafficContributor.readable(first)
+                      : ""),
               Grade.INFERRED,
               subjects,
               alertSummaries(board, c2),

@@ -59,6 +59,7 @@ const QUESTION_META: Record<string, { label: string; icon: string }> = {
   'signed-in-user': { label: 'Signed-in user', icon: 'bi-person-badge' },
   'data-transfer': { label: 'Bulk transfer', icon: 'bi-arrow-up-right-circle' },
   'remote-access': { label: 'Remote-access tool', icon: 'bi-display' },
+  downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
 };
 
 /** Grade → chip colour: MEASURED strongest, INFERRED weakest. */

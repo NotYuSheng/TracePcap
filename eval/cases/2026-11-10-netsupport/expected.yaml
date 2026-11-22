@@ -17,3 +17,8 @@ c2:
     proto: TCP
 # Also in the key, not scored today: NetSupport traffic started 2026-11-10 18:22:07 UTC; the
 # loader came from vericheckusgo.com and 96.62.224.200 (/5555.mp4).
+
+# When the NetSupport traffic began (the key's first question), against the C2/remote-access server.
+timeline:
+  ip: 93.152.209.36
+  start: "2026-11-10T18:22:07Z"

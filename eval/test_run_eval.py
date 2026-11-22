@@ -233,5 +233,13 @@ class BeyondTheKey(unittest.TestCase):
             ev.beyond_key({"beyond_key": {"c2.ip": [{"value": "1.2.3.4", "evidence": "ET sid 1"}]}}, "c2.ip"),
             ["1.2.3.4"])
 
+
+class RecallOnly(unittest.TestCase):
+    """Downloads aren't accusations: every key hash must be found; other downloads are fine."""
+
+    def test_extras_are_fine_and_a_missing_hash_is_a_miss(self):
+        self.assertEqual(ev.classify(["aa", "bb"], ["aa", "bb", "cc"], recall_only=True)[0], ev.CORRECT)
+        self.assertEqual(ev.classify(["aa", "bb"], ["aa", "cc"], recall_only=True)[0], ev.MISSED)
+
 if __name__ == "__main__":
     unittest.main()

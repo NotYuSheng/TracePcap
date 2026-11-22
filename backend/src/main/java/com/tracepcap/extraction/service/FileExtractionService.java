@@ -12,7 +12,6 @@ import com.tracepcap.file.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.*;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -361,27 +360,32 @@ public class FileExtractionService implements FileExtractionStage {
    * URL-decoded, with unsafe chars replaced by {@code _}. Returns {@code %2f} for root/empty paths
    * (matching tshark's observed behaviour).
    */
-  private static String uriToBasename(String uri) {
-    try {
-      String path = uri;
-      int schemeEnd = uri.indexOf("://");
-      if (schemeEnd >= 0) {
-        int slashAfterHost = uri.indexOf('/', schemeEnd + 3);
-        path = slashAfterHost >= 0 ? uri.substring(slashAfterHost) : "/";
-      }
-      int q = path.indexOf('?');
-      if (q >= 0) path = path.substring(0, q);
-      int f = path.indexOf('#');
-      if (f >= 0) path = path.substring(0, f);
-      int lastSlash = path.lastIndexOf('/');
-      String segment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
-      segment = URLDecoder.decode(segment, StandardCharsets.UTF_8);
-      segment = segment.replaceAll("[/\\\\:*?\"<>|\t]", "_");
-      return segment.isBlank() ? "%2f" : segment;
-    } catch (Exception e) {
-      return "%2f";
+  /**
+   * The file name tshark's {@code --export-objects http} gives a request's object, so an exported
+   * file can be matched back to its conversation. tshark takes the last path component of the
+   * <em>whole</em> request URI, query string included ({@code g_path_get_basename}), then
+   * percent-encodes the characters a file name can't hold ({@code eo_massage_str}):
+   * {@code /managements?a=1} → {@code managements%3fa=1}, {@code /fwlink/?LinkID=1} →
+   * {@code %3fLinkID=1}, {@code /} → {@code %2f}, a proxy-style {@code http://host/} → {@code host}.
+   * An earlier version stripped the query and URL-decoded, so every download with a query string
+   * (58 of 166 across five training captures, including WarmCookie's ZIP) lost its conversation.
+   */
+  static String uriToBasename(String uri) {
+    if (uri == null || uri.isEmpty()) return ".";
+    // g_path_get_basename: strip trailing separators, then take what follows the last one.
+    int end = uri.length();
+    while (end > 0 && uri.charAt(end - 1) == '/') end--;
+    if (end == 0) return "%2f";
+    String trimmed = uri.substring(0, end);
+    String base = trimmed.substring(trimmed.lastIndexOf('/') + 1);
+    StringBuilder out = new StringBuilder(base.length());
+    for (char c : base.toCharArray()) {
+      if (c < 0x20 || "<>:\"/\\|?*".indexOf(c) >= 0) out.append(String.format("%%%02x", (int) c));
+      else out.append(c);
     }
+    return out.toString();
   }
+
 
   /**
    * Strips a tshark duplicate-numbering suffix from a filename. e.g. {@code "xcms(1).asp"} → {@code

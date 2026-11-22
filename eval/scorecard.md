@@ -3,7 +3,7 @@
 Baseline of TracePcap's **deterministic** conclusions vs. published answer keys (#819, Workstream A). Regenerate with `python3 eval/run_eval.py`.
 
 - Cases scored: **5** of 5
-- Correct: **28** / 32 (accuracy 0.875)
+- Correct: **30** / 34 (accuracy 0.882)
 - Missed: **4**
 - Confidently wrong: **0** ✅
 
@@ -19,6 +19,8 @@ Analysis: Suricata **on**, nDPI on.
 | user.real_name | ✅ correct | Clark Collier |
 | malware.family | ✅ correct | STRRAT |
 | c2.ip | ✅ correct | 141.98.10.79 |
+| timeline.start | — n/a |  |
+| files.sha256 | — n/a |  |
 
 ## 2024-08-15-warmcookie
 Analysis: Suricata **on**, nDPI on.
@@ -32,6 +34,8 @@ Analysis: Suricata **on**, nDPI on.
 | user.real_name | ✅ correct | Pierce Lucero |
 | malware.family | ✅ correct | WarmCookie |
 | c2.ip | ✅ correct | 72.5.43.29 |
+| timeline.start | — n/a |  |
+| files.sha256 | ✅ correct | 798563fcf7600f7ef1a35996291a9dfb5f9902733404dd499e2e736ea1dc6fc5, b7aec5f73d2a6bbd8cd920edb4760e2edadc98c3a45bf4fa994d47ca9cbd02f6 |
 
 ## 2025-01-22-fake-authenticator
 Analysis: Suricata **on**, nDPI on.
@@ -45,6 +49,8 @@ Analysis: Suricata **on**, nDPI on.
 | user.real_name | — n/a |  |
 | malware.family | — n/a |  |
 | c2.ip | ◻️ missed | missing: 45.125.66.32, 45.125.66.252 |
+| timeline.start | — n/a |  |
+| files.sha256 | — n/a |  |
 
 ## 2026-01-31-lumma
 Analysis: Suricata **on**, nDPI on.
@@ -58,6 +64,8 @@ Analysis: Suricata **on**, nDPI on.
 | user.real_name | ✅ correct | Gabriel Wyatt |
 | malware.family | ✅ correct | Lumma Stealer |
 | c2.ip | ✅ correct | 153.92.1.49; also, beyond the key (evidenced): 62.72.32.156 |
+| timeline.start | — n/a |  |
+| files.sha256 | — n/a |  |
 
 ## 2026-11-10-netsupport
 Analysis: Suricata **on**, nDPI on.
@@ -71,3 +79,5 @@ Analysis: Suricata **on**, nDPI on.
 | user.real_name | — n/a |  |
 | malware.family | ◻️ missed |  |
 | c2.ip | ◻️ missed |  |
+| timeline.start | ✅ correct | 2026-11-10T18:22:07Z |
+| files.sha256 | — n/a |  |
