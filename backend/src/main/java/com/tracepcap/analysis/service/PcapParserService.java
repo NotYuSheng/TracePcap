@@ -736,6 +736,8 @@ public class PcapParserService {
     private String dstMac;
     private String ja3Client;
     private String ja3Server;
+    private String ja4Client;
+    private String tlsVersion;
     private String tlsIssuer;
     private String tlsSubject;
     private LocalDateTime tlsNotBefore;

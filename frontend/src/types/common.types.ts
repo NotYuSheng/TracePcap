@@ -70,6 +70,10 @@ export interface Conversation {
   hostname?: string;
   ja3Client?: string;
   ja3Server?: string;
+  /** JA4 client fingerprint, from nDPI (#599). */
+  ja4Client?: string;
+  /** Negotiated TLS version, e.g. "TLS 1.2", from Suricata (#599). */
+  tlsVersion?: string;
   tlsIssuer?: string;
   tlsSubject?: string;
   tlsNotBefore?: number;

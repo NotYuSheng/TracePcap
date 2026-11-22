@@ -354,11 +354,13 @@ what data was available during analysis:
 - **Custom Rules** — names of fired custom signature rules, color-coded by
   severity (critical=red, high=orange, medium=amber, low=purple).
 
-**TLS metadata** (when nDPI analysis was enabled and a TLS handshake was
-observed)
+**TLS** (when nDPI or Suricata ran and a TLS handshake was observed)
 
-- **JA3 Client** — MD5 hash of the TLS ClientHello parameters.
-- **JA3S Server** — MD5 hash of the TLS ServerHello parameters.
+- **Version** — the negotiated version (e.g. ``TLS 1.2``), from Suricata. TLS
+  1.0, TLS 1.1 and SSL are marked **Legacy**.
+- **JA3** — MD5 hash of the TLS ClientHello parameters, from Suricata.
+- **JA3S** — MD5 hash of the TLS ServerHello parameters, from nDPI or Suricata.
+- **JA4** — the newer client fingerprint, from nDPI.
 - **TLS Issuer** — Issuer DN from the server certificate.
 - **TLS Subject** — Subject DN from the server certificate.
 - **Cert Valid From / Cert Valid To** — certificate validity dates from

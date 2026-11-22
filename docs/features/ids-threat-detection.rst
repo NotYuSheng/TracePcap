@@ -21,6 +21,18 @@ How it works
    the conversations they belong to.
 3. Matching alert signatures are stored on each conversation and counted into a
    security-alert total shown across the UI.
+4. The same ``eve.json`` has a ``tls`` record for each TLS session. Its facts fill
+   in what nDPI didn't provide: the client **JA3** fingerprint (nDPI 6 reports
+   JA4 instead), the server JA3S, SNI, certificate subject, issuer and validity,
+   and the negotiated **TLS version**, which nothing else records. They only
+   fill gaps; a value nDPI found is never replaced. Suricata's ``http``,
+   ``dns`` and ``fileinfo`` records aren't read, because tshark already extracts
+   the same information (the web server log, the DNS query log and file
+   extraction).
+
+On the STRRAT incident capture (184 TLS conversations) this took client JA3 from
+0 to 153, hostnames from 65 to 162 and certificate subjects from 25 to 60, with
+no measurable change in analysis time.
 
 Suricata is gated **independently of nDPI** — it has its own per-file toggle, so
 you can run one without the other.

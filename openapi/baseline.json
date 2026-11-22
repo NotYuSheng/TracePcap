@@ -978,6 +978,9 @@
           "ja3Server": {
             "type": "string"
           },
+          "ja4Client": {
+            "type": "string"
+          },
           "packetCount": {
             "format": "int64",
             "type": "integer"
@@ -1026,6 +1029,9 @@
             "type": "string"
           },
           "tlsSubject": {
+            "type": "string"
+          },
+          "tlsVersion": {
             "type": "string"
           },
           "totalBytes": {
@@ -1249,6 +1255,9 @@
           "ja3Server": {
             "type": "string"
           },
+          "ja4Client": {
+            "type": "string"
+          },
           "packetCount": {
             "format": "int64",
             "type": "integer"
@@ -1294,6 +1303,9 @@
             "type": "string"
           },
           "tlsSubject": {
+            "type": "string"
+          },
+          "tlsVersion": {
             "type": "string"
           },
           "totalBytes": {

@@ -42,6 +42,13 @@ import org.springframework.stereotype.Service;
  * stored in the conversation's {@code suricataAlerts} list, mirroring how {@link NdpiService}
  * populates {@code flowRisks}.
  *
+ * <p>The same eve.json carries a {@code tls} record per TLS session (#599). Those fill the TLS facts
+ * nDPI didn't provide: above all the client JA3, which nDPI 6 no longer reports (it reports JA4
+ * instead), plus SNI and certificate fields where nDPI missed them, and the negotiated version,
+ * which nothing else records. They only ever fill gaps; a value nDPI set is never replaced. The
+ * {@code http}, {@code dns} and {@code fileinfo} records are deliberately not read: tshark already
+ * extracts those (web server log, DNS query log, file extraction).
+ *
  * <p>Gracefully degrades: if the {@code suricata} binary or ruleset is missing or Suricata fails,
  * {@code suricataAlerts} stays empty and analysis continues normally.
  */
@@ -99,12 +106,30 @@ public class SuricataService implements Extractor {
   /** The engine run (the slow part) needs only the file, so it happens before the pipeline's transaction (#409). */
   @Override
   public Prepared prepare(ExtractionTarget target) {
-    Map<String, Set<String>> alertMap = runSuricata(target.capture());
+    Eve eve = runSuricata(target.capture());
     return conversations -> {
-      applyAlerts(alertMap, conversations);
+      apply(eve, conversations);
       return Outcome.completed("suricata ran");
     };
   }
+
+  /** What one Suricata run produced: alerts and TLS records, each keyed by flow (both directions). */
+  record Eve(Map<String, Set<String>> alerts, Map<String, TlsRecord> tls) {
+    static Eve empty() {
+      return new Eve(new HashMap<>(), new HashMap<>());
+    }
+  }
+
+  /** The TLS facts from one eve.json {@code tls} record (#599). Every field may be null. */
+  record TlsRecord(
+      String sni,
+      String subject,
+      String issuer,
+      java.time.LocalDateTime notBefore,
+      java.time.LocalDateTime notAfter,
+      String version,
+      String ja3,
+      String ja3s) {}
 
   private static final String SURICATA_BINARY = "suricata";
 
@@ -124,23 +149,46 @@ public class SuricataService implements Extractor {
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
-    applyAlerts(runSuricata(pcapFile), conversations);
+    apply(runSuricata(pcapFile), conversations);
   }
 
-  /** Resolves engine alerts onto conversations by 5-tuple. Shared by {@link #enrich} and {@link #prepare}. */
-  private void applyAlerts(
-      Map<String, Set<String>> alertMap, List<PcapParserService.ConversationInfo> conversations) {
-    if (alertMap.isEmpty() || conversations.isEmpty()) return;
-
+  /** Resolves alerts and TLS records onto conversations by 5-tuple. Shared by {@link #enrich} and {@link #prepare}. */
+  void apply(Eve eve, List<PcapParserService.ConversationInfo> conversations) {
+    if (conversations.isEmpty()) return;
+    int filled = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
-      Set<String> alerts = resolve(alertMap, conv);
+      Set<String> alerts = resolve(eve.alerts(), conv);
       if (alerts != null && !alerts.isEmpty()) {
         conv.setSuricataAlerts(new ArrayList<>(alerts));
       }
+      TlsRecord tls = resolve(eve.tls(), conv);
+      if (tls != null && fillTls(conv, tls)) filled++;
     }
-
     long enriched = conversations.stream().filter(c -> !c.getSuricataAlerts().isEmpty()).count();
-    log.info("Suricata flagged {}/{} conversations with IDS alerts", enriched, conversations.size());
+    log.info(
+        "Suricata flagged {}/{} conversations with IDS alerts; TLS records filled facts on {}",
+        enriched, conversations.size(), filled);
+  }
+
+  /**
+   * Fills the conversation's TLS facts Suricata knows and nDPI didn't provide. Never replaces a
+   * value: nDPI's stays when both have one. Returns whether anything was filled.
+   */
+  static boolean fillTls(PcapParserService.ConversationInfo conv, TlsRecord t) {
+    boolean any = false;
+    if (conv.getJa3Client() == null && t.ja3() != null) { conv.setJa3Client(t.ja3()); any = true; }
+    if (conv.getJa3Server() == null && t.ja3s() != null) { conv.setJa3Server(t.ja3s()); any = true; }
+    if (isBlank(conv.getHostname()) && t.sni() != null) { conv.setHostname(t.sni()); any = true; }
+    if (conv.getTlsSubject() == null && t.subject() != null) { conv.setTlsSubject(t.subject()); any = true; }
+    if (conv.getTlsIssuer() == null && t.issuer() != null) { conv.setTlsIssuer(t.issuer()); any = true; }
+    if (conv.getTlsNotBefore() == null && t.notBefore() != null) { conv.setTlsNotBefore(t.notBefore()); any = true; }
+    if (conv.getTlsNotAfter() == null && t.notAfter() != null) { conv.setTlsNotAfter(t.notAfter()); any = true; }
+    if (conv.getTlsVersion() == null && t.version() != null) { conv.setTlsVersion(t.version()); any = true; }
+    return any;
+  }
+
+  private static boolean isBlank(String s) {
+    return s == null || s.isBlank();
   }
 
   // ---------------------------------------------------------------------------
@@ -151,8 +199,8 @@ public class SuricataService implements Extractor {
    * Runs {@code suricata -r <file> -l <tmp>} and returns a map of flow key → set of alert strings.
    * The output directory is created per-run and deleted afterwards.
    */
-  private Map<String, Set<String>> runSuricata(File pcapFile) {
-    Map<String, Set<String>> result = new HashMap<>();
+  private Eve runSuricata(File pcapFile) {
+    Eve result = Eve.empty();
     Path outDir = null;
 
     try {
@@ -169,7 +217,7 @@ public class SuricataService implements Extractor {
         // Warm output lives in its own subdirectory so an abandoned warm run cannot interleave
         // with the cold fallback below.
         parseEveJson(SuricataEngine.warmDir(outDir).resolve(EVE_JSON), result);
-        log.debug("Suricata (warm) produced alerts for {} distinct flows", result.size());
+        log.debug("Suricata (warm) produced alerts for {} flow keys, TLS records for {}", result.alerts().size(), result.tls().size());
         return result;
       }
 
@@ -202,7 +250,7 @@ public class SuricataService implements Extractor {
         }
 
         parseEveJson(outDir.resolve(EVE_JSON), result);
-        log.debug("Suricata produced alerts for {} distinct flows", result.size());
+        log.debug("Suricata produced alerts for {} flow keys, TLS records for {}", result.alerts().size(), result.tls().size());
       } finally {
         // Never leak the subprocess if waitFor was interrupted or parsing threw.
         if (process.isAlive()) process.destroyForcibly();
@@ -231,7 +279,7 @@ public class SuricataService implements Extractor {
    * result map keyed by 5-tuple flow key (indexed in both directions for direction-independent
    * lookup).
    */
-  private void parseEveJson(Path eveJson, Map<String, Set<String>> result) {
+  private void parseEveJson(Path eveJson, Eve result) {
     if (!Files.isReadable(eveJson)) {
       log.warn("Suricata eve.json not found at {} — no alerts parsed", eveJson);
       return;
@@ -244,12 +292,19 @@ public class SuricataService implements Extractor {
     }
   }
 
-  /** Parse a single eve.json line; only {@code event_type == "alert"} objects contribute. */
-  private void parseEveLine(String line, Map<String, Set<String>> result) {
+  /** Parse a single eve.json line; {@code alert} and {@code tls} objects contribute. */
+  void parseEveLine(String line, Eve result) {
     if (line == null || line.isBlank()) return;
+    // Cheap pre-check: most lines are flow and stats records, which we don't read.
+    if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")) return;
     try {
       JsonNode root = objectMapper.readTree(line);
-      if (!"alert".equals(root.path("event_type").asText())) return;
+      String type = root.path("event_type").asText();
+      if ("tls".equals(type)) {
+        parseTls(root, result.tls());
+        return;
+      }
+      if (!"alert".equals(type)) return;
 
       JsonNode alert = root.path("alert");
       if (alert.isMissingNode()) return;
@@ -268,9 +323,69 @@ public class SuricataService implements Extractor {
       String proto = root.path("proto").asText(null);
 
       String key = flowKey(srcIp, srcPort, dstIp, dstPort, proto);
-      result.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
+      result.alerts().computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
     } catch (Exception e) {
       log.debug("Skipping unparseable eve.json line: {}", e.getMessage());
+    }
+  }
+
+  /**
+   * One {@code tls} record. Suricata 6 writes, under {@code tls}: {@code sni}, {@code subject},
+   * {@code issuerdn}, {@code notbefore}/{@code notafter} (ISO local), {@code version} (e.g. "TLS 1.2")
+   * and {@code ja3}/{@code ja3s} objects with a {@code hash}. A session can log more than one record;
+   * the first value seen for a field is kept.
+   */
+  private void parseTls(JsonNode root, Map<String, TlsRecord> out) {
+    JsonNode tls = root.path("tls");
+    String srcIp = root.path("src_ip").asText(null);
+    String dstIp = root.path("dest_ip").asText(null);
+    if (tls.isMissingNode() || srcIp == null || dstIp == null) return;
+    Integer srcPort = root.has("src_port") ? root.get("src_port").asInt() : null;
+    Integer dstPort = root.has("dest_port") ? root.get("dest_port").asInt() : null;
+    TlsRecord parsed =
+        new TlsRecord(
+            text(tls, "sni", ConversationEntity.HOSTNAME_MAX_LENGTH),
+            text(tls, "subject", Integer.MAX_VALUE),
+            text(tls, "issuerdn", Integer.MAX_VALUE),
+            date(tls, "notbefore"),
+            date(tls, "notafter"),
+            text(tls, "version", ConversationEntity.TLS_VERSION_MAX_LENGTH),
+            hash(tls.path("ja3")),
+            hash(tls.path("ja3s")));
+    out.merge(flowKey(srcIp, srcPort, dstIp, dstPort, null), parsed, SuricataService::firstSeen);
+  }
+
+  private static TlsRecord firstSeen(TlsRecord a, TlsRecord b) {
+    return new TlsRecord(
+        a.sni() != null ? a.sni() : b.sni(),
+        a.subject() != null ? a.subject() : b.subject(),
+        a.issuer() != null ? a.issuer() : b.issuer(),
+        a.notBefore() != null ? a.notBefore() : b.notBefore(),
+        a.notAfter() != null ? a.notAfter() : b.notAfter(),
+        a.version() != null ? a.version() : b.version(),
+        a.ja3() != null ? a.ja3() : b.ja3(),
+        a.ja3s() != null ? a.ja3s() : b.ja3s());
+  }
+
+  private static String text(JsonNode node, String field, int max) {
+    String v = node.path(field).asText("").trim();
+    if (v.isEmpty()) return null;
+    return v.length() > max ? v.substring(0, max) : v;
+  }
+
+  /** A JA3/JA3S object's 32-hex hash, or null. */
+  private static String hash(JsonNode ja3) {
+    String h = ja3.path("hash").asText("").trim().toLowerCase();
+    return h.matches("[0-9a-f]{" + ConversationEntity.JA3_HASH_LENGTH + "}") ? h : null;
+  }
+
+  private static java.time.LocalDateTime date(JsonNode node, String field) {
+    String v = node.path(field).asText("").trim();
+    if (v.isEmpty()) return null;
+    try {
+      return java.time.LocalDateTime.parse(v);
+    } catch (java.time.format.DateTimeParseException e) {
+      return null;
     }
   }
 
@@ -300,9 +415,8 @@ public class SuricataService implements Extractor {
         : s;
   }
 
-  /** Lookup alerts trying both directions (src→dst and dst→src). */
-  private Set<String> resolve(
-      Map<String, Set<String>> alertMap, PcapParserService.ConversationInfo conv) {
+  /** Looks up a flow's entry trying both directions (src→dst and dst→src). */
+  private static <T> T resolve(Map<String, T> alertMap, PcapParserService.ConversationInfo conv) {
     String key1 =
         flowKey(
             conv.getSrcIp(),
@@ -310,7 +424,7 @@ public class SuricataService implements Extractor {
             conv.getDstIp(),
             conv.getDstPort(),
             conv.getProtocol());
-    Set<String> alerts = alertMap.get(key1);
+    T alerts = alertMap.get(key1);
     if (alerts == null) {
       String key2 =
           flowKey(
@@ -329,7 +443,7 @@ public class SuricataService implements Extractor {
    * Suricata's {@code proto} field ("TCP"/"UDP") and pcap4j's {@code protocol} string may differ in
    * casing/naming; IP+port pairs are unique enough to map an alert to its conversation.
    */
-  private String flowKey(String ip, Integer port, String ip2, Integer port2, String proto) {
+  private static String flowKey(String ip, Integer port, String ip2, Integer port2, String proto) {
     return ip + ":" + port + "->" + ip2 + ":" + port2;
   }
 

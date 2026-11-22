@@ -97,7 +97,9 @@ public interface ConversationLookup {
       LocalDateTime tlsNotBefore,
       LocalDateTime tlsNotAfter,
       String ja3Client,
-      String ja3Server) {}
+      String ja3Server,
+      String ja4Client,
+      String tlsVersion) {}
 
   /**
    * What a tool concluded. The lists are never null (empty when the tool found nothing or did not
