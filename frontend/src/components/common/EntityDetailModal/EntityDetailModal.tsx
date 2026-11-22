@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@govtechsg/sgds-react';
+import '@components/common/SideDrawer/SideDrawer.css';
 import { useEntityRole } from './hooks/useEntityRole';
 import { useEntityStats } from './hooks/useEntityStats';
 import { useEntityNote } from './hooks/useEntityNote';
@@ -290,9 +291,19 @@ export function EntityDetailModal({
     );
   }
 
+  // Protocols and apps open in the right-hand drawer, like the app's other side panels; the
+  // centred dialog stays for the rest.
+  const asDrawer = entityType === 'PROTOCOL' || entityType === 'APPLICATION';
+
   return (
     <>
-    <Modal show onHide={onClose} size="lg" scrollable>
+    <Modal
+      show
+      onHide={onClose}
+      {...(asDrawer
+        ? { dialogClassName: 'side-drawer side-drawer-wide', contentClassName: 'side-drawer-content' }
+        : { size: 'lg' as const, scrollable: true })}
+    >
       <Modal.Header closeButton closeLabel="Close (Esc)">
             <Modal.Title as="h5" className="d-flex align-items-center gap-2 flex-wrap">
               {displayName}
@@ -327,7 +338,7 @@ export function EntityDetailModal({
             </ul>
           </div>
 
-          <Modal.Body>
+          <Modal.Body className={asDrawer ? 'side-drawer-body' : undefined}>
 
             {/* ── DETAILS TAB ──────────────────────────────────────── */}
             {activeTab === 'details' && (
