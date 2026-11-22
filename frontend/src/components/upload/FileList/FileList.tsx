@@ -20,6 +20,7 @@ import {
 } from '@/features/captureKeep/captureKeepService';
 import './FileList.css';
 import '@/features/captureKeep/captureKeep.css';
+import { SYSTEM_ACTOR, uploaderWords } from '@utils/actorWords';
 
 // Exported so contractConformance.test-d.ts can check it against the backend's
 // FileMetadataDto. It is a deliberate subset — this list renders only these fields.
@@ -489,9 +490,13 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         )}
                         {' · '}
                         {ago(uploaded, now)}
-                        {file.uploadedBy && file.uploadedBy !== 'system' && (
-                          <span data-testid="capture-uploader"> · by {file.uploadedBy}</span>
-                        )}
+                        <span
+                          data-testid="capture-uploader"
+                          className={file.uploadedBy && file.uploadedBy !== SYSTEM_ACTOR ? undefined : 'text-muted'}
+                        >
+                          {' · '}
+                          {uploaderWords(file.uploadedBy)}
+                        </span>
                       </div>
                       {notes.length > 0 && (
                         <div className="file-notes">

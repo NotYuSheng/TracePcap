@@ -38,9 +38,9 @@ describe('buildActivity', () => {
   it('merges captures and changes, newest first', () => {
     const events = buildActivity([file('a', 3), file('b', 1)], [change(1, 2)], null, NOW);
     expect(events.map(e => e.key)).toEqual(['f-b', 'a-1', 'f-a']);
-    expect(events[0]).toMatchObject({ tone: 'done', text: 'Analysed', meta: '913 packets' });
+    expect(events[0]).toMatchObject({ tone: 'done', text: 'Analysed', meta: '913 packets · uploader not recorded' });
     expect(events[1].tone).toBe('change');
-    expect(events[1].meta).toBe('Rule · by system');
+    expect(events[1].meta).toBe('Rule · without sign-in');
   });
 
   it('warns about a capture that will be deleted soon, at the top', () => {
@@ -149,15 +149,17 @@ describe('kept captures', () => {
 })
 
 describe('who uploaded a capture', () => {
-  it('is named on its activity line, except the shared login-off profile', () => {
-    const [ana, sys, failed] = [
+  it('is named on its activity line; no sign-in and unrecorded say so instead of going blank', () => {
+    const [ana, sys, failed, old] = [
       buildActivity([file('a', 1, 'COMPLETED', { uploadedBy: 'ana' })], [], null, NOW)[0],
       buildActivity([file('b', 1, 'COMPLETED', { uploadedBy: 'system' })], [], null, NOW)[0],
       buildActivity([file('c', 1, 'FAILED', { uploadedBy: 'bob' })], [], null, NOW)[0],
+      buildActivity([file('d', 1, 'COMPLETED', { uploadedBy: null })], [], null, NOW)[0],
     ];
     expect(ana.meta).toBe('913 packets · by ana');
-    expect(sys.meta).toBe('913 packets');
+    expect(sys.meta).toBe('913 packets · uploaded without sign-in');
     expect(failed.meta).toBe('Uploaded · by bob');
+    expect(old.meta).toBe('913 packets · uploader not recorded');
   });
 });
 
