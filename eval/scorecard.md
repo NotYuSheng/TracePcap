@@ -3,8 +3,8 @@
 Baseline of TracePcap's **deterministic** conclusions vs. published answer keys (#819, Workstream A). Regenerate with `python3 eval/run_eval.py`.
 
 - Cases scored: **5** of 5
-- Correct: **27** / 32 (accuracy 0.844)
-- Missed: **5**
+- Correct: **28** / 32 (accuracy 0.875)
+- Missed: **4**
 - Confidently wrong: **0** ✅
 
 ## 2024-07-30-strrat
@@ -38,13 +38,13 @@ Analysis: Suricata **on**, nDPI on.
 
 | Field | Status | Detail |
 |---|---|---|
-| victim.ip | ◻️ missed |  |
+| victim.ip | ✅ correct | 10.1.17.215 |
 | victim.mac | ✅ correct | 00:d0:b7:26:4a:74 |
 | victim.hostname | ✅ correct | DESKTOP-L8C5GSJ |
 | user.account | ✅ correct | shutchenson |
 | user.real_name | — n/a |  |
 | malware.family | — n/a |  |
-| c2.ip | ◻️ missed |  |
+| c2.ip | ◻️ missed | missing: 45.125.66.32, 45.125.66.252 |
 
 ## 2026-01-31-lumma
 Analysis: Suricata **on**, nDPI on.

@@ -3,10 +3,10 @@
     "cases": 5,
     "cases_scored": 5,
     "scored_fields": 32,
-    "correct": 27,
-    "missed": 5,
+    "correct": 28,
+    "missed": 4,
     "confidently_wrong": 0,
-    "accuracy": 0.844
+    "accuracy": 0.875
   },
   "cases": [
     {
@@ -112,8 +112,8 @@
       "fields": [
         {
           "field": "victim.ip",
-          "status": "missed",
-          "detail": null
+          "status": "correct",
+          "detail": "10.1.17.215"
         },
         {
           "field": "victim.mac",
@@ -143,7 +143,12 @@
         {
           "field": "c2.ip",
           "status": "missed",
-          "detail": null
+          "detail": {
+            "missing": [
+              "45.125.66.32",
+              "45.125.66.252"
+            ]
+          }
         }
       ]
     },
