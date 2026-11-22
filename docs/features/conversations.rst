@@ -109,7 +109,17 @@ This means a packet from ``10.0.0.1:55000`` → ``10.0.0.2:443`` and a reply fro
 row**. The ``srcIp``/``dstIp`` shown in the UI are from the **first packet** that
 created the conversation entry, not necessarily the initiating direction.
 
-The full key format is: ``ip1:port1-ip2:port2-PROTOCOL``.
+The full key format is: ``ip1:port1-ip2:port2-TRANSPORT``, where the transport is
+``TCP`` or ``UDP`` (or, for traffic without ports, the packet's own protocol, such as
+``ICMP`` or ``ARP``). One TCP connection is therefore one conversation, whatever
+Wireshark labels its individual packets: the handshake is labelled ``TCP`` and the
+records ``TLSv1.2``, but they share a row. The row's **Protocol** is the most specific
+label the connection showed (``TLSv1.2`` rather than the ``TCP`` of its opening SYN).
+
+.. note::
+
+   Captures analysed before this fix split such a connection into a row per label
+   (often half the rows of a real capture). Re-analyse a capture to regroup it.
 
 Packet Count and Byte Count
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -322,7 +322,12 @@ public class PcapParserService {
             final String fProtocol = protocol;
             final LocalDateTime fTs = timestamp;
 
-            String convKey = createConversationKey(srcIp, srcPort, dstIp, dstPort, protocol);
+            // Keyed on the transport, not Wireshark's per-packet label: one TCP connection carries
+            // "TCP" (handshake), "TLSv1.2" (records) and more, and keying on the label split it into
+            // a row per label (45-53% of rows on real captures were such pieces, a regression from
+            // the move to tshark in #120). The row shows the most specific label it saw instead.
+            String transport = transportOf(tcpSport, udpSport, protocol);
+            String convKey = createConversationKey(srcIp, srcPort, dstIp, dstPort, transport);
             // A client with no address yet (a DHCP request from 0.0.0.0) is told apart only by its
             // MAC. Without it in the key, every such client merged into one conversation credited
             // to whichever MAC came first, so the map drew one "0.0.0.0" device for all of them.
@@ -362,6 +367,8 @@ public class PcapParserService {
                       return c;
                     });
             conv.setPacketCount(conv.getPacketCount() + 1);
+            // "TCP" on the opening SYN, "TLSv1.2" once the handshake starts: show the specific one.
+            if (isBareTransport(conv.getProtocol()) && !isBareTransport(fProtocol)) conv.setProtocol(fProtocol);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
             // Each side's MAC (#462): the first eth.src seen from it. A local host's own MAC, or for
             // traffic from outside the site's router MAC, which says which network it was on.
@@ -606,6 +613,18 @@ public class PcapParserService {
   /** The unspecified address: a sender that has no address yet, so its MAC is its identity. */
   static boolean isUnspecified(String ip) {
     return "0.0.0.0".equals(ip) || "::".equals(ip);
+  }
+
+  /** The conversation's transport: TCP or UDP when it has ports, else the packet's own label. */
+  static String transportOf(String tcpSport, String udpSport, String label) {
+    if (tcpSport != null && !tcpSport.isEmpty()) return "TCP";
+    if (udpSport != null && !udpSport.isEmpty()) return "UDP";
+    return label;
+  }
+
+  /** A label that names only the transport, which a more specific one should replace. */
+  static boolean isBareTransport(String label) {
+    return label == null || "TCP".equals(label) || "UDP".equals(label);
   }
 
   private String createConversationKey(
