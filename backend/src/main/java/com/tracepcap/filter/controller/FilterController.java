@@ -1,5 +1,7 @@
 package com.tracepcap.filter.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.filter.dto.*;
 import com.tracepcap.filter.service.FilterService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
     description = "APIs for natural language to pcap filter generation and execution")
 public class FilterController {
 
+  private final PermissionService permissionService;
+
   private final FilterService filterService;
 
   @PostMapping("/{fileId}/generate")
@@ -29,6 +33,7 @@ public class FilterController {
       description = "Uses AI to convert a natural language query into a BPF filter expression")
   public ResponseEntity<FilterGenerationResponse> generateFilter(
       @PathVariable String fileId, @Valid @RequestBody FilterGenerationRequest request) {
+    permissionService.require(PermissionAction.ASK_AI);
 
     log.info(
         "Generating filter for file {} with query: {}", fileId, request.getNaturalLanguageQuery());

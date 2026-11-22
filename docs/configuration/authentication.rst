@@ -91,11 +91,38 @@ so it cannot poison a plain-HTTP origin into HTTPS-only. For internet-facing
 deployments, terminate TLS in front of nginx and set ``PUBLIC_URL`` to the
 ``https://`` origin. See :doc:`../operations/production-hardening`.
 
+Using your own realm and client
+-------------------------------
+
+The bundled Keycloak creates a realm called ``tracepcap`` with a client called
+``tracepcap``. To sign in through another realm, such as one your organisation
+shares across its apps, set ``KEYCLOAK_REALM`` and ``KEYCLOAK_CLIENT_ID`` in
+``.env`` and rebuild (both are baked into the frontend). The client must be a
+public OpenID Connect client with the standard flow, PKCE (S256), and
+``<PUBLIC_URL>/*`` as a valid redirect URI. TracePcap's roles are that client's
+client roles: see :doc:`../features/roles-and-permissions`.
+
+.. _renamed-client:
+
+Upgrading from v0.4: the client was renamed
+-------------------------------------------
+
+Up to v0.4 the client was called ``tracepcap-frontend``. It's ``tracepcap`` now,
+because it's the client for the whole app. Keycloak only imports the realm file
+on first start, so an existing install still has the old name, and sign-in fails
+after upgrading until you do **one** of these:
+
+- **Rename it in Keycloak** (keeps every role and group assignment): admin
+  console, realm ``tracepcap``, **Clients › tracepcap-frontend › Settings**, set
+  **Client ID** to ``tracepcap``, **Save**.
+- **Keep the old name**: set ``KEYCLOAK_CLIENT_ID=tracepcap-frontend`` in
+  ``.env`` and rebuild.
+
 Related environment variables
 -----------------------------
 
-See :doc:`environment-variables` for ``PUBLIC_URL``,
-``TRACEPCAP_AUTH_ENABLED``, ``KEYCLOAK_ADMIN``, and
+See :doc:`environment-variables` for ``PUBLIC_URL``, ``KEYCLOAK_REALM``,
+``KEYCLOAK_CLIENT_ID``, ``TRACEPCAP_AUTH_ENABLED``, ``KEYCLOAK_ADMIN``, and
 ``KEYCLOAK_ADMIN_PASSWORD``. The ``KEYCLOAK_ISSUER_URI``,
 ``KEYCLOAK_JWK_SET_URI``, and ``VITE_AUTH_*`` values are set automatically by
 the overlay and derived from ``PUBLIC_URL``.

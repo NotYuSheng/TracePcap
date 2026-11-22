@@ -71,6 +71,13 @@ public class FileEntity {
   @Column(name = "story_status", length = 20)
   private String storyStatus;
 
+  /**
+   * Who uploaded it: the login's username, or "system" with login off. Null for captures uploaded
+   * before this was recorded (V72), which only a role that may delete anyone's captures can delete.
+   */
+  @Column(name = "uploaded_by")
+  private String uploadedBy;
+
   /** Opted out of the retention cleanup at upload: kept until someone deletes it. */
   @Builder.Default
   @Column(name = "keep_forever", nullable = false)

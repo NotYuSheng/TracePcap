@@ -35,18 +35,19 @@ let cursor = 0;
 for (const span of sorted) {
   // Overlapping/rounding artefacts would produce a negative-length trim.
   if (span.start > cursor + 0.05) {
-    parts.push({ from: cursor, to: span.start, speed: 1 });
+    parts.push({ from: cursor, to: span.start, speed: 1, label: '' });
   }
-  parts.push({ from: Math.max(span.start, cursor), to: span.end, speed: span.speed });
+  parts.push({ from: Math.max(span.start, cursor), to: span.end, speed: span.speed, label: span.label ?? '' });
   cursor = span.end;
 }
-if (duration > cursor + 0.05) parts.push({ from: cursor, to: duration, speed: 1 });
+if (duration > cursor + 0.05) parts.push({ from: cursor, to: duration, speed: 1, label: '' });
 
-// --parts: one "from to speed" line per segment, for cutting them one at a time (the filter below
+// --parts: one "from to speed label" line per segment (the label, possibly empty, is the rest of
+// the line: the video captions a sped-up part with it), for cutting them one at a time (the filter below
 // decodes once into N trims, and ffmpeg then queues every later segment's frames in memory: on a
 // 9-minute recording that filled a 15 GB machine, 2026-11-16).
 if (process.argv.includes('--parts')) {
-  for (const p of parts) process.stdout.write(`${p.from.toFixed(3)} ${p.to.toFixed(3)} ${p.speed}\n`);
+  for (const p of parts) process.stdout.write(`${p.from.toFixed(3)} ${p.to.toFixed(3)} ${p.speed} ${p.label.replace(/\s+/g, ' ')}\n`);
   process.exit(0);
 }
 

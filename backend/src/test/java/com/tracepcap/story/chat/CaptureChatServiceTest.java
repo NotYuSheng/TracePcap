@@ -144,4 +144,34 @@ class CaptureChatServiceTest {
     assertThat(s.parse("```\nJust text.\n```").answer()).isEqualTo("Just text.");
     assertThat(s.parse("Sure! {\"answer\":\"Wrapped.\"} hope that helps").answer()).isEqualTo("Wrapped.");
   }
+
+  @Test
+  void lineBreaksTheModelEscapedTwiceBecomeRealOnes() {
+    var s = service(mock(LlmClient.class), new FakeFilterTool());
+    // As the model sent it: inside the JSON string, "\\n" (an escaped backslash, then n).
+    String raw = "{\"answer\":\"Victim: 172.16.1.66.\\\\n\\\\nTalking to:\\\\n• 141.98.10.79\"}";
+    assertThat(s.parse(raw).answer()).isEqualTo("Victim: 172.16.1.66.\n\nTalking to:\n• 141.98.10.79");
+    // A real line break means the text is as meant: a literal backslash-n stays.
+    assertThat(CaptureChatService.unescapeLineBreaks("Filter:\nframe contains \"\\n\""))
+        .isEqualTo("Filter:\nframe contains \"\\n\"");
+  }
+
+  @Test
+  void anAnswerThatIsNotStrictJsonIsStillReadAsTheAnswer() {
+    var s = service(mock(LlmClient.class), new FakeFilterTool());
+    // A raw line break inside the string (strict JSON forbids it).
+    assertThat(s.parse("{\"answer\":\"Victim: 172.16.1.66.\nC2: 141.98.10.79\"}").answer())
+        .isEqualTo("Victim: 172.16.1.66.\nC2: 141.98.10.79");
+    // An escape JSON doesn't have (\-), with \n line breaks.
+    assertThat(s.parse("{\"answer\":\"Victim\\n\\- C2: 141.98.10.79\",\"followUpQuestions\":[\"Why?\"]}"))
+        .satisfies(p -> {
+          assertThat(p.answer()).isEqualTo("Victim\n- C2: 141.98.10.79");
+          assertThat(p.followUps()).containsExactly("Why?");
+        });
+    // Cut off before the closing quote and brace.
+    assertThat(s.parse("{\"answer\": \"Victim is 172.16.1.66.\\n\\nWhat it talks to:\\n- C2 141.98").answer())
+        .isEqualTo("Victim is 172.16.1.66.\n\nWhat it talks to:\n- C2 141.98");
+    // Reasoning left unclosed at the top.
+    assertThat(s.parse("thinking about it…</think>{\"answer\":\"Done.\"}").answer()).isEqualTo("Done.");
+  }
 }

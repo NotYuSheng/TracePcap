@@ -78,6 +78,33 @@ class PipelineIntegrationTest {
   @Autowired private com.tracepcap.extraction.repository.ExtractedFileRepository extractedFiles;
   @Autowired private com.tracepcap.file.repository.FileRepository files;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  /** What each role may do as V72 seeded it, read before any test changes it (tests share the DB). */
+  private static java.util.List<java.util.Map<String, Object>> seededRolePermissions;
+
+  @org.junit.jupiter.api.BeforeEach
+  void rememberSeededRoles() {
+    if (seededRolePermissions == null) {
+      seededRolePermissions = jdbc.queryForList("SELECT role_key, action FROM role_permissions");
+    }
+  }
+
+  /** Puts every role's permissions back as seeded. */
+  private void resetRoles() {
+    jdbc.update("DELETE FROM role_permissions");
+    for (java.util.Map<String, Object> row : seededRolePermissions) {
+      jdbc.update(
+          "INSERT INTO role_permissions (role_key, action) VALUES (?, ?)", row.get("role_key"), row.get("action"));
+    }
+  }
+
+  /**
+   * Makes {@code action} admin-only, as an admin would by clearing it from every other role. With
+   * login off everyone has every role but admin, so it's then refused.
+   */
+  private void adminOnly(String action) {
+    jdbc.update("DELETE FROM role_permissions WHERE action = ?", action);
+  }
   @Autowired private com.tracepcap.analysis.repository.IpGeoInfoRepository geoCache;
   @Autowired private com.tracepcap.story.service.FindingsService storyFindings;
 
@@ -1079,13 +1106,13 @@ class PipelineIntegrationTest {
       JsonNode reset = rest.postForEntity("/api/v1/custom-private-ranges",
           json("{\"cidr\":\"10.250.0.0/16\",\"classification\":\"PUBLIC\"}"), JsonNode.class).getBody();
       assertThat(reset.get("id").asLong()).isEqualTo(rangeId); // updated, not duplicated
-      jdbc.update("INSERT INTO permissions (action, level, updated_by) VALUES ('ADDRESS_DEFAULTS', 'ADMIN', 'itest')");
+      adminOnly("ADDRESS_DEFAULTS");
       try {
         assertThat(rest.postForEntity("/api/v1/ip-org-rules",
             json("{\"cidr\":\"10.252.0.0/16\",\"label\":\"X\"}"), JsonNode.class).getStatusCode())
             .isEqualTo(HttpStatus.FORBIDDEN);
       } finally {
-        jdbc.update("DELETE FROM permissions WHERE action = 'ADDRESS_DEFAULTS'");
+        resetRoles();
       }
     } finally {
       rest.delete("/api/v1/monitor/networks/" + net);
@@ -1150,7 +1177,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void permissionsAndAudit_loginOff() {
-    jdbc.update("DELETE FROM permissions"); // tests share the DB
+    resetRoles(); // tests share the DB
 
     JsonNode me = rest.getForEntity("/api/v1/me", JsonNode.class).getBody();
     assertThat(me.get("authEnabled").asBoolean()).isFalse();
@@ -1185,14 +1212,14 @@ class PipelineIntegrationTest {
     assertThat(entry.path("before").path("inactivityMode").asText()).isEqualTo("SNAPSHOTS");
     assertThat(entry.path("after").path("inactivityThreshold").asInt()).isEqualTo(7);
 
+    // With login off no one is an admin (SYSTEM_SETTINGS_EDITABLE is off), so roles can't change.
     ResponseEntity<JsonNode> change =
         rest.exchange(
-            "/api/v1/permissions/NETWORK_SETTINGS", HttpMethod.PUT, json("{\"level\":\"ADMIN\"}"), JsonNode.class);
+            "/api/v1/roles/analyst", HttpMethod.PATCH, json("{\"permissions\":[\"SEE_CAPTURES\"]}"), JsonNode.class);
     assertThat(change.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
     // An admin could raise it (simulated here); then the same analyst save is refused, unaudited.
-    jdbc.update(
-        "INSERT INTO permissions (action, level, updated_by) VALUES ('NETWORK_SETTINGS', 'ADMIN', 'itest')");
+    adminOnly("NETWORK_SETTINGS");
     ResponseEntity<JsonNode> refused =
         rest.exchange(
             "/api/v1/monitor/networks/" + id + "/settings",
@@ -1208,7 +1235,7 @@ class PipelineIntegrationTest {
                 .asLong())
         .isEqualTo(1);
 
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     rest.exchange("/api/v1/monitor/networks/" + id, HttpMethod.DELETE, null, Void.class);
   }
 
@@ -1219,7 +1246,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void editablePolicy_loginOff_thresholdsYes_retentionNo() {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     jdbc.update("DELETE FROM system_settings");
     String url = "/api/v1/system/settings/HTTP_MIN_REQUESTS";
 
@@ -1273,7 +1300,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void detectionRules_crudExportImport_andAnalysisUsesThem() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "itest-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     String ruleJson =
         "{\"name\":\"" + tag + "-port\",\"severity\":\"high\",\"match\":{\"dstPort\":5999,\"protocol\":\"UDP\"},"
@@ -1394,7 +1421,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void ruleSync_staleAfterEdit_reapplyFixes_labelsFollowRuleChanges() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "sync-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     String r1 = createRule("{\"name\":\"" + tag + "-a\",\"severity\":\"high\",\"match\":{\"dstPort\":5999},"
         + "\"payloadContains\":[{\"ascii\":\"" + tag + "\"}]}");
@@ -1457,7 +1484,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void captureRules_applyAtOnceToTheirCaptureOnly_andPromote() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "cap-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     String a = uploadBytes(tag + "-a.pcap", udpPcap(tag + "-a")).getBody().get("fileId").asText();
     String b = uploadBytes(tag + "-b.pcap", udpPcap(tag + "-b")).getBody().get("fileId").asText();
@@ -1497,7 +1524,7 @@ class PipelineIntegrationTest {
     assertThat(ruleStatus(b).get("staleRules").toString()).contains(tag);
 
     // The capture-rule permission is enforced.
-    jdbc.update("INSERT INTO permissions (action, level, updated_by) VALUES ('DETECTION_RULES_CAPTURE', 'ADMIN', 'itest')");
+    adminOnly("DETECTION_RULES_CAPTURE");
     assertThat(
             rest.postForEntity(
                     "/api/v1/files/" + b + "/detection-rules",
@@ -1505,7 +1532,7 @@ class PipelineIntegrationTest {
                     JsonNode.class)
                 .getStatusCode())
         .isEqualTo(HttpStatus.FORBIDDEN);
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
   }
 
@@ -1516,7 +1543,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void networkRules_applyWhenACaptureJoins_andShowOnlyInThatNetwork() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "net-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
     assertThat(awaitAnalysis(file)).isEqualTo("completed");
@@ -1589,7 +1616,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void networkContext_listsTheCapturesNetworks_rulesWithNames_andDetailOverlay() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "ctx-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
     assertThat(awaitAnalysis(file)).isEqualTo("completed");
@@ -1641,7 +1668,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void suppressionHidesAGlobalRuleInOneNetwork_andPreviewMatchesWithoutSaving() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "sup-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     String g = createRule("{\"name\":\"" + tag + "-g\",\"severity\":\"high\",\"match\":{\"dstPort\":5999}}");
     String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
@@ -1710,7 +1737,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void ruleClassificationHint_votesForTheMatchedEndpoint_withTheRuleInTheEvidence() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "hint-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     createRule("{\"name\":\"" + tag + "\",\"severity\":\"low\",\"match\":{\"dstPort\":5999},"
         + "\"deviceType\":\"CCTV Camera\",\"deviceTypeWeight\":100}");
@@ -1839,7 +1866,7 @@ class PipelineIntegrationTest {
    */
   @Test
   void reanalysis_createsAVersion_keepsTheOriginal_andCarriesCaptureRules() throws Exception {
-    jdbc.update("DELETE FROM permissions");
+    resetRoles();
     String tag = "ver-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     byte[] pcap = udpPcap(tag);
     String orig = uploadBytes(tag + ".pcap", pcap).getBody().get("fileId").asText();

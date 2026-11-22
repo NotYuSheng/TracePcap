@@ -143,8 +143,8 @@ if [ "$SAVE_KEYCLOAK" = "1" ]; then
     --build-arg "VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}" \
     --build-arg "VITE_APP_VERSION=${VITE_APP_VERSION}" \
     --build-arg "VITE_AUTH_ENABLED=true" \
-    --build-arg "VITE_OIDC_CLIENT_ID=tracepcap-frontend" \
-    --build-arg "VITE_OIDC_REALM=tracepcap" \
+    --build-arg "VITE_OIDC_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-tracepcap}" \
+    --build-arg "VITE_OIDC_REALM=${KEYCLOAK_REALM:-tracepcap}" \
     -t "$NGINX_AUTH_IMAGE" \
     -f ./nginx/Dockerfile \
     .

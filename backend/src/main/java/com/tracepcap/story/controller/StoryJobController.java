@@ -1,5 +1,7 @@
 package com.tracepcap.story.controller;
 
+import com.tracepcap.governance.PermissionService;
+import com.tracepcap.governance.PermissionAction;
 import com.tracepcap.common.aijob.AiJobDto;
 import com.tracepcap.common.aijob.AiJobService;
 import com.tracepcap.common.exception.ResourceNotFoundException;
@@ -25,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Story Generation", description = "APIs for AI-powered network traffic story generation")
 public class StoryJobController {
 
+  private final PermissionService permissionService;
+
   private final AiJobService jobs;
   private final StoryService stories;
   private final FileRepository files;
@@ -35,6 +39,7 @@ public class StoryJobController {
       summary = "Write the story in the background",
       description = "Queues the story and returns at once with the job WAITING. Check on it at /ai-jobs/{id}: it ends DONE with the story as its result, or FAILED with why (CONTEXT_LENGTH_EXCEEDED carries the prompt to cut down). The current story stays until the new one is written. Asking again while one waits or runs returns that job.")
   public AiJobDto start(@PathVariable UUID fileId, @RequestBody(required = false) StoryJobRequest request) {
+    permissionService.require(PermissionAction.ASK_AI);
     FileEntity file =
         files.findById(fileId).orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
     StoryJobRequest r = request != null ? request : new StoryJobRequest();

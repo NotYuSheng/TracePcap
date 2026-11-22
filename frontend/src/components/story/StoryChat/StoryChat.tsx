@@ -1,6 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useRef, useEffect } from 'react';
 import { Button, Card, Form } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { chatService, type ChatTurn } from '@/features/chat/chatService';
 import { ChatToolsPopover } from './ChatToolsPopover';
@@ -84,6 +86,7 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
   }, [messages, working]);
 
   const busy = sending || working !== null;
+  const ai = usePermission('ASK_AI');
 
   const submit = async () => {
     const question = input.trim();
@@ -182,8 +185,12 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
       </div>
 
       <div className="story-chat-foot">
-        {error && <Alert variant="danger" className="small py-2 mb-2">{error}</Alert>}
-        {suggestions.length > 0 && !busy && (
+        {error && (
+          <Alert variant="danger" className="small py-2 mb-2">
+            {error}
+          </Alert>
+        )}
+        {suggestions.length > 0 && !busy && ai.allowed && (
           <div className="story-chat-suggestions">
             {suggestions.map((q, i) => (
               <button
@@ -206,12 +213,16 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
             as="textarea"
             size="sm"
             rows={2}
-            placeholder="Ask a question… (Enter to send)"
+            placeholder={
+              ai.allowed
+                ? 'Ask a question… (Enter to send)'
+                : "Your roles don't allow asking the AI"
+            }
             aria-label="Ask a question about this capture"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            disabled={busy}
+            disabled={busy || !ai.allowed}
             style={{ resize: 'none' }}
           />
           <Button
@@ -219,10 +230,11 @@ export const StoryChat = ({ fileId, networkId, suggestedQuestions, hasStory }: S
             size="sm"
             className="flex-shrink-0"
             onClick={() => void submit()}
-            disabled={busy || !input.trim()}
+            disabled={busy || !input.trim() || !ai.allowed}
           >
             {busy ? <Spinner animation="border" size="sm" /> : 'Ask'}
           </Button>
+          <PermissionLock action="ASK_AI" className="align-self-center" />
         </div>
       </div>
     </Card>

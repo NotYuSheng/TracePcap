@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import {
   adjudicationService,
   type AdjudicationOverride,
@@ -101,6 +103,9 @@ function LabelField({
  */
 export function AdjudicationPanel({ fileId, question, entityKey, title, verdict, onChanged, labelOptions }: Props) {
   const [override, setOverride] = useState<AdjudicationOverride | null>(null);
+  // Roles (#915): without Override an answer, the answer and its evidence stay visible, read-only.
+  const canOverride = usePermission('OVERRIDE_ANSWERS');
+  const locked = !canOverride.allowed;
   const [evidence, setEvidence] = useState<AdjudicationEvidence[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -253,11 +258,19 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
             className="py-0"
             style={{ fontSize: '0.75rem' }}
             onClick={() => { setOverriding(true); setOverrideLabel(''); }}
+            disabled={locked}
           >
             <i className="bi bi-pencil me-1" />I disagree
           </Button>
         )}
       </h6>
+      {locked && (
+        <p className="small text-muted mb-2" data-testid="override-locked">
+          <i className="bi bi-lock me-1" aria-hidden="true" />
+          You can see this answer and its evidence but not change them.
+          <PermissionLock action="OVERRIDE_ANSWERS" />
+        </p>
+      )}
 
       {loading && <div className="text-muted small fst-italic">Loading…</div>}
 
@@ -319,7 +332,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                     className="py-0"
                     style={{ fontSize: '0.72rem' }}
                     onClick={() => handleResolve(label)}
-                    disabled={busy}
+                    disabled={busy || locked}
                   >
                     <i className="bi bi-check2 me-1" />{label}
                   </Button>
@@ -331,7 +344,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                   className="py-0"
                   style={{ fontSize: '0.72rem' }}
                   onClick={() => { setOverriding(true); setOverrideLabel(''); }}
-                  disabled={busy}
+                  disabled={busy || locked}
                 >
                   <i className="bi bi-pencil me-1" />Other…
                 </Button>
@@ -366,7 +379,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                     onChanged();
                   })
                 }
-                disabled={busy}
+                disabled={busy || locked}
               >
                 <i className="bi bi-check-lg me-1" />Re-affirm “{override.label}”
               </Button>
@@ -387,7 +400,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 className="p-0 mt-1 text-muted"
                 style={{ fontSize: '0.72rem' }}
                 onClick={handleClearOverride}
-                disabled={busy}
+                disabled={busy || locked}
               >
                 <i className="bi bi-arrow-counterclockwise me-1" />Revert to machine verdict
               </Button>
@@ -413,10 +426,10 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 onChange={e => setOverrideRationale(e.target.value)}
               />
               <div className="d-flex gap-2">
-                <Button variant="primary" size="sm" className="py-0" style={{ fontSize: '0.75rem' }} onClick={handleSaveOverride} disabled={busy || !overrideLabel.trim()}>
+                <Button variant="primary" size="sm" className="py-0" style={{ fontSize: '0.75rem' }} onClick={handleSaveOverride} disabled={busy || locked || !overrideLabel.trim()}>
                   {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-floppy me-1" />Save override</>}
                 </Button>
-                <Button variant="outline-secondary" size="sm" className="py-0" style={{ fontSize: '0.75rem' }} onClick={() => setOverriding(false)} disabled={busy}>
+                <Button variant="outline-secondary" size="sm" className="py-0" style={{ fontSize: '0.75rem' }} onClick={() => setOverriding(false)} disabled={busy || locked}>
                   Cancel
                 </Button>
               </div>
@@ -456,6 +469,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                   className="p-0 text-muted"
                   style={{ fontSize: '0.72rem' }}
                   onClick={() => { setEditingEvidenceId(null); setEvLabel(''); setEvWeight(40); setEvReason(''); setAddingEvidence(true); }}
+                  disabled={locked}
                 >
                   <i className="bi bi-plus-circle me-1" />Add evidence
                 </Button>
@@ -468,13 +482,12 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                   <li key={ev.id}>
                     <strong>{ev.label}</strong> (+{ev.weight}) — {ev.reason}
                     <span className="fst-italic"> · {attributed(ev.actor)}</span>
-                    {ev.actor === me && (
+                    {ev.actor === me && !locked && (
                       <>
                         {' '}
                         <button
                           type="button"
                           aria-label="Edit evidence"
-                          title="Edit"
                           className="btn btn-link p-0 ms-1 text-muted align-baseline"
                           style={{ fontSize: 'inherit' }}
                           onClick={() => handleEditEvidence(ev)}
@@ -484,7 +497,6 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                         <button
                           type="button"
                           aria-label="Delete evidence"
-                          title="Delete"
                           className="btn btn-link p-0 ms-1 text-muted align-baseline"
                           style={{ fontSize: 'inherit' }}
                           onClick={() => handleDeleteEvidence(ev)}
@@ -554,10 +566,10 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="outline-secondary" size="sm" onClick={resetEvidenceForm} disabled={busy}>
+              <Button variant="outline-secondary" size="sm" onClick={resetEvidenceForm} disabled={busy || locked}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSaveEvidence} disabled={busy || !evLabel.trim() || !evReason.trim()}>
+              <Button variant="primary" size="sm" onClick={handleSaveEvidence} disabled={busy || locked || !evLabel.trim() || !evReason.trim()}>
                 {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-check-lg me-1" />{editingEvidenceId != null ? 'Save changes' : 'Add evidence'}</>}
               </Button>
             </Modal.Footer>

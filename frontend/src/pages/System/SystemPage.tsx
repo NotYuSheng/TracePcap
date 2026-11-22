@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card } from '@govtechsg/sgds-react';
 import { AnalysisRail, type RailItem } from '@pages/Analysis/AnalysisRail';
@@ -9,13 +10,8 @@ import { AddressDefaultsPanel } from './AddressDefaultsPanel';
 import { AuditLogPanel } from './AuditLogPanel';
 import { DetectionRulesPanel } from './DetectionRulesPanel';
 import { PermissionsPanel } from './PermissionsPanel';
-
-/** The Keycloak admin console's user list for this realm. Keycloak is proxied same-origin by default. */
-function keycloakUsersUrl(): string {
-  const authority = env.OIDC_AUTHORITY || `${window.location.origin}/realms/${env.OIDC_REALM}`;
-  const base = authority.replace(/\/realms\/[^/]+\/?$/, '');
-  return `${base}/admin/master/console/#/${env.OIDC_REALM}/users`;
-}
+import { UsersPanel } from './UsersPanel';
+import './SystemPage.css';
 
 /**
  * The Settings page: your own settings, and (#915) everything that applies to the whole install.
@@ -27,7 +23,7 @@ const TABS = [
   { key: 'system', title: 'System', short: 'System', icon: 'bi-sliders', group: 'This install' },
   { key: 'rules', title: 'Detection rules', short: 'Rules', icon: 'bi-shield-check' },
   { key: 'addresses', title: 'Address defaults', short: 'Addresses', icon: 'bi-signpost-split' },
-  { key: 'permissions', title: 'Permissions', short: 'Permissions', icon: 'bi-key' },
+  { key: 'roles', title: 'Roles', short: 'Roles', icon: 'bi-key' },
   { key: 'audit', title: 'Audit log', short: 'Audit', icon: 'bi-clock-history' },
   { key: 'users', title: 'Users', short: 'Users', icon: 'bi-people' },
 ] as const;
@@ -41,14 +37,26 @@ const RAIL_ITEMS: RailItem[] = TABS.map(t => ({
   group: 'group' in t ? t.group : undefined,
 }));
 
+/** A Settings section's content, in the app's standard card (no header: the title is above it). */
+function SectionCard({ bare, children }: { bare: boolean; children: ReactNode }) {
+  if (bare) return <>{children}</>;
+  return (
+    <Card>
+      <Card.Body>{children}</Card.Body>
+    </Card>
+  );
+}
+
 export function SystemPage() {
   const me = useMe();
   // The sections down the left, like a capture's analysis. The section is in the URL
   // (?tab=rules), so other pages can link straight to it.
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
-  // `?tab=settings` was the System tab before the two pages became one.
-  const asked = requested === 'settings' ? 'system' : requested;
+  // Older links: `?tab=settings` was the System tab before the two pages became one, and
+  // `?tab=permissions` the Roles tab before roles.
+  const asked =
+    requested === 'settings' ? 'system' : requested === 'permissions' ? 'roles' : requested;
   const tab: TabKey = TABS.some(t => t.key === asked) ? (asked as TabKey) : 'personal';
   const setTab = (key: TabKey) =>
     setParams(key === 'personal' ? {} : { tab: key }, { replace: true });
@@ -73,45 +81,33 @@ export function SystemPage() {
                 <>
                   {' '}
                   Signed in as <strong>{me.username}</strong>
-                  {me.authEnabled ? (me.admin ? ' (admin).' : ' (analyst).') : ' (login is off).'}
+                  {me.authEnabled
+                    ? me.roles.length
+                      ? ` (${me.roles.join(', ')}).`
+                      : '.'
+                    : ' (login is off).'}
                 </>
               )}
             </div>
           </div>
         </header>
         <div className="analysis-body">
-          <Card>
-            <Card.Header>
-              <h2 className="h6 mb-0" id={`system-tab-${tab}`}>
-                {current.title}
-              </h2>
-            </Card.Header>
-            <Card.Body id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
+          {/* The section's title sits on the page, and its content in the same SGDS Card the
+              Analysis and Monitor pages use (Roles lays out two cards of its own). */}
+          <section id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
+            <h2 className="settings-section-title" id={`system-tab-${tab}`}>
+              {current.title}
+            </h2>
+            <SectionCard bare={tab === 'roles'}>
               {tab === 'personal' && <PersonalSettingsTab />}
               {tab === 'system' && <SystemSettingsTab />}
               {tab === 'rules' && <DetectionRulesPanel />}
               {tab === 'addresses' && <AddressDefaultsPanel />}
-              {tab === 'permissions' && <PermissionsPanel />}
+              {tab === 'roles' && <PermissionsPanel />}
               {tab === 'audit' && <AuditLogPanel />}
               {tab === 'users' &&
                 (env.AUTH_ENABLED ? (
-                  <div className="small">
-                    <p>
-                      Users, passwords and the <strong>admin</strong> role are managed in Keycloak.
-                      To make someone an admin, open the user, then Role mapping, Assign role,
-                      Filter by clients, and pick{' '}
-                      <span className="font-monospace">{env.OIDC_CLIENT_ID}</span> admin.
-                    </p>
-                    <a
-                      href={keycloakUsersUrl()}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-outline-primary btn-sm"
-                    >
-                      <i className="bi bi-box-arrow-up-right me-1" aria-hidden="true" />
-                      Open users in Keycloak
-                    </a>
-                  </div>
+                  <UsersPanel />
                 ) : (
                   <p className="small text-muted mb-0">
                     Login is off, so there are no user accounts: everyone shares one profile and
@@ -119,8 +115,8 @@ export function SystemPage() {
                     described in the Authentication section of the docs.
                   </p>
                 ))}
-            </Card.Body>
-          </Card>
+            </SectionCard>
+          </section>
         </div>
       </div>
     </div>

@@ -200,8 +200,9 @@ tracepcap:
     # Backend-reachable JWKS URL; blank = discover from issuer-uri
     jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
     # Keycloak client whose roles TracePcap reads (resource_access.<client>.roles). Its client role
-    # `admin` marks an admin (#915). Matches the frontend's VITE_OIDC_CLIENT_ID default.
-    client-id: tracepcap-frontend
+    # `admin` marks an admin (#915). Must match the frontend's VITE_OIDC_CLIENT_ID; the prod
+    # overlays set both from KEYCLOAK_CLIENT_ID.
+    client-id: ${KEYCLOAK_CLIENT_ID:tracepcap}
     # With login off there are no roles: this decides whether admin-only actions (#915) are allowed
     # for everyone (true) or for no one (false, the default).
     system-settings-editable: ${SYSTEM_SETTINGS_EDITABLE:false}
@@ -260,9 +261,9 @@ tracepcap:
     enabled: ${GEO_ENRICHMENT_ENABLED:true}
     # Override the offline MMDB location; empty uses the copy bundled in the image.
     mmdb-path: ${GEO_MMDB_PATH:}
-    # When true, suppresses all ipinfo.io egress (connectivity probe + lookups) and resolves
-    # geo exclusively from the bundled MMDB. For air-gapped / egress-monitored deployments.
-    force-offline: ${GEO_FORCE_OFFLINE:false}
+    # True (the default) resolves geo from the bundled MMDB only: no ipinfo.io connectivity probe,
+    # no lookups, no runtime egress. False opts in to ipinfo.io (adds ASN/org) when reachable.
+    force-offline: ${GEO_FORCE_OFFLINE:true}
   intelligence:
     max-clusters: ${INTELLIGENCE_MAX_CLUSTERS:60}   # Max cluster nodes returned per groupBy request
     max-edges: ${INTELLIGENCE_MAX_EDGES:200}         # Max edges returned per groupBy request

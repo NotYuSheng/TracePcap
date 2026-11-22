@@ -8,7 +8,7 @@ const goal = (g: string, answered: boolean, headline: string | null = null): Goa
   answered,
   headline,
   grade: answered ? 'MEASURED' : null,
-  confidence: answered ? 0.9 : 0,
+  confidence: answered ? 90 : 0,
   basis: answered ? ['Suricata alert ET MALWARE'] : [],
   subjects: [],
 });

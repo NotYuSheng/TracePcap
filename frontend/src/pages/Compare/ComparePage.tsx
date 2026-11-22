@@ -3,6 +3,8 @@ import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Badge, Button, Card, Form } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { DEFAULT_DIAGRAM_NODES, NODE_LIMIT_PRESETS } from '@/features/network/hooks/useNetworkData';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -53,6 +55,7 @@ export const ComparePage = () => {
   // We hold off passing labels to useCompareData until names are resolved so that
   // the sources tags on nodes/edges match what the toggle buttons display.
   const [fileNames, setFileNames] = useState<string[] | null>(null);
+  const report = usePermission('DOWNLOAD_REPORT');
 
   useEffect(() => {
     if (fileIds.length < 2) return;
@@ -383,7 +386,7 @@ export const ComparePage = () => {
             variant="outline-primary"
             size="sm"
             onClick={handleDownloadReport}
-            disabled={reportLoading}
+            disabled={reportLoading || !report.allowed}
           >
             {reportLoading ? (
               <>
@@ -397,6 +400,7 @@ export const ComparePage = () => {
               </>
             )}
           </Button>
+          <PermissionLock action="DOWNLOAD_REPORT" />
           {reportError && <small className="text-danger">{reportError}</small>}
         </div>
       </div>

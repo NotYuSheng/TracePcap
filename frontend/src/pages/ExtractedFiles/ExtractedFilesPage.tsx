@@ -15,6 +15,8 @@ import { Pagination } from '@components/common/Pagination/Pagination';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { PermissionLock } from '@components/common/PermissionLock';
+import { usePermission } from '@/features/me/useMe';
 import { SideDrawer, FilterDrawerFooter, FilterPillCount } from '@components/common/SideDrawer';
 import { Alert } from '@components/common/Alert';
 import { formatBytes } from '@/utils/formatters';
@@ -217,6 +219,7 @@ export const ExtractedFilesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDownload, setPendingDownload] = useState<ExtractedFile | null>(null);
+  const exportPackets = usePermission('EXPORT_PACKETS');
   const [previewFile, setPreviewFile] = useState<ExtractedFile | null>(null);
   const [sortBy, setSortBy] = useState<SortField | ''>('');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -586,10 +589,12 @@ export const ExtractedFilesPage = () => {
                               size="sm"
                               className="text-nowrap"
                               onClick={() => handleDownloadRequest(file)}
+                              disabled={!exportPackets.allowed}
                             >
                               <i className="bi bi-download me-1"></i>
                               Download
                             </Button>
+                            <PermissionLock action="EXPORT_PACKETS" className="align-self-center" />
                           </div>
                         )}
                       </td>
@@ -751,6 +756,7 @@ export const ExtractedFilesPage = () => {
           <Button
             variant="outline-primary"
             onClick={() => { setPreviewFile(null); handleDownloadRequest(previewFile!); }}
+            disabled={!exportPackets.allowed}
           >
             <i className="bi bi-download me-1"></i>
             Download
