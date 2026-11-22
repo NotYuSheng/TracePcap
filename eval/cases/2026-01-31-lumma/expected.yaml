@@ -1,0 +1,29 @@
+# Ground truth from the exercise's published answer key (2026-01-31-traffic-analysis-exercise-answers.pdf),
+# NOT from TracePcap's output.
+case_id: 2026-01-31-lumma
+title: "Lumma in the Room-ah!"
+source: https://www.malware-traffic-analysis.net/2026/01/31/index.html
+
+victim:
+  # The key's "Victim Details" says 10.1.28.58, but its LAN range (10.1.21.0/24), its hints and
+  # every screenshot say 10.1.21.58: a typo in the key. The capture agrees with 10.1.21.58.
+  ip: 10.1.21.58
+  mac: "00:21:5d:c8:0e:f2"
+  hostname: DESKTOP-ES9F3ML
+user:
+  account: gwyatt
+  real_name: Gabriel Wyatt      # from an SMB/SAMR QueryUserInfo reply, not LDAP
+malware:
+  family: Lumma Stealer
+c2:
+  - ip: 153.92.1.49
+    port: 80                    # whitepepper.su; also 443
+    proto: TCP
+# Also in the key, not scored today: the alert's domain whitepepper.su, and follow-up HTTPS to
+# holiday-forever.cc (80.97.160.24) and communicationfirewall-security.cc (104.21.9.36).
+#
+# Scored as confidently wrong, and kept that way: TracePcap also names 62.72.32.156 as a C2. The
+# victim did connect to it (TLS, SNI whooptm.cyou, answered, ~9.6 KB back) two seconds before the
+# whitepepper.su traffic, and ET sid 2066851 calls whooptm.cyou a Lumma Stealer domain. It is likely
+# a second Lumma server the key doesn't mention, but the key is the ground truth here, so it isn't
+# added from TracePcap's own output.

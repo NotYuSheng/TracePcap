@@ -1,0 +1,21 @@
+# Ground truth from the exercise's published answer key, NOT from TracePcap's output.
+case_id: 2024-08-15-warmcookie
+title: "WarmCookie"
+source: https://www.malware-traffic-analysis.net/2024/08/15/index.html
+
+victim:
+  ip: 10.8.15.133
+  mac: "00:1c:bf:03:54:82"
+  hostname: DESKTOP-H8ALZBV
+user:
+  account: plucero
+  real_name: Pierce Lucero
+malware:
+  family: WarmCookie
+c2:
+  - ip: 72.5.43.29
+    port: 80
+    proto: TCP
+# Also in the key, not scored today: ZIP from quote.checkfedexexp.com (104.21.55.70), follow-up
+# business.checkfedexexp.com (172.67.170.169), DLL from 72.5.43.29 with SHA256
+# b7aec5f73d2a6bbd8cd920edb4760e2edadc98c3a45bf4fa994d47ca9cbd02f6.

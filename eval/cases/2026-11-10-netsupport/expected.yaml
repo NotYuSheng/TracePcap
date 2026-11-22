@@ -1,0 +1,19 @@
+# Ground truth from the exercise's published answer key, NOT from TracePcap's output.
+case_id: 2026-11-10-netsupport
+title: "The Lucky Turkey"
+source: https://www.malware-traffic-analysis.net/2026/11/10/index.html
+
+victim:
+  ip: 10.11.10.147
+  mac: "00:12:f0:e5:17:43"
+  hostname: DESKTOP-5OMVI3L
+user:
+  account: edward.winslow
+malware:
+  family: NetSupport RAT
+c2:
+  - ip: 93.152.209.36
+    port: 443                   # plain HTTP POSTs on port 443
+    proto: TCP
+# Also in the key, not scored today: NetSupport traffic started 2026-11-10 18:22:07 UTC; the
+# loader came from vericheckusgo.com and 96.62.224.200 (/5555.mp4).

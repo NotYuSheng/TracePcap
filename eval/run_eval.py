@@ -51,13 +51,19 @@ PCAP_SEARCH_DIRS = [EVAL_DIR / "pcaps", REPO_ROOT / "backend" / "target" / "ctf-
 CORRECT, MISSED, WRONG, NA = "correct", "missed", "wrong", "n/a"
 
 
+def auth_headers() -> dict:
+    """With login on, set TRACEPCAP_TOKEN to an access token; it's sent as a bearer token."""
+    token = os.environ.get("TRACEPCAP_TOKEN")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 class ApiError(Exception):
     """A failure talking to the stack, with a message that says what actually went wrong."""
 
 
 # --------------------------------------------------------------------------- HTTP helpers
 def http_get_json(url: str, timeout: int = 60):
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    req = urllib.request.Request(url, headers={"Accept": "application/json", **auth_headers()})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -121,6 +127,7 @@ def upload_and_wait(api_base: str, pcap_path: Path, expected_sha256: str | None,
     with tempfile.NamedTemporaryFile(suffix=".json") as body:
         out = subprocess.run(
             ["curl", "-sS", "-o", body.name, "-w", "%{http_code}", "-X", "POST",
+             *[arg for k, v in auth_headers().items() for arg in ("-H", f"{k}: {v}")],
              f"{api_base}/files", "-F", f"file=@{pcap_path}"],
             capture_output=True, text=True, timeout=300,
         )

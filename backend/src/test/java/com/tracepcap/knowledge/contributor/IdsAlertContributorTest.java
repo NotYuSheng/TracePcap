@@ -136,4 +136,45 @@ class IdsAlertContributorTest {
           assertThat(r.to()).isEqualTo(EntityRef.external("141.98.10.79"));
         });
   }
+
+  // ── Family from the rule's malware_family tag ───────────────────────────────
+
+  private static final com.tracepcap.analysis.spi.IdsRuleMetadata ET =
+      sid ->
+          java.util.Optional.ofNullable(
+              java.util.Map.of(
+                      2066606L, new com.tracepcap.analysis.spi.IdsRuleMetadata.RuleInfo(true, "Lumma Stealer"),
+                      2052557L, new com.tracepcap.analysis.spi.IdsRuleMetadata.RuleInfo(true, "WARMCOOKIE"),
+                      2052558L, new com.tracepcap.analysis.spi.IdsRuleMetadata.RuleInfo(true, null),
+                      2059607L, new com.tracepcap.analysis.spi.IdsRuleMetadata.RuleInfo(true, null))
+                  .get(sid));
+
+  @Test
+  void theRulesOwnTag_namesTheFamily_evenInMixedCase() {
+    // The message reading missed this one: "Lumma Stealer" isn't all capitals.
+    assertThat(new IdsAlertContributor(ET).malwareFamily(
+            "ET MALWARE Lumma Stealer Victim Fingerprinting Activity (sid:2066606 sev:1)"))
+        .isEqualTo("Lumma Stealer");
+  }
+
+  @Test
+  void anAllCapsTag_takesTheMessagesSpelling() {
+    assertThat(new IdsAlertContributor(ET).malwareFamily(
+            "ET MALWARE BadSpace/WarmCookie CnC Activity (GET) M1 (sid:2052557 sev:1)"))
+        .isEqualTo("WarmCookie");
+  }
+
+  @Test
+  void aTaggedRuleWithoutAFamily_namesNone_ratherThanGuessing() {
+    // Was a spurious "Badspace" next to WarmCookie, and a lure is not a family.
+    IdsAlertContributor c = new IdsAlertContributor(ET);
+    assertThat(c.malwareFamily("ET MALWARE W32/Badspace.Backdoor CnC Activity (POST) (sid:2052558 sev:1)")).isNull();
+    assertThat(c.malwareFamily("ET MALWARE Fake Microsoft Teams CnC Payload Request (GET) (sid:2059607 sev:1)")).isNull();
+  }
+
+  @Test
+  void aRuleTheRulesetDoesntKnow_fallsBackToTheMessage() {
+    assertThat(new IdsAlertContributor(ET).malwareFamily("ET MALWARE STRRAT CnC Checkin (sid:9999999 sev:1)"))
+        .isEqualTo("STRRAT");
+  }
 }

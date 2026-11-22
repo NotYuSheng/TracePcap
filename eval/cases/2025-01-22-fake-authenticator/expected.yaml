@@ -1,0 +1,18 @@
+# Ground truth from the exercise's published answer key, NOT from TracePcap's output.
+case_id: 2025-01-22-fake-authenticator
+title: "Download from fake software site"
+source: https://www.malware-traffic-analysis.net/2025/01/22/index.html
+
+victim:
+  ip: 10.1.17.215
+  mac: "00:d0:b7:26:4a:74"
+  hostname: DESKTOP-L8C5GSJ
+user:
+  account: shutchenson
+# malware.family: the key says "I'm not sure what this malware is called", so it isn't scored.
+c2:
+  - ip: 5.252.153.241
+  - ip: 45.125.66.32
+  - ip: 45.125.66.252
+# Also in the key, not scored today: the fake Google Authenticator page authenticatoor.org
+# (reached via google-authenticator.burleson-appliance.net, from a Bing ad).
