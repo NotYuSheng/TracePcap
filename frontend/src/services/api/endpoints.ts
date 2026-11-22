@@ -145,6 +145,8 @@ export const API_ENDPOINTS = {
   SYSTEM_LIMITS: '/system/limits',
   LLM_TEST: '/system/llm/test',
   SYSTEM_SURICATA: '/system/suricata',
+  PROTOCOL_USAGE: '/protocol-usage',
+  PROTOCOL_USAGE_CAPTURES: (appName: string) => `/protocol-usage/${encodeURIComponent(appName)}/captures`,
   SYSTEM_SETTINGS: '/system/settings',
   SYSTEM_SETTING: (key: string) => `/system/settings/${key}`,
   PREFERENCES: '/preferences',

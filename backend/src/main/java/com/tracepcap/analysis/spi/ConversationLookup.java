@@ -282,6 +282,19 @@ public interface ConversationLookup {
   long conversationCount(UUID fileId);
 
   /**
+   * How many captures and conversations each nDPI application name appears in, across the install.
+   * Counts original captures only: a re-analysis is a copy, and would count the same traffic twice.
+   */
+  record AppUsage(String appName, long captures, long conversations) {}
+
+  List<AppUsage> appUsage();
+
+  /** The captures (originals) an nDPI application name appears in, most conversations first. */
+  record AppCapture(UUID fileId, String fileName, long conversations) {}
+
+  List<AppCapture> appCaptures(String appName, int limit);
+
+  /**
    * How many conversations carry at least one nDPI flow risk — the same predicate as {@link
    * #atRiskConversations}, and like it, nDPI risks only.
    */

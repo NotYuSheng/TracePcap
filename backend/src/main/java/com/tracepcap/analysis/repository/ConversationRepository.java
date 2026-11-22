@@ -811,4 +811,23 @@ public interface ConversationRepository
               + " AND conversation_id IS NOT NULL GROUP BY detected_file_type",
       nativeQuery = true)
   List<Object[]> countByFileType(@Param("fileId") UUID fileId);
+
+  /** nDPI app name, captures it's in, conversations; original captures only (#protocol reference). */
+  @Query(
+      value =
+          "SELECT c.app_name, count(DISTINCT c.file_id), count(*) FROM conversations c"
+              + " JOIN files f ON f.id = c.file_id"
+              + " WHERE c.app_name IS NOT NULL AND btrim(c.app_name) <> '' AND f.is_version = false"
+              + " GROUP BY c.app_name",
+      nativeQuery = true)
+  List<Object[]> appUsage();
+
+  /** The original captures an nDPI app name appears in: id, name, conversations; most first. */
+  @Query(
+      value =
+          "SELECT f.id, f.file_name, count(*) FROM conversations c JOIN files f ON f.id = c.file_id"
+              + " WHERE c.app_name = :app AND f.is_version = false"
+              + " GROUP BY f.id, f.file_name ORDER BY count(*) DESC, f.file_name LIMIT :lim",
+      nativeQuery = true)
+  List<Object[]> appCaptures(@Param("app") String app, @Param("lim") int limit);
 }

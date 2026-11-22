@@ -4421,6 +4421,22 @@
         },
         "type": "object"
       },
+      "ProtocolCaptureDto": {
+        "properties": {
+          "conversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ProtocolRiskEntry": {
         "properties": {
           "atRisk": {
@@ -4468,6 +4484,22 @@
               "$ref": "#/components/schemas/ProtocolStat"
             },
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolUsageDto": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "captures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "conversations": {
+            "format": "int64",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -13322,6 +13354,75 @@
         ]
       }
     },
+    "/api/v1/protocol-usage": {
+      "get": {
+        "description": "Counts original captures only; a re-analysis is a copy of one.",
+        "operationId": "usage",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProtocolUsageDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Every nDPI application name in your captures, with how many captures and conversations",
+        "tags": [
+          "Protocol usage"
+        ]
+      }
+    },
+    "/api/v1/protocol-usage/{appName}/captures": {
+      "get": {
+        "operationId": "captures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProtocolCaptureDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The captures an nDPI application name appears in, most conversations first",
+        "tags": [
+          "Protocol usage"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "list_2",
@@ -14691,6 +14792,10 @@
     {
       "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",
       "name": "Host Identities"
+    },
+    {
+      "description": "Which nDPI protocols appear in your captures, and where",
+      "name": "Protocol usage"
     },
     {
       "description": "AI-generated insights for a monitored network",

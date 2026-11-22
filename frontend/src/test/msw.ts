@@ -19,6 +19,8 @@ import { setupServer } from 'msw/node'
  * A test can still override them with `server.use(...)`.
  */
 const defaults = [
+  // The protocol reference's "seen in your captures" counts.
+  http.get('*/protocol-usage', () => HttpResponse.json([])),
   // The Suricata ruleset note (#600) appears beside alerts on several pages.
   http.get('*/system/suricata', () =>
     HttpResponse.json({
