@@ -149,8 +149,7 @@
 }
 @media (max-width: 575.98px) {
   .captures-status-col,
-  .captures-status-cell,
-  .captures-table .captures-open {
+  .captures-status-cell {
     display: none;
   }
   .captures-table .captures-status-inline {

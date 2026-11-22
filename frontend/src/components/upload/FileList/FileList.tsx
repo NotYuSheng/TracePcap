@@ -11,7 +11,7 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import { formatBytes } from '@/utils/formatters';
-import { actionOf, EXPIRING_WITHIN_MS, expiresAt, notesOf, statusOf } from './fileStatus';
+import { EXPIRING_WITHIN_MS, expiresAt, notesOf, statusOf } from './fileStatus';
 import {
   captureKeepService,
   EXTEND_DAYS,
@@ -489,6 +489,9 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         )}
                         {' · '}
                         {ago(uploaded, now)}
+                        {file.uploadedBy && file.uploadedBy !== 'system' && (
+                          <span data-testid="capture-uploader"> · by {file.uploadedBy}</span>
+                        )}
                       </div>
                       {notes.length > 0 && (
                         <div className="file-notes">
@@ -520,7 +523,8 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                       )}
                     </td>
                     <td className="text-end text-nowrap">
-                      {status.key === 'expiring' ? (
+                      {/* The capture's name opens it; a button here only when there's something else to do. */}
+                      {status.key === 'expiring' && keep.allowed && (
                         <Button
                           variant="outline-warning"
                           size="sm"
@@ -528,13 +532,6 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         >
                           Keep 7 days longer
                         </Button>
-                      ) : (
-                        <Link
-                          to={`/analysis/${file.fileId}`}
-                          className="btn btn-outline-secondary btn-sm captures-open"
-                        >
-                          {actionOf(status.key)}
-                        </Link>
                       )}
                       <Dropdown align="end" className="d-inline-block ms-2">
                         <Dropdown.Toggle

@@ -30,6 +30,13 @@ export interface ActivityFile {
   keepForever?: boolean;
   /** Its own deletion time (#1139), which replaces the retention window. */
   expiresAt?: string | number[] | null;
+  /** Who uploaded it; null for captures from before uploaders were recorded. */
+  uploadedBy?: string | null;
+}
+
+/** " · by ana", or nothing when the uploader isn't known (or is the shared login-off profile). */
+function byWhom(f: ActivityFile): string {
+  return f.uploadedBy && f.uploadedBy !== 'system' ? ` · by ${f.uploadedBy}` : '';
 }
 
 export type Tone = 'done' | 'busy' | 'failed' | 'warn' | 'change';
@@ -86,7 +93,12 @@ export function buildActivity(
         tone: 'done',
         text: f.source === 'MONITOR' ? 'Snapshot analysed:' : 'Analysed',
         link: { label: f.fileName, to },
-        meta: f.packetCount != null ? `${f.packetCount.toLocaleString()} packets` : undefined,
+        meta:
+          f.packetCount != null
+            ? `${f.packetCount.toLocaleString()} packets${byWhom(f)}`
+            : byWhom(f)
+              ? `Uploaded${byWhom(f)}`
+              : undefined,
       });
       // Its own expiry if it has one, else the install's retention window from upload.
       const own = ownExpiry(f.expiresAt);
@@ -115,6 +127,7 @@ export function buildActivity(
         tone: 'failed',
         text: 'Analysis failed:',
         link: { label: f.fileName, to },
+        meta: byWhom(f) ? `Uploaded${byWhom(f)}` : undefined,
       });
     } else {
       events.push({
@@ -123,6 +136,7 @@ export function buildActivity(
         tone: 'busy',
         text: 'Analysing',
         link: { label: f.fileName, to },
+        meta: byWhom(f) ? `Uploaded${byWhom(f)}` : undefined,
       });
     }
   }

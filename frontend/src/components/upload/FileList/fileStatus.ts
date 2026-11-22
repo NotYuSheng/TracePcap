@@ -127,16 +127,3 @@ export function notesOf(file: StatusFile, ctx: StatusContext): CaptureNote[] {
   return notes;
 }
 
-/** What the row's button does for each status. */
-export function actionOf(key: StatusKey): string {
-  switch (key) {
-    case 'queued':
-    case 'analysing':
-      return 'Watch';
-    case 'failed':
-      return 'See why';
-    case 'expiring':
-    case 'ready':
-      return 'Open';
-  }
-}

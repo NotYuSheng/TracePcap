@@ -18,6 +18,7 @@ const files = Array.from({ length: 60 }, (_, i) => ({
   status: 'COMPLETED',
   source: 'ANALYSIS',
   favourite: i === 0,
+  uploadedBy: i === 1 ? 'ana' : i === 2 ? 'system' : undefined,
 }))
 
 function serve(favourites: string[] = []) {
@@ -79,5 +80,16 @@ describe('FileList', () => {
     fireEvent.click(star)
     await waitFor(() => expect(favourites).toEqual([files[1].fileId]))
     expect(screen.getByRole('button', { name: 'Unfavourite cap-1.pcap' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('says who uploaded a capture, and has no separate Open button (the name opens it)', async () => {
+    serve()
+    renderList()
+    await screen.findByRole('link', { name: 'cap-1.pcap' })
+    const uploaders = screen.getAllByTestId('capture-uploader')
+    expect(uploaders).toHaveLength(1)
+    expect(uploaders[0]).toHaveTextContent('by ana')
+    // The row's own action button is gone; Open stays in the row's ⋯ menu.
+    expect(document.querySelector('.captures-open')).toBeNull()
   })
 })
