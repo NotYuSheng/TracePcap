@@ -559,6 +559,16 @@ public interface ConversationRepository
         predicates.add(root.get("category").in(params.getCategories()));
       }
 
+      // Connection outcome (#1233); UNKNOWN selects the conversations without one.
+      if (params.getOutcomes() != null && !params.getOutcomes().isEmpty()) {
+        List<String> known =
+            params.getOutcomes().stream().filter(o -> !"UNKNOWN".equals(o)).toList();
+        List<Predicate> any = new java.util.ArrayList<>();
+        if (!known.isEmpty()) any.add(root.get("connectionOutcome").in(known));
+        if (params.getOutcomes().contains("UNKNOWN")) any.add(cb.isNull(root.get("connectionOutcome")));
+        predicates.add(cb.or(any.toArray(new Predicate[0])));
+      }
+
       // Has flow risks, custom signature, or Suricata IDS alert matches
       if (Boolean.TRUE.equals(params.getHasRisks())) {
         predicates.add(
@@ -762,6 +772,14 @@ public interface ConversationRepository
               + " AND category IS NOT NULL AND category <> '' GROUP BY category",
       nativeQuery = true)
   List<Object[]> countByCategory(@Param("fileId") UUID fileId);
+
+  /** Conversations per connection outcome (#1233); those without one are counted as UNKNOWN. */
+  @Query(
+      value =
+          "SELECT coalesce(connection_outcome, 'UNKNOWN'), count(*) FROM conversations"
+              + " WHERE file_id = :fileId GROUP BY 1",
+      nativeQuery = true)
+  List<Object[]> countByConnectionOutcome(@Param("fileId") UUID fileId);
 
   @Query(
       value =

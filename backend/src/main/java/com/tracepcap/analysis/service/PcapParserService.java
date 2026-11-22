@@ -131,7 +131,9 @@ public class PcapParserService {
             "-e",
             "tcp.flags.syn",
             "-e",
-            "tcp.flags.ack");
+            "tcp.flags.ack",
+            "-e",
+            "tcp.flags.reset");
     pb.redirectErrorStream(false);
 
     // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
@@ -198,8 +200,8 @@ public class PcapParserService {
           //
           // Tail layout, from the end: tcp.payload, udp.payload, ip.ttl, eth.src,
           // arp.src.proto_ipv4, arp.dst.proto_ipv4, eth.dst, arp.src.hw_mac, frame.number,
-          // tcp.flags.syn, tcp.flags.ack.
-          final int TAIL = 11; // structured fields emitted after _ws.col.Info
+          // tcp.flags.syn, tcp.flags.ack, tcp.flags.reset.
+          final int TAIL = 12; // structured fields emitted after _ws.col.Info
           final int n = f.length;
           // 11 head fields + Info (>=1 column) + TAIL fields. A shorter row is malformed/truncated;
           // treat its post-Info fields as absent rather than risk reading a head field as a tail one.
@@ -224,27 +226,27 @@ public class PcapParserService {
             info = f[11];
           }
 
-          String tcpPayloadField = aligned ? f[n - 11] : "";
-          String udpPayloadField = aligned ? f[n - 10] : "";
+          String tcpPayloadField = aligned ? f[n - 12] : "";
+          String udpPayloadField = aligned ? f[n - 11] : "";
 
           // First-seen TTL for the source IP — best-effort, may be absent.
           Integer ttl = null;
-          if (aligned && !f[n - 9].isEmpty()) {
+          if (aligned && !f[n - 10].isEmpty()) {
             try {
-              ttl = Integer.parseInt(firstValue(f[n - 9]));
+              ttl = Integer.parseInt(firstValue(f[n - 10]));
             } catch (NumberFormatException ignored) {
             }
           }
-          String srcMac = aligned && !f[n - 8].isEmpty() ? firstValue(f[n - 8]).toLowerCase() : null;
+          String srcMac = aligned && !f[n - 9].isEmpty() ? firstValue(f[n - 9]).toLowerCase() : null;
 
           // Layer-2 address fallback for non-IP protocols (ARP, STP, LLDP, CDP, etc.).
           // For ARP: use the embedded protocol (IP) addresses from the ARP payload.
           // For other pure L2 frames: use Ethernet MAC addresses as node identifiers.
-          String arpSrcIp = aligned && !f[n - 7].isEmpty() ? firstValue(f[n - 7]) : null;
-          String arpDstIp = aligned && !f[n - 6].isEmpty() ? firstValue(f[n - 6]) : null;
-          String dstMac = aligned && !f[n - 5].isEmpty() ? firstValue(f[n - 5]).toLowerCase() : null;
+          String arpSrcIp = aligned && !f[n - 8].isEmpty() ? firstValue(f[n - 8]) : null;
+          String arpDstIp = aligned && !f[n - 7].isEmpty() ? firstValue(f[n - 7]) : null;
+          String dstMac = aligned && !f[n - 6].isEmpty() ? firstValue(f[n - 6]).toLowerCase() : null;
           // ARP sender hardware address — the "I own this IP at this MAC" claim.
-          String arpSrcMac = aligned && !f[n - 4].isEmpty() ? firstValue(f[n - 4]).toLowerCase() : null;
+          String arpSrcMac = aligned && !f[n - 5].isEmpty() ? firstValue(f[n - 5]).toLowerCase() : null;
           // Belt-and-suspenders: these embedded IPs can become a node id and persist to a
           // varchar(45) column (e.g. ip_mac_observations.ip), so cap them like srcIp/dstIp above.
           if (arpSrcIp != null && arpSrcIp.length() > 45) arpSrcIp = arpSrcIp.substring(0, 45);
@@ -379,13 +381,15 @@ public class PcapParserService {
             // SYN without ACK — the two trailing fields, read from the end for the same reason
             // frame.number is (an Info-column '|' must not shift them). Guarded on length so a row
             // that somehow lacks the flag columns skips this rather than indexing out of bounds.
-            if (conv.getInitiatorIp() == null
-                && f.length >= 3
-                && "1".equals(f[f.length - 2])
-                && !"1".equals(f[f.length - 1])) {
+            boolean syn = f.length >= 4 && "1".equals(f[f.length - 3]);
+            boolean ack = f.length >= 4 && "1".equals(f[f.length - 2]);
+            boolean rst = f.length >= 4 && "1".equals(f[f.length - 1]);
+            if (conv.getInitiatorIp() == null && syn && !ack) {
               conv.setInitiatorIp(fSrcIp);
               conv.setInitiatorPort(fSrcPort);
             }
+            // How the connection went (#1233), from the handshake. Only TCP has one.
+            if (!tcpSport.isEmpty()) conv.observeTcp(fSrcIp, fSrcPort, syn, ack, rst);
 
             // Extract payload hex from tcp.payload / udp.payload (both read tail-relative above, for
             // the same reason as the other post-Info fields — a '|' in Info must not shift them).
@@ -402,7 +406,7 @@ public class PcapParserService {
             // shift every fixed index, and appending syn/ack already moved frame.number off the last
             // slot once — reading from the tail is what keeps that from silently corrupting data.
             long frameNumber = packetNumber;
-            String rawFrame = f.length >= 3 ? f[f.length - 3] : null;
+            String rawFrame = f.length >= 4 ? f[f.length - 4] : null;
             if (rawFrame != null && !rawFrame.isEmpty()) {
               try {
                 frameNumber = Long.parseLong(rawFrame.trim());
@@ -756,6 +760,24 @@ public class PcapParserService {
      * back from the database by this id instead.
      */
     private UUID entityId;
+
+    /** The handshake as seen so far (#1233); TCP conversations only. */
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
+    private TcpHandshake handshake;
+
+    /** Feeds one TCP packet's flags to the handshake. */
+    public void observeTcp(String srcIp, Integer srcPort, boolean syn, boolean ack, boolean rst) {
+      if (handshake == null) handshake = new TcpHandshake();
+      handshake.observe(srcIp, srcPort, syn, ack, rst);
+    }
+
+    /** How the connection went, or null when unknown (not TCP, or the SYN wasn't captured). */
+    public TcpHandshake.Outcome getConnectionOutcome() {
+      return handshake == null ? null : handshake.outcome();
+    }
   }
 
   // ---------------------------------------------------------------------------

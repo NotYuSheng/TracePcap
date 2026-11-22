@@ -74,6 +74,8 @@ export interface Conversation {
   ja4Client?: string;
   /** Negotiated TLS version, e.g. "TLS 1.2", from Suricata (#599). */
   tlsVersion?: string;
+  /** How the TCP connection went (#1233): ANSWERED, NO_ANSWER, REJECTED; absent when unknown. */
+  connectionOutcome?: string | null;
   tlsIssuer?: string;
   tlsSubject?: string;
   tlsNotBefore?: number;

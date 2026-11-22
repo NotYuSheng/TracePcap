@@ -72,6 +72,14 @@ public class ConversationEntity {
   @Column(name = "dst_mac", length = 50)
   private String dstMac;
 
+  /**
+   * How the TCP connection went (#1233): ANSWERED, NO_ANSWER or REJECTED, from the handshake
+   * ({@link com.tracepcap.analysis.service.TcpHandshake}). Null when unknown: not TCP, or the
+   * capture joined after the SYN.
+   */
+  @Column(name = "connection_outcome", length = 16)
+  private String connectionOutcome;
+
   @Column(name = "initiator_port")
   private Integer initiatorPort;
 

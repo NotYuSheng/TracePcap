@@ -134,6 +134,32 @@ by the capturing host's clock at the moment each packet was recorded. They do
 not reflect any clock synchronisation — if the capture machine's clock was
 skewed, all timestamps will be skewed equally.
 
+Connection Outcome
+~~~~~~~~~~~~~~~~~~
+
+For TCP conversations, the parser reads the handshake as the packets go by and
+records how the connection went:
+
+- **Answered**: the server replied with SYN+ACK. Also counted as answered: the
+  client sending plain ACKs or data after its SYN, or the server sending
+  anything but a reset. Both only happen on an open connection, so a capture that
+  missed the SYN+ACK, or saw only the client's direction, isn't mistaken for a
+  failure.
+- **No answer**: SYNs went out and nothing came back (Zeek's ``S0``).
+- **Refused**: the server sent a reset instead of SYN+ACK (Zeek's ``REJ``).
+- **Unknown**: not TCP, or the capture started after the SYN.
+
+There is deliberately no "reset" outcome. Many ordinary connections end with a
+reset (82 of 210 on a real Windows-domain capture), so it would flag normal
+traffic. A connection that was answered and later reset is *Answered*.
+
+Many unanswered or refused connections from one host usually mean a scan; one
+host retrying a single silent server can be a dead command-and-control server or
+a misconfiguration. The counts and the most-tried failed targets are passed to
+the AI story. A SYN in the last moments of a capture, whose reply wasn't
+recorded, reads as *No answer*. Captures analysed before this existed show
+*Unknown* until re-analysed.
+
 Payload Storage
 ~~~~~~~~~~~~~~~
 
@@ -285,6 +311,10 @@ with AND logic — a conversation must satisfy all active filters to be shown.
    * - **Category** (pills)
      - The nDPI traffic category (e.g. Web, Media, VPN, Social Network).
        Multiple selections are OR-matched.
+   * - **Connection outcome** (pills)
+     - How the TCP connection went: Answered, No answer, Refused, or Unknown
+       (see `Connection Outcome`_). Multiple selections are OR-matched. Shown
+       once the capture has outcomes. URL parameter ``outcomes``.
    * - **File Types** (pills)
      - Shows only conversations containing at least one packet where a file
        magic-byte signature was detected in the stored 64-byte payload

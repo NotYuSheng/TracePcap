@@ -65,7 +65,20 @@ public interface ConversationLookup {
       LocalDateTime startTime,
       LocalDateTime endTime,
       String srcMac,
-      String dstMac) {
+      String dstMac,
+      String connectionOutcome) {
+
+    /**
+     * Without the connection outcome (#1233): unknown. {@code connectionOutcome} is ANSWERED,
+     * NO_ANSWER or REJECTED for TCP, null when not TCP or the SYN wasn't captured.
+     */
+    public FlowIdentity(
+        String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp,
+        Integer initiatorPort, String protocol, long packetCount, long totalBytes,
+        LocalDateTime startTime, LocalDateTime endTime, String srcMac, String dstMac) {
+      this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
+          totalBytes, startTime, endTime, srcMac, dstMac, null);
+    }
 
     /** Without each side's MAC (#462): they default to unknown. */
     public FlowIdentity(
@@ -73,7 +86,7 @@ public interface ConversationLookup {
         Integer initiatorPort, String protocol, long packetCount, long totalBytes,
         LocalDateTime startTime, LocalDateTime endTime) {
       this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
-          totalBytes, startTime, endTime, null, null);
+          totalBytes, startTime, endTime, null, null, null);
     }
 
     /** The MAC on {@code ip}'s side of the flow, when recorded (#462). */
@@ -219,7 +232,8 @@ public interface ConversationLookup {
       Map<String, Long> customSignatures,
       Map<String, Long> suricataAlerts,
       Map<String, Long> countries,
-      Map<String, Long> deviceTypes) {}
+      Map<String, Long> deviceTypes,
+      Map<String, Long> outcomes) {}
 
   /** Per-value conversation counts for every filter facet, aggregated in the database. */
   FacetCounts facetCounts(UUID fileId);

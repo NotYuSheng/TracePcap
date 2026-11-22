@@ -25,6 +25,7 @@ import { HostDetailModal } from '@components/common/EntityDetailModal';
 import { isPrivateIp } from '@/utils/ipClassification';
 import type { DeviceType } from '@/types';
 import './ConversationDetail.css';
+import { CONNECTION_OUTCOME_WORDS } from '@/features/conversation/connectionOutcome';
 
 interface ConversationDetailProps {
   conversation: Conversation;
@@ -458,6 +459,14 @@ export const ConversationDetail = ({
                 <dt>Packets</dt><dd>{conversation.packetCount.toLocaleString()}</dd>
                 <dt>Bytes</dt><dd>{formatBytes(conversation.totalBytes)}</dd>
                 <dt>Start</dt><dd>{formatTimestamp(conversation.startTime)}</dd>
+                {conversation.connectionOutcome && (
+                  <>
+                    <dt>Connection</dt>
+                    <dd data-testid="connection-outcome">
+                      {CONNECTION_OUTCOME_WORDS[conversation.connectionOutcome] ?? conversation.connectionOutcome}
+                    </dd>
+                  </>
+                )}
               </dl>
             </MetaGroup>
 

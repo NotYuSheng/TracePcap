@@ -5,6 +5,7 @@ import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSect
 import { Badge, Button, Form, Popover } from '@govtechsg/sgds-react';
 import { SideDrawer, FilterDrawerFooter, FilterPillCount } from '@components/common/SideDrawer';
 import type { ConversationFacetCounts, ConversationFilters } from '@/features/conversation/types';
+import { CONNECTION_OUTCOMES, CONNECTION_OUTCOME_LABELS } from '@/features/conversation/connectionOutcome';
 import {
   getAppColor,
   getCategoryColor,
@@ -552,6 +553,47 @@ export function ConversationFilterPanel({
                         >
                           {category}
                           <FilterPillCount n={countOf('categories', category)} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Connection outcome pills (#1233): shown once the capture has any. Captures analysed
+                  before outcomes existed have only UNKNOWN, so the section stays hidden for them. */}
+              {Object.keys(facetCounts?.outcomes ?? {}).some(k => k !== 'UNKNOWN') && (
+                <div className="col-12">
+                  <PillSectionHeader
+                    label="Connection outcome"
+                    info={
+                      <InfoPopover
+                        id="info-connection-outcome"
+                        title="Connection outcome"
+                        body="How each TCP connection went, read from its handshake. No answer: the SYNs got no reply. Refused: the server sent a reset instead. Many unanswered or refused connections from one host usually mean a scan; one host retrying a silent server can be a dead C2 server. Unknown: not TCP, or the capture started mid-connection."
+                      />
+                    }
+                    onSelectAll={() => onFiltersChange({ outcomes: [...CONNECTION_OUTCOMES] })}
+                    onDeselectAll={() => onFiltersChange({ outcomes: [] })}
+                  />
+                  <div className="d-flex flex-wrap gap-1">
+                    {CONNECTION_OUTCOMES.filter(o => countOf('outcomes', o)).map(o => {
+                      const active = filters.outcomes ?? [];
+                      const isActive = active.includes(o);
+                      return (
+                        <button
+                          key={o}
+                          type="button"
+                          className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
+                          aria-pressed={isActive}
+                          onClick={() =>
+                            onFiltersChange({
+                              outcomes: isActive ? active.filter(x => x !== o) : [...active, o],
+                            })
+                          }
+                        >
+                          {CONNECTION_OUTCOME_LABELS[o]}
+                          <FilterPillCount n={countOf('outcomes', o)} />
                         </button>
                       );
                     })}

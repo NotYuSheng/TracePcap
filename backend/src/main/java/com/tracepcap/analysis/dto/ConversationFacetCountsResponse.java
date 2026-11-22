@@ -17,7 +17,9 @@ public record ConversationFacetCountsResponse(
     Map<String, Long> customSignatures,
     Map<String, Long> suricataAlerts,
     Map<String, Long> countries,
-    Map<String, Long> deviceTypes) {
+    Map<String, Long> deviceTypes,
+    /** Connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN. */
+    Map<String, Long> outcomes) {
 
   public static ConversationFacetCountsResponse from(FacetCounts c) {
     return new ConversationFacetCountsResponse(
@@ -30,6 +32,7 @@ public record ConversationFacetCountsResponse(
         c.customSignatures(),
         c.suricataAlerts(),
         c.countries(),
-        c.deviceTypes());
+        c.deviceTypes(),
+        c.outcomes());
   }
 }

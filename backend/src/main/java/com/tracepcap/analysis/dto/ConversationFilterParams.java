@@ -95,6 +95,12 @@ public class ConversationFilterParams {
   /** Exact match on the destination address. Null = no filter. */
   private final String dstIp;
 
+  /**
+   * How the TCP connection went (#1233): any of ANSWERED, NO_ANSWER, REJECTED, or UNKNOWN for
+   * conversations with no outcome (not TCP, or joined after the SYN). Empty or null = no filter.
+   */
+  private final List<String> outcomes;
+
   /** Exact match on the destination port specifically (cf. {@code port}, which matches either). */
   private final Integer dstPort;
 

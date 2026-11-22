@@ -47,6 +47,9 @@ public class ConversationResponse {
 
   private String dstMac;
 
+  /** How the TCP connection went (#1233): ANSWERED, NO_ANSWER, REJECTED; null when unknown. */
+  private String connectionOutcome;
+
   private Integer initiatorPort;
 
   private String protocol;

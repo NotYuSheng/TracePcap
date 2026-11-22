@@ -37,6 +37,7 @@ interface ConversationApiResponse {
   ja3Server?: string | null;
   ja4Client?: string | null;
   tlsVersion?: string | null;
+  connectionOutcome?: string | null;
   tlsIssuer?: string | null;
   tlsSubject?: string | null;
   tlsNotBefore?: string | number[] | null;
@@ -127,6 +128,7 @@ function transformConversation(
     ja3Server: apiData.ja3Server ?? undefined,
     ja4Client: apiData.ja4Client ?? undefined,
     tlsVersion: apiData.tlsVersion ?? undefined,
+    connectionOutcome: apiData.connectionOutcome ?? null,
     tlsIssuer: apiData.tlsIssuer ?? undefined,
     tlsSubject: apiData.tlsSubject ?? undefined,
     tlsNotBefore: apiData.tlsNotBefore != null ? parseDateTime(apiData.tlsNotBefore) : undefined,
@@ -272,6 +274,7 @@ export const conversationService = {
     if (filters.l7Protocols.length > 0) params.l7Protocols = filters.l7Protocols.join(',');
     if (filters.apps.length > 0) params.apps = filters.apps.join(',');
     if (filters.categories.length > 0) params.categories = filters.categories.join(',');
+    if (filters.outcomes?.length) params.outcomes = filters.outcomes.join(',');
     if (filters.hasRisks) params.hasRisks = 'true';
     if (filters.fileTypes.length > 0) params.fileTypes = filters.fileTypes.join(',');
     if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
@@ -316,6 +319,7 @@ export const conversationService = {
     if (filters.l7Protocols.length > 0) params.set('l7Protocols', filters.l7Protocols.join(','));
     if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));
     if (filters.categories.length > 0) params.set('categories', filters.categories.join(','));
+    if (filters.outcomes?.length) params.set('outcomes', filters.outcomes.join(','));
     if (filters.hasRisks) params.set('hasRisks', 'true');
     if (filters.fileTypes.length > 0) params.set('fileTypes', filters.fileTypes.join(','));
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
@@ -354,6 +358,7 @@ export const conversationService = {
     if (filters.l7Protocols.length > 0) params.set('l7Protocols', filters.l7Protocols.join(','));
     if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));
     if (filters.categories.length > 0) params.set('categories', filters.categories.join(','));
+    if (filters.outcomes?.length) params.set('outcomes', filters.outcomes.join(','));
     if (filters.hasRisks) params.set('hasRisks', 'true');
     if (filters.fileTypes.length > 0) params.set('fileTypes', filters.fileTypes.join(','));
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));

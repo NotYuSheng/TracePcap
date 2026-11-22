@@ -692,6 +692,8 @@ public class AnalysisService {
       conversation.setInitiatorIp(convInfo.getInitiatorIp());
       conversation.setSrcMac(convInfo.getSrcMac());
       conversation.setDstMac(convInfo.getDstMac());
+      conversation.setConnectionOutcome(
+          convInfo.getConnectionOutcome() == null ? null : convInfo.getConnectionOutcome().name());
       conversation.setInitiatorPort(convInfo.getInitiatorPort());
       conversation.setAppName(convInfo.getAppName());
       conversation.setTsharkProtocol(convInfo.getTsharkProtocol());
@@ -1074,6 +1076,7 @@ public class AnalysisService {
                   .ja3Server(conv.getJa3Server())
                   .ja4Client(conv.getJa4Client())
                   .tlsVersion(conv.getTlsVersion())
+                  .connectionOutcome(conv.getConnectionOutcome())
                   .tlsIssuer(conv.getTlsIssuer())
                   .tlsSubject(conv.getTlsSubject())
                   .tlsNotBefore(conv.getTlsNotBefore())
