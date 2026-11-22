@@ -77,6 +77,29 @@ public class SuricataEngine implements DetectionEngineStatus {
   private final ReentrantLock lock = new ReentrantLock();
   private volatile Process daemon;
 
+  /** Which ruleset to load (#600); set by {@link SuricataRuleset}. Null means the packaged default. */
+  private volatile SuricataRuleset ruleset;
+
+  void setRuleset(SuricataRuleset ruleset) {
+    this.ruleset = ruleset;
+  }
+
+  /**
+   * Stops the warm engine and runs {@code work} while holding the engine's lock, so nothing else
+   * loads a ruleset at the same time (#600: validating an imported ruleset loads it in full, and two
+   * loaded rule sets at once could exhaust the container's memory). The next capture starts the
+   * engine again, with whatever ruleset {@code work} made active.
+   */
+  public void withEngineStopped(Runnable work) {
+    lock.lock();
+    try {
+      discardDaemon();
+      work.run();
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /**
    * Whether the engine has finished building its ruleset.
    *
@@ -145,8 +168,9 @@ public class SuricataEngine implements DetectionEngineStatus {
       Files.createDirectories(engineLogDir);
 
       log.info("Starting warm Suricata engine on {} (first run builds the ruleset)", socketPath);
-      daemon =
-          new ProcessBuilder(
+      java.util.List<String> command =
+          new java.util.ArrayList<>(
+              java.util.List.of(
                   SURICATA,
                   "--unix-socket=" + socketPath,
                   // Same reason the per-file path sets it: Suricata otherwise starts one worker
@@ -157,7 +181,11 @@ public class SuricataEngine implements DetectionEngineStatus {
                   "--runmode",
                   "single",
                   "--set",
-                  "default-log-dir=" + engineLogDir.toAbsolutePath())
+                  "default-log-dir=" + engineLogDir.toAbsolutePath()));
+      // The active ruleset (#600): nothing extra for the built-in one, -S for an imported one.
+      if (ruleset != null) command.addAll(ruleset.suricataArgs());
+      daemon =
+          new ProcessBuilder(command)
               // Kept, not discarded: a warm engine that fails silently is worse than no warm
               // engine, because the fallback hides it and only the timings show anything is wrong.
               .redirectErrorStream(true)

@@ -125,9 +125,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 #
 # Rules are made world-readable so the non-root `spring` runtime user can load them.
 #
-# To refresh the ruleset in air-gapped deployments: rebuild the image and redeploy
-# (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh) —
-# analogous to the nDPI refresh flow above.
+# To use a newer ruleset without rebuilding, drop ET's emerging.rules.tar.gz into the mounted
+# suricata-rules folder (#600, SuricataRuleset): it's test-loaded and used instead of these rules,
+# whose build date the app shows next to Suricata's alerts. Rebuilding refreshes the baked-in copy.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     DEBIAN_FRONTEND=noninteractive apt-get update && \

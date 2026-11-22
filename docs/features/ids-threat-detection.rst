@@ -88,5 +88,51 @@ Suricata fits the project's offline requirement (see
 - The Suricata binary and the Emerging Threats Open ruleset are baked into the
   backend image at build time.
 - No rules are fetched at runtime and no telemetry leaves the host.
-- The ruleset version is recorded in the image (``/opt/suricata-ruleset-version``).
-  To refresh the rules, rebuild the backend image.
+- The ruleset's date is shown in the app (see below); to use newer rules without
+  rebuilding, import them from a folder.
+
+The ruleset's age
+-----------------
+
+Signatures go stale: a ruleset frozen when the image was built keeps matching
+yesterday's threats, and a capture with **no** alerts may only mean the rules are
+old. So the ruleset in use, and how old it is, is shown next to Suricata's results:
+on a capture's Overview (*Needs a look*), on a conversation with Suricata alerts,
+in a monitored network's security tab, and on **Settings › System**. Once it's
+older than ``SURICATA_RULESET_STALE_DAYS`` (default 30) it's flagged.
+
+The same information is at ``GET /api/v1/system/suricata``: the engine version,
+``source`` (``built-in`` or ``imported``), the ruleset's date and age, ``stale``,
+the number of rules, and ``importError`` if an imported bundle wasn't used.
+
+Using a newer ruleset offline
+-----------------------------
+
+To update the rules without rebuilding the image (the usual case for an
+air-gapped install):
+
+1. On any machine with internet, download ET Open's
+   ``emerging.rules.tar.gz`` from https://rules.emergingthreats.net/open/suricata/.
+   One or more ``.rules`` files work too, with ``classification.config`` and
+   ``reference.config`` alongside if you have them.
+2. Copy it into the ``suricata-rules/`` folder next to ``docker-compose.yml``
+   (or the folder ``SURICATA_RULES_DIR`` names). It's mounted read-only into the
+   backend.
+3. Within about two minutes the app shows the new ruleset: TracePcap checks the
+   folder every minute, and test-loads the bundle with ``suricata -T`` (about a
+   minute) before using it. Analyses waiting meanwhile just wait for it.
+
+A bundle that won't load (corrupt, truncated, or with no valid rules) is reported
+in the app, with Suricata's reason, and the rules **built into the image** are
+used, so Suricata is never left without rules. Empty the folder to go back to
+the built-in rules.
+
+An imported tarball is dated by the newest file in it (ET's publication time);
+loose ``.rules`` files by the newest rule's ``updated_at``. Nothing is ever
+downloaded by TracePcap itself.
+
+.. note::
+
+   ET Open is redistributable, which is why the image can ship it. Snort's
+   Registered and Subscriber rules are not, so they can't be baked into the
+   image, but you can import them yourself the same way, subject to their licence.

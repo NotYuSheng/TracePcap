@@ -1,0 +1,4 @@
+# Operator-supplied Suricata rules (#600): only this README is tracked.
+*
+!README.md
+!.gitignore
