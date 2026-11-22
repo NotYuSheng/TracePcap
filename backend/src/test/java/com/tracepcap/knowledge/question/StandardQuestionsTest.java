@@ -203,4 +203,36 @@ class StandardQuestionsTest {
     assertThat(new SignedInUserQuestion().answer(empty)).isEmpty();
     assertThat(new DataTransferQuestion().answer(empty)).isEmpty();
   }
+
+  // ── Direction (a download is not exfiltration) ──────────────────────────────
+
+  private CaseKnowledge directionalBoard(long sent, long received) {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef host = EntityRef.host("10.11.10.147");
+    EntityRef ext = EntityRef.external("96.62.224.200");
+    b.addEntity(ext, java.util.Map.of("org", "Some Hosting", "country", "DE"));
+    b.addRelationship(new Relationship(host, "communicates-with", ext, Grade.MEASURED, "traffic",
+        java.util.Map.of("bytes", sent + received, "sentBytes", sent, "receivedBytes", received)));
+    return b.build();
+  }
+
+  @Test
+  void dataTransfer_aLargeDownload_isNotFlagged() {
+    // 2026-11-10: the host received a 6 MB file (5555.mp4); it used to read "sent 6.3 MB".
+    assertThat(new DataTransferQuestion().answer(directionalBoard(200_000L, 6_100_000L))).isEmpty();
+  }
+
+  @Test
+  void dataTransfer_aLargeUpload_isFlagged_asSent() {
+    assertThat(new DataTransferQuestion().answer(directionalBoard(7_000_000L, 300_000L)))
+        .singleElement()
+        .satisfies(ans -> assertThat(ans.headline()).contains("10.11.10.147 sent 7.0 MB"));
+  }
+
+  @Test
+  void dataTransfer_withoutDirection_saysExchanged() {
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "UAB Host Baltic")))
+        .singleElement()
+        .satisfies(ans -> assertThat(ans.headline()).contains("exchanged 8.0 MB"));
+  }
 }

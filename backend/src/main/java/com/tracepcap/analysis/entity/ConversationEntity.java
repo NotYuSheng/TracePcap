@@ -88,6 +88,13 @@ public class ConversationEntity {
   @Column(name = "transport", length = 20)
   private String transport;
 
+  /** Bytes sent by src_ip, and by dst_ip. Null for captures analysed before these were kept. */
+  @Column(name = "bytes_src_to_dst")
+  private Long bytesSrcToDst;
+
+  @Column(name = "bytes_dst_to_src")
+  private Long bytesDstToSrc;
+
   @Column(name = "initiator_port")
   private Integer initiatorPort;
 

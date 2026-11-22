@@ -29,6 +29,11 @@ public class TrafficContributor implements KnowledgeContributor {
 
   static final String COMMUNICATES_WITH = "communicates-with";
 
+  /** Relationship attributes: bytes the host sent to, and received from, the external. */
+  public static final String SENT_BYTES = "sentBytes";
+
+  public static final String RECEIVED_BYTES = "receivedBytes";
+
   /** External-entity attribute: first contact, ISO-8601 UTC, to the second ("2026-11-10T18:22:07Z"). */
   public static final String FIRST_SEEN = "firstSeen";
 
@@ -56,6 +61,9 @@ public class TrafficContributor implements KnowledgeContributor {
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     // internal host -> (external ip -> total bytes)
     Map<String, Map<String, Long>> bytesByPair = new LinkedHashMap<>();
+    // internal host -> (external ip -> bytes the host sent); a pair is absent if any flow lacked it
+    Map<String, Map<String, Long>> sentByPair = new LinkedHashMap<>();
+    java.util.Set<String> sentUnknown = new java.util.HashSet<>();
     // external ip -> when any internal host first talked to it (the start of the activity)
     Map<String, java.time.LocalDateTime> firstSeen = new LinkedHashMap<>();
     for (ConversationFacts conv : context.conversationFacts()) {
@@ -79,6 +87,9 @@ public class TrafficContributor implements KnowledgeContributor {
       bytesByPair
           .computeIfAbsent(host, k -> new LinkedHashMap<>())
           .merge(external, conv.flow().totalBytes(), Long::sum);
+      Long sent = conv.flow().bytesSentBy(host);
+      if (sent == null) sentUnknown.add(host + ">" + external);
+      else sentByPair.computeIfAbsent(host, k -> new LinkedHashMap<>()).merge(external, sent, Long::sum);
       java.time.LocalDateTime start = conv.flow().startTime();
       if (start != null) firstSeen.merge(external, start, (x, y) -> x.isBefore(y) ? x : y);
     }
@@ -94,6 +105,13 @@ public class TrafficContributor implements KnowledgeContributor {
             peers.forEach(
                 (external, bytes) -> {
                   if (bytes < MIN_BYTES) return;
+                  Map<String, Object> attrs = new LinkedHashMap<>();
+                  attrs.put("bytes", bytes);
+                  Long sent = sentByPair.getOrDefault(host, Map.of()).get(external);
+                  if (sent != null && !sentUnknown.contains(host + ">" + external)) {
+                    attrs.put(SENT_BYTES, sent);
+                    attrs.put(RECEIVED_BYTES, bytes - sent);
+                  }
                   board.addRelationship(
                       new Relationship(
                           EntityRef.host(host),
@@ -101,7 +119,7 @@ public class TrafficContributor implements KnowledgeContributor {
                           EntityRef.external(external),
                           Grade.MEASURED,
                           name(),
-                          Map.of("bytes", bytes)));
+                          attrs));
                 }));
   }
 }
