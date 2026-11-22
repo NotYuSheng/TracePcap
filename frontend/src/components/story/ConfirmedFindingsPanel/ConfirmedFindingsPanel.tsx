@@ -72,7 +72,7 @@ function Basis({ lines }: { lines: string[] }) {
   const shown = open ? lines : lines.slice(0, BASIS_SHOWN);
   const hidden = lines.length - BASIS_SHOWN;
   return (
-    <ul className="mb-0 mt-1 ps-3 text-muted" style={{ fontSize: '0.72rem' }}>
+    <ul className="mb-0 mt-1 ps-3 text-muted" style={{ fontSize: '0.72rem', overflowWrap: 'anywhere' }}>
       {shown.map((b, j) => (
         <li key={j}>{b}</li>
       ))}
@@ -163,7 +163,8 @@ export const ConfirmedFindingsPanel = ({
                       {grade.label}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.82rem' }}>{a.headline}</div>
+                  {/* URLs and hashes have no spaces: let them wrap rather than run out of the card. */}
+                  <div style={{ fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{a.headline}</div>
                   {a.basis.length > 0 && <Basis lines={a.basis} />}
                 </div>
               </div>
