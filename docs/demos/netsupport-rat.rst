@@ -136,15 +136,18 @@ line: a remote-admin tool is surfaced for review, never called malware on that a
 
 The capture holds the story that makes this one malicious, spread across several weak signals:
 
-- the host fetched a page from ``vericheckusgo.com`` and then ``/5555.mp4`` from ``96.62.224.200``;
-- PowerShell downloaded a packed executable (*ET INFO Windows Powershell User-Agent Usage*,
-  *ET INFO Packed Executable Download*);
-- minutes later NetSupport began checking in to a **bare IP address**, not a vendor domain, using
-  plain HTTP on port 443.
+- at 18:21:49 UTC **PowerShell** fetched a script from ``vericheckusgo.com`` (*ET INFO Windows
+  Powershell User-Agent Usage*);
+- nine seconds later the same server, ``96.62.224.200``, delivered 6 MB as ``/5555.mp4``;
+- nine seconds after that, NetSupport began checking in to a **bare IP address**, not a vendor
+  domain, using plain HTTP on port 443, every 60 seconds for the next two hours.
+
+(The capture's *ET INFO Packed Executable Download* alert is a Windows Update at 18:30, not part of
+the chain.)
 
 A legitimate NetSupport install rarely looks like that chain. Escalating it (a remote-access check-in
-to a bare IP, preceded on the same host by a PowerShell download) to a probable unsanctioned install
-is a candidate improvement. It would be graded INFERRED with every link as evidence, and the
+to a bare IP, preceded within minutes on the same host by PowerShell fetching from an outside server)
+to a probable unsanctioned install is a candidate improvement. It would be graded INFERRED with every link as evidence, and the
 evaluation harness would show whether it raises false alarms.
 
 .. tip::

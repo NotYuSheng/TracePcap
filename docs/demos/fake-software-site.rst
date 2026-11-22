@@ -183,9 +183,12 @@ file name (``.ps1``, ``.js``, ``.vbs``, ``.hta``, ``.bat``) as well is a straigh
 **Why two C2s are missed.** The only alert on ``45.125.66.32`` and ``45.125.66.252`` is *ET DROP
 Spamhaus DROP Listed Traffic*: the addresses are in a netblock run by criminals. That's reputation,
 not behaviour; plenty of traffic to such space is scanning or spam. TracePcap doesn't call a server a
-C2 on reputation alone. The capture does hold more: the host pulled 10 MB from ``45.125.66.32``,
-including a DLL. A rule that combines those signals (an already-infected host, a DROP-listed server,
-executables from it) is a candidate improvement, graded INFERRED with the chain as its evidence.
+C2 on reputation alone. The capture does hold more: starting 14 minutes after the confirmed C2,
+the host contacts ``45.125.66.32`` in three rounds (19:59, 20:25, 20:28 UTC), each the same three TLS
+sessions to a bare IP on the unusual port 2917 with near-identical sizes, and in every round
+``45.125.66.252`` is contacted seconds later. A rule that combines those signals (an
+already-infected host, a reputation-listed server, a bare IP contacted in repeated, scripted rounds)
+is a candidate improvement, graded INFERRED with the chain as its evidence.
 
 What this demonstrates
 ----------------------
