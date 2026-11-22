@@ -64,6 +64,10 @@ public class ExtractedFileEntity {
   private String extractionMethod;
 
   /** Non-null when the file was detected but not stored (e.g. "exceeds_size_limit"). */
+  /** Where an HTTP download came from: http://host/path?query. Null for carved files. */
+  @Column(name = "source_url", length = 2000)
+  private String sourceUrl;
+
   @Column(name = "skipped_reason", length = 100)
   private String skippedReason;
 

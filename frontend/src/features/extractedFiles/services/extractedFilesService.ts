@@ -12,6 +12,8 @@ export interface ExtractedFile {
   sha256: string | null;
   extractionMethod: string | null;
   skippedReason: string | null;
+  /** Where an HTTP download came from (http://host/path?query); null for carved files. */
+  sourceUrl?: string | null;
   createdAt: string;
 }
 

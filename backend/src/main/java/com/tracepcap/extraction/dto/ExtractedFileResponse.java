@@ -21,5 +21,7 @@ public class ExtractedFileResponse {
   private String sha256;
   private String extractionMethod;
   private String skippedReason;
+  /** Where an HTTP download came from (http://host/path?query); null for carved files. */
+  private String sourceUrl;
   private LocalDateTime createdAt;
 }

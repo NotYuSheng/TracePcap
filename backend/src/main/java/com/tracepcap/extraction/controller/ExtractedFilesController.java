@@ -221,6 +221,7 @@ public class ExtractedFilesController {
         .sha256(e.getSha256())
         .extractionMethod(e.getExtractionMethod())
         .skippedReason(e.getSkippedReason())
+        .sourceUrl(e.getSourceUrl())
         .createdAt(e.getCreatedAt())
         .build();
   }

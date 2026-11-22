@@ -27,7 +27,8 @@ public class ExtractedFileLookupAdapter implements ExtractedFileLookup {
                     e.getFileSize(),
                     e.getSha256(),
                     e.getExtractionMethod(),
-                    e.getSkippedReason() != null))
+                    e.getSkippedReason() != null,
+                    e.getSourceUrl()))
         .toList();
   }
 }

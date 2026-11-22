@@ -26,4 +26,27 @@ class HttpObjectNamingTest {
     assertThat(FileExtractionService.uriToBasename("/data/0f60a3e7baecf2748b1c8183ed37d1e4"))
         .isEqualTo("0f60a3e7baecf2748b1c8183ed37d1e4");
   }
+
+  @Test
+  void theServersOwnFileName_fromContentDisposition() {
+    assertThat(FileExtractionService.dispositionFileName("attachment; filename=\"Invoice 876597035_003.zip\""))
+        .isEqualTo("Invoice 876597035_003.zip");
+    assertThat(FileExtractionService.dispositionFileName("attachment; filename=report.pdf")).isEqualTo("report.pdf");
+    // RFC 5987: the encoded form wins, decoded.
+    assertThat(FileExtractionService.dispositionFileName(
+            "attachment; filename=\"fallback.zip\"; filename*=UTF-8''Rechnung%20M%C3%A4rz.zip"))
+        .isEqualTo("Rechnung März.zip");
+    // A path in the name is never kept.
+    assertThat(FileExtractionService.dispositionFileName("attachment; filename=\"..\\..\\evil.exe\""))
+        .isEqualTo("evil.exe");
+    assertThat(FileExtractionService.dispositionFileName("inline")).isNull();
+    assertThat(FileExtractionService.dispositionFileName(null)).isNull();
+  }
+
+  @Test
+  void theFullUrl_fromTheRequestUriAndHost() {
+    assertThat(FileExtractionService.absoluteUrl("/data/0f60a3e7", "72.5.43.29")).isEqualTo("http://72.5.43.29/data/0f60a3e7");
+    assertThat(FileExtractionService.absoluteUrl("http://ip.webernetz.net/", "")).isEqualTo("http://ip.webernetz.net/");
+    assertThat(FileExtractionService.absoluteUrl("/x", "")).isNull();
+  }
 }

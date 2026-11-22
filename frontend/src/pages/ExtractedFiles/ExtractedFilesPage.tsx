@@ -311,7 +311,10 @@ export const ExtractedFilesPage = () => {
     (skip === 'mime' || mimeTypeFilter.length === 0 || (f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))) &&
     (skip === 'method' || methodFilter.length === 0 || methodFilter.includes(f.extractionMethod ?? '')) &&
     (skip === 'stored' || storedFilter.length === 0 || storedFilter.includes(storedOf(f))) &&
-    (!q || (f.filename ?? '').toLowerCase().includes(q) || (f.sha256 ?? '').toLowerCase().includes(q));
+    (!q ||
+      (f.filename ?? '').toLowerCase().includes(q) ||
+      (f.sha256 ?? '').toLowerCase().includes(q) ||
+      (f.sourceUrl ?? '').toLowerCase().includes(q));
   const filtered = files.filter(f => passes(f));
   const sorted = sortFiles(filtered, sortBy, sortDir);
   const activeFilterCount = mimeTypeFilter.length + methodFilter.length + storedFilter.length;
@@ -514,6 +517,15 @@ export const ExtractedFilesPage = () => {
                         <span className="font-monospace" style={{ fontSize: '0.85em' }}>
                           {file.filename ?? '(unnamed)'}
                         </span>
+                        {file.sourceUrl && (
+                          <div
+                            className="text-muted text-break font-monospace"
+                            style={{ fontSize: '0.75em' }}
+                            data-testid="extracted-file-url"
+                          >
+                            from {file.sourceUrl}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span className="text-muted" style={{ fontSize: '0.85em' }}>

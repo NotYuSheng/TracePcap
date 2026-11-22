@@ -12,6 +12,7 @@ public interface ExtractedFileLookup {
    * @param method how it was found: {@code tshark_http} is a real HTTP transfer, reassembled;
    *     {@code magic_bytes} is a file signature carved from a raw stream, which can be a false hit
    * @param skipped true when it was recorded but not stored (too large, a limit hit)
+   * @param sourceUrl where an HTTP download came from; null for carved files
    */
   record ExtractedFileFacts(
       UUID conversationId,
@@ -20,7 +21,15 @@ public interface ExtractedFileLookup {
       Long size,
       String sha256,
       String method,
-      boolean skipped) {
+      boolean skipped,
+      String sourceUrl) {
+
+    /** Without a source URL: unknown (a carved file, or extracted before URLs were kept). */
+    public ExtractedFileFacts(
+        UUID conversationId, String filename, String mimeType, Long size, String sha256,
+        String method, boolean skipped) {
+      this(conversationId, filename, mimeType, size, sha256, method, skipped, null);
+    }
 
     /** A transfer the protocol itself delimited, not a guess from bytes that looked like a file. */
     public boolean realTransfer() {

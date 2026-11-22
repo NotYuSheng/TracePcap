@@ -40,7 +40,9 @@ public class DownloadsQuestion implements StandardQuestion {
         (sha, f) -> {
           Map<String, Object> a = f.attributes();
           Object size = a.get("size");
-          String from = String.valueOf(a.getOrDefault("serverName", a.get("external")));
+          String from = a.get("url") != null
+              ? a.get("url") + " (" + a.get("external") + ")"
+              : String.valueOf(a.getOrDefault("serverName", a.get("external")));
           answers.add(
               new Answer(
                   QUESTION,
