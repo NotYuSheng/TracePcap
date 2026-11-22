@@ -86,9 +86,10 @@ describe('FileList', () => {
     serve()
     renderList()
     await screen.findByRole('link', { name: 'cap-1.pcap' })
-    const uploaders = screen.getAllByTestId('capture-uploader')
-    expect(uploaders).toHaveLength(1)
-    expect(uploaders[0]).toHaveTextContent('by ana')
+    // Every row says who uploaded it, or that it wasn't recorded: a blank looked like a missing feature.
+    const uploaders = screen.getAllByTestId('capture-uploader').map(u => u.textContent?.trim())
+    expect(uploaders).toContain('· by ana')
+    expect(uploaders.every(u => /by ana|uploader not recorded|uploaded without sign-in/.test(u ?? ''))).toBe(true)
     // The row's own action button is gone; Open stays in the row's ⋯ menu.
     expect(document.querySelector('.captures-open')).toBeNull()
   })

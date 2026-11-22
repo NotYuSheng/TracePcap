@@ -7,6 +7,7 @@ import { kindOf, summarize } from '@/features/me/auditDiff';
 import { parseDateTime } from '@/utils/dateUtils';
 import { ownExpiry } from '@/features/captureKeep/captureKeepService';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { actorWords, uploaderWords } from '@utils/actorWords';
 
 /** How many events the feed shows. */
 const SHOWN = 3;
@@ -35,8 +36,9 @@ export interface ActivityFile {
 }
 
 /** " · by ana", or nothing when the uploader isn't known (or is the shared login-off profile). */
+/** " · by alice", " · uploaded without sign-in" or " · uploader not recorded". */
 function byWhom(f: ActivityFile): string {
-  return f.uploadedBy && f.uploadedBy !== 'system' ? ` · by ${f.uploadedBy}` : '';
+  return ` · ${uploaderWords(f.uploadedBy)}`;
 }
 
 export type Tone = 'done' | 'busy' | 'failed' | 'warn' | 'change';
@@ -96,9 +98,7 @@ export function buildActivity(
         meta:
           f.packetCount != null
             ? `${f.packetCount.toLocaleString()} packets${byWhom(f)}`
-            : byWhom(f)
-              ? `Uploaded${byWhom(f)}`
-              : undefined,
+            : `Uploaded${byWhom(f)}`,
       });
       // Its own expiry if it has one, else the install's retention window from upload.
       const own = ownExpiry(f.expiresAt);
@@ -127,7 +127,7 @@ export function buildActivity(
         tone: 'failed',
         text: 'Analysis failed:',
         link: { label: f.fileName, to },
-        meta: byWhom(f) ? `Uploaded${byWhom(f)}` : undefined,
+        meta: `Uploaded${byWhom(f)}`,
       });
     } else {
       events.push({
@@ -136,7 +136,7 @@ export function buildActivity(
         tone: 'busy',
         text: 'Analysing',
         link: { label: f.fileName, to },
-        meta: byWhom(f) ? `Uploaded${byWhom(f)}` : undefined,
+        meta: `Uploaded${byWhom(f)}`,
       });
     }
   }
@@ -171,7 +171,7 @@ export function buildActivity(
           label: names.get(latest.targetId) ?? 'a capture',
           to: `/analysis/${latest.targetId}/network-diagram`,
         },
-        meta: `${n === 1 ? summarize(latest) : `${n} changes, latest: ${summarize(latest)}`} · by ${latest.actor}`,
+        meta: `${n === 1 ? summarize(latest) : `${n} changes, latest: ${summarize(latest)}`} · ${actorWords(latest.actor)}`,
       });
     } else {
       events.push({
@@ -182,7 +182,7 @@ export function buildActivity(
           n === 1
             ? summarize(latest)
             : `${summarize(latest)}, and ${n - 1} more change${n === 2 ? '' : 's'}`,
-        meta: `${kindOf(latest.targetType)} · by ${latest.actor}`,
+        meta: `${kindOf(latest.targetType)} · ${actorWords(latest.actor)}`,
       });
     }
   }
