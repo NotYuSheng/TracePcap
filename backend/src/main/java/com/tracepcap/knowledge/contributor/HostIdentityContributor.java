@@ -69,11 +69,11 @@ public class HostIdentityContributor implements KnowledgeContributor {
   }
 
   /**
-   * A Kerberos AS-REQ is MEASURED (the client authenticated as this principal); an LDAP directory
+   * A Kerberos AS-REQ or NTLM sign-in is MEASURED (the client authenticated as this principal); an LDAP directory
    * lookup is REPORTED (a party named an account). Anything else is treated as inferred.
    */
   private Grade gradeForSource(String source) {
-    if (WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(source)) return Grade.MEASURED;
+    if (WindowsIdentityResolverService.isSignIn(source)) return Grade.MEASURED;
     if (WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(source)) return Grade.REPORTED;
     return Grade.INFERRED;
   }

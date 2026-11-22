@@ -65,7 +65,7 @@ Every artifact carries a **grade** — the same three-way provenance the Extract
 ============  ===========================================================================
 Grade         Meaning
 ============  ===========================================================================
-``MEASURED``  the traffic itself exhibited it (a Kerberos AS-REQ principal). Strongest.
+``MEASURED``  the traffic itself exhibited it (a Kerberos AS-REQ or NTLM sign-in principal). Strongest.
 ``REPORTED``  a party asserted it on the wire (an LDAP display name) — testimony.
 ``INFERRED``  a tool judged it (an IDS verdict, a device-type vote) — a guess with error modes.
 ============  ===========================================================================

@@ -54,7 +54,7 @@ public class HostClassificationEntity {
   private String hostname;
 
   /**
-   * How {@link #hostname} was discovered. One of: {@code reverse_dns}, {@code mdns}, {@code nbns},
+   * How {@link #hostname} was discovered. One of: {@code reverse_dns}, {@code mdns}, {@code nbns}, {@code ntlm},
    * {@code dhcp}, {@code manual}. Null when no hostname is set.
    */
   @Column(name = "hostname_source", length = 20)

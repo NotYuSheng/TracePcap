@@ -42,6 +42,12 @@ public class HostnameResolverService {
   public static final String SOURCE_MDNS = "mdns";
   public static final String SOURCE_NBNS = "nbns";
   public static final String SOURCE_DHCP = "dhcp";
+  /**
+   * The workstation name a client gives when it signs in with NTLM (#1234): the host naming
+   * itself, like NBNS. Sent on Windows file-share and intranet sign-ins even when no account is
+   * (anonymous sessions still carry it).
+   */
+  public static final String SOURCE_NTLM = "ntlm";
   public static final String SOURCE_MANUAL = "manual";
 
   private static final int HOSTNAME_MAX_LENGTH = 255;
@@ -65,6 +71,7 @@ public class HostnameResolverService {
     //   0 _ws.col.Protocol  1 ip.src  2 dhcp.option.hostname
     //   3 dhcp.option.requested_ip_address  4 dns.resp.name  5 dns.a  6 dns.aaaa
     //   7 dns.ptr.domain_name  8 dns.qry.name  9 nbns.name  10 nbns.addr
+    //   11 ntlmssp.auth.hostname
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -72,7 +79,7 @@ public class HostnameResolverService {
             pcapFile.getAbsolutePath(),
             "-Y",
             "dhcp.option.hostname || (mdns && dns.flags.response==1) || nbns.name"
-                + " || (dns.flags.response==1 && dns.qry.type==12)",
+                + " || (dns.flags.response==1 && dns.qry.type==12) || ntlmssp.auth.hostname",
             "-T",
             "fields",
             "-E",
@@ -100,7 +107,9 @@ public class HostnameResolverService {
             "-e",
             "nbns.name",
             "-e",
-            "nbns.addr");
+            "nbns.addr",
+            "-e",
+            "ntlmssp.auth.hostname");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -169,7 +178,7 @@ public class HostnameResolverService {
       if (ioExecutor != null) ioExecutor.shutdownNow();
     }
 
-    log.info("Collected {} hostname claim(s) from DHCP/mDNS/NBNS/reverse-DNS", result.size());
+    log.info("Collected {} hostname claim(s) from DHCP/mDNS/NBNS/NTLM/reverse-DNS", result.size());
     return new ArrayList<>(result.keySet());
   }
 
@@ -178,6 +187,14 @@ public class HostnameResolverService {
   private void parseRow(String[] f, Map<Claim, Boolean> result) {
     if (f.length < 11) return;
     String proto = f[0].toUpperCase();
+
+    // NTLM rides inside SMB, HTTP, LDAP..., so it's checked on its own, not by protocol column.
+    // The sender of an AUTHENTICATE message is the client naming itself.
+    if (f.length > 11 && !f[11].isBlank()) {
+      String name = firstValue(f[11]);
+      if (name != null && !"NULL".equals(name)) record(result, firstValue(f[1]), name, SOURCE_NTLM);
+      return;
+    }
 
     if (proto.contains("DHCP") || proto.contains("BOOTP")) {
       // option 12 hostname; IP is the requested address (option 50) or, failing that, the source.
