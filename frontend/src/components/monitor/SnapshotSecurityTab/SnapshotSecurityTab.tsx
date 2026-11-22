@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pagination } from '@components/common/Pagination/Pagination';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import type { GraphEdge } from '@/features/network/types';
 import { severityHex } from '@/utils/severityColors';
 
@@ -100,6 +101,7 @@ function SignalSectionView({
         </span>
       </div>
       <p className="text-muted mb-2" style={{ fontSize: '0.78rem' }}>{section.blurb}</p>
+      {section.key === 'ids' && <SuricataRulesetNote className="mb-2" />}
       {section.rows.length === 0 ? (
         <p className="text-muted small mb-0 ps-1">None detected.</p>
       ) : (

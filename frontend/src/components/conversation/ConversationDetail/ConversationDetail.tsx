@@ -1,5 +1,6 @@
 import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { Fragment, useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -446,6 +447,7 @@ export const ConversationDetail = ({
               {conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now() && (
                 <span className="cd-chip" style={{ backgroundColor: '#dc2626', color: '#fff' }}>Expired certificate</span>
               )}
+              {(conversation.suricataAlerts?.length ?? 0) > 0 && <SuricataRulesetNote className="w-100 mt-1" />}
             </div>
           )}
 

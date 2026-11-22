@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { settingsService, type SystemSetting } from '@/features/settings';
 import { EditSystemSettingModal } from './EditSystemSettingModal';
@@ -145,6 +146,7 @@ export function SystemSettingsTab() {
         retention, detection thresholds and the LLM connection can also be changed here, if you
         have permission. Click any setting to see more.
       </p>
+      <SuricataRulesetNote className="mb-3" />
       <Form.Control
         type="search"
         size="sm"

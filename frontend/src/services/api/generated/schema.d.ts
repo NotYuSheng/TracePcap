@@ -714,7 +714,7 @@ export interface paths {
             cookie?: never;
         };
         /** How many captures are out of date with the enabled rules */
-        get: operations["status"];
+        get: operations["status_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2877,6 +2877,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/suricata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which Suricata ruleset is in use, and how old it is
+         * @description source is built-in (baked into the image) or imported (from the import folder). stale is true once the ruleset is older than SURICATA_RULESET_STALE_DAYS. importError says why the last imported bundle wasn't used.
+         */
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/time": {
         parameters: {
             query?: never;
@@ -4994,6 +5014,21 @@ export interface components {
             key?: string;
             kind?: string;
         };
+        SuricataStatusDto: {
+            /** Format: int64 */
+            ageDays?: number;
+            engineVersion?: string;
+            importDir?: string;
+            importError?: string;
+            /** Format: int32 */
+            ruleCount?: number;
+            /** Format: date */
+            rulesetDate?: string;
+            source?: string;
+            stale?: boolean;
+            /** Format: int32 */
+            staleAfterDays?: number;
+        };
         SystemSettingDto: {
             choices?: string[];
             defaultValue?: string;
@@ -6220,7 +6255,7 @@ export interface operations {
             };
         };
     };
-    status: {
+    status_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -9863,6 +9898,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SuricataStatusDto"];
+                };
             };
         };
     };

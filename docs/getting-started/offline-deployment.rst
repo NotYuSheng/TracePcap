@@ -43,6 +43,17 @@ resolving new external IPs), uses it when reachable, and falls back to the
 MMDB otherwise. Even when it falls back, the outbound *attempt* still
 happens, so leave it ``true`` on air-gapped or egress-monitored machines.
 
+Keeping Suricata's rules current
+--------------------------------
+
+The Suricata ruleset is baked into the backend image, so it ages with the image;
+the app shows its date next to Suricata's alerts and flags it once it's over 30
+days old. To update it on an offline machine, copy ET Open's
+``emerging.rules.tar.gz`` (downloaded elsewhere) into the ``suricata-rules/``
+folder next to ``docker-compose.yml``. It's validated before use, and a broken
+bundle falls back to the built-in rules. See
+:doc:`../features/ids-threat-detection`.
+
 Overview
 --------
 

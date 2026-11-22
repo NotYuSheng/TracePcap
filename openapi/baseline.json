@@ -5547,6 +5547,42 @@
         },
         "type": "object"
       },
+      "SuricataStatusDto": {
+        "properties": {
+          "ageDays": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "importDir": {
+            "type": "string"
+          },
+          "importError": {
+            "type": "string"
+          },
+          "ruleCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rulesetDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "staleAfterDays": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "SystemSettingDto": {
         "properties": {
           "choices": {
@@ -8221,7 +8257,7 @@
     },
     "/api/v1/detection-rules/status": {
       "get": {
-        "operationId": "status",
+        "operationId": "status_1",
         "responses": {
           "200": {
             "content": {
@@ -14198,6 +14234,28 @@
         ]
       }
     },
+    "/api/v1/system/suricata": {
+      "get": {
+        "description": "source is built-in (baked into the image) or imported (from the import folder). stale is true once the ruleset is older than SURICATA_RULESET_STALE_DAYS. importError says why the last imported bundle wasn't used.",
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuricataStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Which Suricata ruleset is in use, and how old it is",
+        "tags": [
+          "Suricata"
+        ]
+      }
+    },
     "/api/v1/system/time": {
       "get": {
         "operationId": "getServerTime",
@@ -14581,6 +14639,10 @@
     {
       "description": "Generate single-file and comparison PDF reports",
       "name": "Reports"
+    },
+    {
+      "description": "The IDS engine and the age of the ruleset behind its alerts",
+      "name": "Suricata"
     },
     {
       "description": "Baseline rules used to detect drift in a monitored network",

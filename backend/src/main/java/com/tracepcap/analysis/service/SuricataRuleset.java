@@ -35,7 +35,7 @@ import org.springframework.stereotype.Component;
  * folder): ET's {@code emerging.rules.tar.gz}, or one or more {@code .rules} files. It's checked
  * every minute; a new or changed bundle is unpacked into a writable folder and test-loaded with
  * {@code suricata -T} before it's used. Only a bundle that loads replaces the built-in rules; a
- * broken one is reported and the built-in rules stay, so Suricata is never left with none.
+ * broken one is reported and the built-in rules are used, so Suricata is never left with none.
  * Nothing is ever downloaded.
  *
  * <p>Validation loads the whole ruleset (about a minute and hundreds of MB), so it runs with the
@@ -216,9 +216,14 @@ public class SuricataRuleset {
     }
   }
 
+  /**
+   * A bundle that won't load means the built-in rules, even if an earlier import had loaded: the
+   * folder no longer holds that one, and after a restart it would be gone anyway.
+   */
   private void reject(String why) {
     importError = why;
-    log.warn("Imported Suricata ruleset not used ({}); keeping the {} ruleset", why, active().source());
+    active = baked();
+    log.warn("Imported Suricata ruleset not used ({}); using the built-in ruleset", why);
   }
 
   /**
@@ -276,7 +281,8 @@ public class SuricataRuleset {
       String output = run(cmd, validateTimeoutSeconds);
       return output.contains("successfully loaded") ? null : "Suricata couldn't load it";
     } catch (IOException e) {
-      return "Suricata couldn't load it (" + firstLine(e.getMessage()) + ")";
+      String why = firstLine(e.getMessage()).replaceFirst("^suricata exited \\d+: ", "");
+      return "Suricata couldn't load it: " + why;
     }
   }
 
@@ -422,9 +428,11 @@ public class SuricataRuleset {
     return out.toString();
   }
 
-  private static String lastLines(String s) {
+  /** The last line of a command's output, without Suricata's timestamp, level and error code. */
+  static String lastLines(String s) {
     String[] lines = s.strip().split("\n");
-    return lines.length == 0 ? "" : lines[lines.length - 1];
+    String last = lines.length == 0 ? "" : lines[lines.length - 1];
+    return last.replaceFirst("^.*?<[A-Za-z]+> - (\\[ERRCODE: [^\\]]*\\] - )?", "").strip();
   }
 
   private static String firstLine(String s) {

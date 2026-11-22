@@ -141,6 +141,15 @@ documented in its own section below with the surrounding detail.
        Adds ~50 s of fixed rule-loading overhead to each capture it processes,
        on top of packet scanning that scales with size. The fixed floor makes it the
        biggest throughput lever, and proportionally heaviest on small captures.
+   * - ``SURICATA_RULES_DIR``
+     - ``./suricata-rules``
+     - Host folder mounted into the backend for a newer Suricata ruleset
+       (ET's ``emerging.rules.tar.gz`` or ``.rules`` files). Checked every
+       minute, test-loaded, and used only if it loads. See
+       :doc:`../features/ids-threat-detection`.
+   * - ``SURICATA_RULESET_STALE_DAYS``
+     - ``30``
+     - A Suricata ruleset older than this is flagged as stale next to its alerts.
    * - ``FILE_RETENTION_ENABLED``
      - ``true``
      - Master switch for automatic deletion. ``false`` keeps captures

@@ -108,4 +108,12 @@ class SuricataRulesetTest {
     ReflectionTestUtils.setField(r, "validateTimeoutSeconds", 60);
     return r;
   }
+
+  @Test
+  void suricatasErrorLine_isTrimmedToItsMessage() {
+    assertThat(
+            SuricataRuleset.lastLines(
+                "noise\n22/11/2026 -- 10:18:39 - <Error> - [ERRCODE: SC_ERR_NO_RULES_LOADED(43)] - Loading signatures failed."))
+        .isEqualTo("Loading signatures failed.");
+  }
 }

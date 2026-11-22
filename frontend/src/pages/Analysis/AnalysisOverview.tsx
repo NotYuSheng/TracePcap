@@ -1,5 +1,6 @@
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
 import { NetworkSegmentsPanel } from '@/features/networkSegments/NetworkSegmentsPanel';
 import { usePermission } from '@/features/me/useMe';
@@ -407,6 +408,7 @@ export const AnalysisOverview = () => {
                 </a>
               </SourceTag>
             </div>
+            <SuricataRulesetNote className="mb-2" />
             {flagged.total === 0 ? (
               <p className="small text-muted mb-0">Nothing flagged in this capture.</p>
             ) : (
