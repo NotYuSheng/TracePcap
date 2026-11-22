@@ -17,6 +17,13 @@ Each field is one of:
 | `missed` | no answer was produced, or only some of the key's values were |
 | `wrong` | an answer was produced that the key does not list — **even if the right value is also present** |
 
+**Beyond the key.** An answer key can be narrower than the capture (it may name one C2 when the
+malware tried two). A case can list such findings under `beyond_key`, per scored field, each with
+`evidence` from outside TracePcap (an IDS rule's own text, an observed connection, a vendor report)
+and who reviewed it. Producing one is neither correct nor wrong: it's left out of the score and shown
+as "also, beyond the key". An entry without evidence is refused, and anything not listed still counts
+as wrong. Never add one from TracePcap's output alone.
+
 The last rule matters: a spurious extra victim or C2 next to the right one is a false accusation, so
 it counts as confidently wrong. (An earlier version scored it `correct`, which meant a regression that
 added spurious answers could never trip the gate.)

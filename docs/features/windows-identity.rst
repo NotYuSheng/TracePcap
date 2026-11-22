@@ -56,6 +56,15 @@ weight, during the same analysis pass that classifies device types:
    guarantee — a helpdesk or admin tool could just as easily be looking up *someone
    else's* account. It contributes a smaller vote.
 
+**The person's full name** can also come from the domain controller itself. When Windows
+looks up the signed-in account over SMB (a SAMR ``QueryUserInfo`` call, routine at sign-in),
+the controller's reply carries the account's **full name** (``gwyatt`` → *Gabriel Wyatt*).
+TracePcap reads it and, when the account matches the host's signed-in user, shows it as the
+user's real name, ahead of a name taken from an LDAP lookup, because the reply ties the name
+to that exact account. It is a lookup, never a sign-in: it doesn't decide who is signed in
+and casts no classification vote. On the host's timeline it reads *Named by the domain
+controller (account gwyatt)*.
+
 Every login is kept, with when it was first and last seen and how many times, so a
 host used by more than one person over a capture (a shift change, a shared PC, an
 admin signing in remotely) shows all of them. The host's **signed-in user** label

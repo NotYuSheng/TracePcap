@@ -16,6 +16,8 @@ function when(dt: WindowsLogon['firstSeen']): string | null {
 function evidenceWords(l: WindowsLogon): string {
   if (l.evidence === 'kerberos_as_req') return 'Signed in (Kerberos login)';
   if (l.evidence === 'ntlm_auth') return 'Signed in (NTLM login)';
+  if (l.evidence === 'samr_user_info')
+    return `Named by the domain controller (account ${l.directoryEntry ?? 'unknown'})`;
   return 'Looked up (LDAP directory)';
 }
 

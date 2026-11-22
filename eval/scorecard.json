@@ -3,10 +3,10 @@
     "cases": 5,
     "cases_scored": 5,
     "scored_fields": 32,
-    "correct": 25,
-    "missed": 6,
-    "confidently_wrong": 1,
-    "accuracy": 0.781
+    "correct": 27,
+    "missed": 5,
+    "confidently_wrong": 0,
+    "accuracy": 0.844
   },
   "cases": [
     {
@@ -178,8 +178,8 @@
         },
         {
           "field": "user.real_name",
-          "status": "missed",
-          "detail": null
+          "status": "correct",
+          "detail": "Gabriel Wyatt"
         },
         {
           "field": "malware.family",
@@ -188,12 +188,12 @@
         },
         {
           "field": "c2.ip",
-          "status": "wrong",
+          "status": "correct",
           "detail": {
-            "spurious": [
+            "value": "153.92.1.49",
+            "beyond_key": [
               "62.72.32.156"
-            ],
-            "missing": []
+            ]
           }
         }
       ]

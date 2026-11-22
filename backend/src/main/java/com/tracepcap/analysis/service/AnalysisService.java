@@ -582,7 +582,9 @@ public class AnalysisService {
       if (board != null) RuleVoteRescoreService.applyBoard(h, board);
     }
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
-    applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
+    applyWindowsSignIn(
+        hostClassifications, windowsIdentityClaimsByIp,
+        WindowsIdentityResolverService.fullNamesByIp(run.logons));
     try {
       persistIpMacObservations(
           run.file, run.parseResult.getHostMacObservations(), run.parseResult.getArpClaimWindows());
@@ -1253,7 +1255,8 @@ public class AnalysisService {
    */
   private void applyWindowsSignIn(
       List<HostClassificationEntity> hostClassifications,
-      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
+      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp,
+      Map<String, Map<String, String>> fullNamesByIp) {
     if (windowsIdentityClaimsByIp.isEmpty()) return;
     for (HostClassificationEntity host : hostClassifications) {
       List<WindowsIdentityResolverService.Claim> claims =
@@ -1277,7 +1280,12 @@ public class AnalysisService {
                 ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
                 : WindowsIdentityResolverService.SOURCE_NTLM_AUTH)
             : WindowsIdentityResolverService.SOURCE_LDAP_DN);
-        if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
+        // The person's name: what the domain controller said this account's full name is (SAMR),
+        // else the one name an LDAP lookup gave.
+        String samr = fullNamesByIp.getOrDefault(host.getIp(), Map.of())
+            .get(accounts.get(0).toLowerCase(java.util.Locale.ROOT));
+        if (samr != null) host.setLoggedInUserRealName(samr);
+        else if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
       }
     }
   }
