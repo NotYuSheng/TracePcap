@@ -11,7 +11,7 @@ const categoryInfoPopover = (
     <Popover.Body>
       <p className="mb-2">
         Categories are assigned by{' '}
-        <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
+        <a href="/reference/protocols" target="_blank" rel="noopener noreferrer">
           nDPI
         </a>{' '}
         by first identifying the application (e.g. YouTube → <em>Media</em>, Google → <em>Web</em>),
@@ -23,7 +23,7 @@ const categoryInfoPopover = (
         signature. A misidentified application will produce an incorrect category. Treat category
         labels as strong indicators, not definitive classifications.
       </p>
-      <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer" className="small">
+      <a href="/reference/protocols" target="_blank" rel="noopener noreferrer" className="small">
         View protocol reference →
       </a>
     </Popover.Body>

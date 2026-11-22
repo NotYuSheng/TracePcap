@@ -483,7 +483,7 @@ export function ConversationFilterPanel({
                             indicative, not definitive.
                             <br />
                             <a
-                              href="/ndpi-reference.html"
+                              href="/reference/protocols"
                               target="_blank"
                               rel="noopener noreferrer"
                             >

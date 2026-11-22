@@ -2,6 +2,7 @@ import { Navigate, createBrowserRouter, useLocation } from 'react-router-dom';
 import { MainLayout } from '@components/common/Layout';
 import { RouteErrorBoundary } from '@components/common/RouteErrorBoundary';
 import { HomePage } from '@pages/Home';
+import { ProtocolReferencePage } from '@pages/Reference/ProtocolReferencePage';
 import { AnalysisPage } from '@pages/Analysis';
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
 import { ConversationPage } from '@pages/Conversation';
@@ -103,6 +104,15 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SystemPage />,
+      },
+      {
+        path: 'reference/protocols',
+        element: <ProtocolReferencePage />,
+      },
+      {
+        // The protocol reference used to be a static page; old links and bookmarks land on it.
+        path: 'ndpi-reference.html',
+        element: <Navigate to="/reference/protocols" replace />,
       },
       {
         // The System page became Settings: old links still land there, tab and all.
