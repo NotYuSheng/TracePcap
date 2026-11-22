@@ -2463,6 +2463,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/protocol-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every nDPI application name in your captures, with how many captures and conversations
+         * @description Counts original captures only; a re-analysis is a copy of one.
+         */
+        get: operations["usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/protocol-usage/{appName}/captures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The captures an nDPI application name appears in, most conversations first */
+        get: operations["captures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -4627,6 +4664,13 @@ export interface components {
             name?: string;
             version?: string;
         };
+        ProtocolCaptureDto: {
+            /** Format: int64 */
+            conversations?: number;
+            /** Format: uuid */
+            fileId?: string;
+            fileName?: string;
+        };
         ProtocolRiskEntry: {
             /** Format: int64 */
             atRisk?: number;
@@ -4649,6 +4693,13 @@ export interface components {
             protocols?: {
                 [key: string]: components["schemas"]["ProtocolStat"];
             };
+        };
+        ProtocolUsageDto: {
+            appName?: string;
+            /** Format: int64 */
+            captures?: number;
+            /** Format: int64 */
+            conversations?: number;
         };
         ReanalyseRequest: {
             enableFileExtraction?: boolean;
@@ -9272,6 +9323,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PreferencesDto"];
+                };
+            };
+        };
+    };
+    usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProtocolUsageDto"][];
+                };
+            };
+        };
+    };
+    captures: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                appName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProtocolCaptureDto"][];
                 };
             };
         };

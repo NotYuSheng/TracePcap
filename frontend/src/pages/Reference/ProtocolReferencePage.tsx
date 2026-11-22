@@ -290,7 +290,7 @@ export function ProtocolDetail({ protocol, appNames }: { protocol: NdpiProtocol;
               {captures.slice(0, 8).map(c => (
                 <Link
                   key={c.fileId + c.appName}
-                  to={`/analysis/${c.fileId}/conversations?app=${encodeURIComponent(c.appName)}`}
+                  to={`/analysis/${c.fileId}/conversations?apps=${encodeURIComponent(c.appName)}`}
                   className="reference-capture"
                 >
                   <span className="text-truncate">{c.fileName}</span>
