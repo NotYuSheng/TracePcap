@@ -66,7 +66,18 @@ public interface ConversationLookup {
       LocalDateTime endTime,
       String srcMac,
       String dstMac,
-      String connectionOutcome) {
+      String connectionOutcome,
+      String transport) {
+
+    /** Without the transport: unknown (captures analysed before it was kept). */
+    public FlowIdentity(
+        String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp,
+        Integer initiatorPort, String protocol, long packetCount, long totalBytes,
+        LocalDateTime startTime, LocalDateTime endTime, String srcMac, String dstMac,
+        String connectionOutcome) {
+      this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
+          totalBytes, startTime, endTime, srcMac, dstMac, connectionOutcome, null);
+    }
 
     /**
      * Without the connection outcome (#1233): unknown. {@code connectionOutcome} is ANSWERED,

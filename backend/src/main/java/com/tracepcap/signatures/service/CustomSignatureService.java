@@ -310,11 +310,14 @@ public class CustomSignatureService implements SignatureApplier {
       if (conv.getAppName() == null || !app.equalsIgnoreCase(conv.getAppName())) return false;
     }
 
-    // protocol — case-insensitive match against transport/network protocol (e.g. TCP, UDP, ICMP)
+    // protocol — case-insensitive match against the transport (TCP, UDP, ICMP). A TLS connection
+    // is TCP even though its row is labelled "TLSV1.2"; the label is accepted too, so a rule
+    // written against it keeps working.
     if (match.containsKey("protocol")) {
       String protocol = String.valueOf(match.get("protocol"));
-      if (conv.getProtocol() == null || !protocol.equalsIgnoreCase(conv.getProtocol()))
-        return false;
+      boolean transport = conv.getTransport() != null && protocol.equalsIgnoreCase(conv.getTransport());
+      boolean label = conv.getProtocol() != null && protocol.equalsIgnoreCase(conv.getProtocol());
+      if (!transport && !label) return false;
     }
 
     return true;

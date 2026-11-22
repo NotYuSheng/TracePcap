@@ -351,6 +351,7 @@ public class PcapParserService {
                       c.setDstIp(fDstIp);
                       c.setDstPort(fDstPort);
                       c.setProtocol(fProtocol);
+                      c.setTransport(transport);
                       c.setStartTime(fTs);
                       c.setEndTime(fTs);
                       c.setPacketCount(0L);
@@ -745,7 +746,14 @@ public class PcapParserService {
     private String initiatorIp;
 
     private Integer initiatorPort;
+    /** The row's display label: the most specific one its packets showed ("TLSV1.2"). */
     private String protocol;
+    /**
+     * TCP or UDP (or the label for portless traffic): what the conversation is keyed on, and what
+     * other tools' flow records (nDPI, tshark, Suricata) are matched by. Never the display label,
+     * which changes as a connection goes from its "TCP" SYN to "TLSV1.2" records.
+     */
+    private String transport;
     private String appName;
     private String tsharkProtocol;
     private List<String> flowRisks = new ArrayList<>();

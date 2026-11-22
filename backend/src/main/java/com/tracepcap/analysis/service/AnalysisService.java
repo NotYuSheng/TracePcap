@@ -694,6 +694,7 @@ public class AnalysisService {
       conversation.setInitiatorIp(convInfo.getInitiatorIp());
       // The most specific label the connection showed ("TLSV1.2" rather than its SYN's "TCP").
       conversation.setProtocol(convInfo.getProtocol());
+      conversation.setTransport(convInfo.getTransport());
       conversation.setSrcMac(convInfo.getSrcMac());
       conversation.setDstMac(convInfo.getDstMac());
       conversation.setConnectionOutcome(
