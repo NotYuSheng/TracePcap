@@ -9,6 +9,7 @@ import type {
   NetworkEndpoint,
   Protocol,
   PaginatedResponse,
+  TlsCertificate,
   Packet,
   HostClassification,
   HostIdentity,
@@ -38,6 +39,7 @@ interface ConversationApiResponse {
   ja4Client?: string | null;
   tlsVersion?: string | null;
   connectionOutcome?: string | null;
+  tlsCertificate?: TlsCertificate | null;
   tlsIssuer?: string | null;
   tlsSubject?: string | null;
   tlsNotBefore?: string | number[] | null;
@@ -129,6 +131,7 @@ function transformConversation(
     ja4Client: apiData.ja4Client ?? undefined,
     tlsVersion: apiData.tlsVersion ?? undefined,
     connectionOutcome: apiData.connectionOutcome ?? null,
+    tlsCertificate: apiData.tlsCertificate ?? null,
     tlsIssuer: apiData.tlsIssuer ?? undefined,
     tlsSubject: apiData.tlsSubject ?? undefined,
     tlsNotBefore: apiData.tlsNotBefore != null ? parseDateTime(apiData.tlsNotBefore) : undefined,

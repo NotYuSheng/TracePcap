@@ -112,7 +112,79 @@ public interface ConversationLookup {
       String ja3Client,
       String ja3Server,
       String ja4Client,
-      String tlsVersion) {}
+      String tlsVersion,
+      CertFacts cert) {
+
+    /** Without the certificate's detail (#1235): unknown. */
+    public TlsFacts(
+        String hostname, String tlsIssuer, String tlsSubject, LocalDateTime tlsNotBefore,
+        LocalDateTime tlsNotAfter, String ja3Client, String ja3Server, String ja4Client,
+        String tlsVersion) {
+      this(hostname, tlsIssuer, tlsSubject, tlsNotBefore, tlsNotAfter, ja3Client, ja3Server,
+          ja4Client, tlsVersion, null);
+    }
+  }
+
+  /**
+   * The server certificate's detail (#1235), parsed from the DER Suricata logs. A description,
+   * never a trust verdict: no trust store or revocation check runs offline.
+   *
+   * @param sans subject alternative names (DNS names and IP addresses), at most {@code TlsCertificateParser.MAX_SANS}
+   * @param keyType "RSA", "EC", "DSA", or the JDK's algorithm name
+   * @param keyBits the key size in bits, or null when unknown
+   * @param signatureAlgorithm e.g. "SHA256withRSA"
+   * @param selfSigned issuer equals subject and the certificate verifies with its own key
+   * @param chainLength certificates the server sent, the leaf included
+   */
+  record CertFacts(
+      List<String> sans,
+      String keyType,
+      Integer keyBits,
+      String signatureAlgorithm,
+      boolean selfSigned,
+      int chainLength) {
+
+    /** RSA/DSA keys below this many bits are weak (NIST SP 800-131A: 2048 since 2014). */
+    public static final int MIN_RSA_BITS = 2048;
+
+    /** EC keys below this many bits are weak (P-224 and below). */
+    public static final int MIN_EC_BITS = 256;
+
+    /** A key too short to trust: RSA/DSA under 2048 bits, EC under 256. */
+    public boolean weakKey() {
+      if (keyBits == null || keyType == null) return false;
+      return "EC".equals(keyType) ? keyBits < MIN_EC_BITS : keyBits < MIN_RSA_BITS;
+    }
+
+    /** Signed with MD5 or SHA-1, which can be forged. */
+    public boolean weakSignature() {
+      if (signatureAlgorithm == null) return false;
+      String s = signatureAlgorithm.toUpperCase(java.util.Locale.ROOT);
+      return s.startsWith("MD5") || s.startsWith("MD2") || s.startsWith("SHA1");
+    }
+
+    /**
+     * Whether the certificate covers {@code serverName}: an exact SAN, or a single-label wildcard
+     * ({@code *.example.com} covers {@code www.example.com}, not {@code a.b.example.com}). Null
+     * when it can't be judged: no name to check, or no SANs listed.
+     */
+    public Boolean covers(String serverName) {
+      if (serverName == null || serverName.isBlank() || sans == null || sans.isEmpty()) return null;
+      String name = serverName.trim().toLowerCase(java.util.Locale.ROOT);
+      if (name.endsWith(".")) name = name.substring(0, name.length() - 1);
+      for (String san : sans) {
+        String s = san.toLowerCase(java.util.Locale.ROOT);
+        if (s.equals(name)) return true;
+        if (s.startsWith("*.")) {
+          String suffix = s.substring(1);
+          int dot = name.indexOf('.');
+          if (dot > 0 && name.substring(dot).equals(suffix)) return true;
+        }
+      }
+      return false;
+    }
+  }
+
 
   /**
    * What a tool concluded. The lists are never null (empty when the tool found nothing or did not

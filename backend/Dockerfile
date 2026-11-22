@@ -139,6 +139,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     cp /tmp/etrules/rules/*.config /etc/suricata/ 2>/dev/null || true && \
     rm -rf /tmp/etrules && \
     date -u +%Y-%m-%d > /opt/suricata-ruleset-version && \
+    # Log each TLS session's certificate and chain (#1235), on top of the fields already read.
+    # The packaged yaml ships this list commented out; the grep fails the build if a Suricata
+    # upgrade moves it, rather than silently losing certificate detail.
+    sed -i 's|^\( *\)#custom: \[subject, issuer, session_resumed.*\]|\1custom: [subject, issuer, serial, fingerprint, sni, version, not_before, not_after, certificate, chain, ja3, ja3s]|' /etc/suricata/suricata.yaml && \
+    grep -q '^ *custom: \[subject, issuer, serial, fingerprint, sni, version, not_before, not_after, certificate, chain' /etc/suricata/suricata.yaml && \
     chmod -R a+rX /etc/suricata && \
     apt-get purge -y --auto-remove curl
 

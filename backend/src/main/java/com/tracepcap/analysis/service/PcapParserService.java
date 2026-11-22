@@ -746,6 +746,8 @@ public class PcapParserService {
     private String tlsSubject;
     private LocalDateTime tlsNotBefore;
     private LocalDateTime tlsNotAfter;
+    /** The server certificate's detail (#1235), from Suricata's logged DER; null when not seen. */
+    private com.tracepcap.analysis.spi.ConversationLookup.CertFacts tlsCert;
     private Long packetCount;
     private Long totalBytes;
     private LocalDateTime startTime;

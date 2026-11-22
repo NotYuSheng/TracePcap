@@ -74,6 +74,8 @@ export interface Conversation {
   ja4Client?: string;
   /** Negotiated TLS version, e.g. "TLS 1.2", from Suricata (#599). */
   tlsVersion?: string;
+  /** The server certificate's detail and checks (#1235); absent when the certificate wasn't seen. */
+  tlsCertificate?: TlsCertificate | null;
   /** How the TCP connection went (#1233): ANSWERED, NO_ANSWER, REJECTED; absent when unknown. */
   connectionOutcome?: string | null;
   tlsIssuer?: string;
@@ -612,4 +614,18 @@ export interface InvestigationReport {
   additional: Answer[];
   unknowns: string[];
   coverage: string[];
+}
+
+/** Mirrors TlsCertificateDto (#1235): the checks are worked out by the backend. */
+export interface TlsCertificate {
+  sans: string[];
+  keyType?: string | null;
+  keyBits?: number | null;
+  signatureAlgorithm?: string | null;
+  selfSigned: boolean;
+  chainLength: number;
+  weakKey: boolean;
+  weakSignature: boolean;
+  /** Null when there's no server name to check or no SANs. */
+  coversServerName?: boolean | null;
 }

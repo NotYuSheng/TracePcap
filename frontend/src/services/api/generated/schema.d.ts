@@ -3466,6 +3466,7 @@ export interface components {
             /** Format: date-time */
             startTime?: string;
             suricataAlerts?: string[];
+            tlsCertificate?: components["schemas"]["TlsCertificateDto"];
             tlsIssuer?: string;
             /** Format: date-time */
             tlsNotAfter?: string;
@@ -3573,6 +3574,7 @@ export interface components {
             /** Format: date-time */
             startTime?: string;
             suricataAlerts?: string[];
+            tlsCertificate?: components["schemas"]["TlsCertificateDto"];
             tlsIssuer?: string;
             /** Format: date-time */
             tlsNotAfter?: string;
@@ -5138,11 +5140,30 @@ export interface components {
             /** Format: int64 */
             expired?: number;
             /** Format: int64 */
+            nameMismatch?: number;
+            /** Format: int64 */
             selfSigned?: number;
             /** Format: int64 */
             total?: number;
             /** Format: int64 */
             unknownCa?: number;
+            /** Format: int64 */
+            weakKey?: number;
+            /** Format: int64 */
+            weakSignature?: number;
+        };
+        TlsCertificateDto: {
+            /** Format: int32 */
+            chainLength?: number;
+            coversServerName?: boolean;
+            /** Format: int32 */
+            keyBits?: number;
+            keyType?: string;
+            sans?: string[];
+            selfSigned?: boolean;
+            signatureAlgorithm?: string;
+            weakKey?: boolean;
+            weakSignature?: boolean;
         };
         TlsInfo: {
             issuer?: string;

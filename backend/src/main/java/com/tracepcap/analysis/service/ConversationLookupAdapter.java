@@ -354,7 +354,8 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getJa3Client(),
             e.getJa3Server(),
             e.getJa4Client(),
-            e.getTlsVersion()),
+            e.getTlsVersion(),
+            certFacts(e)),
         new Findings(
             e.getAppName(),
             e.getTsharkProtocol(),
@@ -387,5 +388,19 @@ public class ConversationLookupAdapter implements ConversationLookup {
     return repository.appCaptures(appName, limit).stream()
         .map(r -> new AppCapture((UUID) r[0], (String) r[1], ((Number) r[2]).longValue()))
         .toList();
+  }
+
+  /** The stored certificate detail (#1235), or null when none was recorded. */
+  private static ConversationLookup.CertFacts certFacts(ConversationEntity e) {
+    if (e.getTlsSelfSigned() == null && e.getTlsKeyType() == null && e.getTlsSigAlg() == null) {
+      return null;
+    }
+    return new ConversationLookup.CertFacts(
+        e.getTlsSans() == null ? List.of() : List.of(e.getTlsSans()),
+        e.getTlsKeyType(),
+        e.getTlsKeyBits(),
+        e.getTlsSigAlg(),
+        Boolean.TRUE.equals(e.getTlsSelfSigned()),
+        e.getTlsChainLength() == null ? 1 : e.getTlsChainLength());
   }
 }

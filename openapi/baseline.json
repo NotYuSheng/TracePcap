@@ -1043,6 +1043,9 @@
             },
             "type": "array"
           },
+          "tlsCertificate": {
+            "$ref": "#/components/schemas/TlsCertificateDto"
+          },
           "tlsIssuer": {
             "type": "string"
           },
@@ -1326,6 +1329,9 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "tlsCertificate": {
+            "$ref": "#/components/schemas/TlsCertificateDto"
           },
           "tlsIssuer": {
             "type": "string"
@@ -5763,6 +5769,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "nameMismatch": {
+            "format": "int64",
+            "type": "integer"
+          },
           "selfSigned": {
             "format": "int64",
             "type": "integer"
@@ -5774,6 +5784,51 @@
           "unknownCa": {
             "format": "int64",
             "type": "integer"
+          },
+          "weakKey": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "weakSignature": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TlsCertificateDto": {
+        "properties": {
+          "chainLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "coversServerName": {
+            "type": "boolean"
+          },
+          "keyBits": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "keyType": {
+            "type": "string"
+          },
+          "sans": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "selfSigned": {
+            "type": "boolean"
+          },
+          "signatureAlgorithm": {
+            "type": "string"
+          },
+          "weakKey": {
+            "type": "boolean"
+          },
+          "weakSignature": {
+            "type": "boolean"
           }
         },
         "type": "object"

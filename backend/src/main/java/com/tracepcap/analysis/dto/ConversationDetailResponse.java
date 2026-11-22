@@ -48,6 +48,9 @@ public class ConversationDetailResponse {
   private String ja4Client;
   /** Negotiated TLS version, from Suricata (#599). */
   private String tlsVersion;
+
+  /** The server certificate's detail and checks (#1235); null when the certificate wasn't seen. */
+  private TlsCertificateDto tlsCertificate;
   private String tlsIssuer;
   private String tlsSubject;
   private LocalDateTime tlsNotBefore;

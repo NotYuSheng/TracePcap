@@ -703,6 +703,18 @@ public class AnalysisService {
       conversation.setJa3Server(convInfo.getJa3Server());
       conversation.setJa4Client(convInfo.getJa4Client());
       conversation.setTlsVersion(convInfo.getTlsVersion());
+      if (convInfo.getTlsCert() != null) {
+        var cert = convInfo.getTlsCert();
+        conversation.setTlsSans(cert.sans().toArray(String[]::new));
+        conversation.setTlsKeyType(cert.keyType());
+        conversation.setTlsKeyBits(cert.keyBits());
+        conversation.setTlsSigAlg(
+            cert.signatureAlgorithm() == null || cert.signatureAlgorithm().length() <= 64
+                ? cert.signatureAlgorithm()
+                : cert.signatureAlgorithm().substring(0, 64));
+        conversation.setTlsSelfSigned(cert.selfSigned());
+        conversation.setTlsChainLength(cert.chainLength());
+      }
       conversation.setTlsIssuer(convInfo.getTlsIssuer());
       conversation.setTlsSubject(convInfo.getTlsSubject());
       conversation.setTlsNotBefore(convInfo.getTlsNotBefore());
