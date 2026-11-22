@@ -61,6 +61,17 @@ public class DownloadContributor implements KnowledgeContributor {
     return "downloads";
   }
 
+  /** The host of "http://host:port/path", or null. */
+  static String urlHost(String url) {
+    if (url == null) return null;
+    try {
+      String h = java.net.URI.create(url.replace(" ", "%20")).getHost();
+      return h == null || h.isBlank() ? null : h;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     ExtractedFileLookup lookup = files.getIfAvailable();
@@ -81,7 +92,8 @@ public class DownloadContributor implements KnowledgeContributor {
       if (src == null || dst == null || IpLocality.isLocal(src) == IpLocality.isLocal(dst)) continue;
       String host = IpLocality.isLocal(src) ? src : dst;
       String external = IpLocality.isLocal(src) ? dst : src;
-      String serverName = conv.tls() == null ? null : conv.tls().hostname();
+      String serverName = urlHost(f.sourceUrl());
+      if (serverName == null && conv.tls() != null) serverName = conv.tls().hostname();
       if (serverName != null && OS_UPDATE_HOST.matcher(serverName.trim()).find()) continue;
 
       Map<String, Object> attrs = new LinkedHashMap<>();
@@ -89,6 +101,7 @@ public class DownloadContributor implements KnowledgeContributor {
       attrs.put("external", external);
       if (serverName != null && !serverName.isBlank()) attrs.put("serverName", serverName);
       attrs.put("name", f.filename());
+      if (f.sourceUrl() != null) attrs.put("url", f.sourceUrl());
       attrs.put("mimeType", f.mimeType());
       if (f.size() != null) attrs.put("size", f.size());
       attrs.put("sha256", f.sha256().toLowerCase(Locale.ROOT));

@@ -98,4 +98,29 @@ class DownloadContributorTest {
         .singleElement()
         .satisfies(x -> assertThat(x.headline()).contains("from quote.checkfedexexp.com").contains("archive"));
   }
+
+  @Test
+  void anUpdateFetchedOverPlainHttp_isRecognisedByItsUrl() {
+    // 2025-01-22: a Defender update over HTTP had no TLS name to go by.
+    UUID c = UUID.randomUUID();
+    assertThat(
+            run(
+                List.of(conv(c, "10.1.17.215", "199.232.214.172", null)),
+                List.of(new ExtractedFileFacts(c, "am_delta_patch_1.421.1491.0.exe", "application/x-msdownload", 398_944L,
+                    "3e3466", "tshark_http", false,
+                    "http://au.download.windowsupdate.com/c/msdownload/update/am_delta_patch_1.421.1491.0.exe"))))
+        .isEmpty();
+  }
+
+  @Test
+  void theAnswerSaysTheUrl() {
+    UUID c = UUID.randomUUID();
+    assertThat(
+            run(
+                List.of(conv(c, "10.8.15.133", "72.5.43.29", null)),
+                List.of(new ExtractedFileFacts(c, "0f60a3e7baecf2748b1c8183ed37d1e4", "application/x-msdownload", 159_232L,
+                    "b7aec5f7", "tshark_http", false, "http://72.5.43.29/data/0f60a3e7baecf2748b1c8183ed37d1e4"))))
+        .singleElement()
+        .satisfies(x -> assertThat(x.headline()).contains("from http://72.5.43.29/data/0f60a3e7baecf2748b1c8183ed37d1e4 (72.5.43.29)"));
+  }
 }

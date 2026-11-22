@@ -3870,6 +3870,7 @@ export interface components {
             mimeType?: string;
             sha256?: string;
             skippedReason?: string;
+            sourceUrl?: string;
         };
         ExtractionWarningsResponse: {
             /** Format: int32 */

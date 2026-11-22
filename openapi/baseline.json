@@ -2152,6 +2152,9 @@
           },
           "skippedReason": {
             "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
           }
         },
         "type": "object"

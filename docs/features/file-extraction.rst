@@ -24,9 +24,15 @@ HTTP Object Extraction
 
 The backend runs ``tshark --export-objects http,<tmpdir>`` to extract HTTP
 response bodies as files. A second tshark pass correlates each exported file
-back to its source conversation by matching the URI path component. The
-original filename (from the response URI or ``Content-Disposition`` header)
-and MIME type (from ``Content-Type``) are preserved where available.
+back to its source conversation by the name tshark gives it: the last part of
+the request URI, query string included, with ``?`` and other characters a
+file name can't hold percent-encoded (``/managements?id=1`` becomes
+``managements%3fid=1``). Each file also records its **source URL**
+(``http://host/path?query``), shown under its name and searchable.
+
+A file is named what the server called it when it said so (the
+``Content-Disposition`` header: ``Invoice 876597035_003.zip``, not
+``managements%3f16553a…``); otherwise it keeps tshark's name.
 
 Stream Extraction (Aho-Corasick + Apache Tika)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -42,6 +48,17 @@ length.
 
 A maximum of 5 files per stream are extracted to prevent runaway extraction
 on synthetic or binary-heavy payloads.
+
+Two kinds of stream are never carved, because any "file" found in them is a
+coincidence of bytes:
+
+- **Encrypted streams** (TLS, QUIC, SSH and VPN protocols, or any stream with a
+  TLS handshake): the payload is ciphertext.
+- **Streams already exported as HTTP objects**: carving only finds fragments of
+  the same files again.
+
+Carved files are guesses either way. The **Downloaded file** answer in the
+Investigation panel only ever lists files from a real HTTP transfer.
 
 MIME Detection
 --------------
