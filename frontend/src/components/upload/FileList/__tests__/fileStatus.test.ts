@@ -1,7 +1,7 @@
 /** One status per capture, and the quiet notes under it. */
 import { describe, expect, it } from 'vitest'
 
-import { actionOf, expiresAt, notesOf, statusOf, type StatusContext, type StatusFile } from '../fileStatus'
+import { expiresAt, notesOf, statusOf, type StatusContext, type StatusFile } from '../fileStatus'
 
 const NOW = Date.UTC(2026, 10, 14, 12)
 const H = 3600_000
@@ -94,10 +94,3 @@ describe('upload options', () => {
   })
 })
 
-describe('actionOf', () => {
-  it('offers what each status allows', () => {
-    expect(actionOf('ready')).toBe('Open')
-    expect(actionOf('analysing')).toBe('Watch')
-    expect(actionOf('failed')).toBe('See why')
-  })
-})

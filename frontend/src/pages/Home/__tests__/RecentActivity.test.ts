@@ -147,3 +147,17 @@ describe('kept captures', () => {
     expect(buildActivity([f], [], 12, NOW2).some(e => e.tone === 'warn')).toBe(true)
   })
 })
+
+describe('who uploaded a capture', () => {
+  it('is named on its activity line, except the shared login-off profile', () => {
+    const [ana, sys, failed] = [
+      buildActivity([file('a', 1, 'COMPLETED', { uploadedBy: 'ana' })], [], null, NOW)[0],
+      buildActivity([file('b', 1, 'COMPLETED', { uploadedBy: 'system' })], [], null, NOW)[0],
+      buildActivity([file('c', 1, 'FAILED', { uploadedBy: 'bob' })], [], null, NOW)[0],
+    ];
+    expect(ana.meta).toBe('913 packets · by ana');
+    expect(sys.meta).toBe('913 packets');
+    expect(failed.meta).toBe('Uploaded · by bob');
+  });
+});
+
