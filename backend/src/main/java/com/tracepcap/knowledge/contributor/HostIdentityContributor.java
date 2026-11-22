@@ -74,7 +74,8 @@ public class HostIdentityContributor implements KnowledgeContributor {
    */
   private Grade gradeForSource(String source) {
     if (WindowsIdentityResolverService.isSignIn(source)) return Grade.MEASURED;
-    if (WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(source)) return Grade.REPORTED;
+    if (WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(source)
+        || WindowsIdentityResolverService.SOURCE_SAMR_USER_INFO.equals(source)) return Grade.REPORTED;
     return Grade.INFERRED;
   }
 

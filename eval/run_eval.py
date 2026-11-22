@@ -178,12 +178,16 @@ def norm_host(v):
 
 
 # --------------------------------------------------------------------------- scoring
-def classify(expected, candidates, normalizer=norm_text):
+def classify(expected, candidates, normalizer=norm_text, beyond=()):
     """Score one field. `expected` is a value or a list of values (a key may list several C2s).
 
     Extras count against the answer: producing a value the key does not list is `wrong` even when
     the right value is present too -- otherwise a regression that adds spurious victims / C2s would
     still score "correct" and the confidently-wrong gate would never fire.
+
+    `beyond` lists values the key doesn't mention but the case file records as evidenced findings
+    (see `beyond_key` in expected.yaml). Producing one is neither right nor wrong: it is left out of
+    the scoring and reported as `beyond_key` in the detail.
     """
     exp = [e for e in (expected if isinstance(expected, list) else [expected]) if e is not None]
     if not exp:
@@ -195,16 +199,41 @@ def classify(expected, candidates, normalizer=norm_text):
         if c is not None and normalizer(c) is not None:
             produced.setdefault(normalizer(c), c)
 
+    beyond_norm = {normalizer(b) for b in beyond if b is not None}
+    extra = [raw for n, raw in produced.items() if n in beyond_norm and n not in exp_norm]
+    produced = {n: raw for n, raw in produced.items() if n not in beyond_norm or n in exp_norm}
+
     spurious = [raw for n, raw in produced.items() if n not in exp_norm]
     missing = [e for e in exp if normalizer(e) not in produced]
 
+    def detail(d):
+        if not extra:
+            return d
+        d = d if isinstance(d, dict) else ({} if d is None else {"value": d})
+        return {**d, "beyond_key": extra}
+
     if spurious:
-        return WRONG, {"spurious": spurious, "missing": missing}
+        return WRONG, detail({"spurious": spurious, "missing": missing})
     if not produced:
-        return MISSED, None
+        return MISSED, detail(None)
     if missing:
-        return MISSED, {"missing": missing}
-    return CORRECT, exp[0] if len(exp) == 1 else exp
+        return MISSED, detail({"missing": missing})
+    return CORRECT, detail(exp[0] if len(exp) == 1 else exp)
+
+
+def beyond_key(expected, field):
+    """Evidenced findings the key doesn't mention, for one scored field (`beyond_key` in the case).
+
+    Each entry needs a `value` and written `evidence` from a source other than TracePcap itself (an
+    IDS rule's own text, an observed connection, a vendor report); an entry without evidence is
+    rejected, so this can't quietly become a way to mark TracePcap's own output as right.
+    """
+    out = []
+    for e in (expected.get("beyond_key", {}) or {}).get(field, []) or []:
+        if not e.get("value") or not str(e.get("evidence", "")).strip():
+            raise ValueError(f"beyond_key.{field}: every entry needs a value and evidence, got {e!r}")
+        out.append(e["value"])
+    return out
 
 
 def answers_by_question(answers):
@@ -252,7 +281,7 @@ def score_case(expected, answers, knowledge):
         ("user.account", *classify(u.get("account"), user_accts)),
         ("user.real_name", *classify(u.get("real_name"), real_name_cands)),
         ("malware.family", *classify(m.get("family"), malwares)),
-        ("c2.ip", *classify(c2_ips or None, c2_addrs)),
+        ("c2.ip", *classify(c2_ips or None, c2_addrs, beyond=beyond_key(expected, "c2.ip"))),
     ]
     return [{"field": f, "status": s, "detail": d} for (f, s, d) in fields]
 
@@ -344,8 +373,13 @@ def fmt_detail(d):
         parts = []
         if d.get("spurious"):
             parts.append("spurious: " + ", ".join(map(str, d["spurious"])))
+        if d.get("value") is not None:
+            v = d["value"]
+            parts.append(", ".join(map(str, v)) if isinstance(v, list) else str(v))
         if d.get("missing"):
             parts.append("missing: " + ", ".join(map(str, d["missing"])))
+        if d.get("beyond_key"):
+            parts.append("also, beyond the key (evidenced): " + ", ".join(map(str, d["beyond_key"])))
         return "; ".join(parts)
     return ", ".join(map(str, d)) if isinstance(d, list) else str(d)
 

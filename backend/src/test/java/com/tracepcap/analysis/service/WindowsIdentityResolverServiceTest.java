@@ -155,4 +155,32 @@ class WindowsIdentityResolverServiceTest {
         .extracting(WindowsIdentityResolverService.Logon::source)
         .isEqualTo(WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ);
   }
+
+  // ── SAMR full names ────────────────────────────────────────────────────────
+  // Columns 10-11: samr.samr_UserInfo21.account_name, full_name. The reply goes DC -> client.
+
+  @Test
+  void samrQueryUserInfoReply_namesThePersonBehindTheAccount_forTheClientThatAsked() {
+    // Verbatim from the 2026-01-31 Lumma training capture.
+    var logons =
+        resolver.logonsFromRows(
+            List.of("358|10.1.21.2|10.1.21.58||||1769555064.0||||gwyatt|Gabriel Wyatt"));
+    assertThat(logons).singleElement().satisfies(l -> {
+      assertThat(l.ip()).isEqualTo("10.1.21.58");
+      assertThat(l.source()).isEqualTo(WindowsIdentityResolverService.SOURCE_SAMR_USER_INFO);
+      assertThat(l.username()).isEqualTo("Gabriel Wyatt");
+      assertThat(l.directoryEntry()).isEqualTo("gwyatt");
+    });
+    assertThat(WindowsIdentityResolverService.fullNamesByIp(logons))
+        .containsEntry("10.1.21.58", java.util.Map.of("gwyatt", "Gabriel Wyatt"));
+  }
+
+  @Test
+  void aSamrAnswer_isNotASignIn() {
+    var logons =
+        resolver.logonsFromRows(
+            List.of("90|10.8.15.4|10.8.15.133||||1723680600.0||||plucero|Pierce Lucero"));
+    assertThat(logons).hasSize(1); // recorded, for the timeline
+    assertThat(WindowsIdentityResolverService.toClaims(logons)).isEmpty(); // but not a sign-in
+  }
 }

@@ -3,9 +3,9 @@
 Baseline of TracePcap's **deterministic** conclusions vs. published answer keys (#819, Workstream A). Regenerate with `python3 eval/run_eval.py`.
 
 - Cases scored: **5** of 5
-- Correct: **25** / 32 (accuracy 0.781)
-- Missed: **6**
-- Confidently wrong: **1** ❌
+- Correct: **27** / 32 (accuracy 0.844)
+- Missed: **5**
+- Confidently wrong: **0** ✅
 
 ## 2024-07-30-strrat
 Analysis: Suricata **on**, nDPI on.
@@ -55,9 +55,9 @@ Analysis: Suricata **on**, nDPI on.
 | victim.mac | ✅ correct | 00:21:5d:c8:0e:f2 |
 | victim.hostname | ✅ correct | DESKTOP-ES9F3ML |
 | user.account | ✅ correct | gwyatt |
-| user.real_name | ◻️ missed |  |
+| user.real_name | ✅ correct | Gabriel Wyatt |
 | malware.family | ✅ correct | Lumma Stealer |
-| c2.ip | ❌ wrong | spurious: 62.72.32.156 |
+| c2.ip | ✅ correct | 153.92.1.49; also, beyond the key (evidenced): 62.72.32.156 |
 
 ## 2026-11-10-netsupport
 Analysis: Suricata **on**, nDPI on.

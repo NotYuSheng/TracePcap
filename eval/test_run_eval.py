@@ -208,5 +208,30 @@ class RunSummaryTest(unittest.TestCase):
             json.loads((Path(d) / "scorecard.json").read_text())  # still valid JSON
 
 
+
+class BeyondTheKey(unittest.TestCase):
+    """An evidenced finding the key doesn't mention is neither right nor wrong (2026-01-31 Lumma)."""
+
+    def test_an_evidenced_extra_is_left_out_of_the_score(self):
+        status, detail = ev.classify(["153.92.1.49"], ["153.92.1.49", "62.72.32.156"], beyond=["62.72.32.156"])
+        self.assertEqual(status, ev.CORRECT)
+        self.assertEqual(detail["beyond_key"], ["62.72.32.156"])
+
+    def test_an_unlisted_extra_is_still_wrong(self):
+        status, _ = ev.classify(["153.92.1.49"], ["153.92.1.49", "6.6.6.6"], beyond=["62.72.32.156"])
+        self.assertEqual(status, ev.WRONG)
+
+    def test_only_the_extra_found_is_a_miss(self):
+        status, detail = ev.classify(["153.92.1.49"], ["62.72.32.156"], beyond=["62.72.32.156"])
+        self.assertEqual(status, ev.MISSED)
+        self.assertEqual(detail["beyond_key"], ["62.72.32.156"])
+
+    def test_an_entry_without_evidence_is_refused(self):
+        with self.assertRaises(ValueError):
+            ev.beyond_key({"beyond_key": {"c2.ip": [{"value": "1.2.3.4"}]}}, "c2.ip")
+        self.assertEqual(
+            ev.beyond_key({"beyond_key": {"c2.ip": [{"value": "1.2.3.4", "evidence": "ET sid 1"}]}}, "c2.ip"),
+            ["1.2.3.4"])
+
 if __name__ == "__main__":
     unittest.main()

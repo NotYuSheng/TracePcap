@@ -81,6 +81,14 @@ public class WindowsIdentityResolverService {
    */
   public static final String SOURCE_NTLM_AUTH = "ntlm_auth";
 
+  /**
+   * A domain controller answered an SMB/SAMR "QueryUserInfo" with an account's full name: the row's
+   * {@code directoryEntry} is the account ({@code gwyatt}), its {@code username} the full name
+   * ({@code Gabriel Wyatt}), its {@code ip} the client that asked. A lookup, REPORTED-grade like LDAP,
+   * never a sign-in; it names the person behind an account the host signed in as.
+   */
+  public static final String SOURCE_SAMR_USER_INFO = "samr_user_info";
+
   /** NTLM message type 3 (AUTHENTICATE), the client's own sign-in, per MS-NLMP. */
   private static final String NTLM_MSG_TYPE_AUTHENTICATE = "3";
 
@@ -167,6 +175,8 @@ public class WindowsIdentityResolverService {
   public static List<Claim> toClaims(List<Logon> logons) {
     return logons.stream()
         .filter(l -> !l.isCandidateOnly())
+        // A SAMR answer names a person, it isn't evidence of a sign-in: see fullNamesByIp.
+        .filter(l -> !SOURCE_SAMR_USER_INFO.equals(l.source()))
         .map(l -> new Claim(l.ip(), l.username(), l.source()))
         .distinct()
         .toList();
@@ -186,6 +196,7 @@ public class WindowsIdentityResolverService {
     //   4 kerberos.msg_type  5 kerberos.CNameString
     //   6 frame.time_epoch
     //   7 ntlmssp.messagetype  8 ntlmssp.auth.username  9 ntlmssp.auth.domain
+    //   10 samr UserInfo21 account_name  11 samr UserInfo21 full_name (a reply: ip.dst asked)
     // Every occurrence, not just the first (#812 item 4): one TCP-reassembled frame can carry
     // several Kerberos or LDAP messages, and reading only the first skipped a real AS-REQ when an
     // earlier message in the frame had another type. The aggregator is a control character, not
@@ -203,7 +214,8 @@ public class WindowsIdentityResolverService {
             pcapFile.getAbsolutePath(),
             "-Y",
             "ldap.baseObject || (kerberos.msg_type==10 and kerberos.CNameString)"
-                + " || ntlmssp.messagetype==" + NTLM_MSG_TYPE_AUTHENTICATE,
+                + " || ntlmssp.messagetype==" + NTLM_MSG_TYPE_AUTHENTICATE
+                + " || samr.samr_UserInfo21.full_name",
             "-T",
             "fields",
             "-E",
@@ -231,7 +243,11 @@ public class WindowsIdentityResolverService {
             "-e",
             "ntlmssp.auth.username",
             "-e",
-            "ntlmssp.auth.domain");
+            "ntlmssp.auth.domain",
+            "-e",
+            "samr.samr_UserInfo21.account_name",
+            "-e",
+            "samr.samr_UserInfo21.full_name");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -306,6 +322,20 @@ public class WindowsIdentityResolverService {
         .toList();
   }
 
+  /**
+   * Full names a domain controller gave out (SAMR), per client and account: {@code ip → (account,
+   * lower-case → full name)}. Used to name the person behind the account a host signed in as.
+   */
+  public static Map<String, Map<String, String>> fullNamesByIp(List<Logon> logons) {
+    Map<String, Map<String, String>> out = new java.util.HashMap<>();
+    for (Logon l : logons) {
+      if (!SOURCE_SAMR_USER_INFO.equals(l.source()) || l.directoryEntry() == null) continue;
+      out.computeIfAbsent(l.ip(), k -> new java.util.HashMap<>())
+          .putIfAbsent(l.directoryEntry().toLowerCase(java.util.Locale.ROOT), l.username());
+    }
+    return out;
+  }
+
   /** For tests: tshark output rows (fields as {@link #resolveLogons} requests them) to logins. */
   List<Logon> logonsFromRows(List<String> rows) {
     Map<LogonKey, LogonAgg> result = new java.util.LinkedHashMap<>();
@@ -360,6 +390,16 @@ public class WindowsIdentityResolverService {
     // NTLM sign-ins ride inside other protocols (SMB, HTTP, LDAP binds), so they are read first and
     // don't end the row: the same frame can also carry an LDAP search or a Kerberos message.
     if (f.length > 9) recordNtlm(result, ip, split(f[7]), split(f[8]), split(f[9]), at);
+
+    // A SAMR QueryUserInfo reply: the DC tells the client (ip.dst) an account's full name.
+    if (f.length > 11) {
+      String account = first(split(f[10]));
+      String fullName = first(split(f[11]));
+      if (account != null && fullName != null && !isMachineAccount(account)) {
+        record(result, firstValue(f[2]), fullName, SOURCE_SAMR_USER_INFO, account.trim(), null, null, null, at);
+      }
+      if (fullName != null) return;
+    }
 
     // Every LDAP searchRequest DN in the frame.
     List<String> dns = split(f[3]);

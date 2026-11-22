@@ -58,8 +58,12 @@ export interface ConversationFilters {
 /** One Windows account seen on a host (#812). Mirrors WindowsLogonResponse. */
 export interface WindowsLogon {
   username: string;
-  /** kerberos_as_req / ntlm_auth: signed in. ldap_dn: looked up in the directory. */
-  evidence: 'kerberos_as_req' | 'ntlm_auth' | 'ldap_dn' | string;
+  /**
+   * kerberos_as_req / ntlm_auth: signed in. ldap_dn: looked up in the directory. samr_user_info:
+   * the domain controller gave this account's full name (username is the name, directoryEntry the
+   * account).
+   */
+  evidence: 'kerberos_as_req' | 'ntlm_auth' | 'ldap_dn' | 'samr_user_info' | string;
   /** LDAP only: the full directory entry. */
   directoryEntry?: string | null;
   /** LDAP only: the folder in plain words, e.g. "Users" or "Staff / Sales". */
