@@ -48,6 +48,14 @@ public class IdsAlertContributor implements KnowledgeContributor {
   static final String C2_OF = "c2-of";
 
   /**
+   * A malware rule about command and control: "Fake Microsoft Teams CnC Payload Request", "… C2
+   * Checkin", "… Beacon". Only these make an unnamed C2; an informational or reputation rule (a
+   * Spamhaus DROP hit, a PowerShell user agent) never does.
+   */
+  private static final Pattern C2_RULE =
+      Pattern.compile("\\bMALWARE\\b.*\\b(CnC|C2|Check-?in|Beacon(ing)?)\\b", Pattern.CASE_INSENSITIVE);
+
+  /**
    * The token(s) after "MALWARE" in an ET rule name. Group 1 is an all-caps lead token (a family
    * like {@code STRRAT}, or a platform prefix like {@code MSIL}/{@code ELF}); group 2, when the lead
    * is a {@code platform/family} form, is the family after the slash ({@code MSIL/Ramnit} → Ramnit).
@@ -81,6 +89,9 @@ public class IdsAlertContributor implements KnowledgeContributor {
 
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    // Externals some rule tied to a named family, and externals only a family-less C2 rule hit.
+    java.util.Set<EntityRef> named = new java.util.HashSet<>();
+    java.util.Set<EntityRef> unnamedC2 = new java.util.LinkedHashSet<>();
     for (ConversationFacts conv : context.conversationFacts()) {
       List<String> alerts = conv.findings().suricataAlerts();
       if (alerts == null || alerts.isEmpty()) continue;
@@ -120,7 +131,9 @@ public class IdsAlertContributor implements KnowledgeContributor {
 
       for (String alert : alerts) {
         String family = malwareFamily(alert);
+        if (family == null && C2_RULE.matcher(alert).find()) unnamedC2.add(external);
         if (family != null) {
+          named.add(external);
           EntityRef malwareRef = EntityRef.malware(family);
           board.addEntity(malwareRef);
           // The external endpoint is this malware's C2.
@@ -128,6 +141,16 @@ public class IdsAlertContributor implements KnowledgeContributor {
               Relationship.of(external, C2_OF, malwareRef, Grade.INFERRED, "suricata"));
         }
       }
+    }
+
+    // A C2 that no rule names a family for (a "Fake Microsoft Teams CnC" request): still the C2,
+    // so the host talking to it is the victim, but no family is claimed. Skipped where a named
+    // family already covers the server, so a family-less rule beside a named one adds nothing.
+    for (EntityRef external : unnamedC2) {
+      if (named.contains(external)) continue;
+      EntityRef unidentified = EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE);
+      board.addEntity(unidentified);
+      board.addRelationship(Relationship.of(external, C2_OF, unidentified, Grade.INFERRED, "suricata"));
     }
   }
 
