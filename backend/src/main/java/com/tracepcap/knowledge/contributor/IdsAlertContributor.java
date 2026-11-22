@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
+import com.tracepcap.analysis.spi.IdsRuleMetadata;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,8 +25,23 @@ import org.springframework.stereotype.Component;
  * a query over these findings, not a metric-based guess.
  */
 @Component
-@RequiredArgsConstructor
 public class IdsAlertContributor implements KnowledgeContributor {
+
+  /** The active ruleset's metadata: names a family from the rule's own {@code malware_family} tag. */
+  private final IdsRuleMetadata ruleMetadata;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public IdsAlertContributor(IdsRuleMetadata ruleMetadata) {
+    this.ruleMetadata = ruleMetadata;
+  }
+
+  /** Without a ruleset (tests): families come from the rule message alone. */
+  IdsAlertContributor() {
+    this(IdsRuleMetadata.NONE);
+  }
+
+  /** The sid in a stored alert label, "… (sid:2066606 sev:1)". */
+  private static final Pattern SID = Pattern.compile("\\(sid:(\\d+)");
 
   static final String IDS_ALERT = "ids-alert";
   static final String COMMUNICATES_WITH = "communicates-with";
@@ -122,8 +137,37 @@ public class IdsAlertContributor implements KnowledgeContributor {
     return IpLocality.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
   }
 
-  private String malwareFamily(String alert) {
+  /**
+   * The malware family an alert names. When the rule is in the active ruleset, its {@code
+   * malware_family} tag decides: ET tags 12,000 of its ~19,500 malware rules, and a
+   * rule with metadata but no family tag names none. That fixed "Win32/Lumma Stealer" (no family
+   * read) and "W32/Badspace.Backdoor" (a spurious "Badspace" beside WarmCookie). Only a rule the
+   * ruleset doesn't know falls back to reading the message.
+   */
+  String malwareFamily(String alert) {
     if (alert == null) return null;
+    Matcher sid = SID.matcher(alert);
+    if (sid.find()) {
+      var info = ruleMetadata.rule(Long.parseLong(sid.group(1)));
+      if (info.isPresent() && info.get().hasMetadata()) {
+        return spelledAsInMessage(info.get().malwareFamily(), alert);
+      }
+    }
+    return familyFromMessage(alert);
+  }
+
+  /**
+   * ET writes some tags in capitals ("WARMCOOKIE"); the message usually spells the name properly
+   * ("BadSpace/WarmCookie"), so that spelling is used when the two match ignoring case.
+   */
+  static String spelledAsInMessage(String family, String alert) {
+    if (family == null) return null;
+    if (!family.equals(family.toUpperCase(java.util.Locale.ROOT))) return family;
+    Matcher w = Pattern.compile("(?i)(?<![A-Za-z0-9])" + Pattern.quote(family) + "(?![A-Za-z0-9])").matcher(alert);
+    return w.find() ? w.group() : family;
+  }
+
+  private String familyFromMessage(String alert) {
     Matcher m = MALWARE_FAMILY.matcher(alert);
     while (m.find()) {
       // Prefer the family after a platform prefix ("MSIL/Ramnit" → Ramnit); else the lead token.

@@ -1,12 +1,12 @@
 {
   "summary": {
-    "cases": 1,
-    "cases_scored": 1,
-    "scored_fields": 7,
-    "correct": 7,
-    "missed": 0,
-    "confidently_wrong": 0,
-    "accuracy": 1.0
+    "cases": 5,
+    "cases_scored": 5,
+    "scored_fields": 32,
+    "correct": 25,
+    "missed": 6,
+    "confidently_wrong": 1,
+    "accuracy": 0.781
   },
   "cases": [
     {
@@ -52,6 +52,195 @@
           "field": "c2.ip",
           "status": "correct",
           "detail": "141.98.10.79"
+        }
+      ]
+    },
+    {
+      "case_id": "2024-08-15-warmcookie",
+      "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
+      "fields": [
+        {
+          "field": "victim.ip",
+          "status": "correct",
+          "detail": "10.8.15.133"
+        },
+        {
+          "field": "victim.mac",
+          "status": "correct",
+          "detail": "00:1c:bf:03:54:82"
+        },
+        {
+          "field": "victim.hostname",
+          "status": "correct",
+          "detail": "DESKTOP-H8ALZBV"
+        },
+        {
+          "field": "user.account",
+          "status": "correct",
+          "detail": "plucero"
+        },
+        {
+          "field": "user.real_name",
+          "status": "correct",
+          "detail": "Pierce Lucero"
+        },
+        {
+          "field": "malware.family",
+          "status": "correct",
+          "detail": "WarmCookie"
+        },
+        {
+          "field": "c2.ip",
+          "status": "correct",
+          "detail": "72.5.43.29"
+        }
+      ]
+    },
+    {
+      "case_id": "2025-01-22-fake-authenticator",
+      "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
+      "fields": [
+        {
+          "field": "victim.ip",
+          "status": "missed",
+          "detail": null
+        },
+        {
+          "field": "victim.mac",
+          "status": "correct",
+          "detail": "00:d0:b7:26:4a:74"
+        },
+        {
+          "field": "victim.hostname",
+          "status": "correct",
+          "detail": "DESKTOP-L8C5GSJ"
+        },
+        {
+          "field": "user.account",
+          "status": "correct",
+          "detail": "shutchenson"
+        },
+        {
+          "field": "user.real_name",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "malware.family",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "c2.ip",
+          "status": "missed",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "case_id": "2026-01-31-lumma",
+      "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
+      "fields": [
+        {
+          "field": "victim.ip",
+          "status": "correct",
+          "detail": "10.1.21.58"
+        },
+        {
+          "field": "victim.mac",
+          "status": "correct",
+          "detail": "00:21:5d:c8:0e:f2"
+        },
+        {
+          "field": "victim.hostname",
+          "status": "correct",
+          "detail": "DESKTOP-ES9F3ML"
+        },
+        {
+          "field": "user.account",
+          "status": "correct",
+          "detail": "gwyatt"
+        },
+        {
+          "field": "user.real_name",
+          "status": "missed",
+          "detail": null
+        },
+        {
+          "field": "malware.family",
+          "status": "correct",
+          "detail": "Lumma Stealer"
+        },
+        {
+          "field": "c2.ip",
+          "status": "wrong",
+          "detail": {
+            "spurious": [
+              "62.72.32.156"
+            ],
+            "missing": []
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "2026-11-10-netsupport",
+      "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
+      "fields": [
+        {
+          "field": "victim.ip",
+          "status": "missed",
+          "detail": null
+        },
+        {
+          "field": "victim.mac",
+          "status": "correct",
+          "detail": "00:12:f0:e5:17:43"
+        },
+        {
+          "field": "victim.hostname",
+          "status": "correct",
+          "detail": "DESKTOP-5OMVI3L"
+        },
+        {
+          "field": "user.account",
+          "status": "correct",
+          "detail": "edward.winslow"
+        },
+        {
+          "field": "user.real_name",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "malware.family",
+          "status": "missed",
+          "detail": null
+        },
+        {
+          "field": "c2.ip",
+          "status": "missed",
+          "detail": null
         }
       ]
     }

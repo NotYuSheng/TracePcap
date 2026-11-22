@@ -53,6 +53,14 @@ python3 eval/run_eval.py --out-dir /tmp/x   # write the scorecard elsewhere (a s
 python3 eval/test_run_eval.py               # the scoring tests; no stack needed
 ```
 
+**With login on**, set `TRACEPCAP_TOKEN` to an access token; the runner sends it as a bearer token on
+every request and upload. For a local stack, a password grant on Keycloak's `admin-cli` client works:
+
+```bash
+export TRACEPCAP_TOKEN=$(curl -s -d client_id=admin-cli -d username=<user> --data-urlencode password=<pw> \
+  -d grant_type=password http://localhost/realms/tracepcap/protocol/openid-connect/token | jq -r .access_token)
+```
+
 A case's capture is resolved as: an analyzed file of that name on the server (newest completed one) →
 else, with `--upload-missing`, a local copy in `eval/pcaps/` or `backend/target/ctf-demo/` → else the
 case is reported `pcap_unavailable`. **The runner does not download anything**: `case.yaml`'s
