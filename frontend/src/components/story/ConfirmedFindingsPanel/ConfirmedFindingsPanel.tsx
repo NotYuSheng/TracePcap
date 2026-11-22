@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { Button, Card } from '@govtechsg/sgds-react';
@@ -61,6 +62,36 @@ const QUESTION_META: Record<string, { label: string; icon: string }> = {
   'remote-access': { label: 'Remote-access tool', icon: 'bi-display' },
   downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
 };
+
+/** How many lines of evidence show before the rest fold away. */
+const BASIS_SHOWN = 4;
+
+/** An answer's evidence: the first few lines, the rest behind "and N more". */
+function Basis({ lines }: { lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  const shown = open ? lines : lines.slice(0, BASIS_SHOWN);
+  const hidden = lines.length - BASIS_SHOWN;
+  return (
+    <ul className="mb-0 mt-1 ps-3 text-muted" style={{ fontSize: '0.72rem', overflowWrap: 'anywhere' }}>
+      {shown.map((b, j) => (
+        <li key={j}>{b}</li>
+      ))}
+      {hidden > 0 && (
+        <li className="list-unstyled">
+          <button
+            type="button"
+            className="btn btn-link btn-sm p-0 text-decoration-none"
+            style={{ fontSize: '0.72rem' }}
+            aria-expanded={open}
+            onClick={() => setOpen(o => !o)}
+          >
+            {open ? 'Show fewer' : `and ${hidden} more`}
+          </button>
+        </li>
+      )}
+    </ul>
+  );
+}
 
 /** Grade → chip colour: MEASURED strongest, INFERRED weakest. */
 const GRADE_STYLE: Record<string, { bg: string; label: string; tip: string }> = {
@@ -132,14 +163,9 @@ export const ConfirmedFindingsPanel = ({
                       {grade.label}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.82rem' }}>{a.headline}</div>
-                  {a.basis.length > 0 && (
-                    <ul className="mb-0 mt-1 ps-3 text-muted" style={{ fontSize: '0.72rem' }}>
-                      {a.basis.map((b, j) => (
-                        <li key={j}>{b}</li>
-                      ))}
-                    </ul>
-                  )}
+                  {/* URLs and hashes have no spaces: let them wrap rather than run out of the card. */}
+                  <div style={{ fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{a.headline}</div>
+                  {a.basis.length > 0 && <Basis lines={a.basis} />}
                 </div>
               </div>
             );
