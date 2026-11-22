@@ -94,7 +94,10 @@ conclusion, distinct from a finding). Because input and output are both determin
 unit-testable against a fixture board. Today: victim, command-and-control, malware, signed-in user,
 data-transfer (a bulk transfer to a non-CDN external, for review), and remote-access (a remote-admin
 tool such as NetSupport or AnyDesk talking to a server outside the network, for review: IT uses
-these tools and so do attackers, so it never calls the server a C2). They are deliberately precise
+these tools and so do attackers, so it never calls the server a C2), and downloads (executables,
+scripts, archives and installers a host fetched from outside over a real HTTP transfer, each with its
+SHA-256; never a file carved from raw bytes, and never an operating-system update). The C2 and
+remote-access answers also say when the server was first contacted, in UTC. They are deliberately precise
 — the victim and C2 checks key on the ``c2-of`` edge, not "any host or external in any IDS alert",
 so an informational alert never mislabels the domain controller as a victim or a benign CDN as a
 C2. A malware rule about command and control that names no family still marks its server as a C2,

@@ -2,11 +2,11 @@
   "summary": {
     "cases": 5,
     "cases_scored": 5,
-    "scored_fields": 32,
-    "correct": 28,
+    "scored_fields": 34,
+    "correct": 30,
     "missed": 4,
     "confidently_wrong": 0,
-    "accuracy": 0.875
+    "accuracy": 0.882
   },
   "cases": [
     {
@@ -52,6 +52,16 @@
           "field": "c2.ip",
           "status": "correct",
           "detail": "141.98.10.79"
+        },
+        {
+          "field": "timeline.start",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "files.sha256",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -98,6 +108,19 @@
           "field": "c2.ip",
           "status": "correct",
           "detail": "72.5.43.29"
+        },
+        {
+          "field": "timeline.start",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "files.sha256",
+          "status": "correct",
+          "detail": [
+            "798563fcf7600f7ef1a35996291a9dfb5f9902733404dd499e2e736ea1dc6fc5",
+            "b7aec5f73d2a6bbd8cd920edb4760e2edadc98c3a45bf4fa994d47ca9cbd02f6"
+          ]
         }
       ]
     },
@@ -149,6 +172,16 @@
               "45.125.66.252"
             ]
           }
+        },
+        {
+          "field": "timeline.start",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "files.sha256",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -200,6 +233,16 @@
               "62.72.32.156"
             ]
           }
+        },
+        {
+          "field": "timeline.start",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "files.sha256",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -245,6 +288,16 @@
         {
           "field": "c2.ip",
           "status": "missed",
+          "detail": null
+        },
+        {
+          "field": "timeline.start",
+          "status": "correct",
+          "detail": "2026-11-10T18:22:07Z"
+        },
+        {
+          "field": "files.sha256",
+          "status": "n/a",
           "detail": null
         }
       ]

@@ -29,6 +29,23 @@ public class TrafficContributor implements KnowledgeContributor {
 
   static final String COMMUNICATES_WITH = "communicates-with";
 
+  /** External-entity attribute: first contact, ISO-8601 UTC, to the second ("2026-11-10T18:22:07Z"). */
+  public static final String FIRST_SEEN = "firstSeen";
+
+  /** Capture times are stored in the server's zone; answers speak UTC, as answer keys do. */
+  static String utc(java.time.LocalDateTime at) {
+    return at.atZone(java.time.ZoneId.systemDefault())
+        .withZoneSameInstant(java.time.ZoneOffset.UTC)
+        .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+        .toInstant()
+        .toString();
+  }
+
+  /** "2026-11-10T18:22:07Z" → "2026-11-10 18:22:07 UTC", for a headline. */
+  public static String readable(Object iso) {
+    return iso == null ? null : iso.toString().replace('T', ' ').replace("Z", " UTC");
+  }
+
 
   @Override
   public String name() {
@@ -39,6 +56,8 @@ public class TrafficContributor implements KnowledgeContributor {
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     // internal host -> (external ip -> total bytes)
     Map<String, Map<String, Long>> bytesByPair = new LinkedHashMap<>();
+    // external ip -> when any internal host first talked to it (the start of the activity)
+    Map<String, java.time.LocalDateTime> firstSeen = new LinkedHashMap<>();
     for (ConversationFacts conv : context.conversationFacts()) {
       String a = conv.flow().srcIp();
       String b = conv.flow().dstIp();
@@ -60,7 +79,15 @@ public class TrafficContributor implements KnowledgeContributor {
       bytesByPair
           .computeIfAbsent(host, k -> new LinkedHashMap<>())
           .merge(external, conv.flow().totalBytes(), Long::sum);
+      java.time.LocalDateTime start = conv.flow().startTime();
+      if (start != null) firstSeen.merge(external, start, (x, y) -> x.isBefore(y) ? x : y);
     }
+
+    // When each external server was first contacted, as UTC: answers say when activity began
+    // (e.g. "the NetSupport traffic started 2026-11-10 18:22:07 UTC").
+    firstSeen.forEach(
+        (external, at) ->
+            board.addEntity(EntityRef.external(external), Map.of(FIRST_SEEN, utc(at))));
 
     bytesByPair.forEach(
         (host, peers) ->

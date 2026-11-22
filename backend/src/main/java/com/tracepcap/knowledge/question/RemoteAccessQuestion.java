@@ -100,11 +100,19 @@ public class RemoteAccessQuestion implements StandardQuestion {
       attrs.put("host", host);
       attrs.put("tool", tool);
       attrs.put("external", external);
+      Object first =
+          board.entity(EntityRef.external(external)).map(e -> e.attributes().get("firstSeen")).orElse(null);
+      if (first != null) attrs.put("firstSeen", first);
       answers.add(
           new Answer(
               QUESTION,
               host + " runs " + tool + ", talking to " + external
-                  + " outside the network. IT uses remote-access tools, and so do attackers:"
+                  + " outside the network"
+                  + (first != null
+                      ? " since "
+                          + com.tracepcap.knowledge.contributor.TrafficContributor.readable(first)
+                      : "")
+                  + ". IT uses remote-access tools, and so do attackers:"
                   + " confirm this one is sanctioned.",
               Grade.INFERRED,
               List.of(EntityRef.host(host), EntityRef.external(external)),

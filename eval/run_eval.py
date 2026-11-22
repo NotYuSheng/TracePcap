@@ -178,7 +178,7 @@ def norm_host(v):
 
 
 # --------------------------------------------------------------------------- scoring
-def classify(expected, candidates, normalizer=norm_text, beyond=()):
+def classify(expected, candidates, normalizer=norm_text, beyond=(), recall_only=False):
     """Score one field. `expected` is a value or a list of values (a key may list several C2s).
 
     Extras count against the answer: producing a value the key does not list is `wrong` even when
@@ -188,6 +188,9 @@ def classify(expected, candidates, normalizer=norm_text, beyond=()):
     `beyond` lists values the key doesn't mention but the case file records as evidenced findings
     (see `beyond_key` in expected.yaml). Producing one is neither right nor wrong: it is left out of
     the scoring and reported as `beyond_key` in the detail.
+
+    `recall_only` is for lists that aren't accusations (the files a host downloaded): every value the
+    key lists must be produced, and extras are fine.
     """
     exp = [e for e in (expected if isinstance(expected, list) else [expected]) if e is not None]
     if not exp:
@@ -203,7 +206,7 @@ def classify(expected, candidates, normalizer=norm_text, beyond=()):
     extra = [raw for n, raw in produced.items() if n in beyond_norm and n not in exp_norm]
     produced = {n: raw for n, raw in produced.items() if n not in beyond_norm or n in exp_norm}
 
-    spurious = [raw for n, raw in produced.items() if n not in exp_norm]
+    spurious = [] if recall_only else [raw for n, raw in produced.items() if n not in exp_norm]
     missing = [e for e in exp if normalizer(e) not in produced]
 
     def detail(d):
@@ -258,6 +261,15 @@ def score_case(expected, answers, knowledge):
     m = expected.get("malware", {}) or {}
     c2_ips = [c.get("ip") for c in (expected.get("c2", []) or []) if c.get("ip")]
     victim_ip = v.get("ip")
+    # When the activity began: the first contact with the server the key names, from the C2 or
+    # remote-access answer about that server (ISO-8601 UTC, to the second).
+    t = expected.get("timeline", {}) or {}
+    starts = [a.get("attributes", {}).get("firstSeen")
+              for a in by_q.get("c2", []) + by_q.get("remote-access", [])
+              if t.get("ip") and t.get("ip") in (a.get("attributes", {}).get("address"),
+                                                  a.get("attributes", {}).get("external"))]
+    file_hashes = [f.get("sha256") for f in (expected.get("files", []) or []) if f.get("sha256")]
+    downloads = [a.get("attributes", {}).get("sha256") for a in by_q.get("downloads", [])]
 
     victim_hosts = [a.get("attributes", {}).get("host") for a in by_q.get("victim", [])]
     # The account is scored against the VICTIM's sign-in, not any host's: another machine having
@@ -282,6 +294,8 @@ def score_case(expected, answers, knowledge):
         ("user.real_name", *classify(u.get("real_name"), real_name_cands)),
         ("malware.family", *classify(m.get("family"), malwares)),
         ("c2.ip", *classify(c2_ips or None, c2_addrs, beyond=beyond_key(expected, "c2.ip"))),
+        ("timeline.start", *classify(t.get("start"), starts)),
+        ("files.sha256", *classify(file_hashes or None, downloads, recall_only=True)),
     ]
     return [{"field": f, "status": s, "detail": d} for (f, s, d) in fields]
 
