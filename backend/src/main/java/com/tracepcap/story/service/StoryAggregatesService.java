@@ -227,6 +227,9 @@ public class StoryAggregatesService {
         .selfSigned(selfSigned)
         .expired(expired)
         .unknownCa(unknownCa)
+        .weakKey(tlsConvs.stream().filter(TlsAnomalyUtil::isWeakKey).count())
+        .weakSignature(tlsConvs.stream().filter(TlsAnomalyUtil::isWeakSignature).count())
+        .nameMismatch(tlsConvs.stream().filter(TlsAnomalyUtil::isNameMismatch).count())
         .total(tlsConvs.size())
         .build();
   }

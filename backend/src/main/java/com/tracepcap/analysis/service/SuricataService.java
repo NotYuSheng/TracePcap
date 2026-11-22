@@ -133,9 +133,25 @@ public class SuricataService implements Extractor {
       java.time.LocalDateTime notAfter,
       String version,
       String ja3,
-      String ja3s) {}
+      String ja3s,
+      com.tracepcap.analysis.spi.ConversationLookup.CertFacts cert) {
+
+    /** Without the parsed certificate (#1235). */
+    TlsRecord(
+        String sni, String subject, String issuer, java.time.LocalDateTime notBefore,
+        java.time.LocalDateTime notAfter, String version, String ja3, String ja3s) {
+      this(sni, subject, issuer, notBefore, notAfter, version, ja3, ja3s, null);
+    }
+  }
 
   private static final String SURICATA_BINARY = "suricata";
+
+  /**
+   * Turns JA3/JA3S hashing on (#1235). The image enables the {@code tls} custom field list so the
+   * certificate and chain are logged, and with a custom list Suricata only computes JA3 when
+   * something asks for it, which would silently drop the client JA3 that #599 reads.
+   */
+  static final String JA3_ON = "app-layer.protocols.tls.ja3-fingerprints=yes";
 
   /** Suricata writes its JSON event log here, relative to the {@code -l} output directory. */
   private static final String EVE_JSON = "eve.json";
@@ -188,6 +204,8 @@ public class SuricataService implements Extractor {
     if (conv.getTlsNotBefore() == null && t.notBefore() != null) { conv.setTlsNotBefore(t.notBefore()); any = true; }
     if (conv.getTlsNotAfter() == null && t.notAfter() != null) { conv.setTlsNotAfter(t.notAfter()); any = true; }
     if (conv.getTlsVersion() == null && t.version() != null) { conv.setTlsVersion(t.version()); any = true; }
+    // The certificate's own detail (#1235): only Suricata has it, so it's set whenever present.
+    if (conv.getTlsCert() == null && t.cert() != null) { conv.setTlsCert(t.cert()); any = true; }
     return any;
   }
 
@@ -236,7 +254,9 @@ public class SuricataService implements Extractor {
                   "--runmode",
                   "single",
                   "--set",
-                  "unix-command.enabled=no"));
+                  "unix-command.enabled=no",
+                  "--set",
+                  JA3_ON));
       if (ruleset != null) command.addAll(ruleset.suricataArgs());
       ProcessBuilder pb = new ProcessBuilder(command);
 
@@ -358,7 +378,10 @@ public class SuricataService implements Extractor {
             date(tls, "notafter"),
             text(tls, "version", ConversationEntity.TLS_VERSION_MAX_LENGTH),
             hash(tls.path("ja3")),
-            hash(tls.path("ja3s")));
+            hash(tls.path("ja3s")),
+            TlsCertificateParser.parse(
+                tls.path("certificate").asText(null),
+                tls.path("chain").isArray() ? tls.path("chain").size() : 1));
     out.merge(flowKey(srcIp, srcPort, dstIp, dstPort, null), parsed, SuricataService::firstSeen);
   }
 
@@ -371,7 +394,8 @@ public class SuricataService implements Extractor {
         a.notAfter() != null ? a.notAfter() : b.notAfter(),
         a.version() != null ? a.version() : b.version(),
         a.ja3() != null ? a.ja3() : b.ja3(),
-        a.ja3s() != null ? a.ja3s() : b.ja3s());
+        a.ja3s() != null ? a.ja3s() : b.ja3s(),
+        a.cert() != null ? a.cert() : b.cert());
   }
 
   private static String text(JsonNode node, String field, int max) {

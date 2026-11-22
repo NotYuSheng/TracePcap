@@ -34,6 +34,28 @@ On the STRRAT incident capture (184 TLS conversations) this took client JA3 from
 0 to 153, hostnames from 65 to 162 and certificate subjects from 25 to 60, with
 no measurable change in analysis time.
 
+5. The ``tls`` record also carries the **server certificate itself** (the image
+   turns on Suricata's ``certificate`` and ``chain`` TLS fields). TracePcap parses
+   it offline with the JDK and records, per conversation: the certificate's
+   alternative names, key type and size, signature algorithm, how many
+   certificates the server sent, and whether it is **self-signed** (issuer equals
+   subject *and* it verifies with its own key, rather than comparing names). Three
+   checks follow, shown as badges in the conversation's TLS section and counted in
+   the AI story's TLS summary:
+
+   - **Weak key**: RSA or DSA under 2048 bits, EC under 256.
+   - **SHA-1/MD5 signature**: forgeable signature algorithms.
+   - **Doesn't cover the server name**: none of the certificate's names, wildcards
+     included (one label only), matches the name the client asked for (SNI). A
+     misconfiguration, interception, or a server pretending to be something it
+     isn't.
+
+   This describes the certificate; it is not a trust verdict. There is no trust
+   store and no revocation check offline. TLS 1.3 encrypts the certificate, so for
+   those sessions none of this is available (on the 2024-07-30 training capture,
+   25 of 56 TLS sessions carried one). Captures analysed before this show nothing
+   until re-analysed.
+
 Suricata is gated **independently of nDPI** — it has its own per-file toggle, so
 you can run one without the other.
 

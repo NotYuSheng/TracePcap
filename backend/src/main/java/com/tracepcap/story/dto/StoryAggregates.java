@@ -112,6 +112,10 @@ public class StoryAggregates {
     private long selfSigned;
     private long expired;
     private long unknownCa;
+    /** From the certificate itself (#1235); 0 when no certificate was seen. */
+    private long weakKey;
+    private long weakSignature;
+    private long nameMismatch;
     private long total;
   }
 

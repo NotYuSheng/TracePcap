@@ -752,6 +752,12 @@ public class StoryService {
           String.format(
               "- Self-signed: %d, Expired: %d, Unknown CA: %d (of %d total TLS flows)\n",
               tls.getSelfSigned(), tls.getExpired(), tls.getUnknownCa(), tls.getTotal()));
+      if (tls.getWeakKey() + tls.getWeakSignature() + tls.getNameMismatch() > 0) {
+        prompt.append(
+            String.format(
+                "- Weak key: %d, SHA-1/MD5 signature: %d, certificate doesn't cover the server name: %d\n",
+                tls.getWeakKey(), tls.getWeakSignature(), tls.getNameMismatch()));
+      }
     }
 
     StoryAggregates.ConnectionOutcomes outcomes = agg.getConnectionOutcomes();

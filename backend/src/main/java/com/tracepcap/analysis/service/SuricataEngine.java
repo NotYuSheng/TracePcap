@@ -181,7 +181,9 @@ public class SuricataEngine implements DetectionEngineStatus {
                   "--runmode",
                   "single",
                   "--set",
-                  "default-log-dir=" + engineLogDir.toAbsolutePath()));
+                  "default-log-dir=" + engineLogDir.toAbsolutePath(),
+                  "--set",
+                  SuricataService.JA3_ON));
       // The active ruleset (#600): nothing extra for the built-in one, -S for an imported one.
       if (ruleset != null) command.addAll(ruleset.suricataArgs());
       daemon =

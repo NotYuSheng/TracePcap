@@ -4,7 +4,7 @@ import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity } from '@/types';
+import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity, TlsCertificate } from '@/types';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
@@ -236,6 +236,63 @@ function HostFlowCard({
 }
 
 /** A collapsible group of conversation metadata rows — replaces the flat dt/dd wall. */
+/**
+ * The server certificate's own detail (#1235). The verdicts (weak key, weak signature, name not
+ * covered) come from the backend; this only words them.
+ */
+function TlsCertificateRows({ cert }: { cert: TlsCertificate }) {
+  const MAX_SHOWN = 6;
+  return (
+    <>
+      {cert.keyType && (
+        <>
+          <dt>Key</dt>
+          <dd data-testid="tls-cert-key">
+            <small>
+              {cert.keyType}
+              {cert.keyBits ? ` ${cert.keyBits}-bit` : ''}
+            </small>
+            {cert.weakKey && <Badge bg="danger" className="ms-1">Weak key</Badge>}
+          </dd>
+        </>
+      )}
+      {cert.signatureAlgorithm && (
+        <>
+          <dt>Signature</dt>
+          <dd>
+            <small>{cert.signatureAlgorithm}</small>
+            {cert.weakSignature && <Badge bg="danger" className="ms-1">SHA-1/MD5</Badge>}
+          </dd>
+        </>
+      )}
+      <dt>Signed by</dt>
+      <dd data-testid="tls-cert-signer">
+        {cert.selfSigned ? (
+          <Badge bg="warning" text="dark">Self-signed</Badge>
+        ) : (
+          <small>
+            A CA ({cert.chainLength} certificate{cert.chainLength === 1 ? '' : 's'} sent)
+          </small>
+        )}
+      </dd>
+      {cert.sans.length > 0 && (
+        <>
+          <dt>Names</dt>
+          <dd data-testid="tls-cert-sans">
+            <small className="text-break">
+              {cert.sans.slice(0, MAX_SHOWN).join(', ')}
+              {cert.sans.length > MAX_SHOWN && ` +${cert.sans.length - MAX_SHOWN} more`}
+            </small>
+            {cert.coversServerName === false && (
+              <Badge bg="danger" className="ms-1">Doesn't cover the server name</Badge>
+            )}
+          </dd>
+        </>
+      )}
+    </>
+  );
+}
+
 function MetaGroup({
   title,
   note,
@@ -498,7 +555,7 @@ export const ConversationDetail = ({
             {(conversation.ja3Client || conversation.ja3Server || conversation.ja4Client ||
               conversation.tlsVersion || conversation.tlsIssuer ||
               conversation.tlsSubject || conversation.tlsNotBefore != null ||
-              conversation.tlsNotAfter != null) && (
+              conversation.tlsNotAfter != null || conversation.tlsCertificate) && (
               <MetaGroup
                 title="TLS"
                 defaultOpen
@@ -529,6 +586,9 @@ export const ConversationDetail = ({
                         </small>
                       </dd>
                     </>
+                  )}
+                  {conversation.tlsCertificate && (
+                    <TlsCertificateRows cert={conversation.tlsCertificate} />
                   )}
                   {conversation.ja3Client && (<><dt>JA3</dt><dd><code className="small">{conversation.ja3Client}</code></dd></>)}
                   {conversation.ja3Server && (<><dt>JA3S</dt><dd><code className="small">{conversation.ja3Server}</code></dd></>)}

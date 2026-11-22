@@ -124,6 +124,32 @@ public class ConversationEntity {
   @Column(name = "tls_version", length = TLS_VERSION_MAX_LENGTH)
   private String tlsVersion;
 
+  // The server certificate's detail (#1235), parsed from the DER Suricata logs. All null when the
+  // certificate wasn't seen (TLS 1.3 encrypts it, or Suricata didn't run).
+
+  /** Subject alternative names: DNS names and IPs, at most 50. */
+  @Column(name = "tls_sans", columnDefinition = "text[]")
+  private String[] tlsSans;
+
+  /** RSA, EC, DSA... */
+  @Column(name = "tls_key_type", length = 16)
+  private String tlsKeyType;
+
+  @Column(name = "tls_key_bits")
+  private Integer tlsKeyBits;
+
+  /** e.g. SHA256withRSA. */
+  @Column(name = "tls_sig_alg", length = 64)
+  private String tlsSigAlg;
+
+  /** Issuer = subject and it verifies with its own key. */
+  @Column(name = "tls_self_signed")
+  private Boolean tlsSelfSigned;
+
+  /** Certificates the server sent, leaf included. */
+  @Column(name = "tls_chain_length")
+  private Integer tlsChainLength;
+
   @Column(name = "tls_issuer", columnDefinition = "TEXT")
   private String tlsIssuer;
 
