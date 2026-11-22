@@ -1,0 +1,57 @@
+.reference-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.reference-search {
+  max-width: 480px;
+}
+.reference-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.reference-chip {
+  border: 1px solid var(--tp-border, #d5d9e1);
+  border-radius: 999px;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #1f2937);
+  padding: 3px 12px;
+  font-size: 0.85rem;
+}
+.reference-chip:hover {
+  background: var(--tp-surface-hover, #f3f4f6);
+}
+.reference-chip-on {
+  background: var(--tp-primary-subtle, #ede9fe);
+  border-color: var(--tp-primary-emphasis, #5925dc);
+  color: var(--tp-primary-emphasis, #3b1891);
+  font-weight: 600;
+}
+.reference-chip-count {
+  color: var(--tp-text-muted, #6b7280);
+  font-weight: 400;
+  margin-left: 2px;
+}
+.reference-table td,
+.reference-table th {
+  background: transparent;
+}
+.reference-row-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+}
+.reference-row-button:hover .fw-semibold {
+  text-decoration: underline;
+}
+.reference-detail-heading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tp-text-muted, #6b7280);
+  margin: 0 0 6px;
+}

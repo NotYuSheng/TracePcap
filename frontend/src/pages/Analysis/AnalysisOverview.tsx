@@ -47,7 +47,7 @@ const ndpiPopoverBody = (
   <>
     <p className="mb-2">
       Application labels are identified by{' '}
-      <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
+      <a href="/reference/protocols" target="_blank" rel="noopener noreferrer">
         nDPI
       </a>{' '}
       deep packet inspection, which recognises services such as YouTube, WhatsApp, and Zoom by
@@ -61,7 +61,7 @@ const ndpiPopoverBody = (
       Treat labels as strong indicators, not definitive classifications. Cross-reference the
       destination IP/port and packet payload if a label looks unexpected.
     </p>
-    <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer" className="small">
+    <a href="/reference/protocols" target="_blank" rel="noopener noreferrer" className="small">
       View protocol reference →
     </a>
   </>
@@ -403,9 +403,6 @@ export const AnalysisOverview = () => {
                     and this capture's own).
                   </li>
                 </ul>
-                <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
-                  nDPI risk reference →
-                </a>
               </SourceTag>
             </div>
             <SuricataRulesetNote className="mb-2" />
