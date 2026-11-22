@@ -82,12 +82,13 @@ public class C2Question implements StandardQuestion {
    * the only basis when no IDS rule fired).
    */
   private List<String> alertSummaries(CaseKnowledge board, EntityRef external) {
-    return Stream.concat(
-            board.findingsOfCategory("ids-alert").stream(),
-            board.findingsOfCategory("c2-classification").stream())
-        .filter(f -> f.concerns().contains(external))
-        .map(Finding::summary)
-        .toList();
+    return Evidence.collapse(
+        Stream.concat(
+                board.findingsOfCategory("ids-alert").stream(),
+                board.findingsOfCategory("c2-classification").stream())
+            .filter(f -> f.concerns().contains(external))
+            .map(Finding::summary)
+            .toList());
   }
 
   /**
