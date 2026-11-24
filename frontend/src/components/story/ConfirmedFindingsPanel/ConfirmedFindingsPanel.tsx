@@ -113,14 +113,19 @@ function ConclusionChip({ kind, reason, id }: { kind: string; reason?: string; i
   );
 }
 
-/** The address an answer is about, for its "conversations" link: for lateral movement, the host acted on. */
+/**
+ * The address an answer is about, for its "conversations" link: for lateral movement the host acted
+ * on, for a Kerberos attack the host that made the requests.
+ */
 function answerAddress(a: Answer): string | null {
   const v =
     a.question === 'c2'
       ? a.attributes.address
       : a.question === 'lateral-movement'
         ? a.attributes.server
-        : a.attributes.external;
+        : a.question === 'kerberos-attack'
+          ? a.attributes.client
+          : a.attributes.external;
   return typeof v === 'string' && v ? v : null;
 }
 
@@ -133,6 +138,7 @@ const QUESTION_META: Record<string, { label: string; icon: string }> = {
   'data-transfer': { label: 'Bulk transfer', icon: 'bi-arrow-up-right-circle' },
   'remote-access': { label: 'Remote-access tool', icon: 'bi-display' },
   'lateral-movement': { label: 'Lateral movement', icon: 'bi-diagram-2' },
+  'kerberos-attack': { label: 'Kerberos attack', icon: 'bi-key' },
   downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
 };
 

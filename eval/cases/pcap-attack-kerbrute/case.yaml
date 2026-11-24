@@ -1,0 +1,7 @@
+case_id: pcap-attack-kerbrute
+pcap: CA_kerbrute_passwordspray_kerberos_AS-REQ.pcapng
+source_url: https://github.com/sbousseaden/PCAP-ATTACK/raw/9ef5476dd6b083f565a1b9d2e59e4a3ae8be8c95/CredAccess/CA_kerbrute_passwordspray_kerberos_AS-REQ.pcapng
+sha256: f30458cef193fcbf9a96cf69c385062d731a0827fed518a0d64cd59f319453e9
+notes: >
+  From PCAP-ATTACK (github.com/sbousseaden/PCAP-ATTACK), a set of lab captures each labelled with the
+  ATT&CK technique it shows. Download into eval/pcaps/pcap-attack/.

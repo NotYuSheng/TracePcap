@@ -246,6 +246,24 @@ def score_lateral(expected, by_q):
     return classify(want, produced)
 
 
+def score_kerberos(expected, by_q):
+    """Kerberos attacks (#1267): "technique client -> kdc" for each answer, as lateral movement scores
+    its pairs. `kerberos_attack: []` says there is none; a key without the field doesn't score it."""
+    if "kerberos_attack" not in expected:
+        return NA, None
+    produced = []
+    for a in by_q.get("kerberos-attack", []):
+        at = a.get("attributes", {})
+        p = pair(at.get("client"), at.get("kdc"))
+        if p:
+            produced.append(f"{at.get('technique')} {p}")
+    want = [f"{e.get('technique')} {pair(e.get('client'), e.get('kdc'))}"
+            for e in (expected.get("kerberos_attack") or [])]
+    if not want:
+        return (WRONG, {"spurious": produced}) if produced else (CORRECT, "none")
+    return classify(want, produced)
+
+
 def beyond_key(expected, field):
     """Evidenced findings the key doesn't mention, for one scored field (`beyond_key` in the case).
 
@@ -319,6 +337,7 @@ def score_case(expected, answers, knowledge):
         ("timeline.start", *classify(t.get("start"), starts)),
         ("files.sha256", *classify(file_hashes or None, downloads, recall_only=True)),
         ("lateral_movement", *score_lateral(expected, by_q)),
+        ("kerberos_attack", *score_kerberos(expected, by_q)),
     ]
     return [{"field": f, "status": s, "detail": d} for (f, s, d) in fields]
 

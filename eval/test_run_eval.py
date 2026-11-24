@@ -269,6 +269,24 @@ class LateralMovementScoring(unittest.TestCase):
         self.assertEqual(status(ev.score_case({"case_id": "x"}, [], {}), "lateral_movement"), ev.NA)
 
 
+class KerberosScoring(unittest.TestCase):
+    """#1267: the technique and the pair must be the key's; a key saying "none" makes any answer wrong."""
+
+    SPRAY = {"case_id": "x", "kerberos_attack": [{"technique": "password-guessing", "client": "172.16.66.1", "kdc": "172.16.66.36"}]}
+
+    def test_the_right_technique_and_pair_is_correct(self):
+        r = ev.score_case(self.SPRAY, [ans("kerberos-attack", technique="password-guessing", client="172.16.66.1", kdc="172.16.66.36")], {})
+        self.assertEqual(status(r, "kerberos_attack"), ev.CORRECT)
+
+    def test_another_technique_is_wrong(self):
+        r = ev.score_case(self.SPRAY, [ans("kerberos-attack", technique="weak-ticket", client="172.16.66.1", kdc="172.16.66.36")], {})
+        self.assertEqual(status(r, "kerberos_attack"), ev.WRONG)
+
+    def test_a_key_saying_none_makes_any_answer_wrong(self):
+        r = ev.score_case({"case_id": "x", "kerberos_attack": []}, [ans("kerberos-attack", technique="weak-ticket", client="a", kdc="b")], {})
+        self.assertEqual(status(r, "kerberos_attack"), ev.WRONG)
+
+
 if __name__ == "__main__":
     unittest.main()
 

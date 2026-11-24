@@ -772,6 +772,8 @@ public class PcapParserService {
     private List<SuricataService.Anomaly> suricataAnomalies = new ArrayList<>();
     /** What one host did to another over SMB and RPC (#1266), persisted to remote_operations. */
     private List<SmbRpcRecords.Operation> remoteOperations = new ArrayList<>();
+    /** The tickets and errors a KDC returned on this conversation (#1267), to kerberos_exchanges. */
+    private List<KerberosRecords.Exchange> kerberosExchanges = new ArrayList<>();
     private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;

@@ -117,6 +117,10 @@ only through ``analysis.spi`` ports, never another module's repositories or enti
   called, a program copied to an admin share, or directory replication asked by a host that isn't a
   domain controller (DCSync). Routine domain traffic (IPC$, SYSVOL and group-policy reads, share
   and user enumeration, remote registry) is not posted.
+- ``KerberosContributor`` — from the replies a domain controller sent: one host failing to sign in
+  as five or more accounts within ten minutes (wrong password or no such account; password spraying or user
+  enumeration), or a ticket with RC4 or DES from a domain controller that uses AES elsewhere in the
+  capture (Kerberoasting, Skeleton Key).
 
 **Deterministic checks** (``StandardQuestion``) are the primary analysis layer — *not* the LLM. Each
 answers one standard investigation question by querying the board and posting an ``Answer`` (a
@@ -130,7 +134,7 @@ scripts, archives and installers a host fetched from outside over a real HTTP tr
 SHA-256; never a file carved from raw bytes, never an operating-system update, and never a
 gzip-compressed web response; at most the three largest per host and server, then a count), and lateral movement (one answer per
 pair of hosts, from the contributor above, asking for it to be confirmed, since administrators'
-tools do the same). The C2 and
+tools do the same), and Kerberos attacks (one answer per finding above). The C2 and
 remote-access answers also say when the server was first contacted, in UTC. They are deliberately precise
 — the victim and C2 checks key on the ``c2-of`` edge, not "any host or external in any IDS alert",
 so an informational alert never mislabels the domain controller as a victim or a benign CDN as a

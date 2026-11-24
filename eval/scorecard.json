@@ -1,9 +1,9 @@
 {
   "summary": {
-    "cases": 9,
-    "cases_scored": 9,
-    "scored_fields": 38,
-    "correct": 38,
+    "cases": 11,
+    "cases_scored": 11,
+    "scored_fields": 40,
+    "correct": 40,
     "missed": 0,
     "confidently_wrong": 0,
     "accuracy": 1.0
@@ -65,6 +65,11 @@
         },
         {
           "field": "lateral_movement",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "kerberos_attack",
           "status": "n/a",
           "detail": null
         }
@@ -131,6 +136,11 @@
           "field": "lateral_movement",
           "status": "n/a",
           "detail": null
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -194,6 +204,11 @@
         },
         {
           "field": "lateral_movement",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "kerberos_attack",
           "status": "n/a",
           "detail": null
         }
@@ -262,6 +277,11 @@
           "field": "lateral_movement",
           "status": "n/a",
           "detail": null
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -323,6 +343,77 @@
           "field": "lateral_movement",
           "status": "n/a",
           "detail": null
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "case_id": "pcap-attack-kerbrute",
+      "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
+      "fields": [
+        {
+          "field": "victim.ip",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "victim.mac",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "victim.hostname",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "user.account",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "user.real_name",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "malware.family",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "c2.ip",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "timeline.start",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "files.sha256",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "lateral_movement",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "correct",
+          "detail": "password-guessing 172.16.66.1 -> 172.16.66.36"
         }
       ]
     },
@@ -384,6 +475,11 @@
           "field": "lateral_movement",
           "status": "correct",
           "detail": "none"
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -445,6 +541,11 @@
           "field": "lateral_movement",
           "status": "correct",
           "detail": "172.16.66.1 -> 172.16.66.36"
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
         }
       ]
     },
@@ -506,6 +607,77 @@
           "field": "lateral_movement",
           "status": "correct",
           "detail": "none"
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "case_id": "pcap-attack-skeleton-key",
+      "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
+      "fields": [
+        {
+          "field": "victim.ip",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "victim.mac",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "victim.hostname",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "user.account",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "user.real_name",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "malware.family",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "c2.ip",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "timeline.start",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "files.sha256",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "lateral_movement",
+          "status": "n/a",
+          "detail": null
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "correct",
+          "detail": "weak-ticket 172.16.66.1 -> 172.16.66.36"
         }
       ]
     },
@@ -567,6 +739,11 @@
           "field": "lateral_movement",
           "status": "correct",
           "detail": "172.16.66.1 -> 172.16.66.36"
+        },
+        {
+          "field": "kerberos_attack",
+          "status": "n/a",
+          "detail": null
         }
       ]
     }

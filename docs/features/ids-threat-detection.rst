@@ -161,6 +161,33 @@ operation numbers, which are not enough to say what was done.
 
 Captures analysed before this show nothing until re-analysed.
 
+Kerberos attacks
+~~~~~~~~~~~~~~~~
+
+Suricata also logs each Kerberos reply a domain controller sends: the ticket and its encryption,
+or the error and the account it was about. TracePcap reads them for two attacks:
+
+- **Password guessing**: one host failing to sign in as five or more different accounts within ten
+  minutes, with a wrong password (``KDC_ERR_PREAUTH_FAILED``) or a name that doesn't exist
+  (``KDC_ERR_C_PRINCIPAL_UNKNOWN``). Mostly unknown names is *user enumeration* (finding which
+  accounts exist); mostly wrong passwords is *password spraying*. The ten minutes keep a terminal
+  server's ordinary typos, spread over a day, from counting. ``KDC_ERR_PREAUTH_REQUIRED`` is how
+  every Windows sign-in starts and never counts, and many wrong passwords for *one* account aren't
+  reported: a service left with an old password retries all day and looks the same.
+- **A weak ticket**: a ticket encrypted with RC4 or DES from a domain controller that issues AES
+  tickets elsewhere in the same capture. A domain that only does RC4 is old, not attacked; one
+  that does both was asked for the weak one. Weak *service* tickets are what Kerberoasting requests
+  to crack offline; a weak *sign-in* ticket is what Mimikatz's Skeleton Key forces.
+
+Each shows as a **Kerberos attack** answer in the Investigation Summary, with the accounts or
+tickets behind it. Measured on the nine Windows-domain exercises and holdouts (only
+``PREAUTH_REQUIRED`` errors and AES tickets) neither fires; PCAP-ATTACK's kerbrute capture fails 9
+accounts from one host, and its Skeleton Key capture has one RC4 sign-in ticket among AES ones.
+
+AS-REP roasting (asking for the ticket of an account that doesn't require pre-authentication)
+isn't detected: Suricata doesn't log whether a request carried pre-authentication. Captures
+analysed before this show nothing until re-analysed.
+
 Capture completeness
 ~~~~~~~~~~~~~~~~~~~~
 
