@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupIdsAlerts } from '../idsAlertGroups';
+import { alertsFiredNote, groupIdsAlerts } from '../idsAlertGroups';
 import type { IdsAlert } from '@/types';
 
 const checkin = (time: number): IdsAlert => ({
@@ -22,5 +22,20 @@ describe('groupIdsAlerts (#1265)', () => {
     const reply: IdsAlert = { srcIp: '194.180.191.64', sid: 2035892, signature: 'x' };
     const other: IdsAlert = { ...checkin(5000), httpUrl: 'http://194.180.191.64/other' };
     expect(groupIdsAlerts([checkin(1000), reply, other])).toHaveLength(3);
+  });
+});
+
+describe('alertsFiredNote (#1284)', () => {
+  it('is the count when every alert has a record', () => {
+    expect(alertsFiredNote(3, 3)).toBe('3 fired');
+    expect(alertsFiredNote(3, null)).toBe('3 fired');
+  });
+
+  it('says the rows are only the first when the records stopped at their cap', () => {
+    expect(alertsFiredNote(100, 4512)).toBe('4,512 fired · first 100 shown');
+  });
+
+  it('says none were kept when the capture had passed its cap', () => {
+    expect(alertsFiredNote(0, 7)).toBe('7 fired · no records kept: the capture passed 20,000');
   });
 });

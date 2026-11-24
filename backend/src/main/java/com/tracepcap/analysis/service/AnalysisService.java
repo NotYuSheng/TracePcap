@@ -757,6 +757,29 @@ public class AnalysisService {
         run.parseResult.getConversations().size());
   }
 
+  /**
+   * Per conversation, how many alerts fired and how many records were kept (#1284), so a count built
+   * on the records can say when it's only the first of them.
+   */
+  static List<com.tracepcap.analysis.entity.IdsAlertCountEntity> alertCounts(
+      UUID fileId, List<PcapParserService.ConversationInfo> conversations,
+      List<com.tracepcap.analysis.entity.IdsAlertEntity> rows) {
+    Map<UUID, Integer> kept = new HashMap<>();
+    rows.forEach(r -> kept.merge(r.getConversationId(), 1, Integer::sum));
+    List<com.tracepcap.analysis.entity.IdsAlertCountEntity> out = new ArrayList<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      int k = kept.getOrDefault(c.getEntityId(), 0);
+      // Never below what was kept: a flow handed to two conversations counts under the first.
+      int total = Math.max(c.getIdsAlertTotal(), k);
+      if (total == 0) continue;
+      out.add(com.tracepcap.analysis.entity.IdsAlertCountEntity.builder()
+          .conversationId(c.getEntityId()).fileId(fileId).srcIp(c.getSrcIp()).dstIp(c.getDstIp())
+          .total(total).kept(k).build());
+    }
+    return out;
+  }
+
   /** Each Suricata alert in full (#1265). Never fatal: the conversations carry the alert messages. */
   private void saveIdsAlerts(UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
     List<com.tracepcap.analysis.entity.IdsAlertEntity> rows = new ArrayList<>();
@@ -814,6 +837,11 @@ public class AnalysisService {
       idsAlertWriter.replaceAlerts(fileId, rows);
     } catch (Exception ex) {
       log.warn("[{}] Saving {} IDS alert records failed: {}", fileId, rows.size(), ex.getMessage());
+    }
+    try {
+      idsAlertWriter.replaceAlertCounts(fileId, alertCounts(fileId, conversations, rows));
+    } catch (Exception ex) {
+      log.warn("[{}] Saving IDS alert counts failed: {}", fileId, ex.getMessage());
     }
     try {
       idsAlertWriter.replaceAnomalies(fileId, anomalies);

@@ -3501,6 +3501,8 @@ export interface components {
             flowRisks?: string[];
             hostname?: string;
             httpUserAgents?: string[];
+            /** Format: int32 */
+            idsAlertCount?: number;
             idsAlerts?: components["schemas"]["IdsAlert"][];
             initiatorIp?: string;
             /** Format: int32 */

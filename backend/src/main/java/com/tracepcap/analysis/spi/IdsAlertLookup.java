@@ -48,6 +48,27 @@ public interface IdsAlertLookup {
       LocalDateTime time, String srcIp, String dstIp, String type, String layer, String appProto,
       String event) {}
 
+  /**
+   * How many alerts fired on a conversation and how many of them have records (#1284). The records
+   * stop at 100 each way on a connection and 20,000 per capture, so {@code kept} can be less than
+   * {@code total}; the records kept are the first.
+   */
+  record AlertCount(UUID conversationId, String srcIp, String dstIp, int total, int kept) {
+    public boolean truncated() {
+      return kept < total;
+    }
+  }
+
+  /** A capture's alert counts, one per conversation that had any; empty for older captures. */
+  default List<AlertCount> countsForFile(UUID fileId) {
+    return List.of();
+  }
+
+  /** A conversation's alert count; empty when it had none or was analysed before #1284. */
+  default java.util.Optional<AlertCount> countFor(UUID conversationId) {
+    return java.util.Optional.empty();
+  }
+
   /** A conversation's protocol anomalies, oldest first. */
   List<AnomalyFacts> anomaliesFor(UUID conversationId);
 

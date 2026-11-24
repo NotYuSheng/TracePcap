@@ -16,6 +16,23 @@ class IdsAlertLookupAdapter implements IdsAlertLookup {
 
   private final IdsAlertRepository repository;
   private final com.tracepcap.analysis.repository.SuricataAnomalyRepository anomalies;
+  private final com.tracepcap.analysis.repository.IdsAlertCountRepository counts;
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<AlertCount> countsForFile(UUID fileId) {
+    return counts.findByFileId(fileId).stream().map(IdsAlertLookupAdapter::count).toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.Optional<AlertCount> countFor(UUID conversationId) {
+    return counts.findById(conversationId).map(IdsAlertLookupAdapter::count);
+  }
+
+  private static AlertCount count(com.tracepcap.analysis.entity.IdsAlertCountEntity c) {
+    return new AlertCount(c.getConversationId(), c.getSrcIp(), c.getDstIp(), c.getTotal(), c.getKept());
+  }
 
   @Override
   @Transactional(readOnly = true)

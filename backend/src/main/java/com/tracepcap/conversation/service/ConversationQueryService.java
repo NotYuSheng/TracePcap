@@ -634,6 +634,8 @@ public class ConversationQueryService {
                     .event(a.event())
                     .build())
                 .toList())
+        .idsAlertCount(idsAlertLookup.countFor(conversation.id())
+            .map(com.tracepcap.analysis.spi.IdsAlertLookup.AlertCount::total).orElse(null))
         .idsAlerts(
             idsAlertLookup.forConversation(conversation.id()).stream()
                 .map(a -> ConversationDetailResponse.IdsAlert.builder()

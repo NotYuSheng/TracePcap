@@ -5,7 +5,7 @@ import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity, IdsAlert, TlsCertificate } from '@/types';
-import { groupIdsAlerts } from './idsAlertGroups';
+import { alertsFiredNote, groupIdsAlerts } from './idsAlertGroups';
 import { anomalyWords, groupAnomalies } from './anomalyWords';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -621,15 +621,15 @@ export const ConversationDetail = ({
               </dl>
             </MetaGroup>
 
-            {(conversation.idsAlerts?.length ?? 0) > 0 && (
+            {((conversation.idsAlerts?.length ?? 0) > 0 || (conversation.idsAlertCount ?? 0) > 0) && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <MetaGroup
                   title="IDS alerts"
-                  note={`${conversation.idsAlerts!.length} fired`}
+                  note={alertsFiredNote(conversation.idsAlerts?.length ?? 0, conversation.idsAlertCount)}
                   defaultOpen
                 >
                   <IdsAlertRows
-                    alerts={conversation.idsAlerts!}
+                    alerts={conversation.idsAlerts ?? []}
                     clientIp={conversation.initiatorIp ?? source.ip}
                   />
                 </MetaGroup>
