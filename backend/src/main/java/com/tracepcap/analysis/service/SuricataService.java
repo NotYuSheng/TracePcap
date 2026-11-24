@@ -118,9 +118,50 @@ public class SuricataService implements Extractor {
   }
 
   /** What one Suricata run produced: alerts and TLS records, each keyed by flow (both directions). */
-  record Eve(Map<String, Set<String>> alerts, Map<String, TlsRecord> tls) {
+  record Eve(
+      Map<String, Set<String>> alerts,
+      Map<String, TlsRecord> tls,
+      Map<String, List<AlertEvent>> alertEvents,
+      java.util.concurrent.atomic.AtomicInteger alertEventCount) {
     static Eve empty() {
-      return new Eve(new HashMap<>(), new HashMap<>());
+      return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger());
+    }
+  }
+
+  /**
+   * At most this many alert records are kept per capture (#1265). A scan or a noisy rule can fire
+   * hundreds of thousands of times; the deduplicated message lists are unaffected by the cap.
+   */
+  static final int MAX_ALERT_EVENTS = 20_000;
+
+  /**
+   * One eve.json {@code alert} record in full (#1265): when it fired, the packet's direction, the
+   * rule's metadata, and the HTTP request it fired on. Every field but sid and signature may be null.
+   */
+  public record AlertEvent(
+      java.time.LocalDateTime time,
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort,
+      long sid,
+      Integer gid,
+      Integer rev,
+      String signature,
+      String category,
+      Integer severity,
+      Map<String, List<String>> metadata,
+      String httpMethod,
+      String httpHost,
+      String httpUrl,
+      String httpUserAgent,
+      Integer httpStatus) {
+
+    /** The first value of one metadata key ("signature_severity" → "Major"), or null. */
+    public String meta(String key) {
+      List<String> v = metadata == null ? null : metadata.get(key);
+      return v == null || v.isEmpty() ? null : v.get(0);
     }
   }
 
@@ -177,9 +218,14 @@ public class SuricataService implements Extractor {
     if (conversations.isEmpty()) return;
     int filled = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
-      Set<String> alerts = resolve(eve.alerts(), conv);
+      Set<String> alerts = both(eve.alerts(), conv, LinkedHashSet::new);
       if (alerts != null && !alerts.isEmpty()) {
         conv.setSuricataAlerts(new ArrayList<>(alerts));
+      }
+      List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
+      if (!events.isEmpty()) {
+        events.sort(Comparator.comparing(AlertEvent::time, Comparator.nullsLast(Comparator.naturalOrder())));
+        conv.setIdsAlertEvents(events);
       }
       TlsRecord tls = resolve(eve.tls(), conv);
       if (tls != null && fillTls(conv, tls)) filled++;
@@ -351,8 +397,57 @@ public class SuricataService implements Extractor {
 
       String key = flowKey(srcIp, srcPort, dstIp, dstPort, proto);
       result.alerts().computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
+      // A running count: summing every flow's list on each line made a noisy capture quadratic.
+      if (result.alertEventCount().getAndIncrement() < MAX_ALERT_EVENTS) {
+        result.alertEvents().computeIfAbsent(key, k -> new ArrayList<>())
+            .add(alertEvent(root, alert, signature, sid, severity, srcIp, srcPort, dstIp, dstPort));
+      }
     } catch (Exception e) {
       log.debug("Skipping unparseable eve.json line: {}", e.getMessage());
+    }
+  }
+
+  private static AlertEvent alertEvent(
+      JsonNode root, JsonNode alert, String signature, long sid, int severity, String srcIp,
+      Integer srcPort, String dstIp, Integer dstPort) {
+    Map<String, List<String>> metadata = new java.util.LinkedHashMap<>();
+    alert.path("metadata").fields().forEachRemaining(e -> {
+      List<String> values = new ArrayList<>();
+      if (e.getValue().isArray()) e.getValue().forEach(v -> values.add(v.asText()));
+      else values.add(e.getValue().asText());
+      metadata.put(e.getKey(), values);
+    });
+    JsonNode http = root.path("http");
+    return new AlertEvent(
+        eveTime(root.path("timestamp").asText(null)),
+        srcIp, srcPort, dstIp, dstPort, sid,
+        alert.has("gid") ? alert.get("gid").asInt() : null,
+        alert.has("rev") ? alert.get("rev").asInt() : null,
+        signature,
+        text(alert, "category", 255),
+        severity == 0 ? null : severity,
+        metadata,
+        text(http, "http_method", 32),
+        text(http, "hostname", 512),
+        text(http, "url", 4096),
+        text(http, "http_user_agent", 2048),
+        http.has("status") ? http.get("status").asInt() : null);
+  }
+
+  private static final java.time.format.DateTimeFormatter EVE_TIME =
+      java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ");
+
+  /**
+   * Eve's {@code timestamp} ("2024-11-26T05:08:49.123456+0000") as the local time the conversations'
+   * own times use (the JVM zone, as {@code PcapParserService} converts packet times); null if absent.
+   */
+  static java.time.LocalDateTime eveTime(String ts) {
+    if (ts == null || ts.isBlank()) return null;
+    try {
+      return java.time.LocalDateTime.ofInstant(
+          java.time.OffsetDateTime.parse(ts, EVE_TIME).toInstant(), java.time.ZoneId.systemDefault());
+    } catch (Exception e) {
+      return null;
     }
   }
 
@@ -444,6 +539,24 @@ public class SuricataService implements Extractor {
     return s.length() > ConversationEntity.SURICATA_ALERT_MAX_LENGTH
         ? s.substring(0, ConversationEntity.SURICATA_ALERT_MAX_LENGTH)
         : s;
+  }
+
+  /**
+   * A conversation's alerts from both directions. Suricata keys an alert by the packet that fired
+   * it, so a rule on the server's reply ("Remote Admin Response") sits under the reverse key; taking
+   * one direction only, as {@link #resolve} does, dropped those whenever the client side fired too.
+   */
+  static <E, C extends java.util.Collection<E>> C both(
+      Map<String, ? extends java.util.Collection<E>> map,
+      PcapParserService.ConversationInfo conv,
+      java.util.function.Supplier<C> into) {
+    C out = into.get();
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    if (map.get(forward) != null) out.addAll(map.get(forward));
+    if (!reverse.equals(forward) && map.get(reverse) != null) out.addAll(map.get(reverse));
+    return out;
   }
 
   /** Looks up a flow's entry trying both directions (src→dst and dst→src). */

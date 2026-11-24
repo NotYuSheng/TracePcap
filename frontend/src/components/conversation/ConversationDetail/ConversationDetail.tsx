@@ -4,7 +4,8 @@ import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity, TlsCertificate } from '@/types';
+import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity, IdsAlert, TlsCertificate } from '@/types';
+import { groupIdsAlerts } from './idsAlertGroups';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
@@ -293,6 +294,84 @@ function TlsCertificateRows({ cert }: { cert: TlsCertificate }) {
   );
 }
 
+/** The rule's own rating, as a chip colour; unknown ratings read as neutral. */
+const SIGNATURE_SEVERITY_BG: Record<string, string> = {
+  Critical: '#b02a37',
+  Major: '#b35900',
+  Minor: '#0a58ca',
+  Informational: '#6c757d',
+};
+
+/** A small rating chip, matching the grade chips of the Investigation Summary. */
+function RatingChip({ bg, children }: { bg?: string; children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+        borderRadius: 3,
+        padding: '1px 6px',
+        ...(bg
+          ? { color: '#fff', background: bg }
+          : { color: 'var(--bs-secondary-color, #6c757d)', border: '1px solid var(--bs-border-color, #dee2e6)' }),
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Each Suricata alert on the conversation as it fired (#1265): when, which side sent the packet,
+ * the rule's own rating and confidence, and the HTTP request it fired on.
+ */
+function IdsAlertRows({ alerts, clientIp }: { alerts: IdsAlert[]; clientIp: string }) {
+  const groups = groupIdsAlerts(alerts);
+  return (
+    <ul className="list-unstyled mb-0 d-flex flex-column gap-2" data-testid="ids-alerts">
+      {groups.map((g, i) => {
+        const a = g.first;
+        const fromServer = a.srcIp != null && a.srcIp !== clientIp;
+        return (
+          <li key={i} className="border-bottom pb-2">
+            <div className="d-flex align-items-start gap-2 flex-wrap">
+              <small className="fw-semibold text-break flex-grow-1" style={{ minWidth: 0 }}>{a.signature}</small>
+              {a.signatureSeverity && (
+                <RatingChip bg={SIGNATURE_SEVERITY_BG[a.signatureSeverity] ?? '#6c757d'}>{a.signatureSeverity}</RatingChip>
+              )}
+              {a.confidence && <RatingChip>{a.confidence} confidence</RatingChip>}
+            </div>
+            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+              {a.category && <span>{a.category} · </span>}
+              <span>{fromServer ? 'on the server\'s reply' : 'on the client\'s request'}</span>
+              <span> · sid {a.sid}</span>
+              {g.from != null && (
+                <span>
+                  {' · '}
+                  {g.count > 1
+                    ? `${g.count}× from ${formatTimestamp(g.from)} to ${formatTimestamp(g.to!)}`
+                    : formatTimestamp(g.from)}
+                </span>
+              )}
+              {g.from == null && g.count > 1 && <span> · {g.count}×</span>}
+            </div>
+            {a.httpUrl && (
+              <div style={{ fontSize: '0.75rem', overflowWrap: 'anywhere' }} data-testid="ids-alert-request">
+                <code>
+                  {a.httpMethod ? `${a.httpMethod} ` : ''}
+                  {a.httpUrl}
+                </code>
+                {a.httpStatus != null && <span className="text-muted"> → {a.httpStatus}</span>}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function MetaGroup({
   title,
   note,
@@ -540,6 +619,21 @@ export const ConversationDetail = ({
                 )}
               </dl>
             </MetaGroup>
+
+            {(conversation.idsAlerts?.length ?? 0) > 0 && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <MetaGroup
+                  title="IDS alerts"
+                  note={`${conversation.idsAlerts!.length} fired`}
+                  defaultOpen
+                >
+                  <IdsAlertRows
+                    alerts={conversation.idsAlerts!}
+                    clientIp={conversation.initiatorIp ?? source.ip}
+                  />
+                </MetaGroup>
+              </div>
+            )}
 
             {(conversation.srcGeo?.countryCode || conversation.dstGeo?.countryCode ||
               isPrivateIp(source.ip) || isPrivateIp(destination.ip)) && (

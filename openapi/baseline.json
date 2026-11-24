@@ -999,6 +999,12 @@
             },
             "type": "array"
           },
+          "idsAlerts": {
+            "items": {
+              "$ref": "#/components/schemas/IdsAlert"
+            },
+            "type": "array"
+          },
           "initiatorIp": {
             "type": "string"
           },
@@ -3060,6 +3066,72 @@
             "type": "string"
           },
           "queryRef": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "IdsAlert": {
+        "properties": {
+          "attackTarget": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "httpHost": {
+            "type": "string"
+          },
+          "httpMethod": {
+            "type": "string"
+          },
+          "httpStatus": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "httpUrl": {
+            "type": "string"
+          },
+          "httpUserAgent": {
+            "type": "string"
+          },
+          "rev": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "severity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sid": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signatureSeverity": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "time": {
+            "format": "date-time",
             "type": "string"
           }
         },

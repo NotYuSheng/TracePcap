@@ -60,6 +60,7 @@ public class ConversationQueryService {
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
   private final StorageService storageService;
+  private final com.tracepcap.analysis.spi.IdsAlertLookup idsAlertLookup;
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
       java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
@@ -622,6 +623,29 @@ public class ConversationQueryService {
         .flowRisks(conversation.findings().flowRisks())
         .customSignatures(conversation.findings().customSignatures())
         .suricataAlerts(conversation.findings().suricataAlerts())
+        .idsAlerts(
+            idsAlertLookup.forConversation(conversation.id()).stream()
+                .map(a -> ConversationDetailResponse.IdsAlert.builder()
+                    .time(a.time())
+                    .srcIp(a.srcIp())
+                    .srcPort(a.srcPort())
+                    .dstIp(a.dstIp())
+                    .dstPort(a.dstPort())
+                    .sid(a.sid())
+                    .rev(a.rev())
+                    .signature(a.signature())
+                    .category(a.category())
+                    .severity(a.severity())
+                    .signatureSeverity(a.signatureSeverity())
+                    .confidence(a.confidence())
+                    .attackTarget(a.attackTarget())
+                    .httpMethod(a.httpMethod())
+                    .httpHost(a.httpHost())
+                    .httpUrl(a.httpUrl())
+                    .httpUserAgent(a.httpUserAgent())
+                    .httpStatus(a.httpStatus())
+                    .build())
+                .toList())
         .httpUserAgents(conversation.findings().httpUserAgents())
         .packetCount(conversation.flow().packetCount())
         .totalBytes(conversation.flow().totalBytes())

@@ -58,6 +58,40 @@ public class ConversationDetailResponse {
   private List<String> flowRisks;
   private List<String> customSignatures;
   private List<String> suricataAlerts;
+
+  /**
+   * Each Suricata alert on this conversation as it fired (#1265), oldest first: when, which side
+   * sent the packet, the rule's metadata, and the HTTP request. Empty for captures analysed before.
+   */
+  private List<IdsAlert> idsAlerts;
+
+  /** One alert. {@code srcIp} is the side that sent the packet that fired it. */
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class IdsAlert {
+    private LocalDateTime time;
+    private String srcIp;
+    private Integer srcPort;
+    private String dstIp;
+    private Integer dstPort;
+    private long sid;
+    private Integer rev;
+    private String signature;
+    private String category;
+    private Integer severity;
+    /** The rule's own rating: Critical, Major, Minor or Informational. */
+    private String signatureSeverity;
+    /** The rule's own confidence: High, Medium or Low. */
+    private String confidence;
+    private String attackTarget;
+    private String httpMethod;
+    private String httpHost;
+    private String httpUrl;
+    private String httpUserAgent;
+    private Integer httpStatus;
+  }
   private List<String> httpUserAgents;
   private Long packetCount;
   private Long totalBytes;

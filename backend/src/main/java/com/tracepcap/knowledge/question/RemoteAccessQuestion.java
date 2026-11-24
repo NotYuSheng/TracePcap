@@ -73,6 +73,14 @@ public class RemoteAccessQuestion implements StandardQuestion {
       Object first =
           board.entity(EntityRef.external(external)).map(e -> e.attributes().get("firstSeen")).orElse(null);
       if (first != null) attrs.put("firstSeen", first);
+      List<String> basis = new ArrayList<>(alerts.stream().distinct().toList());
+      Object reqs = board.entity(EntityRef.external(external))
+          .map(e -> e.attributes().get(com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_REQUESTS))
+          .orElse(null);
+      if (reqs instanceof List<?> l && !l.isEmpty()) {
+        attrs.put("requests", l);
+        basis.add("Alerts fired on: " + String.join(", ", l.stream().map(String::valueOf).toList()));
+      }
       answers.add(
           new Answer(
               QUESTION,
@@ -86,7 +94,7 @@ public class RemoteAccessQuestion implements StandardQuestion {
                   + " confirm this one is sanctioned.",
               Grade.INFERRED,
               List.of(EntityRef.host(host), EntityRef.external(external)),
-              alerts.stream().distinct().toList(),
+              basis,
               attrs));
     });
     return answers;

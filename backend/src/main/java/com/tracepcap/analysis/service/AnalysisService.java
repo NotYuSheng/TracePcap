@@ -183,6 +183,7 @@ public class AnalysisService {
   private final OccupancyClassificationService occupancyClassificationService;
   private final com.tracepcap.analysis.repository.HostTtlWindowRepository hostTtlWindowRepository;
   private final WindowsLogonWriter windowsLogonWriter;
+  private final IdsAlertWriter idsAlertWriter;
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -748,11 +749,57 @@ public class AnalysisService {
     }
 
     run.savedConversationIds = savedConversationIds;
+    saveIdsAlerts(fileId, run.parseResult.getConversations());
     log.info(
         "[{}] [6/7] Conversations finalized: {}ms  ({} conversations)",
         fileId,
         System.currentTimeMillis() - t,
         run.parseResult.getConversations().size());
+  }
+
+  /** Each Suricata alert in full (#1265). Never fatal: the conversations carry the alert messages. */
+  private void saveIdsAlerts(UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
+    List<com.tracepcap.analysis.entity.IdsAlertEntity> rows = new ArrayList<>();
+    // One alert once: conversations sharing a flow key (DHCP clients split by MAC, say) are each
+    // handed the same alert record, and storing it under each multiplied every count built on them.
+    java.util.Set<SuricataService.AlertEvent> stored =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SuricataService.AlertEvent e : c.getIdsAlertEvents()) {
+        if (!stored.add(e)) continue;
+        rows.add(
+            com.tracepcap.analysis.entity.IdsAlertEntity.builder()
+                .fileId(fileId)
+                .conversationId(c.getEntityId())
+                .alertTime(e.time())
+                .srcIp(e.srcIp())
+                .srcPort(e.srcPort())
+                .dstIp(e.dstIp())
+                .dstPort(e.dstPort())
+                .sid(e.sid())
+                .gid(e.gid())
+                .rev(e.rev())
+                .signature(e.signature())
+                .category(e.category())
+                .severity(e.severity())
+                .signatureSeverity(e.meta("signature_severity"))
+                .confidence(e.meta("confidence"))
+                .attackTarget(e.meta("attack_target"))
+                .metadata(e.metadata())
+                .httpMethod(e.httpMethod())
+                .httpHost(e.httpHost())
+                .httpUrl(e.httpUrl())
+                .httpUserAgent(e.httpUserAgent())
+                .httpStatus(e.httpStatus())
+                .build());
+      }
+    }
+    try {
+      idsAlertWriter.replaceForFile(fileId, rows);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} IDS alert records failed: {}", fileId, rows.size(), ex.getMessage());
+    }
   }
 
   // ── Stage 7: carve embedded files ───────────────────────────────────────────
