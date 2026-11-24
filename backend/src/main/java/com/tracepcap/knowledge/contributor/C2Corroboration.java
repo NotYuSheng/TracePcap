@@ -122,7 +122,32 @@ public final class C2Corroboration {
     Set<String> escalated = new java.util.HashSet<>();
     out.forEach(e -> escalated.add(e.external()));
     rejected.removeIf(r -> escalated.contains(r.external()));
-    return new Analysis(out, rejected);
+    return new Analysis(out, onePerServer(rejected));
+  }
+
+  /** How close each rejection came: the one that got furthest stands for its server. */
+  private static int closeness(Rejection r) {
+    String why = r.reason();
+    if (why.startsWith("reached in one round")) return 3;
+    if (why.startsWith("it was reached by name")) return 2;
+    if (why.contains("before it first talked")) return 1;
+    return 0;
+  }
+
+  /** One rejection per server: the host that came closest, and how many other hosts reached it. */
+  static List<Rejection> onePerServer(List<Rejection> rejected) {
+    Map<String, List<Rejection>> byServer = new LinkedHashMap<>();
+    rejected.forEach(r -> byServer.computeIfAbsent(r.external(), k -> new ArrayList<>()).add(r));
+    List<Rejection> out = new ArrayList<>();
+    byServer.forEach((ext, rs) -> {
+      Rejection best = rs.stream().max(Comparator.comparingInt(C2Corroboration::closeness)).orElseThrow();
+      long others = rs.stream().map(Rejection::host).distinct().count() - 1;
+      List<String> convs = rs.stream().flatMap(r -> r.conversations().stream()).distinct().limit(20).toList();
+      out.add(new Rejection(best.host(), ext, best.listedBy(),
+          best.reason() + (others > 0 ? " (" + others + " other host" + (others == 1 ? "" : "s") + " reached it too)" : ""),
+          convs));
+    });
+    return out;
   }
 
   // ── Suspected C2: reputation + an infected host + scripted rounds ─────────────
@@ -140,6 +165,12 @@ public final class C2Corroboration {
           .filter(a -> REPUTATION.matcher(a).find())
           .findFirst().orElse(null);
       if (rule == null) return;
+      // Only a server the host reached out to: an inbound scan from a listed address isn't a C2
+      // candidate, and recording one per probed host would bury the list.
+      boolean reachedOut = l.stream().anyMatch(c -> {
+        String init = c.flow().initiatorIp();
+        return init != null ? init.equals(p.host()) : p.host().equals(c.flow().srcIp());
+      });
       LocalDateTime since = infectedSince.get(p.host());
       String why = since == null
           ? p.host() + " never talked to a confirmed C2, so nothing says it is infected"
@@ -147,7 +178,7 @@ public final class C2Corroboration {
               ? p.host() + " reached it before it first talked to a confirmed C2"
               : !bareIp(p.external(), l) ? "it was reached by name, not as a bare IP" : null;
       if (why != null) {
-        rejected.add(new Rejection(p.host(), p.external(), shortRule(rule), why, ids(l)));
+        if (reachedOut) rejected.add(new Rejection(p.host(), p.external(), shortRule(rule), why, ids(l)));
         return;
       }
       candidates.put(p, rule);
@@ -174,7 +205,7 @@ public final class C2Corroboration {
       }
       if (repeated == null) {
         rejected.add(new Rejection(p.host(), p.external(), shortRule(rule),
-            "reached in one round, not in repeated rounds or seconds after a server that was", ids(byPair.get(p))));
+            "reached in one round, and not seconds after a listed server that recurred", ids(byPair.get(p))));
         return;
       }
       out.add(new Escalation(p.host(), p.external(), null,

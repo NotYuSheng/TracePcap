@@ -149,7 +149,10 @@ public class InvestigationOrchestrator {
             .filter(java.util.Objects::nonNull)
             .toList());
     out.addAll(unclassifiedBeacons(board));
-    return out;
+    // One per question and candidate: a listed server that also beacons is one alternative.
+    java.util.Map<List<String>, com.tracepcap.knowledge.spi.Considered> once = new java.util.LinkedHashMap<>();
+    for (com.tracepcap.knowledge.spi.Considered c : out) once.putIfAbsent(List.of(c.question(), c.candidate()), c);
+    return new ArrayList<>(once.values());
   }
 
   static final String BEACON_RULE =
@@ -190,7 +193,10 @@ public class InvestigationOrchestrator {
   private static List<String> coverage(CaseKnowledge board) {
     TreeSet<String> sources = new TreeSet<>();
     board.relationships().forEach(r -> add(sources, r.source()));
-    board.findings().forEach(f -> add(sources, f.source()));
+    // A ruled-out candidate isn't a contribution: the technique concluded nothing (#1294).
+    board.findings().stream()
+        .filter(f -> !com.tracepcap.knowledge.spi.Considered.CATEGORY.equals(f.category()))
+        .forEach(f -> add(sources, f.source()));
     return new ArrayList<>(sources);
   }
 

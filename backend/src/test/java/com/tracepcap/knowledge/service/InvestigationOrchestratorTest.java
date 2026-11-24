@@ -228,4 +228,20 @@ class InvestigationOrchestratorTest {
       assertThat(c.conversations()).containsExactly("conv-203.0.113.9");
     });
   }
+
+  @Test
+  void aRuledOutCandidate_isNoCoverage_andIsListedOncePerServer() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(FILE);
+    com.tracepcap.knowledge.spi.EntityRef host = com.tracepcap.knowledge.spi.EntityRef.host("10.0.0.5");
+    com.tracepcap.knowledge.spi.EntityRef ext = com.tracepcap.knowledge.spi.EntityRef.external("203.0.113.9");
+    b.addFinding(new com.tracepcap.knowledge.spi.Considered("c2", "203.0.113.9", "rule", "on Spamhaus DROP, but …", List.of())
+        .toFinding("corroboration", List.of(ext, host)));
+    b.addFinding(new com.tracepcap.knowledge.spi.Finding("suspected-beacon", "a beacon shape",
+        com.tracepcap.knowledge.spi.Severity.MEDIUM, com.tracepcap.knowledge.spi.Grade.INFERRED, "beacon",
+        List.of(host, ext), List.of("c1"), java.util.Map.of()));
+
+    InvestigationReport r = investigate(b.build());
+    assertThat(r.coverage()).doesNotContain("corroboration");
+    assertThat(r.considered()).singleElement().satisfies(c -> assertThat(c.reason()).startsWith("on Spamhaus DROP"));
+  }
 }

@@ -145,7 +145,7 @@ class C2CorroborationTest {
     assertThat(a.escalations()).isEmpty();
     assertThat(a.rejections()).extracting(C2Corroboration.Rejection::external, C2Corroboration.Rejection::reason)
         .containsExactlyInAnyOrder(
-            org.assertj.core.groups.Tuple.tuple("45.125.66.40", "reached in one round, not in repeated rounds or seconds after a server that was"),
+            org.assertj.core.groups.Tuple.tuple("45.125.66.40", "reached in one round, and not seconds after a listed server that recurred"),
             org.assertj.core.groups.Tuple.tuple("45.125.66.41", "it was reached by name, not as a bare IP"),
             org.assertj.core.groups.Tuple.tuple("45.125.66.42", "10.1.17.216 never talked to a confirmed C2, so nothing says it is infected"));
     assertThat(a.rejections()).allSatisfy(r -> {
@@ -158,5 +158,29 @@ class C2CorroborationTest {
   void aServerTheRuleEscalated_isNotAlsoRuledOut() {
     C2Corroboration.Analysis a = C2Corroboration.analyse(fakeSite(true), Set.of("5.252.153.241"));
     assertThat(a.rejections()).isEmpty();
+  }
+
+  @Test
+  void aListedScannerProbingManyHosts_isNoCandidate_andAServerManyHostsReached_isOneEntry() {
+    List<ConversationFacts> l = new ArrayList<>();
+    // A CINS-listed scanner reaching in: the external initiated every session.
+    for (int h = 1; h <= 40; h++) {
+      LocalDateTime t = T0.plusSeconds(h);
+      l.add(new ConversationFacts(UUID.randomUUID(), UUID.randomUUID(),
+          new FlowIdentity("198.51.100.7", 40000, "10.0.0." + h, 445, "198.51.100.7", 40000, "TCP", 2, 120, t, t,
+              null, null, "REJECTED", "TCP", 60L, 60L),
+          new TlsFacts(null, null, null, null, null, null, null, null, null),
+          new Findings(null, null, null, List.of(), List.of("ET CINS Active Threat Intelligence Poor Reputation IP group 42 (sid:2403341 sev:2)"),
+              List.of(), List.of())));
+    }
+    // A listed server three hosts reached out to, none of them infected.
+    for (int h = 1; h <= 3; h++) l.add(c("10.0.0." + h, "45.125.66.42", 100 + h, null, 5_000, DROP));
+
+    List<C2Corroboration.Rejection> r = C2Corroboration.analyse(l, Set.of()).rejections();
+    assertThat(r).singleElement().satisfies(x -> {
+      assertThat(x.external()).isEqualTo("45.125.66.42");
+      assertThat(x.reason()).endsWith("(2 other hosts reached it too)");
+      assertThat(x.conversations()).hasSize(3);
+    });
   }
 }

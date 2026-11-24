@@ -40,4 +40,14 @@ class StoryConsideredPromptTest {
     service.appendConsidered(prompt, many);
     assertThat(prompt.toString()).contains("- … and 3 more ruled out").doesNotContain("10.0.0.14:");
   }
+
+  @Test
+  void theQaBoardDigest_neverListsARuledOutCandidateAsAFinding() {
+    com.tracepcap.knowledge.spi.CaseKnowledgeBuilder b = new com.tracepcap.knowledge.spi.CaseKnowledgeBuilder(java.util.UUID.randomUUID());
+    b.addFinding(new Considered("c2", "161.0.1.45", "rule", "on Spamhaus DROP, but …", List.of())
+        .toFinding("corroboration", List.of(com.tracepcap.knowledge.spi.EntityRef.external("161.0.1.45"))));
+    StringBuilder prompt = new StringBuilder();
+    org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "appendKnowledgeBoard", prompt, b.build());
+    assertThat(prompt.toString()).doesNotContain("Findings:").doesNotContain("on Spamhaus DROP");
+  }
 }

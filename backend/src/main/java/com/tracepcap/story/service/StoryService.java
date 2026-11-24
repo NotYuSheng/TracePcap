@@ -635,9 +635,13 @@ public class StoryService {
               .append(' ').append(r.to().key()).append(" (").append(r.grade()).append(")\n"));
     }
 
-    if (!board.findings().isEmpty()) {
+    // Ruled-out candidates have their own, guarded block (#1294): never list one as a finding.
+    List<com.tracepcap.knowledge.spi.Finding> findings = board.findings().stream()
+        .filter(f -> !com.tracepcap.knowledge.spi.Considered.CATEGORY.equals(f.category()))
+        .toList();
+    if (!findings.isEmpty()) {
       prompt.append("Findings:\n");
-      board.findings().forEach(
+      findings.forEach(
           f -> prompt.append("- [").append(f.severity()).append("] ").append(f.category())
               .append(": ").append(f.summary()).append('\n'));
     }
