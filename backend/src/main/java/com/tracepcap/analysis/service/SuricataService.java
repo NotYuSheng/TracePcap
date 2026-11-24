@@ -306,6 +306,9 @@ public class SuricataService implements Extractor {
   void apply(Eve eve, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
     int filled = 0;
+    // One flow key can match several conversations (DHCP clients split by MAC): each SMB/RPC
+    // operation goes to the first, so none is stored and counted twice.
+    Set<SmbRpcRecords.Op> opsGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     for (PcapParserService.ConversationInfo conv : conversations) {
       Set<String> alerts = both(eve.alerts(), conv, LinkedHashSet::new);
       if (alerts != null && !alerts.isEmpty()) {
@@ -314,9 +317,11 @@ public class SuricataService implements Extractor {
       List<Anomaly> anomalies = both(eve.anomalies(), conv, ArrayList::new);
       if (!anomalies.isEmpty()) conv.setSuricataAnomalies(anomalies);
       List<SmbRpcRecords.Op> ops = both(eve.remoteOps(), conv, ArrayList::new);
+      ops.removeIf(o -> !opsGiven.add(o));
       if (!ops.isEmpty()) {
         conv.setRemoteOperations(SmbRpcRecords.group(
-            ops, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort()));
+            ops, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(),
+            conv.getInitiatorIp()));
       }
       List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
       if (!events.isEmpty()) {

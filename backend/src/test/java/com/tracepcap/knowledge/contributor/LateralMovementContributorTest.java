@@ -112,6 +112,22 @@ class LateralMovementContributorTest {
         .containsExactly(LateralMovementContributor.SCHEDULED_TASK, LateralMovementContributor.WMI_EXEC);
   }
 
+  @Test
+  void twoDomainControllersReplicating_isNotDcsync_evenWithoutTheirKerberosInTheCapture() {
+    // DC2 replicates from DC, and DC replicates back: both answer DRSUAPI, so both are DCs.
+    List<RemoteOperationFacts> ops = List.of(rpc("10.0.0.11", DC, MsRpc.DRSUAPI, 3), rpc(DC, "10.0.0.11", MsRpc.DRSUAPI, 3));
+    Set<String> dcs = LateralMovementContributor.domainControllers(List.of(), ops);
+    assertThat(dcs).contains(DC, "10.0.0.11");
+    assertThat(board(ops, dcs).findingsOfCategory(LateralMovementContributor.LATERAL_MOVEMENT)).isEmpty();
+  }
+
+  @Test
+  void aFaultedServiceCreation_isNotAMovement() {
+    RemoteOperationFacts faulted = new RemoteOperationFacts(CONV, AT, A, T, "rpc", null, null, MsRpc.SVCCTL,
+        "svcctl", 12, "CreateServiceW", null, "FAULT", 1);
+    assertThat(board(List.of(faulted), Set.of()).findingsOfCategory(LateralMovementContributor.LATERAL_MOVEMENT)).isEmpty();
+  }
+
   private static CaseKnowledge board(List<RemoteOperationFacts> ops, Set<String> dcs) {
     CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
     LateralMovementContributor.post(ops, dcs, b);

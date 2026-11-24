@@ -92,6 +92,62 @@ class SmbRpcRecordsTest {
     });
   }
 
+  private static final String FAULTED =
+      "{\"timestamp\":\"2020-07-19T21:14:41.000000+0800\",\"flow_id\":7,\"event_type\":\"dcerpc\","
+          + "\"src_ip\":\"172.16.66.1\",\"src_port\":52447,\"dest_ip\":\"172.16.66.36\",\"dest_port\":49688,"
+          + "\"proto\":\"TCP\",\"dcerpc\":{\"request\":\"REQUEST\",\"response\":\"FAULT\",\"req\":{\"opnum\":12},"
+          + "\"interfaces\":[{\"uuid\":\"367abb81-9844-35f1-ad32-98f038001003\",\"ack_result\":0}]}}";
+
+  @Test
+  void aFaultedCall_carriesItsFault() {
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    suricata.parseEveLine(FAULTED, eve);
+    PcapParserService.ConversationInfo c = conv(52447, 49688);
+    suricata.apply(eve, List.of(c));
+    assertThat(c.getRemoteOperations()).singleElement().satisfies(o -> assertThat(o.status()).isEqualTo("FAULT"));
+  }
+
+  @Test
+  void aCallOnAConnectionThatAcceptedSeveralInterfaces_isSkipped_notGuessed() {
+    String several = FAULTED.replace("\"response\":\"FAULT\"", "\"response\":\"RESPONSE\"")
+        .replace("\"ack_result\":0}]", "\"ack_result\":0},{\"uuid\":\"9556dc99-828c-11cf-a37e-00aa003240c7\",\"ack_result\":0}]");
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    suricata.parseEveLine(several, eve);
+    assertThat(eve.remoteOps()).isEmpty();
+  }
+
+  @Test
+  void aFileOnATreeConnectedBeforeTheCapture_takesTheShareTheRecordNames() {
+    String write = "{\"timestamp\":\"2020-07-19T21:14:41.000000+0800\",\"flow_id\":9,\"event_type\":\"fileinfo\","
+        + "\"src_ip\":\"172.16.66.1\",\"src_port\":52445,\"dest_ip\":\"172.16.66.36\",\"dest_port\":445,"
+        + "\"proto\":\"TCP\",\"app_proto\":\"smb\",\"smb\":{\"command\":\"SMB2_COMMAND_WRITE\",\"tree_id\":3,"
+        + "\"share\":\"\\\\\\\\172.16.66.36\\\\ADMIN$\"},\"fileinfo\":{\"filename\":\"x.exe\",\"size\":10}}";
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    suricata.parseEveLine(write, eve);
+    PcapParserService.ConversationInfo c = conv(52445, 445);
+    suricata.apply(eve, List.of(c));
+    assertThat(c.getRemoteOperations()).singleElement()
+        .satisfies(o -> assertThat(o.share()).isEqualTo("\\\\172.16.66.36\\ADMIN$"));
+  }
+
+  @Test
+  void twoConversationsOnOneFlowKey_shareItsOperationsOnce() {
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    suricata.parseEveLine(FAULTED, eve);
+    PcapParserService.ConversationInfo a = conv(52447, 49688), b = conv(52447, 49688);
+    suricata.apply(eve, List.of(a, b));
+    assertThat(a.getRemoteOperations()).hasSize(1);
+    assertThat(b.getRemoteOperations()).isEmpty();
+  }
+
+  @Test
+  void theSideThatSentTheSyn_isTheClient() {
+    var ops = SmbRpcRecords.group(
+        List.of(new SmbRpcRecords.Op(null, SmbRpcRecords.RPC, null, null, "x", 1, null, null)),
+        TARGET, 49688, ATTACKER, 52447, ATTACKER);
+    assertThat(ops).singleElement().satisfies(o -> assertThat(o.client()).isEqualTo(ATTACKER));
+  }
+
   private SuricataService.Eve read(String name) throws IOException {
     SuricataService.Eve eve = SuricataService.Eve.empty();
     try (InputStream in = getClass().getResourceAsStream("/suricata-smb/" + name + ".eve.json")) {

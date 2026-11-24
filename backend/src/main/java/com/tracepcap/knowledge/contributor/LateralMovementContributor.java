@@ -80,15 +80,24 @@ public class LateralMovementContributor implements KnowledgeContributor {
     if (lookup == null) return;
     List<RemoteOperationFacts> ops = lookup.forFile(context.fileId());
     if (ops.isEmpty()) return;
-    post(ops, domainControllers(context.conversationFacts()), board);
+    post(ops, domainControllers(context.conversationFacts(), ops), board);
   }
 
-  /** Hosts answering Kerberos or LDAP in this capture: replication between them is normal. */
-  static Set<String> domainControllers(List<ConversationFacts> conversations) {
+  /**
+   * Hosts acting as domain controllers in this capture, between which replication is normal: those
+   * answering Kerberos or LDAP, and those answering directory replication (a short capture of the
+   * replication link may hold none of a DC's Kerberos or LDAP).
+   */
+  static Set<String> domainControllers(List<ConversationFacts> conversations, List<RemoteOperationFacts> ops) {
     Set<String> dcs = new HashSet<>();
     for (ConversationFacts c : conversations) {
       if (c.flow() == null || c.flow().dstIp() == null || c.flow().dstPort() == null) continue;
       if (DC_PORTS.contains(c.flow().dstPort())) dcs.add(c.flow().dstIp());
+    }
+    for (RemoteOperationFacts o : ops) {
+      if ("rpc".equals(o.kind()) && MsRpc.DRSUAPI.equals(o.interfaceUuid()) && o.server() != null) {
+        dcs.add(o.server());
+      }
     }
     return dcs;
   }

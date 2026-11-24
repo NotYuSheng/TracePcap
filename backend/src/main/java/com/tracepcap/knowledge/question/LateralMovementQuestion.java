@@ -91,8 +91,9 @@ public class LateralMovementQuestion implements StandardQuestion {
     for (String t : techniques) {
       String meaning = switch (t) {
         case LateralMovementContributor.DCSYNC -> {
-          did.add("asked " + server + " to replicate directory data without being a domain controller itself");
-          yield "That is DCSync, which copies the domain's password hashes.";
+          did.add("asked " + server + " to replicate directory data, and isn't seen acting as a domain"
+              + " controller in this capture");
+          yield "That is what DCSync looks like: it copies the domain's password hashes.";
         }
         case LateralMovementContributor.REMOTE_SERVICE -> {
           did.add("created a service on " + server + " over RPC");

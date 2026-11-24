@@ -94,7 +94,7 @@ final class SmbRpcRecords {
     }
     if (command.endsWith("CREATE") || command.contains("NT_CREATE")) {
       String name = text(smb, "filename");
-      if (name != null) out.add(new Op(time, OPEN, trees.get(tree), name, null, null, null, status));
+      if (name != null) out.add(new Op(time, OPEN, shareOf(smb, flowId, trees), name, null, null, null, status));
       return;
     }
     // An RPC call carried over a named pipe (srvsvc, samr, lsarpc… over IPC$).
@@ -108,15 +108,26 @@ final class SmbRpcRecords {
     Integer opnum = rpc.has("opnum") ? Integer.valueOf(rpc.get("opnum").asInt())
         : rpc.path("req").has("opnum") ? Integer.valueOf(rpc.path("req").get("opnum").asInt()) : null;
     String uuid = null;
+    java.util.Set<String> accepted = new java.util.HashSet<>();
     for (JsonNode i : rpc.path("interfaces")) {
-      // The accepted one when the bind offered several (ack_result 0), else the first.
-      if (uuid == null || i.path("ack_result").asInt(-1) == 0) uuid = text(i, "uuid");
-      if (i.path("ack_result").asInt(-1) == 0) break;
+      String u = text(i, "uuid");
+      if (u == null) continue;
+      if (i.path("ack_result").asInt(-1) == 0) accepted.add(u.toLowerCase(Locale.ROOT));
+      if (uuid == null) uuid = u; // a bind that offered one interface may log no ack
     }
+    // The accepted one when the bind offered several. When it accepted more than one (DCOM binds
+    // several on one connection), Suricata doesn't say which a request used: skip it, not guess.
+    if (accepted.size() > 1) return;
+    if (accepted.size() == 1) uuid = accepted.iterator().next();
     // Without its bind (it happened before the capture began) the interface is unknown, and an
     // operation number alone means nothing.
     if (uuid == null || opnum == null) return;
-    out.add(new Op(time, RPC, share, null, uuid.toLowerCase(Locale.ROOT), opnum, null, null));
+    // A fault is a refusal (access denied, say): an attempt, not an action. No reply at all
+    // (UNREPLIED, the capture ended first) stays unknown, so it counts.
+    String response = rpc.path("response").asText("");
+    String status = response.isEmpty() || "RESPONSE".equals(response) || "UNREPLIED".equals(response)
+        ? null : response.length() > 64 ? response.substring(0, 64) : response;
+    out.add(new Op(time, RPC, share, null, uuid.toLowerCase(Locale.ROOT), opnum, null, status));
   }
 
   /** A file Suricata saw cross an SMB session: written to the server, or read from it. */
@@ -128,9 +139,18 @@ final class SmbRpcRecords {
     String command = smb.path("command").asText("");
     String kind = command.contains("WRITE") ? WRITE : command.contains("READ") ? READ : null;
     if (kind == null) return;
-    String share = trees.get(flowId + "/" + smb.path("tree_id").asText(""));
+    String share = shareOf(smb, flowId, trees);
     Long size = info.has("size") ? info.get("size").asLong() : null;
     out.add(new Op(time, kind, share, name, null, null, size, null));
+  }
+
+  /**
+   * The share a record's tree id was connected to; else the share the record names itself, for a
+   * tree connected before the capture began.
+   */
+  private static String shareOf(JsonNode smb, String flowId, Map<String, String> trees) {
+    String s = trees.get(flowId + "/" + smb.path("tree_id").asText(""));
+    return s != null ? s : text(smb, "share");
   }
 
   /** Null when it succeeded or Suricata didn't say. */
@@ -157,8 +177,16 @@ final class SmbRpcRecords {
    */
   static List<Operation> group(
       List<Op> ops, String srcIp, Integer srcPort, String dstIp, Integer dstPort) {
-    boolean swap = srcPort != null && SMB_PORTS.contains(srcPort)
-        && (dstPort == null || !SMB_PORTS.contains(dstPort));
+    return group(ops, srcIp, srcPort, dstIp, dstPort, null);
+  }
+
+  /** As above; {@code initiatorIp}, the side that sent the SYN when it's in the capture, wins. */
+  static List<Operation> group(
+      List<Op> ops, String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp) {
+    boolean swap = initiatorIp != null && (initiatorIp.equals(srcIp) || initiatorIp.equals(dstIp))
+        ? initiatorIp.equals(dstIp) && !initiatorIp.equals(srcIp)
+        : srcPort != null && SMB_PORTS.contains(srcPort)
+            && (dstPort == null || !SMB_PORTS.contains(dstPort));
     String client = swap ? dstIp : srcIp, server = swap ? srcIp : dstIp;
     Map<List<Object>, Operation> grouped = new LinkedHashMap<>();
     for (Op o : ops) {
