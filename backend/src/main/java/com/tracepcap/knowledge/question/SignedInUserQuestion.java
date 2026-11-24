@@ -49,8 +49,9 @@ public class SignedInUserQuestion implements StandardQuestion {
     attrs.put("host", host);
     if (realName != null) attrs.put("realName", realName);
 
-    String source = board.entity(signedIn.to())
-        .map(e -> e.attributes().get("source")).map(Object::toString).orElse(null);
+    Object onEdge = signedIn.attributes().get("signInSource");
+    String source = onEdge != null ? onEdge.toString()
+        : board.entity(signedIn.to()).map(e -> e.attributes().get("source")).map(Object::toString).orElse(null);
     List<com.tracepcap.knowledge.spi.Step> steps = new java.util.ArrayList<>();
     steps.add(com.tracepcap.knowledge.spi.Step.of(
         host + " identified itself as " + user + " in " + Derivations.signInSource(source) + ".",

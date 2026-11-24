@@ -151,7 +151,7 @@ as they run, so they are what the code did. For this capture:
 1. Suricata rule *ET MALWARE STRRAT CnC Checkin* (sid 2030358) fired on ``172.16.1.66 →
    141.98.10.79``. *Rule: a Suricata malware rule that names a server makes it that malware family's
    command-and-control server.* (Inferred: a rule's judgment.)
-2. ``141.98.10.79`` is in Lithuania, from the offline GeoIP database. (Context.)
+2. ``141.98.10.79`` is in LT (Lithuania), from the GeoIP database. (Context.)
 3. First contacted at 02:40:05 UTC. (Measured.)
 
 **Victim host.**

@@ -48,7 +48,10 @@ public class HostIdentityContributor implements KnowledgeContributor {
         if (realName != null && !realName.isBlank()) userAttrs.put("realName", realName);
         board.addEntity(EntityRef.user(user), userAttrs);
         board.addRelationship(
-            Relationship.of(hostRef, SIGNED_IN_AS, EntityRef.user(user), gradeForSource(source), name()));
+            // How this host's sign-in was seen, on the edge: the user entity is shared by every host
+            // the account signed in on, so a source there is the last host's (#1293).
+            new Relationship(hostRef, SIGNED_IN_AS, EntityRef.user(user), gradeForSource(source), name(),
+                Map.of("signInSource", nullToUnknown(source))));
       }
     }
   }

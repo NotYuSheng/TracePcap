@@ -63,7 +63,7 @@ export function DerivationModal({ answer, label, show, onHide, fileId }: Derivat
                 {links.length > 0 && (
                   <div className="small mt-1 d-flex flex-wrap gap-2">
                     {links.map((id, j) => (
-                      <Link key={id} to={`/analysis/${fileId}/conversations?highlight=${encodeURIComponent(id)}`} onClick={onHide}>
+                      <Link key={`${id}-${j}`} to={`/analysis/${fileId}/conversations?highlight=${encodeURIComponent(id)}`} onClick={onHide}>
                         Conversation {j + 1} <i className="bi bi-arrow-right-short" aria-hidden="true" />
                       </Link>
                     ))}

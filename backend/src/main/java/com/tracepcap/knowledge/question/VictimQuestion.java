@@ -42,10 +42,12 @@ public class VictimQuestion implements StandardQuestion {
     // victim host -> the C2s it was seen contacting (deduped: several communicates-with edges — one
     // per alerted conversation plus the aggregated traffic edge — can name the same C2)
     Map<EntityRef, Set<String>> victims = new LinkedHashMap<>();
+    Map<EntityRef, Set<EntityRef>> contacted = new LinkedHashMap<>();
     for (Relationship comm : board.relationshipsWithPredicate("communicates-with")) {
       if (comm.from().type() == EntityType.HOST && c2s.contains(comm.to())) {
         victims.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>())
             .add("contacted C2 " + comm.to().key());
+        contacted.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>()).add(comm.to());
       }
     }
 
@@ -60,8 +62,9 @@ public class VictimQuestion implements StandardQuestion {
               + " — contacted a known malware C2"
               + (user != null ? " (signed in as " + user + ")" : "");
       List<com.tracepcap.knowledge.spi.Step> steps = new ArrayList<>();
+      Set<EntityRef> itsC2s = contacted.getOrDefault(host, Set.of());
       for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
-        if (!basis.contains("contacted C2 " + c2of.from().key())) continue;
+        if (!itsC2s.contains(c2of.from())) continue;
         String fam = EntityRef.UNIDENTIFIED_MALWARE.equals(c2of.to().key()) ? "unidentified malware" : c2of.to().key();
         String found = c2of.from().key() + " is a command-and-control server for " + fam
             + " (the command & control answer shows how).";
@@ -69,14 +72,14 @@ public class VictimQuestion implements StandardQuestion {
           steps.add(com.tracepcap.knowledge.spi.Step.of(found, null, Grade.INFERRED));
         }
       }
-      for (String b : basis) {
-        EntityRef c2 = EntityRef.external(b.substring("contacted C2 ".length()));
+      for (EntityRef c2 : itsC2s) {
         steps.add(new com.tracepcap.knowledge.spi.Step(host.key() + " talked to " + c2.key() + ".",
             Derivations.RULE_VICTIM, Grade.INFERRED, Derivations.conversationsBetween(board, host, c2)));
       }
       if (user != null) {
+        Grade signIn = board.relationshipsFrom(host, "signed-in-as").get(0).grade();
         steps.add(com.tracepcap.knowledge.spi.Step.of(host.key() + " was signed in as " + user
-            + " (the signed-in user answer shows how).", null, Grade.MEASURED));
+            + " (the signed-in user answer shows how).", null, signIn));
       }
       answers.add(
           new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), new ArrayList<>(basis), attrs)

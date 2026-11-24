@@ -106,8 +106,9 @@ public class DataTransferQuestion implements StandardQuestion {
                   com.tracepcap.knowledge.spi.Step.of(r.from().key() + (directional ? " sent " : " exchanged ")
                       + megabytes(bytes) + (directional ? " to " : " with ") + r.to().key()
                       + ", counted from the capture's own byte totals.", null, Grade.MEASURED),
-                  com.tracepcap.knowledge.spi.Step.of(r.to().key() + " belongs to " + where
-                      + " (offline GeoIP), which isn't a known CDN or cloud provider.",
+                  com.tracepcap.knowledge.spi.Step.of(r.to().key() + (org != null
+                      ? " belongs to " + where + " (GeoIP), which isn't a known CDN or cloud provider."
+                      : " has no network named in the GeoIP database, so nothing marks it as a CDN or cloud provider."),
                       Derivations.RULE_TRANSFER, Grade.INFERRED))));
     }
     return answers;

@@ -82,6 +82,7 @@ final class Derivations {
 
   /** What each Kerberos finding means (#1267), as a step's rule. */
   static String kerberosRule(String technique) {
+    if (!"weak-ticket".equals(technique) && !"password-guessing".equals(technique)) return null;
     return "weak-ticket".equals(technique)
         ? "A domain controller that issues AES tickets but gave this host an RC4 or DES one was asked"
             + " for the weak one: what Kerberoasting and Skeleton Key do. An RC4-only domain doesn't count."
@@ -101,8 +102,10 @@ final class Derivations {
     for (Relationship r : board.relationshipsWithPredicate("c2-of")) {
       if (!r.from().equals(c2) || r.attributes().get("corroboration") == null) continue;
       String kind = String.valueOf(r.attributes().get("corroboration"));
-      steps.add(Step.of(String.valueOf(r.attributes().getOrDefault("reason", "")),
-          "install-chain".equals(kind) ? RULE_INSTALL_CHAIN : RULE_SUSPECTED, Grade.INFERRED));
+      Object reason = r.attributes().get("reason");
+      String found = reason != null && !reason.toString().isBlank() ? reason.toString()
+          : c2.key() + " was corroborated as a C2 (" + kind + ").";
+      steps.add(Step.of(found, "install-chain".equals(kind) ? RULE_INSTALL_CHAIN : RULE_SUSPECTED, Grade.INFERRED));
     }
     steps.addAll(alertSteps(board, c2, families));
     for (Finding f : board.findingsOfCategory("c2-classification")) {
@@ -113,7 +116,7 @@ final class Derivations {
     Object country = e.get("country"), org = e.get("org");
     if (country != null || org != null) {
       steps.add(Step.of(c2.key() + (org != null ? " is hosted by " + org + (country != null ? " in " + country : "")
-          : " is in " + country) + ", from the offline GeoIP database.", null, Grade.INFERRED));
+          : " is in " + country) + ", from the GeoIP database.", null, Grade.INFERRED));
     }
     if (e.get("firstSeen") != null) {
       steps.add(Step.of("First contacted at "

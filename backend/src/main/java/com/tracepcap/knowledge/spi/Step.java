@@ -19,7 +19,8 @@ public record Step(String found, String rule, Grade grade, List<String> conversa
   public Step {
     if (found == null || found.isBlank()) throw new IllegalArgumentException("A step needs what was found");
     if (grade == null) grade = Grade.INFERRED;
-    conversations = conversations == null ? List.of() : List.copyOf(conversations);
+    // Once each: a finding's evidence can name a conversation twice.
+    conversations = conversations == null ? List.of() : List.copyOf(new java.util.LinkedHashSet<>(conversations));
   }
 
   public static Step of(String found, String rule, Grade grade) {

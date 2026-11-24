@@ -83,4 +83,50 @@ class DerivationTest {
       assertThat(s.conversations()).containsExactly(CONV);
     });
   }
+
+  @Test
+  void eachHostsSignIn_isNamedByItsOwnMethod_notTheLastHosts() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    b.addEntity(EntityRef.user("ccollier"), Map.of("source", "ldap_dn")); // the last host's
+    b.addRelationship(new Relationship(EntityRef.host("10.0.0.1"), "signed-in-as", EntityRef.user("ccollier"),
+        Grade.MEASURED, "host-identity", Map.of("signInSource", "kerberos_as_req")));
+    b.addRelationship(new Relationship(EntityRef.host("10.0.0.2"), "signed-in-as", EntityRef.user("ccollier"),
+        Grade.REPORTED, "host-identity", Map.of("signInSource", "ldap_dn")));
+    List<Answer> answers = new SignedInUserQuestion().answer(b.build());
+    assertThat(answers).filteredOn(a -> "10.0.0.1".equals(a.attributes().get("host"))).singleElement()
+        .satisfies(a -> assertThat(a.derivation().get(0).rule()).isEqualTo(Derivations.RULE_KERBEROS_SIGN_IN));
+    assertThat(answers).filteredOn(a -> "10.0.0.2".equals(a.attributes().get("host"))).singleElement()
+        .satisfies(a -> assertThat(a.derivation().get(0).rule()).isEqualTo(Derivations.RULE_LDAP_SIGN_IN));
+  }
+
+  @Test
+  void aVictimsReportedSignIn_staysReportedInItsSteps() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef host = EntityRef.host(VICTIM), c2 = EntityRef.external(C2);
+    b.addRelationship(Relationship.of(host, "communicates-with", c2, Grade.MEASURED, "ids-alerts"));
+    b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("STRRAT"), Grade.INFERRED, "suricata"));
+    b.addRelationship(Relationship.of(host, "signed-in-as", EntityRef.user("ccollier"), Grade.REPORTED, "host-identity"));
+    Answer a = new VictimQuestion().answer(b.build()).get(0);
+    assertThat(a.derivation().get(a.derivation().size() - 1).grade()).isEqualTo(Grade.REPORTED);
+  }
+
+  @Test
+  void aCorroborationWithoutAReason_stillAnswers_andIsNoDetectorsIdentification() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("45.1.2.3");
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware("STRRAT"), Grade.INFERRED, "corroboration",
+        Map.of("corroboration", "suspected-c2", "reason", " ")));
+    b.addFinding(new Finding("c2-classification", "STRRAT suspected: listed and reached in rounds", Severity.HIGH,
+        Grade.INFERRED, "corroboration", List.of(c2), List.of(), Map.of()));
+    CaseKnowledge board = b.build();
+    assertThat(new C2Question().answer(board)).singleElement()
+        .satisfies(a -> assertThat(a.derivation().get(0).found()).contains("corroborated as a C2"));
+    assertThat(new MalwareQuestion().answer(board)).singleElement()
+        .satisfies(a -> assertThat(a.derivation()).isEmpty());
+  }
+
+  @Test
+  void aStepNamesEachConversationOnce() {
+    assertThat(new Step("x", null, Grade.MEASURED, List.of("a", "b", "a")).conversations()).containsExactly("a", "b");
+  }
 }
