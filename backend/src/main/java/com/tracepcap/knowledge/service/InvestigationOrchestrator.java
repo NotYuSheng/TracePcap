@@ -3,6 +3,7 @@ package com.tracepcap.knowledge.service;
 import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
+import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Goal;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.InvestigationReport;
@@ -134,7 +135,49 @@ public class InvestigationOrchestrator {
     // a second malware family, another victim host. The panel renders from here, so dropping them
     // would hide real findings that /answers and the narrative both show.
     List<Answer> additional = answers.stream().filter(a -> !representing.contains(a)).toList();
-    return new InvestigationReport(fileId, outcomes, additional, coverage(board));
+    return new InvestigationReport(fileId, outcomes, additional, coverage(board), considered(board));
+  }
+
+  /**
+   * Every candidate a check tested and ruled out on this board (#1294): what contributors posted,
+   * and beacons whose server didn't end up a C2. The report, the narrative and Q&A all read this.
+   */
+  public static List<com.tracepcap.knowledge.spi.Considered> considered(CaseKnowledge board) {
+    List<com.tracepcap.knowledge.spi.Considered> out = new ArrayList<>(
+        board.findingsOfCategory(com.tracepcap.knowledge.spi.Considered.CATEGORY).stream()
+            .map(com.tracepcap.knowledge.spi.Considered::from)
+            .filter(java.util.Objects::nonNull)
+            .toList());
+    out.addAll(unclassifiedBeacons(board));
+    // One per question and candidate: a listed server that also beacons is one alternative.
+    java.util.Map<List<String>, com.tracepcap.knowledge.spi.Considered> once = new java.util.LinkedHashMap<>();
+    for (com.tracepcap.knowledge.spi.Considered c : out) once.putIfAbsent(List.of(c.question(), c.candidate()), c);
+    return new ArrayList<>(once.values());
+  }
+
+  static final String BEACON_RULE =
+      "A beacon is a C2 only when a rule names its server or its stream opens with a known malware"
+          + " family's check-in; a regular, quiet connection alone is also what update checks and"
+          + " telemetry look like.";
+
+  /**
+   * Beacons whose server didn't end up a C2 (#1294): judged after the pivots, so a beacon the
+   * stream classifier did match isn't listed. One per server.
+   */
+  static List<com.tracepcap.knowledge.spi.Considered> unclassifiedBeacons(CaseKnowledge board) {
+    Set<EntityRef> c2s = new java.util.HashSet<>();
+    board.relationshipsWithPredicate("c2-of").forEach(r -> c2s.add(r.from()));
+    java.util.Map<String, com.tracepcap.knowledge.spi.Considered> out = new java.util.LinkedHashMap<>();
+    for (com.tracepcap.knowledge.spi.Finding f : board.findingsOfCategory("suspected-beacon")) {
+      EntityRef ext = f.concerns().stream()
+          .filter(r -> r.type() == com.tracepcap.knowledge.spi.EntityType.EXTERNAL_SERVICE)
+          .findFirst().orElse(null);
+      if (ext == null || c2s.contains(ext) || out.containsKey(ext.key())) continue;
+      out.put(ext.key(), new com.tracepcap.knowledge.spi.Considered("c2", ext.key(), BEACON_RULE,
+          "a beacon (" + f.summary() + "), but no rule named it and no known family's check-in was"
+              + " found in its stream.", f.evidence()));
+    }
+    return new ArrayList<>(out.values());
   }
 
   /** Confidence follows the evidence grade — how directly the conclusion is known. */
@@ -150,7 +193,10 @@ public class InvestigationOrchestrator {
   private static List<String> coverage(CaseKnowledge board) {
     TreeSet<String> sources = new TreeSet<>();
     board.relationships().forEach(r -> add(sources, r.source()));
-    board.findings().forEach(f -> add(sources, f.source()));
+    // A ruled-out candidate isn't a contribution: the technique concluded nothing (#1294).
+    board.findings().stream()
+        .filter(f -> !com.tracepcap.knowledge.spi.Considered.CATEGORY.equals(f.category()))
+        .forEach(f -> add(sources, f.source()));
     return new ArrayList<>(sources);
   }
 

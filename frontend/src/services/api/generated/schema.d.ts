@@ -3470,6 +3470,13 @@ export interface components {
             rejected?: number;
             topFailedTargets?: components["schemas"]["FailedTarget"][];
         };
+        ConsideredResponse: {
+            candidate?: string;
+            conversations?: string[];
+            question?: string;
+            reason?: string;
+            rule?: string;
+        };
         ConversationDetailResponse: {
             anomalies?: components["schemas"]["ProtocolAnomaly"][];
             appName?: string;
@@ -4292,6 +4299,7 @@ export interface components {
         };
         InvestigationReportResponse: {
             additional?: components["schemas"]["AnswerResponse"][];
+            considered?: components["schemas"]["ConsideredResponse"][];
             coverage?: string[];
             goals?: components["schemas"]["GoalOutcomeDto"][];
             unknowns?: string[];

@@ -33,7 +33,7 @@ import { getExtractedFiles } from '@features/extractedFiles/services/extractedFi
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import { CaptureQualityNote } from '@components/common/CaptureQualityNote/CaptureQualityNote';
-import type { Answer } from '@/types';
+import type { Answer, Considered } from '@/types';
 
 /** "Where the hosts are" lists this many groups per heading before "Show all". */
 const HOSTS_SHOWN = 6;
@@ -97,6 +97,7 @@ export const AnalysisOverview = () => {
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [considered, setConsidered] = useState<Considered[]>([]);
   const [activity, setActivity] = useState<TimelineDataPoint[]>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const { tops: hostTops } = useHostGroups(fileId, data);
@@ -180,10 +181,12 @@ export const AnalysisOverview = () => {
       .then(s => {
         setAnswers(s.answers);
         setUnknowns(s.unknowns);
+        setConsidered(s.considered);
       })
       .catch(() => {
         setAnswers([]);
         setUnknowns([]);
+        setConsidered([]);
       });
     if (networkContext) {
       conversationService
@@ -504,7 +507,7 @@ export const AnalysisOverview = () => {
           </section>
 
           {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4). */}
-          {answers.length > 0 && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} fileId={fileId} />}
+          {(answers.length > 0 || considered.length > 0) && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} considered={considered} fileId={fileId} />}
 
           {(
             <section className="ov-card" aria-labelledby="ov-apps">

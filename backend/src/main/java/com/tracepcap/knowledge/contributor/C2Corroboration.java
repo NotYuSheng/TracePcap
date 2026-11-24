@@ -74,7 +74,26 @@ public final class C2Corroboration {
 
   private record Pair(String host, String external) {}
 
+  /**
+   * A reputation-listed server the suspected-C2 rule tested and didn't escalate (#1294), with the
+   * first requirement it failed.
+   */
+  public record Rejection(String host, String external, String listedBy, String reason, List<String> conversations) {}
+
+  /** What one pass concluded and what it ruled out. */
+  public record Analysis(List<Escalation> escalations, List<Rejection> rejections) {}
+
+  /** The suspected-C2 rule in words, for an answer's steps and a rejection alike. */
+  public static final String SUSPECTED_RULE =
+      "Reputation alone never makes a C2. A listed server becomes a suspected C2 only when a host"
+          + " already talking to a confirmed C2 reaches it by bare IP, in repeated rounds (or seconds"
+          + " after another such server).";
+
   public static List<Escalation> find(List<ConversationFacts> convs, Set<String> confirmedC2) {
+    return analyse(convs, confirmedC2).escalations();
+  }
+
+  public static Analysis analyse(List<ConversationFacts> convs, Set<String> confirmedC2) {
     // Every internal host <-> external conversation, by pair, in time order.
     Map<Pair, List<ConversationFacts>> byPair = new LinkedHashMap<>();
     for (ConversationFacts c : convs) {
@@ -96,8 +115,38 @@ public final class C2Corroboration {
     });
 
     List<Escalation> out = new ArrayList<>();
-    out.addAll(suspectedC2s(byPair, confirmedC2, infectedSince));
+    List<Rejection> rejected = new ArrayList<>();
+    out.addAll(suspectedC2s(byPair, confirmedC2, infectedSince, rejected));
     out.addAll(installChains(byPair, confirmedC2));
+    // A server another host's pass escalated isn't a rejection.
+    Set<String> escalated = new java.util.HashSet<>();
+    out.forEach(e -> escalated.add(e.external()));
+    rejected.removeIf(r -> escalated.contains(r.external()));
+    return new Analysis(out, onePerServer(rejected));
+  }
+
+  /** How close each rejection came: the one that got furthest stands for its server. */
+  private static int closeness(Rejection r) {
+    String why = r.reason();
+    if (why.startsWith("reached in one round")) return 3;
+    if (why.startsWith("it was reached by name")) return 2;
+    if (why.contains("before it first talked")) return 1;
+    return 0;
+  }
+
+  /** One rejection per server: the host that came closest, and how many other hosts reached it. */
+  static List<Rejection> onePerServer(List<Rejection> rejected) {
+    Map<String, List<Rejection>> byServer = new LinkedHashMap<>();
+    rejected.forEach(r -> byServer.computeIfAbsent(r.external(), k -> new ArrayList<>()).add(r));
+    List<Rejection> out = new ArrayList<>();
+    byServer.forEach((ext, rs) -> {
+      Rejection best = rs.stream().max(Comparator.comparingInt(C2Corroboration::closeness)).orElseThrow();
+      long others = rs.stream().map(Rejection::host).distinct().count() - 1;
+      List<String> convs = rs.stream().flatMap(r -> r.conversations().stream()).distinct().limit(20).toList();
+      out.add(new Rejection(best.host(), ext, best.listedBy(),
+          best.reason() + (others > 0 ? " (" + others + " other host" + (others == 1 ? "" : "s") + " reached it too)" : ""),
+          convs));
+    });
     return out;
   }
 
@@ -105,19 +154,34 @@ public final class C2Corroboration {
 
   private static List<Escalation> suspectedC2s(
       Map<Pair, List<ConversationFacts>> byPair, Set<String> confirmed,
-      Map<String, LocalDateTime> infectedSince) {
-    // Candidates: reputation-listed, bare IP, first contacted after the host was infected.
+      Map<String, LocalDateTime> infectedSince, List<Rejection> rejected) {
+    // Candidates: reputation-listed, bare IP, first contacted after the host was infected. A listed
+    // server that fails one of those is recorded with the first it failed (#1294).
     Map<Pair, String> candidates = new LinkedHashMap<>(); // pair -> the reputation rule
     byPair.forEach((p, l) -> {
       if (confirmed.contains(p.external())) return;
-      LocalDateTime since = infectedSince.get(p.host());
-      if (since == null || l.get(0).flow().startTime().isBefore(since)) return;
-      if (!bareIp(p.external(), l)) return;
       String rule = l.stream()
           .flatMap(c -> c.findings().suricataAlerts().stream())
           .filter(a -> REPUTATION.matcher(a).find())
           .findFirst().orElse(null);
-      if (rule != null) candidates.put(p, rule);
+      if (rule == null) return;
+      // Only a server the host reached out to: an inbound scan from a listed address isn't a C2
+      // candidate, and recording one per probed host would bury the list.
+      boolean reachedOut = l.stream().anyMatch(c -> {
+        String init = c.flow().initiatorIp();
+        return init != null ? init.equals(p.host()) : p.host().equals(c.flow().srcIp());
+      });
+      LocalDateTime since = infectedSince.get(p.host());
+      String why = since == null
+          ? p.host() + " never talked to a confirmed C2, so nothing says it is infected"
+          : l.get(0).flow().startTime().isBefore(since)
+              ? p.host() + " reached it before it first talked to a confirmed C2"
+              : !bareIp(p.external(), l) ? "it was reached by name, not as a bare IP" : null;
+      if (why != null) {
+        if (reachedOut) rejected.add(new Rejection(p.host(), p.external(), shortRule(rule), why, ids(l)));
+        return;
+      }
+      candidates.put(p, rule);
     });
 
     Map<Pair, Integer> rounds = new LinkedHashMap<>();
@@ -139,13 +203,21 @@ public final class C2Corroboration {
           }
         }
       }
-      if (repeated == null) return;
+      if (repeated == null) {
+        rejected.add(new Rejection(p.host(), p.external(), shortRule(rule),
+            "reached in one round, and not seconds after a listed server that recurred", ids(byPair.get(p))));
+        return;
+      }
       out.add(new Escalation(p.host(), p.external(), null,
           "Suspected C2: " + p.external() + " is reputation-listed (" + shortRule(rule) + "), a bare IP, "
               + repeated + " by " + p.host() + ", which was already talking to a confirmed C2.",
           SUSPECTED));
     });
     return out;
+  }
+
+  private static List<String> ids(List<ConversationFacts> l) {
+    return l.stream().map(c -> c.id().toString()).toList();
   }
 
   /** Bursts of sessions at least {@link #ROUND_GAP} apart. */

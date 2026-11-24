@@ -986,6 +986,29 @@
         },
         "type": "object"
       },
+      "ConsideredResponse": {
+        "properties": {
+          "candidate": {
+            "type": "string"
+          },
+          "conversations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ConversationDetailResponse": {
         "properties": {
           "anomalies": {
@@ -3257,6 +3280,12 @@
           "additional": {
             "items": {
               "$ref": "#/components/schemas/AnswerResponse"
+            },
+            "type": "array"
+          },
+          "considered": {
+            "items": {
+              "$ref": "#/components/schemas/ConsideredResponse"
             },
             "type": "array"
           },

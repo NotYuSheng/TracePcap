@@ -10,14 +10,23 @@ public record InvestigationReportResponse(
     List<GoalOutcomeDto> goals,
     List<AnswerResponse> additional,
     List<String> unknowns,
-    List<String> coverage) {
+    List<String> coverage,
+    List<ConsideredResponse> considered) {
+
+  /** A candidate a check tested and ruled out (#1294), with why. */
+  public record ConsideredResponse(
+      String question, String candidate, String rule, String reason, List<String> conversations) {}
+
 
   public static InvestigationReportResponse from(InvestigationReport report) {
     return new InvestigationReportResponse(
         report.outcomes().stream().map(GoalOutcomeDto::from).toList(),
         report.additional().stream().map(AnswerResponse::from).toList(),
         report.openGoals().stream().map(Goal::name).toList(),
-        report.coverage());
+        report.coverage(),
+        report.considered().stream()
+            .map(c -> new ConsideredResponse(c.question(), c.candidate(), c.rule(), c.reason(), c.conversations()))
+            .toList());
   }
 
   public record GoalOutcomeDto(

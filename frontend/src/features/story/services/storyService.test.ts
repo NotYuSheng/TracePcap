@@ -41,6 +41,12 @@ describe('investigationToSummary', () => {
     expect(investigationToSummary(report).answers[0].derivation).toEqual([step]);
   });
 
+  it('passes the alternatives the checks ruled out through (#1294)', () => {
+    const c = { question: 'c2', candidate: '45.125.66.40', rule: null, reason: 'reached once.', conversations: [] };
+    const report: InvestigationReport = { goals: [], additional: [], unknowns: [], coverage: [], considered: [c] };
+    expect(investigationToSummary(report).considered).toEqual([c]);
+  });
+
   it('omits open goals from the answers and reports them as unknowns once there is an incident', () => {
     const report: InvestigationReport = {
       goals: [

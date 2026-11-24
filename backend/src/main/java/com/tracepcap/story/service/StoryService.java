@@ -492,6 +492,7 @@ public class StoryService {
             - Narrative: "summary" section first covering overall picture, then "detail" sections per major finding cluster, "conclusion" last with recommendations.
             - Write for a technical security analyst. Reference specific IPs, ports, counts, and ratios from the findings.
             - The aggregates section provides full-dataset context — use it to frame the scale of findings.
+            - If an "Alternatives considered and ruled out" block is given, add one "detail" section titled "Alternatives considered" before the conclusion: name each alternative and say why it was ruled out, as given. Never present one as a finding, and never add alternatives that aren't listed.
             - FORMAT each section's "content" as readable Markdown, never one long paragraph: keep paragraphs to 2-3 sentences, separate them with a blank line (\\n\\n), and use "- " bullet lists for enumerations or key facts (one item per line). You may bold a key term with **like this**. Do NOT use headings inside content.
             """;
   }
@@ -526,6 +527,7 @@ public class StoryService {
       return;
     }
     appendConfirmedFindings(prompt, standardQuestionService.answer(board));
+    appendConsidered(prompt, com.tracepcap.knowledge.service.InvestigationOrchestrator.considered(board));
     appendKnowledgeBoard(prompt, board);
   }
 
@@ -536,13 +538,41 @@ public class StoryService {
    */
   private void appendConfirmedFindings(StringBuilder prompt, UUID fileId) {
     List<com.tracepcap.knowledge.spi.Answer> answers;
+    List<com.tracepcap.knowledge.spi.Considered> considered;
     try {
-      answers = standardQuestionService.answer(investigationOrchestrator.investigatedBoard(fileId));
+      com.tracepcap.knowledge.spi.CaseKnowledge board = investigationOrchestrator.investigatedBoard(fileId);
+      answers = standardQuestionService.answer(board);
+      considered = com.tracepcap.knowledge.service.InvestigationOrchestrator.considered(board);
     } catch (Exception e) {
       log.warn("Confirmed-findings context unavailable for file {}: {}", fileId, e.getMessage());
       return;
     }
     appendConfirmedFindings(prompt, answers);
+    appendConsidered(prompt, considered);
+  }
+
+  /** At most this many alternatives go into a prompt; the rest are counted. */
+  private static final int CONSIDERED_LIMIT = 12;
+
+  /**
+   * The candidates the checks tested and ruled out (#1294), so the narrative can say why the other
+   * candidates aren't the answer. Marked as ruled out, with the rule and the reason: the narrator may
+   * describe them as alternatives, never promote one to a finding.
+   */
+  void appendConsidered(StringBuilder prompt, List<com.tracepcap.knowledge.spi.Considered> considered) {
+    if (considered == null || considered.isEmpty()) return;
+    prompt.append("## Alternatives considered and ruled out (deterministic checks)\n");
+    prompt.append(
+        "Each of these was tested against a rule and did NOT meet it. Describe them only as"
+            + " alternatives that were considered and ruled out, with the reason given. Never call one"
+            + " a C2, malicious, an attack, or a finding, and never contradict the reason.\n");
+    considered.stream().limit(CONSIDERED_LIMIT).forEach(c -> prompt.append("- [")
+        .append(c.question()).append("] ").append(c.candidate()).append(": ").append(c.reason())
+        .append("\n    rule: ").append(c.rule() == null ? "(none)" : c.rule()).append('\n'));
+    if (considered.size() > CONSIDERED_LIMIT) {
+      prompt.append("- … and ").append(considered.size() - CONSIDERED_LIMIT).append(" more ruled out\n");
+    }
+    prompt.append('\n');
   }
 
   /** Renders already-resolved answers (the Q&A path reuses one assembled board). */
@@ -605,9 +635,13 @@ public class StoryService {
               .append(' ').append(r.to().key()).append(" (").append(r.grade()).append(")\n"));
     }
 
-    if (!board.findings().isEmpty()) {
+    // Ruled-out candidates have their own, guarded block (#1294): never list one as a finding.
+    List<com.tracepcap.knowledge.spi.Finding> findings = board.findings().stream()
+        .filter(f -> !com.tracepcap.knowledge.spi.Considered.CATEGORY.equals(f.category()))
+        .toList();
+    if (!findings.isEmpty()) {
       prompt.append("Findings:\n");
-      board.findings().forEach(
+      findings.forEach(
           f -> prompt.append("- [").append(f.severity()).append("] ").append(f.category())
               .append(": ").append(f.summary()).append('\n'));
     }

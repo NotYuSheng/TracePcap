@@ -157,7 +157,15 @@ public class IdsAlertContributor implements KnowledgeContributor {
     }
 
     // C2s no single alert proves: a chain of weaker signals, each link required (C2Corroboration).
-    for (C2Corroboration.Escalation e : C2Corroboration.find(context.conversationFacts(), confirmed)) {
+    C2Corroboration.Analysis corroboration = C2Corroboration.analyse(context.conversationFacts(), confirmed);
+    // Reputation-listed servers the rule tested and ruled out, with why (#1294).
+    for (C2Corroboration.Rejection r : corroboration.rejections()) {
+      board.addFinding(new com.tracepcap.knowledge.spi.Considered(
+              "c2", r.external(), C2Corroboration.SUSPECTED_RULE,
+              "on " + r.listedBy() + ", but " + r.reason() + ".", r.conversations())
+          .toFinding("corroboration", List.of(EntityRef.external(r.external()), EntityRef.host(r.host()))));
+    }
+    for (C2Corroboration.Escalation e : corroboration.escalations()) {
       EntityRef external = EntityRef.external(e.external());
       EntityRef malware =
           EntityRef.malware(e.family() != null ? e.family() : EntityRef.UNIDENTIFIED_MALWARE);

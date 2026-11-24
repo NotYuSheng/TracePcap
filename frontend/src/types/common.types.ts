@@ -671,6 +671,17 @@ export interface InvestigationReport {
   additional: Answer[];
   unknowns: string[];
   coverage: string[];
+  /** Candidates the checks tested and ruled out, with why (#1294); absent from older backends. */
+  considered?: Considered[];
+}
+
+/** A candidate a check tested and ruled out (#1294): what it was, the rule, and why it fell short. */
+export interface Considered {
+  question: string;
+  candidate: string;
+  rule: string | null;
+  reason: string;
+  conversations: string[];
 }
 
 /** Mirrors TlsCertificateDto (#1235): the checks are worked out by the backend. */

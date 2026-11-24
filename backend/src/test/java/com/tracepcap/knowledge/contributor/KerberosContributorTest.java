@@ -133,4 +133,23 @@ class KerberosContributorTest {
   private static KerberosFacts ticket(String type, String account, String service, String enc, boolean weak) {
     return new KerberosFacts(UUID.randomUUID(), AT, C, DC, type, account, service, "THREEBEESCO.COM", null, enc, weak, 1);
   }
+
+  @Test
+  void aFewFailedAccounts_areConsidered_notAnswered() {
+    List<KerberosFacts> r = List.of(error("alice", "KDC_ERR_PREAUTH_FAILED"), error("bob", "KDC_ERR_C_PRINCIPAL_UNKNOWN"),
+        error("carol", "KDC_ERR_PREAUTH_FAILED"));
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    KerberosContributor.post(r, b);
+    CaseKnowledge board = b.build();
+    assertThat(new KerberosAttackQuestion().answer(board)).isEmpty();
+    assertThat(board.findingsOfCategory(com.tracepcap.knowledge.spi.Considered.CATEGORY)).singleElement()
+        .satisfies(f -> {
+          com.tracepcap.knowledge.spi.Considered c = com.tracepcap.knowledge.spi.Considered.from(f);
+          assertThat(c.question()).isEqualTo("kerberos-attack");
+          assertThat(c.candidate()).isEqualTo(C + " → " + DC);
+          assertThat(c.reason()).startsWith("failed to sign in as 3 accounts (alice, bob, carol) within ten minutes")
+              .contains("5 are needed");
+          assertThat(c.rule()).isEqualTo(KerberosContributor.GUESSING_RULE);
+        });
+  }
 }
