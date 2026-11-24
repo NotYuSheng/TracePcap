@@ -3,15 +3,15 @@ NetSupport RAT — "The Lucky Turkey"
 
 .. note::
 
-   **Captured against TracePcap** ``v0.5.0`` **(dev, 22 November 2026)**, including the conversation
-   grouping fix (#1257) and per-direction byte counts (#1260). TracePcap changes quickly, so this
+   **Captured against TracePcap** ``v0.5.0-70`` **(dev, 25 November 2026)**. TracePcap changes quickly, so this
    walkthrough is a point-in-time record: the deterministic conclusions are stable, but screenshots,
    counts and UI details reflect that build. Re-verify against the current build before quoting a
    figure.
 
 A remote-access trojan that is really a commercial remote-admin product. NetSupport Manager is sold
-to IT departments, which is exactly why criminals use it: its traffic looks like administration. This
-page shows what TracePcap says about it, where it stops short of calling it malware, and why.
+to IT departments, which is exactly why criminals use it: its traffic looks like administration. No
+rule calls this traffic malware. This page shows how TracePcap gets there anyway, from how the tool
+was installed, and what it still leaves to the analyst.
 
 The exercise
 ------------
@@ -54,11 +54,11 @@ Step 2 — The Investigation Summary
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. figure:: images/mta-netsupport-summary.png
-   :alt: Investigation Summary: the signed-in user and a NetSupport remote-access session
+   :alt: Investigation Summary: victim, user, NetSupport RAT and its C2, and the remote-access session
    :width: 60%
 
-   The summary names the user and flags NetSupport talking to an outside server, with when it began.
-   It does not name a victim, a malware family or a C2.
+   The summary names the victim, the user, NetSupport RAT and its C2, and also lists the NetSupport
+   session as a remote-access tool to confirm.
 
 .. list-table::
    :header-rows: 1
@@ -72,13 +72,47 @@ Step 2 — The Investigation Summary
      - ``edward.winslow`` (Edward Winslow) on ``10.11.10.147``
      - MEASURED
      - Kerberos sign-in
-   * - Remote-access tool
-     - ``10.11.10.147`` runs **NetSupport**, talking to ``93.152.209.36`` outside the network since
-       **2026-11-10 18:22:07 UTC**; *confirm it's sanctioned*
+   * - Victim host
+     - ``10.11.10.147``, which talked to the C2
      - INFERRED
-     - IDS (*ET INFO NetSupport Remote Admin Checkin*) + first contact
+     - contacted the C2 below
+   * - Malware
+     - **NetSupport RAT** (*probable unsanctioned install*)
+     - INFERRED
+     - the install chain (below)
+   * - Command & control
+     - ``93.152.209.36`` (CN), first contacted **2026-11-10 18:22:07 UTC**
+     - INFERRED
+     - the install chain + IDS (*ET REMOTE_ACCESS NetSupport Remote Admin Checkin*)
+   * - Remote-access tool
+     - ``10.11.10.147`` runs **NetSupport**, talking to ``93.152.209.36`` since 18:22:07 UTC;
+       *confirm it's sanctioned*
+     - INFERRED
+     - IDS + first contact
 
 The start time is the exercise's first question, and it matches the key to the second.
+
+**How it got to "RAT".** The only rules that fired are ET's *REMOTE_ACCESS* rules for NetSupport's
+check-in and response. ET doesn't file them under MALWARE, because NetSupport Manager is a
+legitimate product many IT teams run, and TracePcap never calls a remote-admin tool malware on its
+alerts alone. What makes this one a RAT is how it arrived, and the capture holds all of it:
+
+- at 18:21:49 UTC a **script engine** (PowerShell's user agent) on ``10.11.10.147`` fetched from
+  ``vericheckusgo.com`` (``96.62.224.200``);
+- that server then sent the host **6.3 MB** (``/5555.mp4``);
+- **8 seconds later**, NetSupport began checking in to a **bare IP address**, ``93.152.209.36``,
+  not a vendor domain, over plain HTTP on port 443, every 60 seconds for the next two hours.
+
+That chain is a rule TracePcap applies: *a RAT checking in to a bare IP minutes after a script engine
+on the same host fetched a large payload from another server is how it was planted.* The **How we
+got here** button on the C2 answer shows it as the first step, with the rule in words. It's graded
+INFERRED, and the C2 answer says *probable unsanctioned install*. (The capture's *ET INFO Packed
+Executable Download* alert is a Windows Update at 18:30, not part of the chain.)
+
+**Two answers about one session.** The remote-access answer still asks the analyst to confirm the
+tool is sanctioned, beside a C2 answer that already concluded it isn't. They come from separate
+checks: the remote-access one fires on any remote-admin tool talking outside the network. Read the
+C2 answer as the conclusion and the remote-access one as the raw observation behind it.
 
 Step 3 — The session
 ~~~~~~~~~~~~~~~~~~~~
@@ -88,8 +122,9 @@ Step 3 — The session
    :width: 100%
 
    Filtering Conversations to ``93.152.209.36``: **one** conversation, 256 packets from the opening
-   SYN to the end, flagged *ET INFO NetSupport Remote Admin Checkin* and *ET POLICY HTTP traffic on
-   port 443 (POST)*. Times on screen are in the server's zone (UTC+8 here): 02:22:07 on 11 November
+   SYN to the end, flagged *ET REMOTE_ACCESS NetSupport Remote Admin Checkin* and *Response*, and
+   *ET INFO HTTP traffic on port 443 (POST)*. Its IDS alerts read *252 fired · first 102 shown*: a
+   check-in every 60 seconds for two hours, with the records kept for the first 100 each way. Times on screen are in the server's zone (UTC+8 here): 02:22:07 on 11 November
    is 18:22:07 UTC on the 10th.
 
 Checked against the answer key
@@ -124,31 +159,8 @@ Checked against the answer key
      - ``edward.winslow``
      - ✓
 
-The analyst gets every answer, but TracePcap's *own* conclusions stop at "a remote-access tool to
-confirm". It doesn't declare ``10.11.10.147`` a victim, NetSupport malware, or ``93.152.209.36`` a C2.
-
-Why it stops there
-------------------
-
-The only alert is ET's **INFO** rule for NetSupport's check-in. ET files it under INFO, not MALWARE,
-because NetSupport Manager is a legitimate product many IT teams run. TracePcap follows the same
-line: a remote-admin tool is surfaced for review, never called malware on that alone.
-
-The capture holds the story that makes this one malicious, spread across several weak signals:
-
-- at 18:21:49 UTC **PowerShell** fetched a script from ``vericheckusgo.com`` (*ET INFO Windows
-  Powershell User-Agent Usage*);
-- nine seconds later the same server, ``96.62.224.200``, delivered 6 MB as ``/5555.mp4``;
-- nine seconds after that, NetSupport began checking in to a **bare IP address**, not a vendor
-  domain, using plain HTTP on port 443, every 60 seconds for the next two hours.
-
-(The capture's *ET INFO Packed Executable Download* alert is a Windows Update at 18:30, not part of
-the chain.)
-
-A legitimate NetSupport install rarely looks like that chain. Escalating it (a remote-access check-in
-to a bare IP, preceded within minutes on the same host by PowerShell fetching from an outside server)
-to a probable unsanctioned install is a candidate improvement. It would be graded INFERRED with every link as evidence, and the
-evaluation harness would show whether it raises false alarms.
+Every answer in the key, and TracePcap's own conclusions match it: the key's NetSupport RAT on
+``93.152.209.36`` is the C2 answer, reached without a malware rule.
 
 .. tip::
 
@@ -160,7 +172,7 @@ evaluation harness would show whether it raises false alarms.
 What this demonstrates
 ----------------------
 
-Every answer the exercise asks for, including the exact start time, with the line between "seen" and
-"concluded" drawn where an analyst would draw it. The tool shows the remote-access session and when
-it began; deciding that a commercial admin tool is a RAT here is left to evidence TracePcap doesn't
-yet chain together, and says so.
+Every answer the exercise asks for, including the exact start time, and a RAT recognised without a
+rule that calls it malware. TracePcap chains the evidence an analyst would (a script fetch, a large
+payload, then a commercial admin tool checking in to a bare IP seconds later), names the rule it
+applied, and grades the result INFERRED rather than certain.

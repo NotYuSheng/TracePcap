@@ -3,8 +3,7 @@ Download from a fake software site
 
 .. note::
 
-   **Captured against TracePcap** ``v0.5.0`` **(dev, 22 November 2026)**, including the conversation
-   grouping fix (#1257) and per-direction byte counts (#1260). TracePcap changes quickly, so this
+   **Captured against TracePcap** ``v0.5.0-70`` **(dev, 25 November 2026)**. TracePcap changes quickly, so this
    walkthrough is a point-in-time record: the deterministic conclusions are stable, but screenshots,
    counts and UI details reflect that build. Re-verify against the current build before quoting a
    figure.
@@ -56,11 +55,11 @@ Step 2 — The Investigation Summary
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. figure:: images/mta-fake-authenticator-summary.png
-   :alt: Investigation Summary: victim, user, an unidentified C2, three downloads and TeamViewer
+   :alt: Investigation Summary: victim, user, a C2 and two suspected C2s, downloads and TeamViewer
    :width: 60%
 
-   The summary names the victim and one C2, lists what the host downloaded from it with hashes, and
-   flags a remote-access tool. It says plainly that the malware family isn't established.
+   The summary names the victim, one C2 and two suspected C2s, lists what the host downloaded with
+   hashes, and flags a remote-access tool. It says plainly that the malware family isn't established.
 
 .. list-table::
    :header-rows: 1
@@ -83,9 +82,15 @@ Step 2 — The Investigation Summary
        contacted 2025-01-22 19:45:56 UTC
      - INFERRED
      - IDS
+   * - Command & control
+     - ``45.125.66.32`` and ``45.125.66.252`` (LT), *suspected C2 for unidentified malware*, first
+       contacted 19:59:46 and 20:00:13 UTC
+     - INFERRED
+     - reputation + behaviour (below)
    * - Downloaded files
      - ``TeamViewer`` (4.4 MB), ``Teamviewer_Resource_fr`` (669 KB) and ``TV`` (13 KB), Windows
-       programs from ``http://5.252.153.241/api/file/get-file/…``, each with its SHA-256
+       programs from ``http://5.252.153.241/api/file/get-file/…``, each with its SHA-256; and
+       *2 more files* (the PowerShell scripts, folded as the smaller ones)
      - MEASURED
      - HTTP transfer
    * - Remote-access tool
@@ -172,27 +177,29 @@ Checked against the answer key
      - ~
    * - C2 servers
      - ``5.252.153.241``, ``45.125.66.32``, ``45.125.66.252``
-     - ``5.252.153.241`` only
-     - 1 of 3
+     - all three: the first by rule, the other two as *suspected*
+     - ✓
 
-**Why the PowerShell scripts aren't in the summary.** The *Downloaded file* answer picks files by
-their detected content type, and a PowerShell script's content is plain text (``text/plain``), so
-``29842.ps1`` and ``pas.ps1`` are listed under Files but not among the answers. Considering a script's
-file name (``.ps1``, ``.js``, ``.vbs``, ``.hta``, ``.bat``) as well is a straightforward improvement.
+**The PowerShell scripts.** ``29842.ps1`` and ``pas.ps1`` are plain text (``text/plain``), so their
+content doesn't say what they are. TracePcap also reads a script's file name (``.ps1``, ``.js``,
+``.vbs``, ``.hta``, ``.bat``), so they count as downloads; the summary lists the three largest files
+from a server and folds the rest as *2 more files*, with all of them under Files.
 
-**Why two C2s are missed.** The only alert on ``45.125.66.32`` and ``45.125.66.252`` is *ET DROP
-Spamhaus DROP Listed Traffic*: the addresses are in a netblock run by criminals. That's reputation,
-not behaviour; plenty of traffic to such space is scanning or spam. TracePcap doesn't call a server a
-C2 on reputation alone. The capture does hold more: starting 14 minutes after the confirmed C2,
-the host contacts ``45.125.66.32`` in three rounds (19:59, 20:25, 20:28 UTC), each the same three TLS
-sessions to a bare IP on the unusual port 2917 with near-identical sizes, and in every round
-``45.125.66.252`` is contacted seconds later. A rule that combines those signals (an
-already-infected host, a reputation-listed server, a bare IP contacted in repeated, scripted rounds)
-is a candidate improvement, graded INFERRED with the chain as its evidence.
+**How the other two C2s are found.** The only alert on ``45.125.66.32`` and ``45.125.66.252`` is
+*ET DROP Spamhaus DROP Listed Traffic*: the addresses are in a netblock run by criminals. That's
+reputation, not behaviour, and plenty of traffic to such space is scanning or spam, so TracePcap
+doesn't call a server a C2 on reputation alone. Here there's more. Starting 14 minutes after the
+confirmed C2, the already-infected host reaches ``45.125.66.32`` in three separate rounds (19:59,
+20:25, 20:28 UTC), each the same three TLS sessions to a bare IP on the unusual port 2917, and in
+every round ``45.125.66.252`` seconds later. TracePcap's rule for this combines all of it: *a
+reputation-listed bare IP that an already-infected host reaches in repeated rounds is a suspected
+C2*. The answer says *suspected*, is graded INFERRED, and **How we got here** shows the rule and the
+evidence.
 
 What this demonstrates
 ----------------------
 
-A hard case handled honestly: the victim, the user and one C2 concluded; the payload's files with
-hashes; a remote-access tool flagged for review; the fake site one search away. And nothing asserted
-beyond the evidence: no invented family, no C2 on reputation alone.
+A hard case handled honestly: the victim, the user and all three C2s found, with the two that only
+reputation and behaviour point to marked *suspected*; the payload's files with hashes; a
+remote-access tool flagged for review; the fake site one search away. And nothing asserted beyond
+the evidence: no invented family, and no C2 on reputation alone.

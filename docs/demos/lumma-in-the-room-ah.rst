@@ -3,8 +3,7 @@ Lumma Stealer — "Lumma in the Room-ah!"
 
 .. note::
 
-   **Captured against TracePcap** ``v0.5.0`` **(dev, 22 November 2026)**, including the conversation
-   grouping fix (#1257) and per-direction byte counts (#1260). TracePcap changes quickly, so this
+   **Captured against TracePcap** ``v0.5.0-70`` **(dev, 25 November 2026)**. TracePcap changes quickly, so this
    walkthrough is a point-in-time record: the deterministic conclusions are stable, but screenshots,
    counts and UI details reflect that build. Re-verify against the current build before quoting a
    figure.
@@ -65,7 +64,7 @@ Step 2 — The Investigation Summary answers the report
    :width: 60%
 
    The Investigation Summary on the Overview tab. Repeated alerts are collapsed with a count
-   (``×14``); longer evidence folds behind *and N more*.
+   (``×16``); longer evidence folds behind *and N more*.
 
 .. list-table::
    :header-rows: 1
