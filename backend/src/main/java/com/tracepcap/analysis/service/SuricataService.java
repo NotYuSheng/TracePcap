@@ -133,12 +133,16 @@ public class SuricataService implements Extractor {
       java.util.concurrent.atomic.AtomicReference<CaptureStats> stats,
       Map<String, List<SmbRpcRecords.Op>> remoteOps,
       java.util.concurrent.atomic.AtomicInteger remoteOpCount,
-      Map<String, String> smbTrees) {
+      Map<String, String> smbTrees,
+      Map<String, List<KerberosRecords.Reply>> kerberos,
+      java.util.concurrent.atomic.AtomicInteger kerberosCount,
+      Map<String, JsonNode> kerberosRequests) {
     static Eve empty() {
       return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(),
           new java.util.concurrent.atomic.AtomicReference<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>());
     }
   }
@@ -309,6 +313,7 @@ public class SuricataService implements Extractor {
     // One flow key can match several conversations (DHCP clients split by MAC): each SMB/RPC
     // operation goes to the first, so none is stored and counted twice.
     Set<SmbRpcRecords.Op> opsGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    Set<KerberosRecords.Reply> kerberosGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     for (PcapParserService.ConversationInfo conv : conversations) {
       Set<String> alerts = both(eve.alerts(), conv, LinkedHashSet::new);
       if (alerts != null && !alerts.isEmpty()) {
@@ -316,6 +321,12 @@ public class SuricataService implements Extractor {
       }
       List<Anomaly> anomalies = both(eve.anomalies(), conv, ArrayList::new);
       if (!anomalies.isEmpty()) conv.setSuricataAnomalies(anomalies);
+      List<KerberosRecords.Reply> krb = both(eve.kerberos(), conv, ArrayList::new);
+      krb.removeIf(r -> !kerberosGiven.add(r));
+      if (!krb.isEmpty()) {
+        conv.setKerberosExchanges(KerberosRecords.group(
+            krb, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort()));
+      }
       List<SmbRpcRecords.Op> ops = both(eve.remoteOps(), conv, ArrayList::new);
       ops.removeIf(o -> !opsGiven.add(o));
       if (!ops.isEmpty()) {
@@ -472,10 +483,19 @@ public class SuricataService implements Extractor {
     // Cheap pre-check: most lines are flow records, which we don't read.
     if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")
         && !line.contains("\"event_type\":\"anomaly\"") && !line.contains("\"event_type\":\"stats\"")
-        && !SmbRpcRecords.mayBe(line)) return;
+        && !SmbRpcRecords.mayBe(line) && !KerberosRecords.mayBe(line)) return;
     try {
       JsonNode root = objectMapper.readTree(line);
       String type = root.path("event_type").asText();
+      if ("krb5".equals(type)) {
+        String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);
+        if (srcIp == null || dstIp == null) return;
+        String key = flowKey(srcIp, root.has("src_port") ? root.get("src_port").asInt() : null,
+            dstIp, root.has("dest_port") ? root.get("dest_port").asInt() : null,
+            root.path("proto").asText(null));
+        KerberosRecords.read(root, key, result.kerberos(), result.kerberosCount(), result.kerberosRequests());
+        return;
+      }
       if ("smb".equals(type) || "dcerpc".equals(type)
           || ("fileinfo".equals(type) && "smb".equals(root.path("app_proto").asText()))) {
         String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);

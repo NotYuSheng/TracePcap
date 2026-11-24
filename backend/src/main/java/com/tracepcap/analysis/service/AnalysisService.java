@@ -836,6 +836,22 @@ public class AnalysisService {
     } catch (Exception ex) {
       log.warn("[{}] Saving {} SMB/RPC operations failed: {}", fileId, ops.size(), ex.getMessage());
     }
+    List<com.tracepcap.analysis.entity.KerberosExchangeEntity> krb = new ArrayList<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (KerberosRecords.Exchange x : c.getKerberosExchanges()) {
+        krb.add(com.tracepcap.analysis.entity.KerberosExchangeEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).firstTime(x.firstTime())
+            .clientIp(x.client()).kdcIp(x.kdc()).msgType(x.msgType()).account(x.account())
+            .service(x.service()).realm(x.realm()).errorCode(x.errorCode())
+            .encryption(x.encryption()).weak(x.weak()).count(x.count()).build());
+      }
+    }
+    try {
+      idsAlertWriter.replaceKerberosExchanges(fileId, krb);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} Kerberos replies failed: {}", fileId, krb.size(), ex.getMessage());
+    }
   }
 
   // ── Stage 7: carve embedded files ───────────────────────────────────────────

@@ -90,6 +90,21 @@ describe('Answer links to conversations (#1264)', () => {
     );
   });
 
+  it('labels a Kerberos-attack answer and links it to the host that made the requests (#1267)', () => {
+    render(
+      <MemoryRouter>
+        <ConfirmedFindingsPanel
+          fileId="f1"
+          answers={[answer('kerberos-attack', { client: '172.16.66.1', kdc: '172.16.66.36' })]}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Kerberos attack')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Conversations/ }).getAttribute('href')).toBe(
+      '/analysis/f1/conversations?ip=172.16.66.1',
+    );
+  });
+
   it('has no link for an answer about a host only, or without a capture', () => {
     render(<ConfirmedFindingsPanel answers={[answer('c2', { address: '45.1.2.3' })]} />);
     expect(screen.queryByRole('link')).not.toBeInTheDocument();

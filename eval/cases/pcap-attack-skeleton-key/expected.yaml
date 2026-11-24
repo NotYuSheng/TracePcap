@@ -1,0 +1,10 @@
+# Ground truth from the dataset's own label (its file name and folder), NOT from TracePcap's output.
+case_id: pcap-attack-skeleton-key
+title: "Mimikatz Skeleton Key: RC4 encryption type"
+source: https://github.com/sbousseaden/PCAP-ATTACK
+# The label says Skeleton Key forcing the RC4 encryption type; 172.16.66.1 gets its tickets from the
+# domain controller 172.16.66.36.
+kerberos_attack:
+  - technique: weak-ticket
+    client: 172.16.66.1
+    kdc: 172.16.66.36
