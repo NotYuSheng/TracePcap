@@ -112,6 +112,17 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
     });
   }
 
+  /**
+   * "Alerts fired on: POST http://… (65×)", from a server's attributes; null when none were HTTP.
+   * Once its records were cut (#1284) the counts are of the records kept, and the line says so.
+   */
+  public static String requestsLine(Map<String, Object> server) {
+    if (!(server.get(ALERT_REQUESTS) instanceof List<?> reqs) || reqs.isEmpty()) return null;
+    Object kept = server.get(ALERT_RECORDS_KEPT);
+    return (kept != null ? "In the " + kept + " alert records kept, alerts fired on: " : "Alerts fired on: ")
+        + String.join(", ", reqs.stream().map(String::valueOf).toList());
+  }
+
   /** The outside side of an alert between a local host and the outside; null otherwise. */
   private static String externalOf(String srcIp, String dstIp) {
     if (srcIp == null || dstIp == null) return null;

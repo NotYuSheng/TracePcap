@@ -77,12 +77,13 @@ public class RemoteAccessQuestion implements StandardQuestion {
           board.entity(EntityRef.external(external)).map(e -> e.attributes().get("firstSeen")).orElse(null);
       if (first != null) attrs.put("firstSeen", first);
       List<String> basis = new ArrayList<>(alerts.stream().distinct().toList());
-      Object reqs = board.entity(EntityRef.external(external))
-          .map(e -> e.attributes().get(com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_REQUESTS))
-          .orElse(null);
-      if (reqs instanceof List<?> l && !l.isEmpty()) {
-        attrs.put("requests", l);
-        basis.add("Alerts fired on: " + String.join(", ", l.stream().map(String::valueOf).toList()));
+      Map<String, Object> server =
+          board.entity(EntityRef.external(external)).map(e -> e.attributes()).orElse(Map.of());
+      // Counts of the records kept, and saying so once they were cut (#1284).
+      String requests = com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.requestsLine(server);
+      if (requests != null) {
+        attrs.put("requests", server.get(com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_REQUESTS));
+        basis.add(requests);
       }
       answers.add(
           new Answer(

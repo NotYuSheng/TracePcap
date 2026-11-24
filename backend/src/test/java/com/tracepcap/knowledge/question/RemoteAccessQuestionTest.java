@@ -76,4 +76,20 @@ class RemoteAccessQuestionTest {
     assertThat(answers(ndpi)).singleElement()
         .satisfies(x -> assertThat(x.attributes()).containsEntry("tool", "AnyDesk").containsEntry("external", "51.89.1.1"));
   }
+
+  @Test
+  void requestCountsFromCutRecords_sayTheyAreOfTheRecordsKept() {
+    // #1284: 252 check-ins fired, 102 records kept. "(102×)" alone would read as the real count.
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    b.addFinding(alert("ET REMOTE_ACCESS NetSupport Remote Admin Checkin (sid:2035892 sev:3)", "10.11.10.147", "93.152.209.36"));
+    b.addEntity(EntityRef.external("93.152.209.36"), Map.of(
+        com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_REQUESTS,
+        List.of("POST http://93.152.209.36/fakeurl.htm (102×)"),
+        com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_RECORDS_KEPT, 102,
+        com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_COUNT, 252));
+
+    assertThat(new RemoteAccessQuestion().answer(b.build())).singleElement().satisfies(x ->
+        assertThat(x.basis()).contains(
+            "In the 102 alert records kept, alerts fired on: POST http://93.152.209.36/fakeurl.htm (102×)"));
+  }
 }

@@ -75,11 +75,10 @@ public class C2Question implements StandardQuestion {
       // From the full alert records (#1265): the requests the alerts fired on, and the alert span.
       Map<String, Object> ent = board.entity(c2).map(e -> e.attributes()).orElse(Map.of());
       List<String> evidence = new ArrayList<>(alertSummaries(board, c2));
-      if (ent.get(IdsAlertRecordContributor.ALERT_REQUESTS) instanceof List<?> reqs && !reqs.isEmpty()) {
-        attrs.put("requests", reqs);
-        Object keptN = ent.get(IdsAlertRecordContributor.ALERT_RECORDS_KEPT);
-        evidence.add((keptN != null ? "In the " + keptN + " alert records kept, alerts fired on: " : "Alerts fired on: ")
-            + String.join(", ", reqs.stream().map(String::valueOf).toList()));
+      String requests = IdsAlertRecordContributor.requestsLine(ent);
+      if (requests != null) {
+        attrs.put("requests", ent.get(IdsAlertRecordContributor.ALERT_REQUESTS));
+        evidence.add(requests);
       }
       String span = alertSpan(ent);
       if (span != null) evidence.add(span);
