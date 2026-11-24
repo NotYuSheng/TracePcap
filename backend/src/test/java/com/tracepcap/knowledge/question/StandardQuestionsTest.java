@@ -233,6 +233,6 @@ class StandardQuestionsTest {
   void dataTransfer_withoutDirection_saysExchanged() {
     assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "UAB Host Baltic")))
         .singleElement()
-        .satisfies(ans -> assertThat(ans.headline()).contains("exchanged 8.0 MB"));
+        .satisfies(ans -> assertThat(ans.headline()).contains("exchanged 8.0 MB with "));
   }
 }

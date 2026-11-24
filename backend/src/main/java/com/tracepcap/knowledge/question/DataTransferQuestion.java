@@ -68,7 +68,7 @@ public class DataTransferQuestion implements StandardQuestion {
       long total = ((Number) bytesObj).longValue();
       // What the host sent, when known: a large download is not exfiltration (a 6 MB file the
       // host received used to read "sent 6 MB"). Older captures only have the total.
-      Object sentObj = r.attributes().get("sentBytes");
+      Object sentObj = r.attributes().get(com.tracepcap.knowledge.contributor.TrafficContributor.SENT_BYTES);
       boolean directional = sentObj instanceof Number;
       long bytes = directional ? ((Number) sentObj).longValue() : total;
       if (bytes < BULK_THRESHOLD_BYTES) continue;
@@ -94,7 +94,7 @@ public class DataTransferQuestion implements StandardQuestion {
               r.from().key()
                   + (directional ? " sent " : " exchanged ")
                   + megabytes(bytes)
-                  + " to "
+                  + (directional ? " to " : " with ")
                   + r.to().key()
                   + " ("
                   + where
