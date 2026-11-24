@@ -1,0 +1,6 @@
+# Ground truth from the dataset's own label (its file name and folder), NOT from TracePcap's output.
+case_id: pcap-attack-psloggedon
+title: "PsLoggedOn: who is signed in, over winreg and lsarpc"
+source: https://github.com/sbousseaden/PCAP-ATTACK
+# Discovery, not lateral movement: enumeration over IPC$ (winreg, lsarpc) runs nothing on the target.
+lateral_movement: []

@@ -46,8 +46,9 @@ import org.springframework.stereotype.Service;
  * nDPI didn't provide: above all the client JA3, which nDPI 6 no longer reports (it reports JA4
  * instead), plus SNI and certificate fields where nDPI missed them, and the negotiated version,
  * which nothing else records. They only ever fill gaps; a value nDPI set is never replaced. The
- * {@code http}, {@code dns} and {@code fileinfo} records are deliberately not read: tshark already
- * extracts those (web server log, DNS query log, file extraction).
+ * {@code http}, {@code dns} and HTTP {@code fileinfo} records are deliberately not read: tshark
+ * already extracts those (web server log, DNS query log, file extraction). The {@code smb}, {@code
+ * dcerpc} and SMB {@code fileinfo} records are, by {@link SmbRpcRecords} (#1266).
  *
  * <p>Gracefully degrades: if the {@code suricata} binary or ruleset is missing or Suricata fails,
  * {@code suricataAlerts} stays empty and analysis continues normally.
@@ -129,12 +130,16 @@ public class SuricataService implements Extractor {
       java.util.concurrent.atomic.AtomicInteger alertEventCount,
       Map<String, List<Anomaly>> anomalies,
       java.util.concurrent.atomic.AtomicInteger anomalyCount,
-      java.util.concurrent.atomic.AtomicReference<CaptureStats> stats) {
+      java.util.concurrent.atomic.AtomicReference<CaptureStats> stats,
+      Map<String, List<SmbRpcRecords.Op>> remoteOps,
+      java.util.concurrent.atomic.AtomicInteger remoteOpCount,
+      Map<String, String> smbTrees) {
     static Eve empty() {
       return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(),
-          new java.util.concurrent.atomic.AtomicReference<>());
+          new java.util.concurrent.atomic.AtomicReference<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>());
     }
   }
 
@@ -308,6 +313,11 @@ public class SuricataService implements Extractor {
       }
       List<Anomaly> anomalies = both(eve.anomalies(), conv, ArrayList::new);
       if (!anomalies.isEmpty()) conv.setSuricataAnomalies(anomalies);
+      List<SmbRpcRecords.Op> ops = both(eve.remoteOps(), conv, ArrayList::new);
+      if (!ops.isEmpty()) {
+        conv.setRemoteOperations(SmbRpcRecords.group(
+            ops, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort()));
+      }
       List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
       if (!events.isEmpty()) {
         events.sort(Comparator.comparing(AlertEvent::time, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -456,10 +466,21 @@ public class SuricataService implements Extractor {
     if (line == null || line.isBlank()) return;
     // Cheap pre-check: most lines are flow records, which we don't read.
     if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")
-        && !line.contains("\"event_type\":\"anomaly\"") && !line.contains("\"event_type\":\"stats\"")) return;
+        && !line.contains("\"event_type\":\"anomaly\"") && !line.contains("\"event_type\":\"stats\"")
+        && !SmbRpcRecords.mayBe(line)) return;
     try {
       JsonNode root = objectMapper.readTree(line);
       String type = root.path("event_type").asText();
+      if ("smb".equals(type) || "dcerpc".equals(type)
+          || ("fileinfo".equals(type) && "smb".equals(root.path("app_proto").asText()))) {
+        String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);
+        if (srcIp == null || dstIp == null) return;
+        String key = flowKey(srcIp, root.has("src_port") ? root.get("src_port").asInt() : null,
+            dstIp, root.has("dest_port") ? root.get("dest_port").asInt() : null,
+            root.path("proto").asText(null));
+        SmbRpcRecords.read(root, type, key, result.remoteOps(), result.remoteOpCount(), result.smbTrees());
+        return;
+      }
       if ("tls".equals(type)) {
         parseTls(root, result.tls());
         return;

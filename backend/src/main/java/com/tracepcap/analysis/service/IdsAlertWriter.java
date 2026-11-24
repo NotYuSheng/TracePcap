@@ -21,6 +21,15 @@ public class IdsAlertWriter {
   private final IdsAlertRepository repository;
   private final com.tracepcap.analysis.repository.SuricataAnomalyRepository anomalies;
   private final com.tracepcap.analysis.repository.CaptureStatsRepository stats;
+  private final com.tracepcap.analysis.repository.RemoteOperationRepository remoteOperations;
+
+  /** Regenerates this file's SMB and RPC operations (#1266). */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void replaceRemoteOperations(
+      UUID fileId, List<com.tracepcap.analysis.entity.RemoteOperationEntity> rows) {
+    remoteOperations.deleteByFileId(fileId);
+    if (!rows.isEmpty()) remoteOperations.saveAll(rows);
+  }
 
   /** Regenerates this file's alert records (#1265). */
   @Transactional(propagation = Propagation.REQUIRES_NEW)

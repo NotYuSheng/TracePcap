@@ -46,7 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = Path(__file__).resolve().parent
 CASES_DIR = EVAL_DIR / "cases"
 # Where a locally-fetched pcap may live (gitignored eval/pcaps/, or the demo copy in the build tree).
-PCAP_SEARCH_DIRS = [EVAL_DIR / "pcaps", REPO_ROOT / "backend" / "target" / "ctf-demo"]
+PCAP_SEARCH_DIRS = [EVAL_DIR / "pcaps", EVAL_DIR / "pcaps" / "pcap-attack", REPO_ROOT / "backend" / "target" / "ctf-demo"]
 
 CORRECT, MISSED, WRONG, NA = "correct", "missed", "wrong", "n/a"
 
@@ -224,6 +224,28 @@ def classify(expected, candidates, normalizer=norm_text, beyond=(), recall_only=
     return CORRECT, detail(exp[0] if len(exp) == 1 else exp)
 
 
+def pair(client, server):
+    """One host acting on another, as "client -> server"."""
+    return f"{client} -> {server}" if client and server else None
+
+
+def score_lateral(expected, by_q):
+    """Lateral movement: the (client, server) pairs a lateral-movement answer names (#1266).
+
+    A key that lists `lateral_movement: []` asserts there is none -- a discovery capture, say -- so any
+    answer is confidently wrong there; a key without the field doesn't score it.
+    """
+    if "lateral_movement" not in expected:
+        return NA, None
+    produced = [pair(a.get("attributes", {}).get("client"), a.get("attributes", {}).get("server"))
+                for a in by_q.get("lateral-movement", [])]
+    want = [pair(e.get("client"), e.get("server")) for e in (expected.get("lateral_movement") or [])]
+    if not want:
+        produced = [p for p in produced if p]
+        return (WRONG, {"spurious": produced}) if produced else (CORRECT, "none")
+    return classify(want, produced)
+
+
 def beyond_key(expected, field):
     """Evidenced findings the key doesn't mention, for one scored field (`beyond_key` in the case).
 
@@ -296,6 +318,7 @@ def score_case(expected, answers, knowledge):
         ("c2.ip", *classify(c2_ips or None, c2_addrs, beyond=beyond_key(expected, "c2.ip"))),
         ("timeline.start", *classify(t.get("start"), starts)),
         ("files.sha256", *classify(file_hashes or None, downloads, recall_only=True)),
+        ("lateral_movement", *score_lateral(expected, by_q)),
     ]
     return [{"field": f, "status": s, "detail": d} for (f, s, d) in fields]
 

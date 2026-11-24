@@ -770,6 +770,8 @@ public class PcapParserService {
     private List<SuricataService.AlertEvent> idsAlertEvents = new ArrayList<>();
     /** Suricata's protocol anomalies on this conversation (#1268), persisted to suricata_anomalies. */
     private List<SuricataService.Anomaly> suricataAnomalies = new ArrayList<>();
+    /** What one host did to another over SMB and RPC (#1266), persisted to remote_operations. */
+    private List<SmbRpcRecords.Operation> remoteOperations = new ArrayList<>();
     private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;

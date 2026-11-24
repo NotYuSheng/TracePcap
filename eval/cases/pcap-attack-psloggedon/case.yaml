@@ -1,0 +1,7 @@
+case_id: pcap-attack-psloggedon
+pcap: Discovery_PsLoggedOn_remotelocalusers_enum_winreg_lsarpc_dcerpc_smb.pcapng
+source_url: https://github.com/sbousseaden/PCAP-ATTACK/raw/9ef5476dd6b083f565a1b9d2e59e4a3ae8be8c95/Discovery/Discovery_PsLoggedOn_remotelocalusers_enum_winreg_lsarpc_dcerpc_smb.pcapng
+sha256: 52756f0264a796d3d3309d0d1745988f01d51caa04f0cf09f291292825a3f176
+notes: >
+  From PCAP-ATTACK (github.com/sbousseaden/PCAP-ATTACK), a set of lab captures each labelled with the
+  ATT&CK technique it shows. Download into eval/pcaps/pcap-attack/.

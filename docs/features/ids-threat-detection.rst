@@ -60,9 +60,10 @@ How it works
    JA4 instead), the server JA3S, SNI, certificate subject, issuer and validity,
    and the negotiated **TLS version**, which nothing else records. They only
    fill gaps; a value nDPI found is never replaced. Suricata's ``http``,
-   ``dns`` and ``fileinfo`` records aren't read, because tshark already extracts
-   the same information (the web server log, the DNS query log and file
-   extraction).
+   ``dns`` and HTTP ``fileinfo`` records aren't read, because tshark already
+   extracts the same information (the web server log, the DNS query log and file
+   extraction). Its ``smb`` and ``dcerpc`` records, and SMB file transfers, are
+   (see *Lateral movement* below).
 
 On the STRRAT incident capture (184 TLS conversations) this took client JA3 from
 0 to 153, hostnames from 65 to 162 and certificate subjects from 25 to 60, with
@@ -127,6 +128,38 @@ IDS Alerts appear wherever conversations are shown:
   security-alert total alongside nDPI risk flags.
 - **CSV export** — the ``suricataAlerts`` column is included in conversation CSV
   exports.
+
+Lateral movement
+~~~~~~~~~~~~~~~~
+
+Suricata also logs what happens inside SMB and DCE-RPC sessions: the shares a host connected to,
+the files and pipes it opened, the files it copied (with their size), and each RPC call (interface
+and operation). TracePcap keeps these, one row per kind of operation on a conversation with a
+count, and reads them for the moments one Windows host made another run something:
+
+- **A service created remotely** (``svcctl`` CreateService or ChangeServiceConfig): how PsExec,
+  smbexec and Impacket's tools run a command on another machine.
+- **A scheduled task registered** (``atsvc`` NetrJobAdd, ``ITaskSchedulerService``
+  SchRpcRegisterTask).
+- **A WMI method called** (``IWbemServices`` ExecMethod), how a process is started remotely.
+- **A program copied to an admin share** (ADMIN$, C$…).
+- **Directory replication asked by a host that isn't a domain controller** (``drsuapi``
+  DRSGetNCChanges): DCSync, which copies the domain's password hashes. A host counts as a domain
+  controller when it answers Kerberos or LDAP in the capture.
+
+Each pair of hosts gets one **Lateral movement** answer in the Investigation Summary, listing the
+calls and files behind it, and asking for it to be confirmed: administrators' deployment and
+support tools do the same things. A refused operation (access denied) doesn't count.
+
+Routine domain traffic never produces one: connecting to IPC$, reading SYSVOL and NETLOGON (every
+member does at logon), share and user enumeration (``srvsvc``, ``samr``, ``lsarpc``), remote
+registry and the endpoint mapper.
+
+An RPC call is only recognised when its *bind* is in the capture, since that is where the interface
+is named. A capture that starts mid-session (PCAP-ATTACK's DCSync sample, for one) shows bare
+operation numbers, which are not enough to say what was done.
+
+Captures analysed before this show nothing until re-analysed.
 
 Capture completeness
 ~~~~~~~~~~~~~~~~~~~~

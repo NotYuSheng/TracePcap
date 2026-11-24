@@ -1,0 +1,8 @@
+# Ground truth from the dataset's own label (its file name and folder), NOT from TracePcap's output.
+case_id: pcap-attack-psexec
+title: "PsExec over SMB and svcctl"
+source: https://github.com/sbousseaden/PCAP-ATTACK
+# The label says PsExec; the capture has two hosts, and 172.16.66.1 copies PSEXESVC.exe to 172.16.66.36's ADMIN$ and runs it as a service.
+lateral_movement:
+  - client: 172.16.66.1
+    server: 172.16.66.36

@@ -1,0 +1,6 @@
+# Ground truth from the dataset's own label (its file name and folder), NOT from TracePcap's output.
+case_id: pcap-attack-netshareenum
+title: "Share enumeration over srvsvc"
+source: https://github.com/sbousseaden/PCAP-ATTACK
+# Discovery, not lateral movement: listing shares (srvsvc NetrShareEnum) runs nothing on the target.
+lateral_movement: []
