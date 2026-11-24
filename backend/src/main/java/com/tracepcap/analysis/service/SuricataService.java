@@ -454,7 +454,7 @@ public class SuricataService implements Extractor {
             conv.getSrcPort(),
             conv.getDstIp(),
             conv.getDstPort(),
-            conv.getProtocol());
+            transportOf(conv));
     T alerts = alertMap.get(key1);
     if (alerts == null) {
       String key2 =
@@ -463,7 +463,7 @@ public class SuricataService implements Extractor {
               conv.getDstPort(),
               conv.getSrcIp(),
               conv.getSrcPort(),
-              conv.getProtocol());
+              transportOf(conv));
       alerts = alertMap.get(key2);
     }
     return alerts;
@@ -508,5 +508,10 @@ public class SuricataService implements Extractor {
   private boolean isNotFoundError(Exception e) {
     String msg = e.getMessage();
     return msg != null && (msg.contains("No such file") || msg.contains("error=2"));
+  }
+
+  /** The transport a flow record is matched by (TCP/UDP); the display label for older rows. */
+  private static String transportOf(PcapParserService.ConversationInfo conv) {
+    return conv.getTransport() != null ? conv.getTransport() : conv.getProtocol();
   }
 }

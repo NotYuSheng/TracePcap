@@ -186,7 +186,7 @@ public class NdpiService implements Extractor {
       if (data.appName() != null)
         conv.setAppName(
             correctMisclassification(
-                data.appName(), conv.getSrcPort(), conv.getDstPort(), conv.getProtocol()));
+                data.appName(), conv.getSrcPort(), conv.getDstPort(), transportOf(conv)));
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
       if (data.hostname() != null) conv.setHostname(data.hostname());
@@ -405,7 +405,7 @@ public class NdpiService implements Extractor {
             conv.getSrcPort(),
             conv.getDstIp(),
             conv.getDstPort(),
-            conv.getProtocol());
+            transportOf(conv));
     FlowData data = flowMap.get(key1);
     if (data == null) {
       String key2 =
@@ -414,7 +414,7 @@ public class NdpiService implements Extractor {
               conv.getDstPort(),
               conv.getSrcIp(),
               conv.getSrcPort(),
-              conv.getProtocol());
+              transportOf(conv));
       data = flowMap.get(key2);
     }
     // IP-pair fallback for portless protocols (IGMP, PIM, GRE, OSPF…) where the l4proto
@@ -518,5 +518,10 @@ public class NdpiService implements Extractor {
   private boolean isNotFoundError(Exception e) {
     String msg = e.getMessage();
     return msg != null && (msg.contains("No such file") || msg.contains("error=2"));
+  }
+
+  /** The transport a flow record is matched by (TCP/UDP); the display label for older rows. */
+  private static String transportOf(PcapParserService.ConversationInfo conv) {
+    return conv.getTransport() != null ? conv.getTransport() : conv.getProtocol();
   }
 }

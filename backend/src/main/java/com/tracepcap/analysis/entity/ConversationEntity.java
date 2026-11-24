@@ -80,6 +80,14 @@ public class ConversationEntity {
   @Column(name = "connection_outcome", length = 16)
   private String connectionOutcome;
 
+  /**
+   * TCP or UDP (or the protocol for portless traffic): what the conversation is keyed on, and what
+   * a detection rule's {@code protocol} means. {@link #protocol} is the display label instead
+   * ("TLSV1.2"). Null for captures analysed before it was kept.
+   */
+  @Column(name = "transport", length = 20)
+  private String transport;
+
   @Column(name = "initiator_port")
   private Integer initiatorPort;
 
