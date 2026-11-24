@@ -65,6 +65,23 @@ public class ConversationDetailResponse {
    */
   private List<IdsAlert> idsAlerts;
 
+  /** Suricata's protocol anomalies on this conversation (#1268), oldest first. */
+  private List<Anomaly> anomalies;
+
+  /** One protocol anomaly: malformed or one-sided traffic, not an attack signature. */
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class Anomaly {
+    private LocalDateTime time;
+    private String srcIp;
+    private String type;
+    private String layer;
+    private String appProto;
+    private String event;
+  }
+
   /** One alert. {@code srcIp} is the side that sent the packet that fired it. */
   @Data
   @Builder

@@ -96,6 +96,8 @@ export interface Conversation {
   bytesDstToSrc?: number | null;
   /** Each Suricata alert as it fired (#1265), oldest first; absent for captures analysed before. */
   idsAlerts?: IdsAlert[];
+  /** Suricata's protocol anomalies (#1268), oldest first; absent for captures analysed before. */
+  anomalies?: ProtocolAnomaly[];
   packets: Packet[];
   direction: 'bidirectional' | 'unidirectional';
   srcGeo?: ConversationGeoInfo;
@@ -460,6 +462,17 @@ export type DeviceType =
   | 'VIRTUAL_ADDRESS'
   | 'UNKNOWN'
   | string; // custom values from detection-rule classification hints (#926)
+
+/** One Suricata protocol anomaly (#1268): malformed or one-sided traffic, not an attack signature. */
+export interface ProtocolAnomaly {
+  /** Epoch ms. */
+  time?: number;
+  srcIp?: string;
+  type?: string;
+  layer?: string;
+  appProto?: string;
+  event: string;
+}
 
 /** One Suricata alert as logged (#1265). `srcIp` sent the packet that fired it. */
 export interface IdsAlert {

@@ -446,6 +446,52 @@
         },
         "type": "object"
       },
+      "CaptureQualityResponse": {
+        "properties": {
+          "invalidPackets": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "memcapDrops": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "array"
+          },
+          "packets": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reassemblyGaps": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "streamDepthReached": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpConversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpSessions": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpWithoutHandshake": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CaseKnowledgeResponse": {
         "properties": {
           "entities": {
@@ -936,6 +982,12 @@
       },
       "ConversationDetailResponse": {
         "properties": {
+          "anomalies": {
+            "items": {
+              "$ref": "#/components/schemas/Anomaly"
+            },
+            "type": "array"
+          },
           "appName": {
             "type": "string"
           },
@@ -3987,6 +4039,20 @@
         },
         "type": "object"
       },
+      "Note": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Occupancy": {
         "properties": {
           "automatic": {
@@ -6510,7 +6576,7 @@
     "/api/v1/ai-jobs/{jobId}": {
       "get": {
         "description": "WAITING with its place in line, RUNNING, then DONE with the result or FAILED with why.",
-        "operationId": "get_4",
+        "operationId": "get_5",
         "parameters": [
           {
             "in": "path",
@@ -8583,7 +8649,7 @@
         ]
       },
       "get": {
-        "operationId": "get_3",
+        "operationId": "get_4",
         "parameters": [
           {
             "in": "path",
@@ -9483,7 +9549,7 @@
         ]
       },
       "get": {
-        "operationId": "get_2",
+        "operationId": "get_3",
         "parameters": [
           {
             "in": "path",
@@ -9627,6 +9693,39 @@
         "summary": "Deterministic answers to the standard investigation questions for a file",
         "tags": [
           "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/capture-quality": {
+      "get": {
+        "description": "Connections already open when the capture began, gaps in TCP streams, undecodable packets, and sessions Suricata stopped inspecting, as plain-language notes. Suricata's counters are null for captures it didn't run on (or analysed before they were kept).",
+        "operationId": "get_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureQualityResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "How complete a capture is",
+        "tags": [
+          "Capture quality"
         ]
       }
     },
@@ -14990,6 +15089,10 @@
     {
       "description": "Generate single-file and comparison PDF reports",
       "name": "Reports"
+    },
+    {
+      "description": "How complete a capture is, and how fully it was inspected",
+      "name": "Capture quality"
     },
     {
       "description": "The IDS engine and the age of the ruleset behind its alerts",

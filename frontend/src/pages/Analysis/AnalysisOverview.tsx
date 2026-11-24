@@ -32,6 +32,7 @@ import { storyService } from '@/features/story/services/storyService';
 import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
+import { CaptureQualityNote } from '@components/common/CaptureQualityNote/CaptureQualityNote';
 import type { Answer } from '@/types';
 
 /** "Where the hosts are" lists this many groups per heading before "Show all". */
@@ -499,6 +500,7 @@ export const AnalysisOverview = () => {
                 traffic
               </button>
             )}
+            <CaptureQualityNote fileId={fileId} />
           </section>
 
           {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4). */}

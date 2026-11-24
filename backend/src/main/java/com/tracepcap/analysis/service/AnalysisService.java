@@ -795,8 +795,18 @@ public class AnalysisService {
                 .build());
       }
     }
+    List<com.tracepcap.analysis.entity.SuricataAnomalyEntity> anomalies = new ArrayList<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SuricataService.Anomaly a : c.getSuricataAnomalies()) {
+        anomalies.add(com.tracepcap.analysis.entity.SuricataAnomalyEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).time(a.time()).srcIp(a.srcIp())
+            .dstIp(a.dstIp()).type(a.type()).layer(a.layer()).appProto(a.appProto())
+            .event(a.event()).build());
+      }
+    }
     try {
-      idsAlertWriter.replaceForFile(fileId, rows);
+      idsAlertWriter.replaceForFile(fileId, rows, anomalies);
     } catch (Exception ex) {
       log.warn("[{}] Saving {} IDS alert records failed: {}", fileId, rows.size(), ex.getMessage());
     }

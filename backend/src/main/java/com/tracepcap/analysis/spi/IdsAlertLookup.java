@@ -43,6 +43,14 @@ public interface IdsAlertLookup {
       String httpUserAgent,
       Integer httpStatus) {}
 
+  /** One Suricata protocol anomaly (#1268): traffic a parser found malformed or one-sided. */
+  record AnomalyFacts(
+      LocalDateTime time, String srcIp, String dstIp, String type, String layer, String appProto,
+      String event) {}
+
+  /** A conversation's protocol anomalies, oldest first. */
+  List<AnomalyFacts> anomaliesFor(UUID conversationId);
+
   /** A conversation's alerts, oldest first. */
   List<IdsAlertFacts> forConversation(UUID conversationId);
 

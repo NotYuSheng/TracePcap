@@ -19,11 +19,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class IdsAlertWriter {
 
   private final IdsAlertRepository repository;
+  private final com.tracepcap.analysis.repository.SuricataAnomalyRepository anomalies;
+  private final com.tracepcap.analysis.repository.CaptureStatsRepository stats;
 
-  /** Regenerates this file's alerts. */
+  /** Regenerates this file's alerts and protocol anomalies (#1268). */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void replaceForFile(UUID fileId, List<IdsAlertEntity> alerts) {
+  public void replaceForFile(
+      UUID fileId,
+      List<IdsAlertEntity> alerts,
+      List<com.tracepcap.analysis.entity.SuricataAnomalyEntity> anomalyRows) {
     repository.deleteByFileId(fileId);
     if (!alerts.isEmpty()) repository.saveAll(alerts);
+    anomalies.deleteByFileId(fileId);
+    if (!anomalyRows.isEmpty()) anomalies.saveAll(anomalyRows);
+  }
+
+  /** Suricata's counters for this file's run (#1268), replacing any earlier ones. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void saveStats(com.tracepcap.analysis.entity.CaptureStatsEntity row) {
+    stats.save(row);
   }
 }

@@ -623,6 +623,17 @@ public class ConversationQueryService {
         .flowRisks(conversation.findings().flowRisks())
         .customSignatures(conversation.findings().customSignatures())
         .suricataAlerts(conversation.findings().suricataAlerts())
+        .anomalies(
+            idsAlertLookup.anomaliesFor(conversation.id()).stream()
+                .map(a -> ConversationDetailResponse.Anomaly.builder()
+                    .time(a.time())
+                    .srcIp(a.srcIp())
+                    .type(a.type())
+                    .layer(a.layer())
+                    .appProto(a.appProto())
+                    .event(a.event())
+                    .build())
+                .toList())
         .idsAlerts(
             idsAlertLookup.forConversation(conversation.id()).stream()
                 .map(a -> ConversationDetailResponse.IdsAlert.builder()

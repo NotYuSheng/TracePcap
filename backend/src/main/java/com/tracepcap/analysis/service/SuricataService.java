@@ -103,7 +103,10 @@ public class SuricataService implements Extractor {
 
   @Override
   public Outcome extract(ExtractionTarget target) {
-    enrich(target.capture(), target.conversations());
+    if (target.conversations().isEmpty()) return Outcome.completed("suricata ran");
+    Eve eve = runSuricata(target.capture());
+    apply(eve, target.conversations());
+    saveStats(target, eve);
     return Outcome.completed("suricata ran");
   }
 
@@ -113,6 +116,7 @@ public class SuricataService implements Extractor {
     Eve eve = runSuricata(target.capture());
     return conversations -> {
       apply(eve, conversations);
+      saveStats(target, eve);
       return Outcome.completed("suricata ran");
     };
   }
@@ -122,10 +126,61 @@ public class SuricataService implements Extractor {
       Map<String, Set<String>> alerts,
       Map<String, TlsRecord> tls,
       Map<String, List<AlertEvent>> alertEvents,
-      java.util.concurrent.atomic.AtomicInteger alertEventCount) {
+      java.util.concurrent.atomic.AtomicInteger alertEventCount,
+      Map<String, List<Anomaly>> anomalies,
+      java.util.concurrent.atomic.AtomicInteger anomalyCount,
+      java.util.concurrent.atomic.AtomicReference<CaptureStats> stats) {
     static Eve empty() {
       return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
-          new java.util.concurrent.atomic.AtomicInteger());
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(),
+          new java.util.concurrent.atomic.AtomicReference<>());
+    }
+  }
+
+  /**
+   * One eve.json {@code anomaly} record (#1268): traffic a protocol parser found malformed or
+   * one-sided, e.g. {@code applayer / proto_detect / APPLAYER_DETECT_PROTOCOL_ONLY_ONE_DIRECTION}.
+   */
+  public record Anomaly(
+      java.time.LocalDateTime time, String srcIp, String dstIp, String type, String layer,
+      String appProto, String event) {}
+
+  /**
+   * Suricata's counters for one run (#1268), from its {@code stats} record. Per capture in both
+   * per-file and socket mode (measured: the same capture twice through one engine gave the same
+   * counts).
+   */
+  public record CaptureStats(
+      Long packets, Long invalidPackets, Long tcpSessions, Long reassemblyGaps,
+      Long streamDepthReached, Long memcapDrops) {}
+
+  /** At most this many anomaly records are kept per capture. */
+  static final int MAX_ANOMALIES = 5_000;
+
+  /** Saves a run's counters; optional so tests can build the service without persistence. */
+  private IdsAlertWriter statsSink;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setStatsSink(IdsAlertWriter statsSink) {
+    this.statsSink = statsSink;
+  }
+
+  private void saveStats(ExtractionTarget target, Eve eve) {
+    CaptureStats s = eve.stats().get();
+    if (s == null || statsSink == null || target.file() == null || target.file().getId() == null) return;
+    try {
+      statsSink.saveStats(com.tracepcap.analysis.entity.CaptureStatsEntity.builder()
+          .fileId(target.file().getId())
+          .packets(s.packets())
+          .invalidPackets(s.invalidPackets())
+          .tcpSessions(s.tcpSessions())
+          .reassemblyGaps(s.reassemblyGaps())
+          .streamDepthReached(s.streamDepthReached())
+          .memcapDrops(s.memcapDrops())
+          .build());
+    } catch (Exception e) {
+      log.warn("Saving Suricata's capture counters failed: {}", e.getMessage());
     }
   }
 
@@ -222,6 +277,8 @@ public class SuricataService implements Extractor {
       if (alerts != null && !alerts.isEmpty()) {
         conv.setSuricataAlerts(new ArrayList<>(alerts));
       }
+      List<Anomaly> anomalies = both(eve.anomalies(), conv, ArrayList::new);
+      if (!anomalies.isEmpty()) conv.setSuricataAnomalies(anomalies);
       List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
       if (!events.isEmpty()) {
         events.sort(Comparator.comparing(AlertEvent::time, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -370,12 +427,21 @@ public class SuricataService implements Extractor {
   void parseEveLine(String line, Eve result) {
     if (line == null || line.isBlank()) return;
     // Cheap pre-check: most lines are flow and stats records, which we don't read.
-    if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")) return;
+    if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")
+        && !line.contains("\"event_type\":\"anomaly\"") && !line.contains("\"event_type\":\"stats\"")) return;
     try {
       JsonNode root = objectMapper.readTree(line);
       String type = root.path("event_type").asText();
       if ("tls".equals(type)) {
         parseTls(root, result.tls());
+        return;
+      }
+      if ("anomaly".equals(type)) {
+        parseAnomaly(root, result);
+        return;
+      }
+      if ("stats".equals(type)) {
+        result.stats().set(parseStats(root.path("stats")));
         return;
       }
       if (!"alert".equals(type)) return;
@@ -433,6 +499,42 @@ public class SuricataService implements Extractor {
         text(http, "url", 4096),
         text(http, "http_user_agent", 2048),
         http.has("status") ? http.get("status").asInt() : null);
+  }
+
+  private static void parseAnomaly(JsonNode root, Eve result) {
+    JsonNode a = root.path("anomaly");
+    String event = a.path("event").asText("").trim();
+    String srcIp = root.path("src_ip").asText(null);
+    String dstIp = root.path("dest_ip").asText(null);
+    // Decoder anomalies on a lone packet have no flow to hang on: only flow-level ones are kept.
+    if (event.isEmpty() || srcIp == null || dstIp == null) return;
+    if (result.anomalyCount().getAndIncrement() >= MAX_ANOMALIES) return; // a running count, as for alerts
+    Integer srcPort = root.has("src_port") ? root.get("src_port").asInt() : null;
+    Integer dstPort = root.has("dest_port") ? root.get("dest_port").asInt() : null;
+    String key = flowKey(srcIp, srcPort, dstIp, dstPort, root.path("proto").asText(null));
+    String app = text(a, "app_proto", 64);
+    if (app == null) app = text(root, "app_proto", 64);
+    result.anomalies().computeIfAbsent(key, k -> new ArrayList<>()).add(new Anomaly(
+        eveTime(root.path("timestamp").asText(null)), srcIp, dstIp, text(a, "type", 64),
+        text(a, "layer", 64), app, event.length() > 255 ? event.substring(0, 255) : event));
+  }
+
+  /** The counters that say how complete the capture and the inspection were. */
+  static CaptureStats parseStats(JsonNode s) {
+    JsonNode tcp = s.path("tcp"), dec = s.path("decoder");
+    long memcap = num(tcp, "ssn_memcap_drop") + num(tcp, "segment_memcap_drop")
+        + num(s.path("flow"), "memcap");
+    return new CaptureStats(
+        dec.has("pkts") ? dec.get("pkts").asLong() : null,
+        dec.has("invalid") ? dec.get("invalid").asLong() : null,
+        tcp.has("sessions") ? tcp.get("sessions").asLong() : null,
+        tcp.has("reassembly_gap") ? tcp.get("reassembly_gap").asLong() : null,
+        tcp.has("stream_depth_reached") ? tcp.get("stream_depth_reached").asLong() : null,
+        memcap);
+  }
+
+  private static long num(JsonNode n, String f) {
+    return n.path(f).asLong(0);
   }
 
   private static final java.time.format.DateTimeFormatter EVE_TIME =

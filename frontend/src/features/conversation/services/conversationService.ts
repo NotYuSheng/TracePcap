@@ -15,6 +15,7 @@ import type {
   HostIdentity,
   HostIdentityEvidence,
   IdsAlert,
+  ProtocolAnomaly,
 } from '@/types';
 import type { ConversationFacetCounts, ConversationFilters, WindowsLogon } from '../types';
 
@@ -59,6 +60,7 @@ interface ConversationApiResponse {
   bytesSrcToDst?: number | null;
   bytesDstToSrc?: number | null;
   idsAlerts?: Array<Omit<IdsAlert, 'time'> & { time?: string | number[] | null }> | null;
+  anomalies?: Array<Omit<ProtocolAnomaly, 'time'> & { time?: string | number[] | null }> | null;
   startTime: string | number[];
   endTime: string | number[];
   durationMs: number;
@@ -155,6 +157,10 @@ function transformConversation(
     totalBytes: apiData.totalBytes,
     bytesSrcToDst: apiData.bytesSrcToDst ?? null,
     bytesDstToSrc: apiData.bytesDstToSrc ?? null,
+    anomalies: (apiData.anomalies ?? []).map((a) => ({
+      ...a,
+      time: a.time != null ? parseDateTime(a.time) : undefined,
+    })),
     idsAlerts: (apiData.idsAlerts ?? []).map((a) => ({
       ...a,
       time: a.time != null ? parseDateTime(a.time) : undefined,
