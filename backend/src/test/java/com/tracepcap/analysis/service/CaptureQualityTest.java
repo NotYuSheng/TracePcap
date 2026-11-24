@@ -63,9 +63,11 @@ class CaptureQualityTest {
   }
 
   @Test
-  void noOutcomeOnAnyConnection_isNotMeasured_notAllMidstream() {
-    // A capture analysed before connection outcomes existed: every TCP outcome is null.
-    assertThat(CaptureQualityService.notes(100, 100, null)).isEmpty();
+  void everyConnectionAlreadyOpen_isTheMidstreamNote() {
+    // A capture that began after all its sessions did (PCAP-ATTACK's Zerologon sample). Captures
+    // analysed before connection outcomes existed have no transport, so they never count as TCP.
+    assertThat(CaptureQualityService.notes(100, 100, null))
+        .singleElement().satisfies(n -> assertThat(n.getKind()).isEqualTo("midstream"));
   }
 
   @Test

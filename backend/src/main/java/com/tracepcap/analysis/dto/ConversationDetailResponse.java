@@ -73,6 +73,9 @@ public class ConversationDetailResponse {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  // Its own schema name: springdoc names schemas by simple class name, and NetworkInsightDto has an
+  // Anomaly too, so the two merged into one with that one's fields.
+  @io.swagger.v3.oas.annotations.media.Schema(name = "ProtocolAnomaly")
   public static class Anomaly {
     private LocalDateTime time;
     private String srcIp;

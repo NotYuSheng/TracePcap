@@ -426,7 +426,7 @@ public class SuricataService implements Extractor {
   /** Parse a single eve.json line; {@code alert} and {@code tls} objects contribute. */
   void parseEveLine(String line, Eve result) {
     if (line == null || line.isBlank()) return;
-    // Cheap pre-check: most lines are flow and stats records, which we don't read.
+    // Cheap pre-check: most lines are flow records, which we don't read.
     if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")
         && !line.contains("\"event_type\":\"anomaly\"") && !line.contains("\"event_type\":\"stats\"")) return;
     try {

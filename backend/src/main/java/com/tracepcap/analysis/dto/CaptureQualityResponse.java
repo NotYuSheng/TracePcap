@@ -36,7 +36,7 @@ public class CaptureQualityResponse {
   @NoArgsConstructor
   @AllArgsConstructor
   public static class Note {
-    /** Stable key: midstream, gaps, invalid, memcap, depth. */
+    /** Stable key: suricata-unread, midstream, gaps, invalid, memcap, depth. */
     private String kind;
     /** {@code warning} when answers may be missing; {@code info} otherwise. */
     private String level;

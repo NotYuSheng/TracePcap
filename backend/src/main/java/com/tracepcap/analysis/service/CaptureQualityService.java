@@ -87,9 +87,10 @@ public class CaptureQualityService {
       out.add(note("memcap", "warning", "Suricata ran out of memory " + s.getMemcapDrops() + " time"
           + plural(s.getMemcapDrops()) + " on this capture, so some traffic wasn't inspected."));
     }
-    // noHandshake < tcp: when no connection has an outcome at all, outcomes weren't measured (a
-    // capture analysed before #1233), which is not the same as every connection being mid-stream.
-    if (tcp > 0 && noHandshake > 0 && noHandshake < tcp && (double) noHandshake / tcp > MIDSTREAM_SHARE) {
+    // Every connection mid-stream is the case that needs this most (a capture that began after its
+    // sessions did). Captures analysed before connection outcomes existed (#1233) have no transport
+    // either, so they're never counted as TCP here.
+    if (tcp > 0 && noHandshake > 0 && (double) noHandshake / tcp > MIDSTREAM_SHARE) {
       out.add(note("midstream", "info", noHandshake + " of " + tcp + " TCP connections ("
           + Math.round(100.0 * noHandshake / tcp) + "%) were already open when the capture began:"
           + " how they started, and which side opened them, isn't in it."));

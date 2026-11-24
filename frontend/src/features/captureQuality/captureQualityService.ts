@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 
 /** One plain-language note on how complete a capture is (#1268). */
 export interface CaptureQualityNote {
-  /** midstream | gaps | invalid | memcap | depth */
+  /** suricata-unread | midstream | gaps | invalid | memcap | depth */
   kind: string;
   /** warning: answers may be missing; info: worth knowing. */
   level: 'warning' | 'info' | string;

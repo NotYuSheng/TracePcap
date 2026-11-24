@@ -984,7 +984,7 @@
         "properties": {
           "anomalies": {
             "items": {
-              "$ref": "#/components/schemas/Anomaly"
+              "$ref": "#/components/schemas/ProtocolAnomaly"
             },
             "type": "array"
           },
@@ -4647,6 +4647,30 @@
             "type": "string"
           },
           "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolAnomaly": {
+        "properties": {
+          "appProto": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         },

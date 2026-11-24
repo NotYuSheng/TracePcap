@@ -3470,7 +3470,7 @@ export interface components {
             topFailedTargets?: components["schemas"]["FailedTarget"][];
         };
         ConversationDetailResponse: {
-            anomalies?: components["schemas"]["Anomaly"][];
+            anomalies?: components["schemas"]["ProtocolAnomaly"][];
             appName?: string;
             /** Format: int64 */
             bytesDstToSrc?: number;
@@ -4776,6 +4776,15 @@ export interface components {
             layer?: string;
             name?: string;
             version?: string;
+        };
+        ProtocolAnomaly: {
+            appProto?: string;
+            event?: string;
+            layer?: string;
+            srcIp?: string;
+            /** Format: date-time */
+            time?: string;
+            type?: string;
         };
         ProtocolCaptureDto: {
             /** Format: int64 */
