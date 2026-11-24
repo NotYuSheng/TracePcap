@@ -28,7 +28,8 @@ time: a short excerpt of a PsExec session otherwise produces no alerts at all.
 Measured on 71 captures (the eval exercises, four holdouts, 36 clean samples and
 26 labelled attack captures from PCAP-ATTACK), it added alerts on six attack
 captures (PsExec, smbexec, Zerologon, DNS-over-TCP SIGRed, and NTLM sign-ins in
-two more) and changed no answer on any capture.
+two more) and changed no answer on any capture. It applies to captures analysed from now on:
+re-analyse an earlier one to pick it up.
 
 How it works
 ------------
