@@ -34,6 +34,6 @@ export function groupIdsAlerts(alerts: IdsAlert[]): AlertGroup[] {
 export function alertsFiredNote(kept: number, total?: number | null): string {
   const fired = Math.max(total ?? 0, kept);
   const n = fired.toLocaleString('en-US');
-  if (fired > kept && kept === 0) return `${n} fired · no records kept: the capture passed 20,000`;
+  if (fired > kept && kept === 0) return `${n} fired · no records kept`;
   return fired > kept ? `${n} fired · first ${kept.toLocaleString('en-US')} shown` : `${n} fired`;
 }

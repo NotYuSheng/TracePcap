@@ -37,6 +37,23 @@ class IdsAlertCountsTest {
         .singleElement().satisfies(x -> assertThat(x.getTotal()).isEqualTo(1));
   }
 
+  @Test
+  void aSharedFlow_isCountedUnderTheFirstSavedConversation_once() {
+    // The first on the flow wasn't saved: its count goes to the next, where its records went.
+    UUID file = UUID.randomUUID();
+    PcapParserService.ConversationInfo unsaved = conv(null, 4512), a = conv(UUID.randomUUID(), 4512),
+        b = conv(UUID.randomUUID(), 4512);
+    for (var c : List.of(unsaved, a, b)) c.setIdsAlertFlow("flow-1");
+    List<IdsAlertEntity> rows = List.of(row(file, a), row(file, a));
+
+    assertThat(AnalysisService.alertCounts(file, List.of(unsaved, a, b), rows)).singleElement()
+        .satisfies(c -> {
+          assertThat(c.getConversationId()).isEqualTo(a.getEntityId());
+          assertThat(c.getTotal()).isEqualTo(4512);
+          assertThat(c.getKept()).isEqualTo(2);
+        });
+  }
+
   private static PcapParserService.ConversationInfo conv(UUID id, int total) {
     PcapParserService.ConversationInfo c = new PcapParserService.ConversationInfo();
     c.setEntityId(id);

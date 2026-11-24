@@ -35,7 +35,7 @@ describe('alertsFiredNote (#1284)', () => {
     expect(alertsFiredNote(100, 4512)).toBe('4,512 fired · first 100 shown');
   });
 
-  it('says none were kept when the capture had passed its cap', () => {
-    expect(alertsFiredNote(0, 7)).toBe('7 fired · no records kept: the capture passed 20,000');
+  it('says when none were kept', () => {
+    expect(alertsFiredNote(0, 7)).toBe('7 fired · no records kept');
   });
 });

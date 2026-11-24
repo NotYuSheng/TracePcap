@@ -322,7 +322,6 @@ public class SuricataService implements Extractor {
     // operation goes to the first, so none is stored and counted twice.
     Set<SmbRpcRecords.Op> opsGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     Set<KerberosRecords.Reply> kerberosGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-    Set<String> totalsGiven = new java.util.HashSet<>();
     for (PcapParserService.ConversationInfo conv : conversations) {
       Set<String> alerts = both(eve.alerts(), conv, LinkedHashSet::new);
       if (alerts != null && !alerts.isEmpty()) {
@@ -343,8 +342,9 @@ public class SuricataService implements Extractor {
             ops, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(),
             conv.getInitiatorIp()));
       }
-      // A flow's count goes to the first conversation on it, as its records do when they're saved.
-      conv.setIdsAlertTotal(totalOnce(eve.alertTotals(), conv, totalsGiven));
+      // Every conversation on the flow gets its count; saving gives it to the one its records go to.
+      conv.setIdsAlertTotal(totalOf(eve.alertTotals(), conv));
+      conv.setIdsAlertFlow(flowOf(conv));
       List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
       if (!events.isEmpty()) {
         events.sort(Comparator.comparing(AlertEvent::time, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -750,15 +750,20 @@ public class SuricataService implements Extractor {
     return out;
   }
 
-  /** The alerts Suricata logged on this conversation's flow, both directions; 0 if another had them. */
-  static int totalOnce(Map<String, Integer> totals, PcapParserService.ConversationInfo conv, Set<String> given) {
+  /** The alerts Suricata logged on this conversation's flow, both directions. */
+  static int totalOf(Map<String, Integer> totals, PcapParserService.ConversationInfo conv) {
     String t = transportOf(conv);
     String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
     String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
-    int n = 0;
-    if (totals.containsKey(forward) && given.add(forward)) n += totals.get(forward);
-    if (!reverse.equals(forward) && totals.containsKey(reverse) && given.add(reverse)) n += totals.get(reverse);
-    return n;
+    return totals.getOrDefault(forward, 0) + (reverse.equals(forward) ? 0 : totals.getOrDefault(reverse, 0));
+  }
+
+  /** The conversation's flow, the same whichever way round it is written. */
+  static String flowOf(PcapParserService.ConversationInfo conv) {
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    return forward.compareTo(reverse) <= 0 ? forward : reverse;
   }
 
   /** Looks up a flow's entry trying both directions (src→dst and dst→src). */

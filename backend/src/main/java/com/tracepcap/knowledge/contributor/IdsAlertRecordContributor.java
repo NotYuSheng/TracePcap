@@ -30,6 +30,11 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
   public static final String LAST_ALERT = "lastAlert";
   /** Set only when fewer records were kept than alerts fired (#1284): how many were. */
   public static final String ALERT_RECORDS_KEPT = "alertRecordsKept";
+  /**
+   * In place of {@link #FIRST_ALERT} when the records were cut (#1284): the earliest record kept.
+   * The capture's cap cuts in log order, so an earlier alert on another flow may have no record.
+   */
+  public static final String FIRST_KEPT_ALERT = "firstKeptAlert";
   /** "POST http://host/path (65×)", most frequent first, at most {@link #MAX_REQUESTS}. */
   public static final String ALERT_REQUESTS = "alertRequests";
 
@@ -90,8 +95,9 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
         String r = request(a);
         if (r != null) requests.merge(r, 1, Integer::sum);
       }
-      if (first != null) attrs.put(FIRST_ALERT, TrafficContributor.utc(first));
-      // The records kept are the first: past the cap, the last of them isn't the last alert.
+      if (first != null) attrs.put(truncated ? FIRST_KEPT_ALERT : FIRST_ALERT, TrafficContributor.utc(first));
+      // Past the cap, the last record kept isn't the last alert. Request counts are of the records
+      // kept: ALERT_RECORDS_KEPT says so.
       if (last != null && !truncated) attrs.put(LAST_ALERT, TrafficContributor.utc(last));
       if (!requests.isEmpty()) {
         attrs.put(

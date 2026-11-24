@@ -92,12 +92,14 @@ class IdsAlertRecordContributorTest {
     Map<String, Object> a = board.entity(c2).orElseThrow().attributes();
     assertThat(a).containsEntry(IdsAlertRecordContributor.ALERT_COUNT, 500)
         .containsEntry(IdsAlertRecordContributor.ALERT_RECORDS_KEPT, 2)
-        .containsEntry(IdsAlertRecordContributor.FIRST_ALERT, TrafficContributor.utc(t0))
+        .containsEntry(IdsAlertRecordContributor.FIRST_KEPT_ALERT, TrafficContributor.utc(t0))
+        .doesNotContainKey(IdsAlertRecordContributor.FIRST_ALERT)
         .doesNotContainKey(IdsAlertRecordContributor.LAST_ALERT);
     assertThat(new C2Question().answer(board)).singleElement().satisfies(ans -> {
-      assertThat(ans.attributes()).doesNotContainKey("lastAlert");
-      assertThat(ans.basis()).anyMatch(s -> s.startsWith("500 alerts from ")
-          && s.contains("records kept for the first 2 only"));
+      assertThat(ans.attributes()).doesNotContainKeys("firstAlert", "lastAlert");
+      assertThat(ans.basis()).anyMatch(s -> s.startsWith("500 alerts (records kept for 2 of them only, the earliest at "));
+      // the request count is of the records kept, and says so
+      assertThat(ans.basis()).contains("In the 2 alert records kept, alerts fired on: POST http://194.180.191.64/fakeurl.htm (2×)");
     });
   }
 
@@ -106,11 +108,16 @@ class IdsAlertRecordContributorTest {
     var counts = List.of(new com.tracepcap.analysis.spi.IdsAlertLookup.AlertCount(
         UUID.randomUUID(), "10.11.26.183", "203.0.113.9", 7, 0));
     CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("203.0.113.9");
+    b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "suricata"));
     IdsAlertRecordContributor.post(List.of(), counts, b);
+    var board = b.build();
 
-    assertThat(b.build().entity(EntityRef.external("203.0.113.9")).orElseThrow().attributes())
+    assertThat(board.entity(c2).orElseThrow().attributes())
         .containsEntry(IdsAlertRecordContributor.ALERT_COUNT, 7)
         .containsEntry(IdsAlertRecordContributor.ALERT_RECORDS_KEPT, 0)
         .doesNotContainKey(IdsAlertRecordContributor.FIRST_ALERT);
+    assertThat(new C2Question().answer(board)).singleElement()
+        .satisfies(ans -> assertThat(ans.basis()).contains("7 alerts (no records kept)"));
   }
 }
