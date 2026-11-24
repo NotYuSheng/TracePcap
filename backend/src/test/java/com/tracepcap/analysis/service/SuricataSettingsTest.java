@@ -15,6 +15,15 @@ class SuricataSettingsTest {
   }
 
   @Test
+  void bothPathsInspectPacketsWhateverTheirChecksum() {
+    // Offloaded checksums: Suricata's "auto" notices too late on a short capture, and drops the
+    // packets from stream and protocol inspection until it does (SpoolSample: 0 alerts, not 6).
+    assertThat(SuricataService.SHARED_SETTINGS)
+        .containsSequence("--set", "pcap-file.checksum-checks=no")
+        .containsSequence("--set", "stream.checksum-validation=no");
+  }
+
+  @Test
   void bothPathsKeepJa3() {
     assertThat(SuricataService.SHARED_SETTINGS).containsSequence("--set", SuricataService.JA3_ON);
   }

@@ -258,11 +258,25 @@ public class SuricataService implements Extractor {
   static final String MIDSTREAM_ON = "stream.midstream=true";
 
   /**
+   * Doesn't drop packets for a bad TCP/IP checksum (as {@code -k none} does), the settings Suricata
+   * itself uses for pcap reading and stream reassembly. A capture taken on the sending host has the
+   * checksums its network card would have filled in (offload), and Suricata's default, "auto", only
+   * notices that statistically: on a short capture, too late. Until then it leaves those packets
+   * out of stream and protocol inspection, so PCAP-ATTACK's SpoolSample capture produced no alerts
+   * and no SMB records in the warm engine, against 6 and 22 with this. The capture is a record of
+   * what was sent; it isn't the network's job to check it here.
+   */
+  static final String NO_CHECKSUM_DROP_PCAP = "pcap-file.checksum-checks=no";
+  static final String NO_CHECKSUM_DROP_STREAM = "stream.checksum-validation=no";
+
+  /**
    * The analysis settings both ways of running Suricata share, the warm engine and the per-file
    * fallback, as {@code --set} pairs. One list so the two can't drift: a capture would otherwise get
    * different alerts depending on which path happened to run it.
    */
-  static final List<String> SHARED_SETTINGS = List.of("--set", JA3_ON, "--set", MIDSTREAM_ON);
+  static final List<String> SHARED_SETTINGS = List.of(
+      "--set", JA3_ON, "--set", MIDSTREAM_ON,
+      "--set", NO_CHECKSUM_DROP_PCAP, "--set", NO_CHECKSUM_DROP_STREAM);
 
   /** Suricata writes its JSON event log here, relative to the {@code -l} output directory. */
   private static final String EVE_JSON = "eve.json";
