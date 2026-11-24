@@ -249,6 +249,21 @@ public class SuricataService implements Extractor {
    */
   static final String JA3_ON = "app-layer.protocols.tls.ja3-fingerprints=yes";
 
+  /**
+   * Inspects TCP streams that were already open when the capture began (#1266). Suricata's default
+   * ignores a stream without its handshake: no protocol parsing and no alerts. A live sensor sees
+   * every handshake, but a capture is a slice: on PCAP-ATTACK's PsExec and smbexec samples (no SYN)
+   * this is the difference between nothing and "ET INFO PsExec service created".
+   */
+  static final String MIDSTREAM_ON = "stream.midstream=true";
+
+  /**
+   * The analysis settings both ways of running Suricata share, the warm engine and the per-file
+   * fallback, as {@code --set} pairs. One list so the two can't drift: a capture would otherwise get
+   * different alerts depending on which path happened to run it.
+   */
+  static final List<String> SHARED_SETTINGS = List.of("--set", JA3_ON, "--set", MIDSTREAM_ON);
+
   /** Suricata writes its JSON event log here, relative to the {@code -l} output directory. */
   private static final String EVE_JSON = "eve.json";
 
@@ -357,9 +372,8 @@ public class SuricataService implements Extractor {
                   "--runmode",
                   "single",
                   "--set",
-                  "unix-command.enabled=no",
-                  "--set",
-                  JA3_ON));
+                  "unix-command.enabled=no"));
+      command.addAll(SHARED_SETTINGS);
       if (ruleset != null) command.addAll(ruleset.suricataArgs());
       ProcessBuilder pb = new ProcessBuilder(command);
 
