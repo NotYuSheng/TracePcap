@@ -112,6 +112,56 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
     });
   }
 
+  /**
+   * "Alerts fired on: POST http://… (65×)", from a server's attributes; null when none were HTTP.
+   * Once its records were cut (#1284) the counts are of the records kept, and the line says so.
+   */
+  public static String requestsLine(Map<String, Object> server) {
+    if (!(server.get(ALERT_REQUESTS) instanceof List<?> reqs) || reqs.isEmpty()) return null;
+    Object kept = server.get(ALERT_RECORDS_KEPT);
+    return (kept != null
+            ? "Of the " + kept + " alert records kept, the HTTP requests they fired on"
+                + (reqs.size() >= MAX_REQUESTS ? " (most frequent first)" : "") + ": "
+            : "Alerts fired on: ")
+        + String.join(", ", reqs.stream().map(String::valueOf).toList());
+  }
+
+  /**
+   * Copies a server's request list into an answer's attributes, with the true count and how many
+   * records were kept when they were cut (#1284), so a reader of the attributes isn't misled either.
+   */
+  public static void putRequests(Map<String, Object> server, Map<String, Object> attrs) {
+    if (server.get(ALERT_REQUESTS) == null) return;
+    attrs.put("requests", server.get(ALERT_REQUESTS));
+    if (server.get(ALERT_RECORDS_KEPT) != null) {
+      attrs.put(ALERT_COUNT, server.get(ALERT_COUNT));
+      attrs.put(ALERT_RECORDS_KEPT, server.get(ALERT_RECORDS_KEPT));
+    }
+  }
+
+  /**
+   * "65 alerts from … to …"; when the records stopped at their cap (#1284), the true count and how
+   * many records were kept, since neither the first nor the last record kept is then certain to be
+   * the first or last alert.
+   */
+  public static String alertSpan(Map<String, Object> ent) {
+    Object n = ent.get(ALERT_COUNT);
+    String count = n == null ? "Alerts" : n + " alert" + ("1".equals(String.valueOf(n)) ? "" : "s");
+    Object kept = ent.get(ALERT_RECORDS_KEPT);
+    if (kept != null) {
+      Object firstKept = ent.get(FIRST_KEPT_ALERT);
+      return count + " (" + ("0".equals(String.valueOf(kept)) ? "no records kept"
+          : "records kept for " + kept + " of them only"
+              + (firstKept != null ? ", the earliest at " + TrafficContributor.readable(firstKept) : ""))
+          + ")";
+    }
+    Object first = ent.get(FIRST_ALERT);
+    if (first == null) return null;
+    Object last = ent.get(LAST_ALERT);
+    return count + " from " + TrafficContributor.readable(first)
+        + (last != null ? " to " + TrafficContributor.readable(last) : "");
+  }
+
   /** The outside side of an alert between a local host and the outside; null otherwise. */
   private static String externalOf(String srcIp, String dstIp) {
     if (srcIp == null || dstIp == null) return null;

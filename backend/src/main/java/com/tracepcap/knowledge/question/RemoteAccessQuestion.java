@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.question;
 
+import com.tracepcap.knowledge.contributor.IdsAlertRecordContributor;
 import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.EntityRef;
@@ -73,16 +74,19 @@ public class RemoteAccessQuestion implements StandardQuestion {
       attrs.put("host", host);
       attrs.put("tool", tool);
       attrs.put("external", external);
-      Object first =
-          board.entity(EntityRef.external(external)).map(e -> e.attributes().get("firstSeen")).orElse(null);
+      Map<String, Object> server =
+          board.entity(EntityRef.external(external)).map(e -> e.attributes()).orElse(Map.of());
+      Object first = server.get("firstSeen");
       if (first != null) attrs.put("firstSeen", first);
       List<String> basis = new ArrayList<>(alerts.stream().distinct().toList());
-      Object reqs = board.entity(EntityRef.external(external))
-          .map(e -> e.attributes().get(com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_REQUESTS))
-          .orElse(null);
-      if (reqs instanceof List<?> l && !l.isEmpty()) {
-        attrs.put("requests", l);
-        basis.add("Alerts fired on: " + String.join(", ", l.stream().map(String::valueOf).toList()));
+      // Counts of the records kept, saying so, with the true total, once they were cut (#1284).
+      String requests = IdsAlertRecordContributor.requestsLine(server);
+      if (requests != null) {
+        IdsAlertRecordContributor.putRequests(server, attrs);
+        basis.add(requests);
+        if (server.get(IdsAlertRecordContributor.ALERT_RECORDS_KEPT) != null) {
+          basis.add(IdsAlertRecordContributor.alertSpan(server));
+        }
       }
       answers.add(
           new Answer(
