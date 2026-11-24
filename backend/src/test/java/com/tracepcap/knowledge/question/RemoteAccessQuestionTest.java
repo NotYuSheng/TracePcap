@@ -88,8 +88,12 @@ class RemoteAccessQuestionTest {
         com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_RECORDS_KEPT, 102,
         com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_COUNT, 252));
 
-    assertThat(new RemoteAccessQuestion().answer(b.build())).singleElement().satisfies(x ->
-        assertThat(x.basis()).contains(
-            "In the 102 alert records kept, alerts fired on: POST http://93.152.209.36/fakeurl.htm (102×)"));
+    assertThat(new RemoteAccessQuestion().answer(b.build())).singleElement().satisfies(x -> {
+      assertThat(x.basis()).contains(
+          "Of the 102 alert records kept, the HTTP requests they fired on: POST http://93.152.209.36/fakeurl.htm (102×)",
+          "252 alerts (records kept for 102 of them only)");
+      // a reader of the attributes sees it too
+      assertThat(x.attributes()).containsEntry("alertCount", 252).containsEntry("alertRecordsKept", 102);
+    });
   }
 }

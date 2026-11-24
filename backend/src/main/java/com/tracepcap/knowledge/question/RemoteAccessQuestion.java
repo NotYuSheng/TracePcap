@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.question;
 
+import com.tracepcap.knowledge.contributor.IdsAlertRecordContributor;
 import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.EntityRef;
@@ -73,17 +74,18 @@ public class RemoteAccessQuestion implements StandardQuestion {
       attrs.put("host", host);
       attrs.put("tool", tool);
       attrs.put("external", external);
-      Object first =
-          board.entity(EntityRef.external(external)).map(e -> e.attributes().get("firstSeen")).orElse(null);
-      if (first != null) attrs.put("firstSeen", first);
-      List<String> basis = new ArrayList<>(alerts.stream().distinct().toList());
       Map<String, Object> server =
           board.entity(EntityRef.external(external)).map(e -> e.attributes()).orElse(Map.of());
-      // Counts of the records kept, and saying so once they were cut (#1284).
-      String requests = com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.requestsLine(server);
+      if (server.get("firstSeen") != null) attrs.put("firstSeen", server.get("firstSeen"));
+      List<String> basis = new ArrayList<>(alerts.stream().distinct().toList());
+      // Counts of the records kept, saying so, with the true total, once they were cut (#1284).
+      String requests = IdsAlertRecordContributor.requestsLine(server);
       if (requests != null) {
-        attrs.put("requests", server.get(com.tracepcap.knowledge.contributor.IdsAlertRecordContributor.ALERT_REQUESTS));
+        IdsAlertRecordContributor.putRequests(server, attrs);
         basis.add(requests);
+        if (server.get(IdsAlertRecordContributor.ALERT_RECORDS_KEPT) != null) {
+          basis.add(IdsAlertRecordContributor.alertSpan(server));
+        }
       }
       answers.add(
           new Answer(

@@ -99,7 +99,7 @@ class IdsAlertRecordContributorTest {
       assertThat(ans.attributes()).doesNotContainKeys("firstAlert", "lastAlert");
       assertThat(ans.basis()).anyMatch(s -> s.startsWith("500 alerts (records kept for 2 of them only, the earliest at "));
       // the request count is of the records kept, and says so
-      assertThat(ans.basis()).contains("In the 2 alert records kept, alerts fired on: POST http://194.180.191.64/fakeurl.htm (2×)");
+      assertThat(ans.basis()).contains("Of the 2 alert records kept, the HTTP requests they fired on: POST http://194.180.191.64/fakeurl.htm (2×)");
     });
   }
 
