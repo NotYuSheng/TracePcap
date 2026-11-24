@@ -61,6 +61,11 @@ public class ConversationDetailResponse {
   private List<String> httpUserAgents;
   private Long packetCount;
   private Long totalBytes;
+
+  /** Bytes each way (#1260); null for conversations analysed before they were measured. */
+  private Long bytesSrcToDst;
+
+  private Long bytesDstToSrc;
   private LocalDateTime startTime;
   private LocalDateTime endTime;
   private Long durationMs;

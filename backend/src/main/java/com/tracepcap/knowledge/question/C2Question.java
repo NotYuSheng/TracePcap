@@ -39,10 +39,19 @@ public class C2Question implements StandardQuestion {
     Map<EntityRef, Set<String>> c2ToMalware = new LinkedHashMap<>();
     // Servers only corroboration made a C2 (no alert of their own named them): worded "suspected".
     Map<EntityRef, Boolean> suspectedOnly = new LinkedHashMap<>();
+    // How each C2 was concluded, for the UI: "rule" (a malware rule named it), or the
+    // corroboration kind ("suspected-c2", "install-chain") with its reason.
+    Map<EntityRef, Map<String, String>> basisOf = new LinkedHashMap<>();
     for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
       c2ToMalware.computeIfAbsent(c2of.from(), k -> new LinkedHashSet<>()).add(c2of.to().key());
       boolean suspected = "suspected-c2".equals(c2of.attributes().get("corroboration"));
       suspectedOnly.merge(c2of.from(), suspected, Boolean::logicalAnd);
+      Object kind = c2of.attributes().get("corroboration");
+      if (kind == null) basisOf.put(c2of.from(), Map.of("kind", "rule"));
+      else
+        basisOf.putIfAbsent(
+            c2of.from(),
+            Map.of("kind", String.valueOf(kind), "reason", String.valueOf(c2of.attributes().getOrDefault("reason", ""))));
     }
 
     List<Answer> answers = new ArrayList<>();
@@ -58,6 +67,10 @@ public class C2Question implements StandardQuestion {
       String place = geoAttribution(board, c2, attrs);
       Object first = board.entity(c2).map(e -> e.attributes().get("firstSeen")).orElse(null);
       if (first != null) attrs.put("firstSeen", first);
+      Map<String, String> basis = basisOf.getOrDefault(c2, Map.of("kind", "rule"));
+      attrs.put("conclusion", basis.get("kind"));
+      if (basis.get("reason") != null && !basis.get("reason").isBlank())
+        attrs.put("conclusionReason", basis.get("reason"));
       answers.add(
           new Answer(
               QUESTION,

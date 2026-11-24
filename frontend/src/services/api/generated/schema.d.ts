@@ -3431,6 +3431,10 @@ export interface components {
         };
         ConversationDetailResponse: {
             appName?: string;
+            /** Format: int64 */
+            bytesDstToSrc?: number;
+            /** Format: int64 */
+            bytesSrcToDst?: number;
             category?: string;
             connectionOutcome?: string;
             /** Format: uuid */
@@ -3537,6 +3541,10 @@ export interface components {
         };
         ConversationResponse: {
             appName?: string;
+            /** Format: int64 */
+            bytesDstToSrc?: number;
+            /** Format: int64 */
+            bytesSrcToDst?: number;
             category?: string;
             connectionOutcome?: string;
             /** Format: uuid */
@@ -4023,6 +4031,9 @@ export interface components {
         };
         GoalOutcomeDto: {
             answered?: boolean;
+            attributes?: {
+                [key: string]: Record<string, never>;
+            };
             basis?: string[];
             /** Format: int32 */
             confidence?: number;
@@ -4056,6 +4067,7 @@ export interface components {
             loggedInUser?: string;
             /** Format: int32 */
             loggedInUserCount?: number;
+            loggedInUserRealName?: string;
             loggedInUserSource?: string;
             mac?: string;
             manufacturer?: string;

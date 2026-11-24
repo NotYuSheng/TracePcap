@@ -133,6 +133,18 @@ class InvestigationOrchestratorTest {
   }
 
   @Test
+  void aGoalKeepsItsAnswersAttributes() {
+    // The panel renders goals from the report: dropping attributes hid the C2 chip and link (#1264).
+    Answer c2 = new Answer("c2", "93.152.209.36 — C2 for NetSupport RAT", Grade.INFERRED,
+        List.of(EntityRef.external("93.152.209.36")), List.of(),
+        java.util.Map.of("address", "93.152.209.36", "conclusion", "install-chain"));
+    InvestigationReport report = service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), List.of(c2));
+    assertThat(outcome(report, Goal.C2).attributes())
+        .containsEntry("address", "93.152.209.36")
+        .containsEntry("conclusion", "install-chain");
+  }
+
+  @Test
   void nonGoalAnswers_areCarriedAsAdditional_notDropped() {
     // A data-transfer answer isn't one of the four goals, but the panel renders from the report, so
     // it must still be there.

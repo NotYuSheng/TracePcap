@@ -27,7 +27,8 @@ public record InvestigationReportResponse(
       String grade,
       int confidence,
       List<String> basis,
-      List<EntityRefDto> subjects) {
+      List<EntityRefDto> subjects,
+      java.util.Map<String, Object> attributes) {
 
     public static GoalOutcomeDto from(InvestigationReport.GoalOutcome o) {
       return new GoalOutcomeDto(
@@ -37,7 +38,8 @@ public record InvestigationReportResponse(
           o.grade() == null ? null : o.grade().name(),
           o.confidence(),
           o.basis(),
-          o.subjects().stream().map(EntityRefDto::from).toList());
+          o.subjects().stream().map(EntityRefDto::from).toList(),
+          o.attributes());
     }
   }
 }

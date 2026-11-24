@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { Button, Card } from '@govtechsg/sgds-react';
@@ -9,6 +10,8 @@ interface ConfirmedFindingsPanelProps {
   loading?: boolean;
   /** Goals the investigation could not close on this capture (e.g. 'C2'), shown as honest gaps. */
   unknowns?: string[];
+  /** The capture, so an answer can link to its conversations; links are left out without it. */
+  fileId?: string;
 }
 
 /** Human labels for the standing investigation goals, for the "not established" line. */
@@ -50,6 +53,70 @@ function InvestigationSummaryInfoPopover() {
       </Button>
     </EscapableOverlayTrigger>
   );
+}
+
+/**
+ * How a C2 answer was concluded when no malware rule named the server itself (#1263): the chip
+ * shown beside the grade, and the help behind its info button.
+ */
+const CONCLUSION_META: Record<string, { label: string; bg: string; title: string; note: string }> = {
+  'suspected-c2': {
+    label: 'Suspected',
+    bg: '#b35900',
+    title: 'Suspected C2',
+    note:
+      'No rule named this server. It is on a reputation list, a host already talking to a confirmed C2 ' +
+      'reached it by bare IP address, and it did so in repeated rounds (or seconds after another such ' +
+      'server). Reputation alone never makes a C2. Check its conversations before acting on it.',
+  },
+  'install-chain': {
+    label: 'Install chain',
+    bg: '#6f42c1',
+    title: 'Remote-access install chain',
+    note:
+      'A remote-access tool checked in to a bare IP address, and shortly before, the same host ran a ' +
+      'script engine or download tool against another outside server that then sent it a large ' +
+      'payload. That sequence is how the tool was planted, so its server is treated as a C2. Confirm ' +
+      'IT did not deploy the tool this way.',
+  },
+};
+
+/** The chip saying how a C2 was concluded, with its reason behind a click-toggled info button. */
+function ConclusionChip({ kind, reason, id }: { kind: string; reason?: string; id: string }) {
+  const meta = CONCLUSION_META[kind];
+  if (!meta) return null;
+  const popover = (
+    <InfoPopover id={`info-conclusion-${id}`} kind="How it was concluded" title={meta.title} source="corroboration checks" docs="architecture/knowledge-layer">
+      <p className={reason ? 'mb-2' : 'mb-0'}>{meta.note}</p>
+      {reason && (
+        <p className="mb-0">
+          <strong>Here:</strong> {reason}
+        </p>
+      )}
+    </InfoPopover>
+  );
+  return (
+    <span className="d-inline-flex align-items-center gap-1" data-testid="conclusion-chip">
+      <span
+        style={{ fontSize: 9, fontWeight: 600, color: '#fff', background: meta.bg, borderRadius: 3, padding: '1px 5px' }}
+      >
+        {meta.label}
+      </span>
+      {/* "auto": on the Overview this panel sits in the right-hand column, where a popover
+          placed to the right runs off the screen. */}
+      <EscapableOverlayTrigger trigger="click" placement="auto" overlay={popover}>
+        <Button type="button" variant="link" className="p-0 text-muted" style={{ lineHeight: 1 }} aria-label={`About ${meta.title}`}>
+          <i className="bi bi-info-circle" style={{ fontSize: '0.75rem' }} aria-hidden="true"></i>
+        </Button>
+      </EscapableOverlayTrigger>
+    </span>
+  );
+}
+
+/** The outside address an answer is about, for its "conversations" link. */
+function answerAddress(a: Answer): string | null {
+  const v = a.question === 'c2' ? a.attributes.address : a.attributes.external;
+  return typeof v === 'string' && v ? v : null;
 }
 
 /** Friendly label + icon per standard-question key; unknown keys fall back to the raw key. */
@@ -110,6 +177,7 @@ export const ConfirmedFindingsPanel = ({
   answers,
   loading = false,
   unknowns = [],
+  fileId,
 }: ConfirmedFindingsPanelProps) => {
   return (
     <Card>
@@ -162,6 +230,22 @@ export const ConfirmedFindingsPanel = ({
                     >
                       {grade.label}
                     </span>
+                    {typeof a.attributes.conclusion === 'string' && (
+                      <ConclusionChip
+                        kind={a.attributes.conclusion}
+                        reason={typeof a.attributes.conclusionReason === 'string' ? a.attributes.conclusionReason : undefined}
+                        id={String(i)}
+                      />
+                    )}
+                    {fileId && answerAddress(a) && (
+                      <Link
+                        to={`/analysis/${fileId}/conversations?ip=${encodeURIComponent(answerAddress(a)!)}`}
+                        className="ms-auto small text-decoration-none"
+                        style={{ fontSize: '0.72rem' }}
+                      >
+                        Conversations <i className="bi bi-arrow-right-short" aria-hidden="true" />
+                      </Link>
+                    )}
                   </div>
                   {/* URLs and hashes have no spaces: let them wrap rather than run out of the card. */}
                   <div style={{ fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{a.headline}</div>

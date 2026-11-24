@@ -1096,6 +1096,8 @@ public class AnalysisService {
                   .ja4Client(conv.getJa4Client())
                   .tlsVersion(conv.getTlsVersion())
                   .connectionOutcome(conv.getConnectionOutcome())
+                  .bytesSrcToDst(conv.getBytesSrcToDst())
+                  .bytesDstToSrc(conv.getBytesDstToSrc())
                   .tlsIssuer(conv.getTlsIssuer())
                   .tlsSubject(conv.getTlsSubject())
                   .tlsNotBefore(conv.getTlsNotBefore())

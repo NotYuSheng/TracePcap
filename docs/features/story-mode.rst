@@ -181,6 +181,14 @@ such findings, so the key answers are visible without opening Story Mode. When a
 capture matches none of the questions (a benign DNS capture, say), the panel shows
 an explicit empty state rather than disappearing.
 
+A command-and-control answer that no malware rule named directly carries a chip
+saying how it was concluded: **Suspected** for a reputation-listed server that an
+already-infected host kept returning to, or **Install chain** for a remote-access
+tool planted by a script or download tool fetching a large payload just before.
+The info button beside the chip explains the rule and gives this capture's reason.
+Answers about an outside server (command and control, remote access, downloads, bulk
+transfers) link to the **Conversations** tab filtered to that address.
+
 Deterministic Findings
 ~~~~~~~~~~~~~~~~~~~~~~
 

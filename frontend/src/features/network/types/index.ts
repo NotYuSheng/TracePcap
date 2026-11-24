@@ -39,6 +39,8 @@ export interface NodeData {
   loggedInUser?: string;
   /** How `loggedInUser` was discovered: kerberos_as_req or ntlm_auth (signed in) | ldap_dn (weaker). */
   loggedInUserSource?: string;
+  /** The person behind `loggedInUser` ("Gabriel McDowell"), from a SAMR reply or an LDAP person DN. */
+  loggedInUserRealName?: string;
   /**
    * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
    * 1. With more, show "N accounts" and the host's login timeline rather than picking one.
