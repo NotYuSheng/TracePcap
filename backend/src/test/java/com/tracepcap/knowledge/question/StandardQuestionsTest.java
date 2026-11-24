@@ -250,4 +250,19 @@ class StandardQuestionsTest {
             .containsEntry("conclusion", "suspected-c2")
             .containsEntry("conclusionReason", "ET DROP listed; 4 rounds"));
   }
+
+  @Test
+  void c2_theChipNamesTheStrongestConclusion_asTheHeadlineDoes() {
+    // Suspected first, then an install chain: not worded "suspected", so not chipped "Suspected".
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("45.1.2.3");
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE),
+        Grade.INFERRED, "corroboration", java.util.Map.of("corroboration", "suspected-c2", "reason", "listed")));
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware("NetSupport RAT"),
+        Grade.INFERRED, "corroboration", java.util.Map.of("corroboration", "install-chain", "reason", "chain")));
+    assertThat(new C2Question().answer(b.build())).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).doesNotContain("suspected");
+      assertThat(ans.attributes()).containsEntry("conclusion", "install-chain");
+    });
+  }
 }

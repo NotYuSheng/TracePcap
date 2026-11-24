@@ -49,9 +49,12 @@ public class C2Question implements StandardQuestion {
       Object kind = c2of.attributes().get("corroboration");
       if (kind == null) basisOf.put(c2of.from(), Map.of("kind", "rule"));
       else
-        basisOf.putIfAbsent(
+        // The strongest conclusion names the chip, as it does the headline: a rule, then an install
+        // chain, then a suspected C2 (only "suspected" when nothing stronger named the server).
+        basisOf.merge(
             c2of.from(),
-            Map.of("kind", String.valueOf(kind), "reason", String.valueOf(c2of.attributes().getOrDefault("reason", ""))));
+            Map.of("kind", String.valueOf(kind), "reason", String.valueOf(c2of.attributes().getOrDefault("reason", ""))),
+            (old, neu) -> "suspected-c2".equals(old.get("kind")) ? neu : old);
     }
 
     List<Answer> answers = new ArrayList<>();
