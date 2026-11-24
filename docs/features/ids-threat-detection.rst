@@ -37,10 +37,14 @@ the checksums its network card would have filled in later (offload), so every pa
 looks corrupt. Suricata's default notices that statistically, too late on a short capture, and
 until then it drops those packets from stream and protocol inspection: half of each conversation.
 Measured on the same 71 captures: alerts on four more (PCAP-ATTACK's Foudre C2, which now gets its C2
-and victim answers, two NTLM sign-ins, and a WhatsApp capture), and no other answer changed. One
+and victim answers, NTLM sign-ins in SpoolSample and PsLoggedOn, and a WhatsApp capture), and no
+other answer changed. One
 loss: Zerologon's exploit rule no longer fires on PCAP-ATTACK's capture of it, which has no TCP
 handshakes. Suricata orients those connections server-first, so the rule's "to server" condition
 never matches; it only fired before because the server's packets were being dropped (#1277).
+The trade-off: a packet that really was corrupted, or a decoy sent with a bad checksum on purpose
+to confuse an IDS (which the real endpoint would drop), is inspected too. In a capture taken off the
+wire the offload case is far more common, so inspecting everything is the default here.
 
 How it works
 ------------
