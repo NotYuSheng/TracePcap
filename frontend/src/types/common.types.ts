@@ -94,6 +94,8 @@ export interface Conversation {
   /** Bytes from srcIp to dstIp and back (#1260); absent for conversations analysed before then. */
   bytesSrcToDst?: number | null;
   bytesDstToSrc?: number | null;
+  /** Each Suricata alert as it fired (#1265), oldest first; absent for captures analysed before. */
+  idsAlerts?: IdsAlert[];
   packets: Packet[];
   direction: 'bidirectional' | 'unidirectional';
   srcGeo?: ConversationGeoInfo;
@@ -458,6 +460,26 @@ export type DeviceType =
   | 'VIRTUAL_ADDRESS'
   | 'UNKNOWN'
   | string; // custom values from detection-rule classification hints (#926)
+
+/** One Suricata alert as logged (#1265). `srcIp` sent the packet that fired it. */
+export interface IdsAlert {
+  /** Epoch ms. */
+  time?: number;
+  srcIp?: string;
+  dstIp?: string;
+  sid: number;
+  signature: string;
+  category?: string;
+  severity?: number;
+  /** The rule's own rating: Critical, Major, Minor, Informational. */
+  signatureSeverity?: string;
+  /** The rule's own confidence: High, Medium, Low. */
+  confidence?: string;
+  httpMethod?: string;
+  httpHost?: string;
+  httpUrl?: string;
+  httpStatus?: number;
+}
 
 export interface HostClassification {
   ip: string;

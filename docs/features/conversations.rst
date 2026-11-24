@@ -394,6 +394,25 @@ what data was available during analysis:
 - **Custom Rules** — names of fired custom signature rules, color-coded by
   severity (critical=red, high=orange, medium=amber, low=purple).
 
+**IDS alerts** (when Suricata ran and a rule fired on the conversation)
+
+Each Suricata alert as it fired, not just its name. Alerts that differ only in
+time fold into one row with a count and the first and last time ("52× from …
+to …"). Each row shows:
+
+- the rule's message, its category, and its sid;
+- the rule's own **rating** (Critical, Major, Minor or Informational) and
+  **confidence** (High, Medium or Low), from the rule's metadata. These are more
+  telling than the 1–3 priority, which most ET rules set to 2 or 3;
+- whether it fired **on the client's request or the server's reply**. Alerts
+  from both directions are kept, so a rule on the reply (NetSupport's "Remote
+  Admin Response") shows alongside the client's check-ins;
+- the **HTTP request** it fired on (``POST http://194.180.191.64/fakeurl.htm →
+  200``), the indicator an incident report lists.
+
+Captures analysed before this record only the alert names; re-analyse one to
+see the full alerts.
+
 **TLS** (when nDPI or Suricata ran and a TLS handshake was observed)
 
 - **Version** — the negotiated version (e.g. ``TLS 1.2``), from Suricata. TLS

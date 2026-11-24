@@ -3452,6 +3452,7 @@ export interface components {
             flowRisks?: string[];
             hostname?: string;
             httpUserAgents?: string[];
+            idsAlerts?: components["schemas"]["IdsAlert"][];
             initiatorIp?: string;
             /** Format: int32 */
             initiatorPort?: number;
@@ -4198,6 +4199,33 @@ export interface components {
             hypothesis?: string;
             id?: string;
             queryRef?: string;
+        };
+        IdsAlert: {
+            attackTarget?: string;
+            category?: string;
+            confidence?: string;
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            httpHost?: string;
+            httpMethod?: string;
+            /** Format: int32 */
+            httpStatus?: number;
+            httpUrl?: string;
+            httpUserAgent?: string;
+            /** Format: int32 */
+            rev?: number;
+            /** Format: int32 */
+            severity?: number;
+            /** Format: int64 */
+            sid?: number;
+            signature?: string;
+            signatureSeverity?: string;
+            srcIp?: string;
+            /** Format: int32 */
+            srcPort?: number;
+            /** Format: date-time */
+            time?: string;
         };
         InvestigationQuery: {
             appName?: string;

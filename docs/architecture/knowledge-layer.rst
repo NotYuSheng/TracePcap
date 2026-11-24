@@ -109,6 +109,9 @@ only through ``analysis.spi`` ports, never another module's repositories or enti
 - ``GeoOrgContributor`` — country / ASN / org for the external endpoints the capture talked to.
 - ``TrafficContributor`` — a ``communicates-with`` edge per host→external pair carrying the total
   bytes, for pairs above a threshold.
+- ``IdsAlertRecordContributor`` — from the full alert records, each outside server's alert count,
+  first and last alert (UTC), and the HTTP requests the alerts fired on. The command-and-control
+  and remote-access answers cite them ("Alerts fired on: POST http://…/fakeurl.htm (52×)").
 
 **Deterministic checks** (``StandardQuestion``) are the primary analysis layer — *not* the LLM. Each
 answers one standard investigation question by querying the board and posting an ``Answer`` (a

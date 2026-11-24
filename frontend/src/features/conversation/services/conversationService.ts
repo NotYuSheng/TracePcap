@@ -14,6 +14,7 @@ import type {
   HostClassification,
   HostIdentity,
   HostIdentityEvidence,
+  IdsAlert,
 } from '@/types';
 import type { ConversationFacetCounts, ConversationFilters, WindowsLogon } from '../types';
 
@@ -57,6 +58,7 @@ interface ConversationApiResponse {
   totalBytes: number;
   bytesSrcToDst?: number | null;
   bytesDstToSrc?: number | null;
+  idsAlerts?: Array<Omit<IdsAlert, 'time'> & { time?: string | number[] | null }> | null;
   startTime: string | number[];
   endTime: string | number[];
   durationMs: number;
@@ -153,6 +155,10 @@ function transformConversation(
     totalBytes: apiData.totalBytes,
     bytesSrcToDst: apiData.bytesSrcToDst ?? null,
     bytesDstToSrc: apiData.bytesDstToSrc ?? null,
+    idsAlerts: (apiData.idsAlerts ?? []).map((a) => ({
+      ...a,
+      time: a.time != null ? parseDateTime(a.time) : undefined,
+    })),
     packets,
     direction: (apiData.flowRisks ?? []).includes('unidirectional_traffic')
       ? 'unidirectional'

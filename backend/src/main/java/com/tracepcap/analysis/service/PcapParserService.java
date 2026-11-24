@@ -766,6 +766,8 @@ public class PcapParserService {
     private List<String> flowRisks = new ArrayList<>();
     private List<String> customSignatures = new ArrayList<>();
     private List<String> suricataAlerts = new ArrayList<>();
+    /** Each alert behind {@code suricataAlerts} in full (#1265), persisted to ids_alerts. */
+    private List<SuricataService.AlertEvent> idsAlertEvents = new ArrayList<>();
     private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;

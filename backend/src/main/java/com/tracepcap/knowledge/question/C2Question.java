@@ -7,6 +7,8 @@ import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.contributor.IdsAlertRecordContributor;
+import com.tracepcap.knowledge.contributor.TrafficContributor;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -70,6 +72,22 @@ public class C2Question implements StandardQuestion {
       String place = geoAttribution(board, c2, attrs);
       Object first = board.entity(c2).map(e -> e.attributes().get("firstSeen")).orElse(null);
       if (first != null) attrs.put("firstSeen", first);
+      // From the full alert records (#1265): the requests the alerts fired on, and the alert span.
+      Map<String, Object> ent = board.entity(c2).map(e -> e.attributes()).orElse(Map.of());
+      List<String> evidence = new ArrayList<>(alertSummaries(board, c2));
+      if (ent.get(IdsAlertRecordContributor.ALERT_REQUESTS) instanceof List<?> reqs && !reqs.isEmpty()) {
+        attrs.put("requests", reqs);
+        evidence.add("Alerts fired on: " + String.join(", ", reqs.stream().map(String::valueOf).toList()));
+      }
+      if (ent.get(IdsAlertRecordContributor.FIRST_ALERT) != null) {
+        attrs.put("firstAlert", ent.get(IdsAlertRecordContributor.FIRST_ALERT));
+        attrs.put("lastAlert", ent.get(IdsAlertRecordContributor.LAST_ALERT));
+        Object n = ent.get(IdsAlertRecordContributor.ALERT_COUNT);
+        evidence.add(
+            (n == null ? "Alerts" : n + " alert" + ("1".equals(String.valueOf(n)) ? "" : "s"))
+                + " from " + TrafficContributor.readable(ent.get(IdsAlertRecordContributor.FIRST_ALERT))
+                + " to " + TrafficContributor.readable(ent.get(IdsAlertRecordContributor.LAST_ALERT)));
+      }
       Map<String, String> basis = basisOf.getOrDefault(c2, Map.of("kind", "rule"));
       attrs.put("conclusion", basis.get("kind"));
       if (basis.get("reason") != null && !basis.get("reason").isBlank())
@@ -93,7 +111,7 @@ public class C2Question implements StandardQuestion {
                       : ""),
               Grade.INFERRED,
               subjects,
-              alertSummaries(board, c2),
+              evidence,
               attrs));
     });
     return answers;
