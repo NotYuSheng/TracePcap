@@ -161,13 +161,20 @@ public class SuricataEngine implements DetectionEngineStatus {
     return lastLoad;
   }
 
-  /** Reads Suricata's load line from a log; "no rules were loaded" is zero. Null when absent. */
+  /**
+   * Reads Suricata's load line from a log; "no rules were loaded" is zero. Null when absent. The
+   * latest wins, so a log that kept an earlier start's success can't hide a later failure.
+   */
   static LoadReport parseLoad(String logText) {
     if (logText == null) return null;
     java.util.regex.Matcher m = LOADED.matcher(logText);
     LoadReport r = null;
-    while (m.find()) r = new LoadReport(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
-    if (r == null && logText.contains("no rules were loaded")) r = new LoadReport(0, 0);
+    int at = -1;
+    while (m.find()) {
+      r = new LoadReport(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
+      at = m.start();
+    }
+    if (logText.lastIndexOf("no rules were loaded") > at) r = new LoadReport(0, 0);
     return r;
   }
 
@@ -207,6 +214,8 @@ public class SuricataEngine implements DetectionEngineStatus {
       // (hundreds of MB) that nothing can reach afterwards. Same defect the startup-timeout path
       // had; this is the restart path.
       discardDaemon();
+      // A new engine's numbers, or none: a failed start must not keep showing the last one's.
+      lastLoad = new LoadReport(null, null);
 
       Path socket = Path.of(socketPath);
       Files.createDirectories(socket.getParent());
@@ -217,6 +226,7 @@ public class SuricataEngine implements DetectionEngineStatus {
       // without this the engine exits immediately with SC_ERR_LOGDIR_CONFIG.
       Path engineLogDir = socket.getParent().resolve("log");
       Files.createDirectories(engineLogDir);
+      Files.deleteIfExists(engineLogDir.resolve("suricata.log"));
 
       log.info("Starting warm Suricata engine on {} (first run builds the ruleset)", socketPath);
       java.util.List<String> command =
@@ -260,7 +270,9 @@ public class SuricataEngine implements DetectionEngineStatus {
         }
         if (isResponsive()) {
           log.info("Warm Suricata engine ready");
-          recordLoad(engineLogDir.resolve("engine.log"), "warm engine");
+          // The load count is an Info line: it is in Suricata's own log, not on the console (which
+          // logs notices and up). That log is cleared at each start, so it's this engine's.
+          recordLoad(engineLogDir.resolve("suricata.log"), "warm engine");
           warm = true;
           return true;
         }
@@ -327,7 +339,14 @@ public class SuricataEngine implements DetectionEngineStatus {
           discardDaemon();
           return false;
         }
-        if (current.contains("None") && Files.exists(eve)) return true;
+        if (current.contains("None") && Files.exists(eve)) {
+          // Suricata may not have flushed its load line by the time the socket answered: read it
+          // again after a capture until a count is in.
+          if (lastLoad.loaded() == null) {
+            recordLoad(Path.of(socketPath).getParent().resolve("log").resolve("suricata.log"), "warm engine");
+          }
+          return true;
+        }
         Thread.sleep(100);
       }
       log.warn("Warm Suricata engine did not finish within {}s — falling back", runTimeoutSeconds);

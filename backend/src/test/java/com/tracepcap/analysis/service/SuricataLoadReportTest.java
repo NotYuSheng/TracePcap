@@ -29,4 +29,14 @@ class SuricataLoadReportTest {
   void noLoadLine_isUnknown() {
     assertThat(SuricataEngine.parseLoad("i: suricata: This is Suricata version 8.0.8 RELEASE")).isNull();
   }
+
+  @Test
+  void theLatestLoadWins_soAnEarlierSuccessCantHideALaterFailure() {
+    String appended = "Info: detect: 1 rule files processed. 53052 rules successfully loaded, 0 rules failed\n"
+        + "Warning: detect: 1 rule files specified, but no rules were loaded!\n";
+    assertThat(SuricataEngine.parseLoad(appended).noRules()).isTrue();
+    String recovered = "Warning: detect: 1 rule files specified, but no rules were loaded!\n"
+        + "Info: detect: 1 rule files processed. 53073 rules successfully loaded, 0 rules failed\n";
+    assertThat(SuricataEngine.parseLoad(recovered).loaded()).isEqualTo(53073);
+  }
 }
