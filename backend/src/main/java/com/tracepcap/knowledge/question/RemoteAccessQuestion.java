@@ -76,7 +76,8 @@ public class RemoteAccessQuestion implements StandardQuestion {
       attrs.put("external", external);
       Map<String, Object> server =
           board.entity(EntityRef.external(external)).map(e -> e.attributes()).orElse(Map.of());
-      if (server.get("firstSeen") != null) attrs.put("firstSeen", server.get("firstSeen"));
+      Object first = server.get("firstSeen");
+      if (first != null) attrs.put("firstSeen", first);
       List<String> basis = new ArrayList<>(alerts.stream().distinct().toList());
       // Counts of the records kept, saying so, with the true total, once they were cut (#1284).
       String requests = IdsAlertRecordContributor.requestsLine(server);
