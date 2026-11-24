@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -152,5 +152,43 @@ describe('How we got here (#1293)', () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole('button', { name: /How we got here/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Considered and ruled out (#1294)', () => {
+  const considered = [
+    {
+      question: 'c2',
+      candidate: '45.125.66.40',
+      rule: 'Reputation alone never makes a C2.',
+      reason: 'on Spamhaus DROP, but reached in one round, not in repeated rounds or seconds after a server that was.',
+      conversations: ['conv-9'],
+    },
+  ];
+
+  it('folds the alternatives away, then shows each with its reason, rule and conversation', async () => {
+    render(
+      <MemoryRouter>
+        <ConfirmedFindingsPanel fileId="f1" answers={[answer('c2', { address: '141.98.10.79' })]} considered={considered} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId('considered-list')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Considered and ruled out \(1\)/ }));
+    const list = screen.getByTestId('considered-list');
+    expect(list).toHaveTextContent('45.125.66.40');
+    expect(list).toHaveTextContent('reached in one round');
+    expect(list).toHaveTextContent('Rule: Reputation alone never makes a C2.');
+    expect(within(list).getByRole('link', { name: /Conversation/ }).getAttribute('href')).toBe(
+      '/analysis/f1/conversations?highlight=conv-9',
+    );
+  });
+
+  it('shows the alternatives even when nothing was concluded', () => {
+    render(
+      <MemoryRouter>
+        <ConfirmedFindingsPanel answers={[]} considered={considered} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: /Considered and ruled out/ })).toBeInTheDocument();
   });
 });

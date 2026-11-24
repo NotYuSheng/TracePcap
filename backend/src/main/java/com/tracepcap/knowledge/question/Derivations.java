@@ -33,10 +33,7 @@ final class Derivations {
   static final String RULE_FINGERPRINT =
       "A stream that opens with a malware family's own check-in is that family's C2, even when no"
           + " rule fired.";
-  static final String RULE_SUSPECTED =
-      "Reputation alone never makes a C2. A listed server becomes a suspected C2 only when a host"
-          + " already talking to a confirmed C2 reaches it by bare IP, in repeated rounds (or seconds"
-          + " after another such server).";
+  static final String RULE_SUSPECTED = com.tracepcap.knowledge.contributor.C2Corroboration.SUSPECTED_RULE;
   static final String RULE_INSTALL_CHAIN =
       "A RAT checking in to a bare IP minutes after a script engine on the same host fetched a large"
           + " payload from another server is how it was planted: its server is treated as a C2.";
@@ -86,9 +83,7 @@ final class Derivations {
     return "weak-ticket".equals(technique)
         ? "A domain controller that issues AES tickets but gave this host an RC4 or DES one was asked"
             + " for the weak one: what Kerberoasting and Skeleton Key do. An RC4-only domain doesn't count."
-        : "Failing to sign in as five or more accounts within ten minutes is password guessing: mostly"
-            + " unknown names is user enumeration, mostly wrong passwords is spraying. \"Pre-authentication"
-            + " required\" starts every Windows sign-in and never counts.";
+        : com.tracepcap.knowledge.contributor.KerberosContributor.GUESSING_RULE;
   }
 
   private static final Pattern C2_RULE = Pattern.compile("(?i)\\b(CnC|C2|Command and Control)\\b");

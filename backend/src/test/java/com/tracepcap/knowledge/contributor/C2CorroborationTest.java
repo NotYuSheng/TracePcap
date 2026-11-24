@@ -133,4 +133,30 @@ class C2CorroborationTest {
     l.add(c("10.10.1.128", "51.89.1.1", 40, null, 9_000, "ET INFO AnyDesk Remote Desktop Software User-Agent (sid:1 sev:3)"));
     assertThat(C2Corroboration.find(l, Set.of())).isEmpty();
   }
+
+  @Test
+  void whatTheRuleRuledOut_saysWhichRequirementItFailed() {
+    // #1294: the same three misses as above, now with their reasons rather than silence.
+    List<ConversationFacts> l = new ArrayList<>(fakeSite(true).subList(0, 1));
+    l.add(c("10.1.17.215", "45.125.66.40", 900, null, 5_000, DROP)); // once only
+    l.add(c("10.1.17.215", "45.125.66.41", 900, "cdn.example.com", 5_000, DROP)); // has a name
+    l.add(c("10.1.17.216", "45.125.66.42", 900, null, 5_000, DROP)); // a host with no confirmed C2
+    C2Corroboration.Analysis a = C2Corroboration.analyse(l, Set.of("5.252.153.241"));
+    assertThat(a.escalations()).isEmpty();
+    assertThat(a.rejections()).extracting(C2Corroboration.Rejection::external, C2Corroboration.Rejection::reason)
+        .containsExactlyInAnyOrder(
+            org.assertj.core.groups.Tuple.tuple("45.125.66.40", "reached in one round, not in repeated rounds or seconds after a server that was"),
+            org.assertj.core.groups.Tuple.tuple("45.125.66.41", "it was reached by name, not as a bare IP"),
+            org.assertj.core.groups.Tuple.tuple("45.125.66.42", "10.1.17.216 never talked to a confirmed C2, so nothing says it is infected"));
+    assertThat(a.rejections()).allSatisfy(r -> {
+      assertThat(r.listedBy()).isEqualTo("Spamhaus DROP");
+      assertThat(r.conversations()).isNotEmpty();
+    });
+  }
+
+  @Test
+  void aServerTheRuleEscalated_isNotAlsoRuledOut() {
+    C2Corroboration.Analysis a = C2Corroboration.analyse(fakeSite(true), Set.of("5.252.153.241"));
+    assertThat(a.rejections()).isEmpty();
+  }
 }

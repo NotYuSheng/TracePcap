@@ -150,6 +150,13 @@ Investigation Summary shows them under **How we got here** on each answer, linki
 conversations. They are written by the checks as they run, so they can't drift from what the code
 did, and they are the answer to "it's deterministic, not the LLM": the reasoning is on screen.
 
+**What was ruled out.** Checks also record the candidates they tested and ruled out (#1294): a
+``Considered`` (the question, the candidate, the rule, the reason, its conversations) posted as a
+finding of category ``considered``, read back by ``InvestigationOrchestrator.considered``, which adds
+beacons whose server didn't end up a C2. The investigation report carries them, the Investigation
+Summary lists them under **Considered and ruled out**, and the narrative gets them as alternatives,
+marked so it can't promote one to a finding.
+
 **The agent** is one final, additive knowledge source. The narrator and the Q&A consume the board's
 answers as authoritative ground truth (named, never contradicted); the investigation loop is a
 ReAct-style tool loop over the capture. The agent narrates and answers ad-hoc questions — it never

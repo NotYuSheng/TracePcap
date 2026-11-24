@@ -59,6 +59,12 @@ public class KerberosContributor implements KnowledgeContributor {
   /** Failures this close together are one burst. Kerbrute's nine took seconds. */
   static final java.time.Duration WINDOW = java.time.Duration.ofMinutes(10);
 
+  /** The password-guessing rule in words, for a near miss (#1294) and an answer's steps alike. */
+  public static final String GUESSING_RULE =
+      "Failing to sign in as five or more accounts within ten minutes is password guessing: mostly"
+          + " unknown names is user enumeration, mostly wrong passwords is spraying. \"Pre-authentication"
+          + " required\" starts every Windows sign-in and never counts.";
+
   private final ObjectProvider<KerberosLookup> kerberos;
 
   public KerberosContributor(ObjectProvider<KerberosLookup> kerberos) {
@@ -105,7 +111,18 @@ public class KerberosContributor implements KnowledgeContributor {
       Set<String> all = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
       all.addAll(wrong);
       all.addAll(unknown);
-      if (all.size() < MIN_ACCOUNTS) return;
+      if (all.size() < MIN_ACCOUNTS) {
+        // Two to four: tested and short of the rule, worth saying so (#1294). One is a typo.
+        if (all.size() >= 2) {
+          board.addFinding(new com.tracepcap.knowledge.spi.Considered("kerberos-attack",
+                  pair.get(0) + " → " + pair.get(1), GUESSING_RULE,
+                  "failed to sign in as " + all.size() + " accounts (" + list(all) + ") within ten minutes;"
+                      + " " + MIN_ACCOUNTS + " are needed to call it password guessing.",
+                  conversations(errors))
+              .toFinding("suricata", List.of(EntityRef.host(pair.get(0)), EntityRef.host(pair.get(1)))));
+        }
+        return;
+      }
 
       List<String> lines = new ArrayList<>();
       if (!wrong.isEmpty()) lines.add("Wrong password for " + wrong.size() + " account" + plural(wrong.size()) + ": " + list(wrong));

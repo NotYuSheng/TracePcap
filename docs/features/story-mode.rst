@@ -11,6 +11,26 @@ command-and-control, malware, signed-in user) are shown directly and fed to the
 LLM as authoritative ground truth, so the narrative names what the deterministic
 layers already established rather than re-deriving a weaker picture from metrics.
 
+Alternatives considered
+-----------------------
+
+A good report says why the other candidates aren't the answer. The deterministic checks record the
+candidates they tested and ruled out, with the rule and the reason, and the narrator gets them as
+their own block, marked as ruled out: it may describe each as an alternative that was considered,
+never as a finding. When there are any, the narrative has an **Alternatives considered** section
+before its conclusion. Today these are:
+
+- a reputation-listed server (Spamhaus DROP, CINS…) that the suspected-C2 rule tested and didn't
+  escalate, with the requirement it failed: the host wasn't talking to a confirmed C2 (or reached it
+  before it did), the server was reached by name, or it was reached once rather than in rounds;
+- a beacon whose server didn't end up a C2: no rule named it and no known family's check-in was in
+  its stream;
+- a host that failed to sign in as two to four accounts within ten minutes, short of the five that
+  make password guessing.
+
+The same list is on the Overview's Investigation Summary, folded under **Considered and ruled out**,
+which also answers "did it even look at that server?".
+
 Requirements
 ------------
 

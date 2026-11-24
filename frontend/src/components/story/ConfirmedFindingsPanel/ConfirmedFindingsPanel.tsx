@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { Button, Card } from '@govtechsg/sgds-react';
-import type { Answer } from '@/types';
+import type { Answer, Considered } from '@/types';
 import { DerivationModal } from '../DerivationModal/DerivationModal';
 
 interface ConfirmedFindingsPanelProps {
@@ -13,6 +13,8 @@ interface ConfirmedFindingsPanelProps {
   unknowns?: string[];
   /** The capture, so an answer can link to its conversations; links are left out without it. */
   fileId?: string;
+  /** Candidates the checks tested and ruled out, with why (#1294). */
+  considered?: Considered[];
 }
 
 /** Human labels for the standing investigation goals, for the "not established" line. */
@@ -164,6 +166,56 @@ function HowWeGotHere({ answer, label, fileId }: { answer: Answer; label: string
   );
 }
 
+/**
+ * The candidates the checks tested and ruled out (#1294), folded away: the reputation-listed server
+ * that wasn't a C2, the beacon that matched no family. Answers "did it even look at X?".
+ */
+function ConsideredList({ items, fileId }: { items: Considered[]; fileId?: string }) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2">
+      <Button
+        type="button"
+        variant="link"
+        className="p-0 small text-decoration-none"
+        style={{ fontSize: '0.75rem' }}
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <i className={`bi ${open ? 'bi-chevron-down' : 'bi-chevron-right'} me-1`} aria-hidden="true" />
+        Considered and ruled out ({items.length})
+      </Button>
+      {open && (
+        <ul className="list-unstyled mb-0 mt-1 d-flex flex-column gap-2" data-testid="considered-list">
+          {items.map((c, i) => (
+            <li key={i} className="border rounded p-2" style={{ fontSize: '0.78rem', overflowWrap: 'anywhere' }}>
+              <div>
+                <span className="text-muted me-1">{QUESTION_META[c.question]?.label ?? c.question}:</span>
+                <strong>{c.candidate}</strong> — {c.reason}
+              </div>
+              {c.rule && (
+                <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>
+                  <strong>Rule:</strong> {c.rule}
+                </div>
+              )}
+              {fileId && c.conversations.length > 0 && (
+                <Link
+                  to={`/analysis/${fileId}/conversations?highlight=${encodeURIComponent(c.conversations[0])}`}
+                  className="small text-decoration-none"
+                  style={{ fontSize: '0.72rem' }}
+                >
+                  Conversation <i className="bi bi-arrow-right-short" aria-hidden="true" />
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** How many lines of evidence show before the rest fold away. */
 const BASIS_SHOWN = 4;
 
@@ -212,6 +264,7 @@ export const ConfirmedFindingsPanel = ({
   loading = false,
   unknowns = [],
   fileId,
+  considered = [],
 }: ConfirmedFindingsPanelProps) => {
   return (
     <Card>
@@ -302,6 +355,7 @@ export const ConfirmedFindingsPanel = ({
           )}
         </div>
         )}
+        {!loading && <ConsideredList items={considered} fileId={fileId} />}
       </Card.Body>
     </Card>
   );
