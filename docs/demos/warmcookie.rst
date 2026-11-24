@@ -58,8 +58,8 @@ Step 2 — The Investigation Summary is the report
    :alt: Investigation Summary for WarmCookie: victim, user, malware, C2 and two downloaded files
    :width: 60%
 
-   The Investigation Summary. The C2 tripped one rule 303 times; the evidence shows it once, with a
-   count.
+   The Investigation Summary. The C2's GET check-ins tripped one rule 303 times and its POSTs another
+   3 times; the evidence shows each rule once, with a count.
 
 .. list-table::
    :header-rows: 1

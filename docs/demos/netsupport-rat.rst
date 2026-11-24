@@ -71,7 +71,7 @@ Step 2 — The Investigation Summary
    * - Signed-in user
      - ``edward.winslow`` (Edward Winslow) on ``10.11.10.147``
      - MEASURED
-     - Kerberos sign-in
+     - Kerberos sign-in; full name from the domain controller
    * - Victim host
      - ``10.11.10.147``, which talked to the C2
      - INFERRED
@@ -99,9 +99,10 @@ alerts alone. What makes this one a RAT is how it arrived, and the capture holds
 
 - at 18:21:49 UTC a **script engine** (PowerShell's user agent) on ``10.11.10.147`` fetched from
   ``vericheckusgo.com`` (``96.62.224.200``);
-- that server then sent the host **6.3 MB** (``/5555.mp4``);
-- **8 seconds later**, NetSupport began checking in to a **bare IP address**, ``93.152.209.36``,
-  not a vendor domain, over plain HTTP on port 443, every 60 seconds for the next two hours.
+- at 18:21:58 that server sent the host **6.3 MB** (``/5555.mp4``), in about two seconds;
+- at 18:22:07, **8 seconds after that download began**, NetSupport began checking in to a **bare
+  IP address**, ``93.152.209.36``, not a vendor domain, over plain HTTP on port 443, every 60
+  seconds for the next two hours.
 
 That chain is a rule TracePcap applies: *a RAT checking in to a bare IP minutes after a script engine
 on the same host fetched a large payload from another server is how it was planted.* The **How we
@@ -123,9 +124,10 @@ Step 3 — The session
 
    Filtering Conversations to ``93.152.209.36``: **one** conversation, 256 packets from the opening
    SYN to the end, flagged *ET REMOTE_ACCESS NetSupport Remote Admin Checkin* and *Response*, and
-   *ET INFO HTTP traffic on port 443 (POST)*. Its IDS alerts read *252 fired · first 102 shown*: a
-   check-in every 60 seconds for two hours, with the records kept for the first 100 each way. Times on screen are in the server's zone (UTC+8 here): 02:22:07 on 11 November
-   is 18:22:07 UTC on the 10th.
+   *ET INFO HTTP traffic on port 443 (POST)*. Its IDS alerts read *252 fired · first 102 shown*:
+   alert records stop at 100 in each direction of a connection, so these are the first 100 on the
+   host's check-ins and the 2 on the server's replies. Times on screen are in the server's zone
+   (UTC+8 here): 02:22:07 on 11 November is 18:22:07 UTC on the 10th.
 
 Checked against the answer key
 ------------------------------
@@ -159,8 +161,8 @@ Checked against the answer key
      - ``edward.winslow``
      - ✓
 
-Every answer in the key, and TracePcap's own conclusions match it: the key's NetSupport RAT on
-``93.152.209.36`` is the C2 answer, reached without a malware rule.
+TracePcap matches every answer in the key, and its own conclusions agree with it: the key's
+NetSupport RAT on ``93.152.209.36`` is the C2 answer, reached without a malware rule.
 
 .. tip::
 

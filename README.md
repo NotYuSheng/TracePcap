@@ -142,6 +142,10 @@ malware-traffic-analysis.net's training exercises. Worked investigations, step b
 - [STRRAT infection: "You dirty rat!"](https://notyusheng.github.io/TracePcap/demos/strrat-you-dirty-rat.html), checked against the exercise's answer key
 - [Devices on a DHCP network: "Who was 10.0.0.50?"](https://notyusheng.github.io/TracePcap/demos/devices-on-a-dhcp-network.html)
 - [Two sites, one range: telling networks apart](https://notyusheng.github.io/TracePcap/demos/two-sites-one-range.html)
+- [WarmCookie backdoor: a full incident report](https://notyusheng.github.io/TracePcap/demos/warmcookie.html), with payload hashes matching the key
+- [Lumma Stealer: "Lumma in the Room-ah!"](https://notyusheng.github.io/TracePcap/demos/lumma-in-the-room-ah.html), including the user's full name
+- [Download from a fake software site](https://notyusheng.github.io/TracePcap/demos/fake-software-site.html): three C2s, no named family
+- [NetSupport RAT: "The Lucky Turkey"](https://notyusheng.github.io/TracePcap/demos/netsupport-rat.html): a RAT recognised from how it was installed
 
 ## How it works
 

@@ -183,7 +183,9 @@ Checked against the answer key
 **The PowerShell scripts.** ``29842.ps1`` and ``pas.ps1`` are plain text (``text/plain``), so their
 content doesn't say what they are. TracePcap also reads a script's file name (``.ps1``, ``.js``,
 ``.vbs``, ``.hta``, ``.bat``), so they count as downloads; the summary lists the three largest files
-from a server and folds the rest as *2 more files*, with all of them under Files.
+from a server and folds the rest as *2 more files*, with all of them under Files. The sixth file
+under Files, ``264872``, is a 417-byte text response with no script name, so it isn't counted as a
+download.
 
 **How the other two C2s are found.** The only alert on ``45.125.66.32`` and ``45.125.66.252`` is
 *ET DROP Spamhaus DROP Listed Traffic*: the addresses are in a netblock run by criminals. That's
