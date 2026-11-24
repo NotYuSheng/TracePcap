@@ -102,7 +102,13 @@ public class DataTransferQuestion implements StandardQuestion {
               Grade.INFERRED,
               List.of(r.from(), r.to()),
               List.of(megabytes(bytes) + " transferred; external org: " + (org != null ? org : "unknown")),
-              attrs));
+              attrs).withDerivation(List.of(
+                  com.tracepcap.knowledge.spi.Step.of(r.from().key() + (directional ? " sent " : " exchanged ")
+                      + megabytes(bytes) + (directional ? " to " : " with ") + r.to().key()
+                      + ", counted from the capture's own byte totals.", null, Grade.MEASURED),
+                  com.tracepcap.knowledge.spi.Step.of(r.to().key() + " belongs to " + where
+                      + " (offline GeoIP), which isn't a known CDN or cloud provider.",
+                      Derivations.RULE_TRANSFER, Grade.INFERRED))));
     }
     return answers;
   }

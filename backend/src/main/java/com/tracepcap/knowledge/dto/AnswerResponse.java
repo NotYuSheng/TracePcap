@@ -12,7 +12,14 @@ public record AnswerResponse(
     String grade,
     List<EntityRefDto> subjects,
     List<String> basis,
-    Map<String, Object> attributes) {
+    Map<String, Object> attributes,
+    List<StepResponse> derivation) {
+
+  /**
+   * One step in how the answer was reached (#1293): what was found, the rule applied to it (null
+   * for context), its grade, and the conversations it rests on.
+   */
+  public record StepResponse(String found, String rule, String grade, List<String> conversations) {}
 
   public static AnswerResponse from(Answer a) {
     return new AnswerResponse(
@@ -21,6 +28,9 @@ public record AnswerResponse(
         a.grade().name(),
         a.subjects().stream().map(EntityRefDto::from).toList(),
         a.basis(),
-        a.attributes());
+        a.attributes(),
+        a.derivation().stream()
+            .map(s -> new StepResponse(s.found(), s.rule(), s.grade().name(), s.conversations()))
+            .toList());
   }
 }

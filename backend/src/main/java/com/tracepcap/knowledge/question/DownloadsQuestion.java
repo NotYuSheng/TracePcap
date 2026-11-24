@@ -83,7 +83,9 @@ public class DownloadsQuestion implements StandardQuestion {
         Grade.MEASURED,
         f.concerns(),
         List.of(f.summary()),
-        new LinkedHashMap<>(a));
+        new LinkedHashMap<>(a)).withDerivation(List.of(new com.tracepcap.knowledge.spi.Step(
+            f.summary() + ", and its contents were hashed.", Derivations.RULE_DOWNLOAD, Grade.MEASURED,
+            f.evidence())));
   }
 
 

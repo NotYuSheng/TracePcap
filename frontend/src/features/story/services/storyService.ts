@@ -31,6 +31,7 @@ export function investigationToSummary(report: InvestigationReport): Investigati
       subjects: g.subjects,
       basis: g.basis,
       attributes: g.attributes ?? {},
+      derivation: g.derivation ?? [],
     }));
   const answers = [...goalAnswers, ...report.additional];
   // "Not established" is only meaningful once there is an incident to be incomplete about. On a

@@ -40,7 +40,11 @@ public class KerberosAttackQuestion implements StandardQuestion {
       }
       List<String> basis = new ArrayList<>();
       if (a.get("operations") instanceof List<?> l) l.forEach(x -> basis.add(String.valueOf(x)));
-      answers.add(new Answer(QUESTION, headline(a), Grade.MEASURED, f.concerns(), basis, attrs));
+      answers.add(new Answer(QUESTION, headline(a), Grade.MEASURED, f.concerns(), basis, attrs)
+          .withDerivation(List.of(new com.tracepcap.knowledge.spi.Step(
+              f.summary() + (basis.isEmpty() ? "" : ": " + String.join("; ", basis)) + ".",
+              Derivations.kerberosRule(String.valueOf(a.get("technique"))), Grade.MEASURED,
+              f.evidence()))));
     }
     return answers;
   }

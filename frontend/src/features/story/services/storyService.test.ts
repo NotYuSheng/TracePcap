@@ -30,6 +30,17 @@ describe('investigationToSummary', () => {
     expect(unknowns).toEqual([]);
   });
 
+  it("keeps a goal's derivation, so its walkthrough shows on the Overview (#1293)", () => {
+    const step = { found: 'Suricata rule fired.', rule: 'A rule naming a server makes it a C2.', grade: 'INFERRED', conversations: ['c1'] };
+    const report: InvestigationReport = {
+      goals: [{ ...goal('C2', true, '141.98.10.79 — C2', 'INFERRED'), derivation: [step] }],
+      additional: [],
+      unknowns: [],
+      coverage: [],
+    };
+    expect(investigationToSummary(report).answers[0].derivation).toEqual([step]);
+  });
+
   it('omits open goals from the answers and reports them as unknowns once there is an incident', () => {
     const report: InvestigationReport = {
       goals: [

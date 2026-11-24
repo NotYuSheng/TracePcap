@@ -28,7 +28,8 @@ public record InvestigationReportResponse(
       int confidence,
       List<String> basis,
       List<EntityRefDto> subjects,
-      java.util.Map<String, Object> attributes) {
+      java.util.Map<String, Object> attributes,
+      List<AnswerResponse.StepResponse> derivation) {
 
     public static GoalOutcomeDto from(InvestigationReport.GoalOutcome o) {
       return new GoalOutcomeDto(
@@ -39,7 +40,10 @@ public record InvestigationReportResponse(
           o.confidence(),
           o.basis(),
           o.subjects().stream().map(EntityRefDto::from).toList(),
-          o.attributes());
+          o.attributes(),
+          o.derivation().stream()
+              .map(s -> new AnswerResponse.StepResponse(s.found(), s.rule(), s.grade().name(), s.conversations()))
+              .toList());
     }
   }
 }

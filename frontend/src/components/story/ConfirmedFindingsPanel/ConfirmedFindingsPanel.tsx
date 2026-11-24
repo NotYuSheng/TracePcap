@@ -4,6 +4,7 @@ import { InfoPopover } from '@components/common/InfoPopover';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { Button, Card } from '@govtechsg/sgds-react';
 import type { Answer } from '@/types';
+import { DerivationModal } from '../DerivationModal/DerivationModal';
 
 interface ConfirmedFindingsPanelProps {
   answers: Answer[];
@@ -142,6 +143,27 @@ const QUESTION_META: Record<string, { label: string; icon: string }> = {
   downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
 };
 
+/** The answer's "How we got here" button and the walkthrough it opens (#1293). */
+function HowWeGotHere({ answer, label, fileId }: { answer: Answer; label: string; fileId?: string }) {
+  const [show, setShow] = useState(false);
+  if (!answer.derivation || answer.derivation.length === 0) return null;
+  return (
+    <>
+      <Button
+        type="button"
+        variant="link"
+        className="p-0 small text-decoration-none"
+        style={{ fontSize: '0.72rem' }}
+        onClick={() => setShow(true)}
+      >
+        <i className="bi bi-signpost-split me-1" aria-hidden="true" />
+        How we got here
+      </Button>
+      <DerivationModal answer={answer} label={label} show={show} onHide={() => setShow(false)} fileId={fileId} />
+    </>
+  );
+}
+
 /** How many lines of evidence show before the rest fold away. */
 const BASIS_SHOWN = 4;
 
@@ -249,15 +271,18 @@ export const ConfirmedFindingsPanel = ({
                         id={String(i)}
                       />
                     )}
+                    <span className="ms-auto d-inline-flex align-items-center gap-2">
+                    <HowWeGotHere answer={a} label={meta.label} fileId={fileId} />
                     {fileId && answerAddress(a) && (
                       <Link
                         to={`/analysis/${fileId}/conversations?ip=${encodeURIComponent(answerAddress(a)!)}`}
-                        className="ms-auto small text-decoration-none"
+                        className="small text-decoration-none"
                         style={{ fontSize: '0.72rem' }}
                       >
                         Conversations <i className="bi bi-arrow-right-short" aria-hidden="true" />
                       </Link>
                     )}
+                    </span>
                   </div>
                   {/* URLs and hashes have no spaces: let them wrap rather than run out of the card. */}
                   <div style={{ fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{a.headline}</div>

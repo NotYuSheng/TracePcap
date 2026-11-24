@@ -126,7 +126,7 @@ public class InvestigationOrchestrator {
         representing.add(a);
         outcomes.add(new GoalOutcome(
             goal, true, a.headline(), a.grade(), confidenceFor(a.grade()), a.basis(), a.subjects(),
-            a.attributes()));
+            a.attributes(), a.derivation()));
       }
     }
     // Every answer that is not the one representing a goal still belongs in the report: a non-goal

@@ -630,6 +630,19 @@ export interface Answer {
   subjects: AnswerEntityRef[];
   basis: string[];
   attributes: Record<string, unknown>;
+  /** How the answer was reached, step by step (#1293). Older servers send none. */
+  derivation?: DerivationStep[];
+}
+
+/**
+ * One step in how an answer was reached (#1293): what was found, the rule that took it to the next
+ * claim (null for context), how directly it's known, and the conversations it rests on.
+ */
+export interface DerivationStep {
+  found: string;
+  rule: string | null;
+  grade: 'MEASURED' | 'REPORTED' | 'INFERRED' | string;
+  conversations: string[];
 }
 
 /** One standing goal's outcome in the autonomous investigation (#819). */
@@ -643,6 +656,8 @@ export interface GoalOutcome {
   subjects: AnswerEntityRef[];
   /** The answer's structured detail (a C2's address, how it was concluded); absent from older backends. */
   attributes?: Record<string, unknown>;
+  /** How the answer was reached (#1293); absent from older backends. */
+  derivation?: DerivationStep[];
 }
 
 /**

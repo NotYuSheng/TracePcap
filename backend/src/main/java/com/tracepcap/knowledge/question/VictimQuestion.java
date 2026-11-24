@@ -59,8 +59,28 @@ public class VictimQuestion implements StandardQuestion {
           host.key()
               + " — contacted a known malware C2"
               + (user != null ? " (signed in as " + user + ")" : "");
+      List<com.tracepcap.knowledge.spi.Step> steps = new ArrayList<>();
+      for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
+        if (!basis.contains("contacted C2 " + c2of.from().key())) continue;
+        String fam = EntityRef.UNIDENTIFIED_MALWARE.equals(c2of.to().key()) ? "unidentified malware" : c2of.to().key();
+        String found = c2of.from().key() + " is a command-and-control server for " + fam
+            + " (the command & control answer shows how).";
+        if (steps.stream().noneMatch(s -> s.found().equals(found))) {
+          steps.add(com.tracepcap.knowledge.spi.Step.of(found, null, Grade.INFERRED));
+        }
+      }
+      for (String b : basis) {
+        EntityRef c2 = EntityRef.external(b.substring("contacted C2 ".length()));
+        steps.add(new com.tracepcap.knowledge.spi.Step(host.key() + " talked to " + c2.key() + ".",
+            Derivations.RULE_VICTIM, Grade.INFERRED, Derivations.conversationsBetween(board, host, c2)));
+      }
+      if (user != null) {
+        steps.add(com.tracepcap.knowledge.spi.Step.of(host.key() + " was signed in as " + user
+            + " (the signed-in user answer shows how).", null, Grade.MEASURED));
+      }
       answers.add(
-          new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), new ArrayList<>(basis), attrs));
+          new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), new ArrayList<>(basis), attrs)
+              .withDerivation(steps));
     });
     return answers;
   }
