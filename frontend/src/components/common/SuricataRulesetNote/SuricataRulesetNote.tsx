@@ -33,6 +33,13 @@ export function SuricataRulesetNote({ className }: { className?: string }) {
           Older than {s.staleAfterDays} days: recent threats may be missed
         </Badge>
       )}
+      {s.loadedRuleCount === 0 && (
+        <span className="d-block text-danger mt-1" data-testid="suricata-no-rules">
+          <i className="bi bi-exclamation-octagon me-1" aria-hidden="true" />
+          Suricata loaded no rules on its last run, so captures get no IDS alerts. A clean result
+          here doesn&apos;t mean the traffic is clean: check the backend log.
+        </span>
+      )}
       {s.importError && (
         <span className="d-block text-warning-emphasis mt-1" data-testid="suricata-import-error">
           <i className="bi bi-exclamation-triangle me-1" aria-hidden="true" />

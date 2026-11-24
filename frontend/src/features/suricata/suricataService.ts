@@ -12,6 +12,10 @@ export interface SuricataStatus {
   stale: boolean;
   staleAfterDays: number;
   ruleCount: number;
+  /** Rules the engine reported loading on its last start; null until it has run (#1269). */
+  loadedRuleCount?: number | null;
+  /** Rules Suricata reported failing to parse on its last start; null until it has run. */
+  failedRuleCount?: number | null;
   importDir?: string | null;
   /** Why the last bundle in the import folder wasn't used, or null. */
   importError?: string | null;

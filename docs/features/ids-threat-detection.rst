@@ -12,6 +12,15 @@ tap and no network egress. The **Emerging Threats Open** ruleset is bundled
 into the backend Docker image at build time, so detection works fully offline
 with no runtime rule downloads.
 
+The image ships **Suricata 8.0** from OISF's ``suricata-8.0`` Ubuntu PPA (Ubuntu
+22.04's own package is 6.0.4, an end-of-life line), with the ET Open ruleset
+published for that engine version. Captures are fed to a long-running engine
+over its Unix socket, so the ruleset is built once rather than per capture;
+compiled rule groups are cached in ``/opt/suricata-cache`` so a restarted engine
+starts faster. That engine runs with ``security.limit-noproc`` off: Suricata 7+
+otherwise sets its own process limit to zero once started, and in socket mode
+that stops it starting a worker for each capture.
+
 How it works
 ------------
 
@@ -86,8 +95,9 @@ IDS Alerts appear wherever conversations are shown:
 
 - **Conversation list** — a purple **IDS Alerts** column shows the matched
   signatures as badges (long labels are truncated with a tooltip).
-- **Conversation detail** — the full list of alert signatures for that
-  conversation.
+- **Conversation detail** — each alert as it fired: when, on which side, the
+  rule's rating and confidence, and the HTTP request it fired on (see
+  :doc:`conversations`).
 - **Security alert count** — Suricata matches contribute to the per-conversation
   security-alert total alongside nDPI risk flags.
 - **CSV export** — the ``suricataAlerts`` column is included in conversation CSV
@@ -125,7 +135,12 @@ older than ``SURICATA_RULESET_STALE_DAYS`` (default 30) it's flagged.
 
 The same information is at ``GET /api/v1/system/suricata``: the engine version,
 ``source`` (``built-in`` or ``imported``), the ruleset's date and age, ``stale``,
-the number of rules, and ``importError`` if an imported bundle wasn't used.
+the number of rules in the ruleset, ``loadedRuleCount`` / ``failedRuleCount``
+(what the engine reported loading on its last start), and ``importError`` if an
+imported bundle wasn't used. A ``loadedRuleCount`` of 0 means Suricata can't see
+the ruleset, so no capture gets IDS alerts; the app logs an error and the note
+beside the alerts says so, since a capture without alerts would otherwise look
+clean.
 
 Using a newer ruleset offline
 -----------------------------
@@ -134,7 +149,10 @@ To update the rules without rebuilding the image (the usual case for an
 air-gapped install):
 
 1. On any machine with internet, download ET Open's
-   ``emerging.rules.tar.gz`` from https://rules.emergingthreats.net/open/suricata/.
+   ``emerging.rules.tar.gz`` for the engine's version, e.g.
+   https://rules.emergingthreats.net/open/suricata-8.0.8/ for Suricata 8.0.8 (the
+   version is on ``GET /api/v1/system/suricata``). The unversioned
+   ``open/suricata/`` path is an older, 5.0-era ruleset.
    One or more ``.rules`` files work too, with ``classification.config`` and
    ``reference.config`` alongside if you have them.
 2. Copy it into the ``suricata-rules/`` folder next to ``docker-compose.yml``

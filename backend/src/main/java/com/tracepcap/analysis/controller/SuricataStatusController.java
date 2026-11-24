@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SuricataStatusController {
 
   private final SuricataRuleset ruleset;
+  private final com.tracepcap.analysis.service.SuricataEngine engine;
 
   @GetMapping
   @Operation(
@@ -34,6 +35,8 @@ public class SuricataStatusController {
         .stale(s.stale())
         .staleAfterDays(s.staleAfterDays())
         .ruleCount(s.ruleCount())
+        .loadedRuleCount(engine.lastLoad().loaded())
+        .failedRuleCount(engine.lastLoad().failed())
         .importDir(s.importDir())
         .importError(s.importError())
         .build();

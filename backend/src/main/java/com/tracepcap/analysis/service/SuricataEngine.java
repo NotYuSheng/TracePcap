@@ -141,6 +141,57 @@ public class SuricataEngine implements DetectionEngineStatus {
   }
 
   /**
+   * What Suricata reported loading (#1269), read from its own log: a ruleset it can't find still
+   * starts an engine and exits 0, and every capture then looks clean. {@code loaded} is null until a
+   * run has reported.
+   */
+  public record LoadReport(Integer loaded, Integer failed) {
+    public boolean noRules() {
+      return loaded != null && loaded == 0;
+    }
+  }
+
+  private static final java.util.regex.Pattern LOADED =
+      java.util.regex.Pattern.compile("(\\d+) rules successfully loaded, (\\d+) rules failed");
+
+  private volatile LoadReport lastLoad = new LoadReport(null, null);
+
+  /** The last load Suricata reported, from the warm engine or a per-file run. */
+  public LoadReport lastLoad() {
+    return lastLoad;
+  }
+
+  /** Reads Suricata's load line from a log; "no rules were loaded" is zero. Null when absent. */
+  static LoadReport parseLoad(String logText) {
+    if (logText == null) return null;
+    java.util.regex.Matcher m = LOADED.matcher(logText);
+    LoadReport r = null;
+    while (m.find()) r = new LoadReport(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
+    if (r == null && logText.contains("no rules were loaded")) r = new LoadReport(0, 0);
+    return r;
+  }
+
+  /**
+   * Records a run's load report from its log file, and says so loudly when no rules loaded: the
+   * analysis then has no IDS alerts at all, which looks exactly like a clean capture.
+   */
+  void recordLoad(Path logFile, String which) {
+    try {
+      if (!Files.exists(logFile)) return;
+      LoadReport r = parseLoad(Files.readString(logFile));
+      if (r == null) return;
+      lastLoad = r;
+      if (r.noRules()) {
+        log.error(
+            "Suricata ({}) loaded no rules: IDS alerts will be missing from every capture. Check the"
+                + " rule path in suricata.yaml against the ruleset (log: {})", which, logFile);
+      }
+    } catch (IOException e) {
+      log.debug("Could not read Suricata's log {}: {}", logFile, e.getMessage());
+    }
+  }
+
+  /**
    * Starts the engine if it is not already running, and waits for it to accept commands.
    *
    * <p>Called lazily rather than at boot: an application that never analyses a capture should not
@@ -182,6 +233,12 @@ public class SuricataEngine implements DetectionEngineStatus {
                   "single",
                   "--set",
                   "default-log-dir=" + engineLogDir.toAbsolutePath(),
+                  // Suricata 7+ sets RLIMIT_NPROC to 0 once initialised, to stop it forking. Linux
+                  // counts threads against that limit, and socket mode starts a worker thread per
+                  // capture afterwards, so every pcap-file failed with pthread_create EAGAIN (#1269).
+                  // The engine never runs anything but this app's captures.
+                  "--set",
+                  "security.limit-noproc=false",
                   "--set",
                   SuricataService.JA3_ON));
       // The active ruleset (#600): nothing extra for the built-in one, -S for an imported one.
@@ -203,6 +260,7 @@ public class SuricataEngine implements DetectionEngineStatus {
         }
         if (isResponsive()) {
           log.info("Warm Suricata engine ready");
+          recordLoad(engineLogDir.resolve("engine.log"), "warm engine");
           warm = true;
           return true;
         }
