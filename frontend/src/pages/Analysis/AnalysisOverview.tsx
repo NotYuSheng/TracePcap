@@ -99,6 +99,10 @@ export const AnalysisOverview = () => {
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [considered, setConsidered] = useState<Considered[]>([]);
+  // Whether the investigation came back: until then (or if it failed) no question is called open.
+  const [investigationLoaded, setInvestigationLoaded] = useState(false);
+  // Every application in the capture, when the Overview's own list was cut to its top ones.
+  const [allApps, setAllApps] = useState<string[] | null>(null);
   const [activity, setActivity] = useState<TimelineDataPoint[]>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const { tops: hostTops } = useHostGroups(fileId, data);
@@ -183,11 +187,13 @@ export const AnalysisOverview = () => {
         setAnswers(s.answers);
         setUnknowns(s.unknowns);
         setConsidered(s.considered);
+        setInvestigationLoaded(true);
       })
       .catch(() => {
         setAnswers([]);
         setUnknowns([]);
         setConsidered([]);
+        setInvestigationLoaded(false);
       });
     if (networkContext) {
       conversationService
@@ -202,6 +208,20 @@ export const AnalysisOverview = () => {
   const triggeredRules = networkContext ? networkTriggered : (data.triggeredCustomRules ?? []);
 
   const detectedApps = data.detectedApplications ?? [];
+
+  // Worth a look matches every application (#1292): when the list above was cut to the top ones, a
+  // small Kerberos or AnyDesk flow could fall off and take its question with it.
+  const appsTruncated = !!data.detectedApplicationsTruncated;
+  useEffect(() => {
+    if (!fileId || !appsTruncated) {
+      setAllApps(null);
+      return;
+    }
+    apiClient
+      .get<string[]>(API_ENDPOINTS.DISTINCT_APPS(fileId))
+      .then(r => setAllApps(r.data))
+      .catch(() => setAllApps(null));
+  }, [fileId, appsTruncated]);
 
   // "26m 12s" for a short capture; days, months or years past two days, not "8846328m 29s".
   const durationText = formatDuration(data.timeRange ? data.timeRange[1] - data.timeRange[0] : 0);
@@ -515,8 +535,9 @@ export const AnalysisOverview = () => {
             <WorthALookCard
               fileId={fileId}
               l7Protocols={data.detectedL7Protocols ?? []}
-              apps={detectedApps.map(a => a.name)}
-              answeredQuestions={answers.map(a => a.question)}
+              apps={allApps ?? detectedApps.map(a => a.name)}
+              answeredQuestions={investigationLoaded ? answers.map(a => a.question) : null}
+              ruledOutQuestions={considered.map(c => c.question)}
             />
           )}
 

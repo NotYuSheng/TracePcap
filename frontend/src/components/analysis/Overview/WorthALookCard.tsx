@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
+import { Badge } from '@govtechsg/sgds-react';
 import { SourceTag } from './SourceTag';
 import { worthALook } from '@/features/insights/protocolInsights';
 
 const STATUS: Record<string, { label: string; bg: string } | undefined> = {
-  answered: { label: 'Answered', bg: '#198754' },
-  open: { label: 'Open', bg: '#6c757d' },
-  context: undefined,
+  answered: { label: 'Answered', bg: 'success' },
+  'ruled-out': { label: 'Ruled out', bg: 'secondary' },
+  open: { label: 'Open', bg: 'warning' },
 };
 
 /**
@@ -18,14 +19,17 @@ export function WorthALookCard({
   l7Protocols,
   apps,
   answeredQuestions,
+  ruledOutQuestions = [],
 }: {
   fileId: string;
   l7Protocols: string[];
   apps: string[];
-  /** The standard-question keys answered for this capture ("c2", "signed-in-user"). */
-  answeredQuestions: string[];
+  /** The standard-question keys answered ("c2", "signed-in-user"); null until the investigation is in. */
+  answeredQuestions: string[] | null;
+  /** The questions with candidates tested and ruled out (#1294). */
+  ruledOutQuestions?: string[];
 }) {
-  const groups = worthALook(l7Protocols, apps, answeredQuestions);
+  const groups = worthALook(l7Protocols, apps, answeredQuestions, ruledOutQuestions);
   if (groups.length === 0) return null;
   return (
     <section className="ov-card" aria-labelledby="ov-worth">
@@ -38,9 +42,10 @@ export function WorthALookCard({
             servers a host reached. This lists the ones present in this capture, by question.
           </p>
           <p className="mb-0">
-            <strong>Answered</strong>: the Investigation Summary has an answer. <strong>Open</strong>:
-            nothing was concluded, so these are where to look. Questions without any of their
-            protocols here are left out.
+            <strong>Answered</strong>: the Investigation Summary has an answer. <strong>Ruled
+            out</strong>: candidates were tested and ruled out (listed in the Summary).{' '}
+            <strong>Open</strong>: nothing was concluded, so these are where to look. Questions
+            without any of their protocols here are left out.
           </p>
         </SourceTag>
       </div>
@@ -53,9 +58,9 @@ export function WorthALookCard({
                 <i className={`bi ${g.icon} text-muted`} aria-hidden="true" />
                 <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>{g.label}</span>
                 {s && (
-                  <span style={{ fontSize: 9, fontWeight: 600, color: '#fff', background: s.bg, borderRadius: 3, padding: '1px 5px' }}>
+                  <Badge bg={s.bg} style={{ fontSize: 9 }}>
                     {s.label}
-                  </span>
+                  </Badge>
                 )}
               </div>
               <ul className="list-unstyled mb-0 ps-4 d-flex flex-column gap-1" style={{ fontSize: '0.8rem' }}>

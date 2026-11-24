@@ -69,7 +69,8 @@ export const QUESTION_INSIGHTS: QuestionInsights[] = [
     key: 'c2',
     label: 'Command & control and malware',
     icon: 'bi-broadcast-pin',
-    answeredBy: ['c2', 'malware', 'victim'],
+    // Not the victim: naming the host says nothing about which server it reached.
+    answeredBy: ['c2', 'malware'],
     insights: [
       { label: 'DNS', l7: ['DNS'], apps: ['DNS'], shows: 'every name a host looked up, a C2’s domain included' },
       { label: 'TLS', l7: ['TLS'], apps: ['TLS'], byL7: true, shows: 'server names, certificates and JA3/JA4 fingerprints, even though the content is encrypted' },
@@ -113,7 +114,7 @@ export const QUESTION_INSIGHTS: QuestionInsights[] = [
     icon: 'bi-arrow-up-right-circle',
     answeredBy: ['data-transfer'],
     insights: [
-      { label: 'Mail', l7: ['SMTP', 'IMAP', 'POP'], apps: ['SMTP', 'SMTPS', 'IMAP', 'IMAPS', 'POP3'], shows: 'mail sent and fetched, attachments included' },
+      { label: 'Mail', l7: ['SMTP', 'IMAP', 'POP'], apps: ['SMTP', 'SMTPS', 'IMAP', 'IMAPS', 'POP3', 'POPS'], shows: 'mail sent and fetched, attachments included' },
       { ...FTP, shows: 'files sent out over FTP' },
     ],
   },
@@ -137,8 +138,6 @@ export const QUESTION_INSIGHTS: QuestionInsights[] = [
 export interface PresentInsight {
   label: string;
   shows: string;
-  /** The names this capture has it under, for the chip's title. */
-  seenAs: string[];
   /** Conversations URL query, e.g. "l7Protocols=KERBEROS". */
   query: string;
 }
@@ -147,8 +146,11 @@ export interface WorthALookGroup {
   key: string;
   label: string;
   icon: string;
-  /** answered: the Investigation Summary has it; open: nothing concluded; context: not a question answers. */
-  status: 'answered' | 'open' | 'context';
+  /**
+   * answered: the Investigation Summary has it; ruled-out: its candidates were tested and ruled out;
+   * open: nothing concluded; context: no question answers it; unknown: the investigation isn't in.
+   */
+  status: 'answered' | 'ruled-out' | 'open' | 'context' | 'unknown';
   items: PresentInsight[];
 }
 
@@ -159,11 +161,14 @@ export interface WorthALookGroup {
 export function worthALook(
   l7Protocols: string[],
   apps: string[],
-  answeredQuestions: string[],
+  /** Null while the investigation is loading or when it failed: no status is claimed then. */
+  answeredQuestions: string[] | null,
+  ruledOutQuestions: string[] = [],
 ): WorthALookGroup[] {
   const l7 = new Map(l7Protocols.map(p => [p.toUpperCase(), p]));
   const app = new Map(apps.map(a => [a.toLowerCase(), a]));
-  const answered = new Set(answeredQuestions);
+  const answered = new Set(answeredQuestions ?? []);
+  const ruledOut = new Set(ruledOutQuestions);
   const groups: WorthALookGroup[] = [];
   for (const q of QUESTION_INSIGHTS) {
     const items: PresentInsight[] = [];
@@ -175,11 +180,13 @@ export function worthALook(
       const query = useL7
         ? `l7Protocols=${encodeURIComponent(viaL7.join(','))}`
         : `apps=${encodeURIComponent(viaApp.join(','))}`;
-      items.push({ label: i.label, shows: i.shows, seenAs: [...viaL7, ...viaApp], query });
+      items.push({ label: i.label, shows: i.shows, query });
     }
     if (items.length === 0) continue;
     const status = q.answeredBy.length === 0 ? 'context'
-      : q.answeredBy.some(k => answered.has(k)) ? 'answered' : 'open';
+      : answeredQuestions === null ? 'unknown'
+        : q.answeredBy.some(k => answered.has(k)) ? 'answered'
+          : q.answeredBy.some(k => ruledOut.has(k)) ? 'ruled-out' : 'open';
     groups.push({ key: q.key, label: q.label, icon: q.icon, status, items });
   }
   return groups;

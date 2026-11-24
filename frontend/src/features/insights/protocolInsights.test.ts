@@ -34,6 +34,17 @@ describe('worthALook (#1292)', () => {
     expect(groups[0].items[0].query).toBe('apps=AnyDesk');
   });
 
+  it('calls nothing open before the investigation is in, and a question with ruled-out candidates ruled out', () => {
+    expect(worthALook(STRRAT_L7, STRRAT_APPS, null).filter(g => g.key !== 'machine').map(g => g.status))
+      .toEqual(expect.arrayContaining(['unknown']));
+    expect(worthALook(STRRAT_L7, STRRAT_APPS, null).some(g => g.status === 'open')).toBe(false);
+    expect(worthALook(STRRAT_L7, STRRAT_APPS, [], ['kerberos-attack']).find(g => g.key === 'accounts')?.status).toBe('ruled-out');
+  });
+
+  it('doesn’t count the victim as an answer for command and control', () => {
+    expect(worthALook(STRRAT_L7, STRRAT_APPS, ['victim']).find(g => g.key === 'c2')?.status).toBe('open');
+  });
+
   it('returns nothing for a capture with none of the catalogue’s protocols', () => {
     expect(worthALook(['NTP', 'SSDP'], ['Microsoft'], [])).toEqual([]);
   });

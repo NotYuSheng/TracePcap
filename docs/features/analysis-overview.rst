@@ -53,8 +53,10 @@ What Needs a Look (right)
   is signed in*, DHCP and NetBIOS for *which machine it is*, DNS, TLS and HTTP for *command and
   control*, SMB, DCE-RPC and RDP for *lateral movement*, Kerberos and NTLM for *account attacks*,
   mail and FTP for *data leaving*, remote-control tools for *remote access*. A question the
-  Investigation Summary answered is marked **Answered**; one nothing concluded is **Open**, so its
-  protocols are where to look. Questions with none of their protocols in the capture are left out.
+  Investigation Summary answered is marked **Answered**; one whose candidates were tested and ruled out
+  is **Ruled out**; one nothing concluded is **Open**, so its protocols are where to look. No status
+  shows until the investigation has loaded. Questions with none of their protocols in the capture are
+  left out; every application counts, not only the top ones the Overview lists.
 - **Applications detected** (from nDPI) and **Dissected protocols** (from
   tshark). Click a badge for its details.
 
