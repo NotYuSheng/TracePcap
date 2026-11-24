@@ -35,7 +35,7 @@ export interface paths {
          * One job's progress or result
          * @description WAITING with its place in line, RUNNING, then DONE with the result or FAILED with why.
          */
-        get: operations["get_4"];
+        get: operations["get_5"];
         put?: never;
         post?: never;
         delete?: never;
@@ -731,7 +731,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get one detection rule */
-        get: operations["get_3"];
+        get: operations["get_4"];
         /** Replace a detection rule (audited; bumps its version if anything changed) */
         put: operations["update"];
         post?: never;
@@ -927,7 +927,7 @@ export interface paths {
             cookie?: never;
         };
         /** The human override for a question about an entity, if one is set */
-        get: operations["get_2"];
+        get: operations["get_3"];
         /** Set or replace the human override; re-runs adjudication (actor from token) */
         put: operations["put_1"];
         post?: never;
@@ -947,6 +947,26 @@ export interface paths {
         };
         /** Deterministic answers to the standard investigation questions for a file */
         get: operations["getAnswers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/capture-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How complete a capture is
+         * @description Connections already open when the capture began, gaps in TCP streams, undecodable packets, and sessions Suricata stopped inspecting, as plain-language notes. Suricata's counters are null for captures it didn't run on (or analysed before they were kept).
+         */
+        get: operations["get_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3258,6 +3278,26 @@ export interface components {
             /** Format: uuid */
             snapshotId?: string;
         };
+        CaptureQualityResponse: {
+            /** Format: int64 */
+            invalidPackets?: number;
+            /** Format: int64 */
+            memcapDrops?: number;
+            notes?: components["schemas"]["Note"][];
+            /** Format: int64 */
+            packets?: number;
+            /** Format: int64 */
+            reassemblyGaps?: number;
+            /** Format: int64 */
+            streamDepthReached?: number;
+            /** Format: int64 */
+            tcpConversations?: number;
+            /** Format: int64 */
+            tcpSessions?: number;
+            /** Format: int64 */
+            tcpWithoutHandshake?: number;
+            verdict?: string;
+        };
         CaseKnowledgeResponse: {
             entities?: components["schemas"]["EntityDto"][];
             findings?: components["schemas"]["FindingDto"][];
@@ -3430,6 +3470,7 @@ export interface components {
             topFailedTargets?: components["schemas"]["FailedTarget"][];
         };
         ConversationDetailResponse: {
+            anomalies?: components["schemas"]["ProtocolAnomaly"][];
             appName?: string;
             /** Format: int64 */
             bytesDstToSrc?: number;
@@ -4524,6 +4565,11 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        Note: {
+            kind?: string;
+            level?: string;
+            text?: string;
+        };
         Occupancy: {
             automatic?: boolean;
             boundaryKey?: string;
@@ -4730,6 +4776,15 @@ export interface components {
             layer?: string;
             name?: string;
             version?: string;
+        };
+        ProtocolAnomaly: {
+            appProto?: string;
+            event?: string;
+            layer?: string;
+            srcIp?: string;
+            /** Format: date-time */
+            time?: string;
+            type?: string;
         };
         ProtocolCaptureDto: {
             /** Format: int64 */
@@ -5409,7 +5464,7 @@ export interface operations {
             };
         };
     };
-    get_4: {
+    get_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -6421,7 +6476,7 @@ export interface operations {
             };
         };
     };
-    get_3: {
+    get_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -6870,7 +6925,7 @@ export interface operations {
             };
         };
     };
-    get_2: {
+    get_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -6971,6 +7026,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnswerResponse"][];
+                };
+            };
+        };
+    };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CaptureQualityResponse"];
                 };
             };
         };

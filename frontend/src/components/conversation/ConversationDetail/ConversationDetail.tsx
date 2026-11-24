@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity, IdsAlert, TlsCertificate } from '@/types';
 import { groupIdsAlerts } from './idsAlertGroups';
+import { anomalyWords, groupAnomalies } from './anomalyWords';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
@@ -633,6 +634,24 @@ export const ConversationDetail = ({
                   />
                 </MetaGroup>
               </div>
+            )}
+
+            {(conversation.anomalies?.length ?? 0) > 0 && (
+              <MetaGroup title="Protocol anomalies" note="malformed or one-sided traffic, not attacks">
+                <ul className="list-unstyled mb-0 d-flex flex-column gap-1" data-testid="protocol-anomalies">
+                  {groupAnomalies(conversation.anomalies!).map((g, i) => (
+                    <li key={i} style={{ fontSize: '0.8rem' }}>
+                      {anomalyWords(g.first.event)}
+                      <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+                        {' '}
+                        {[g.first.appProto, g.first.event, g.count > 1 ? `${g.count}×` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </MetaGroup>
             )}
 
             {(conversation.srcGeo?.countryCode || conversation.dstGeo?.countryCode ||

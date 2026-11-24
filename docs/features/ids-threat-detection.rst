@@ -103,6 +103,37 @@ IDS Alerts appear wherever conversations are shown:
 - **CSV export** — the ``suricataAlerts`` column is included in conversation CSV
   exports.
 
+Capture completeness
+~~~~~~~~~~~~~~~~~~~~
+
+No alert is only reassuring if Suricata saw the traffic. The Overview's
+**Needs a look** card adds a *Capture completeness* note whenever something
+limits that, using Suricata's own counters for the run and TracePcap's
+conversations (also at ``GET /api/v1/files/{fileId}/capture-quality``):
+
+- **Suricata couldn't read the capture** (warning): it read far fewer packets
+  than the file holds. A pcapng that mixes link types (several interfaces in one
+  file) does this: Suricata reads nothing and reports success. See issue #1273.
+- **Gaps in TCP streams** (warning): packets are missing from the capture, so
+  alerts and files in those streams can be missed.
+- **Suricata ran out of memory** (warning): some traffic wasn't inspected.
+- **Connections already open when the capture began** (over 10% of TCP): how
+  they started, and which side opened them, isn't in the capture.
+- **Undecodable packets**: truncated or malformed.
+- **Sessions past Suricata's inspection depth**: it inspects the first 1 MiB of
+  each TCP stream, so an alert later in a longer session can be missed.
+
+Nothing is shown when none of these apply.
+
+Protocol anomalies
+~~~~~~~~~~~~~~~~~~
+
+Suricata also reports *anomalies*: traffic a protocol parser found malformed or
+one-sided (``APPLAYER_DETECT_PROTOCOL_ONLY_ONE_DIRECTION``, say). They aren't
+attacks, so they don't count as alerts. The conversation detail lists them,
+collapsed, under **Protocol anomalies**, in plain words with Suricata's name
+beside each.
+
 Filtering by IDS Alert
 ~~~~~~~~~~~~~~~~~~~~~~~
 

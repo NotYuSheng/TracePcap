@@ -795,10 +795,30 @@ public class AnalysisService {
                 .build());
       }
     }
+    List<com.tracepcap.analysis.entity.SuricataAnomalyEntity> anomalies = new ArrayList<>();
+    // Once each, as for alerts: conversations sharing a flow key are handed the same anomaly.
+    java.util.Set<SuricataService.Anomaly> storedAnomalies =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SuricataService.Anomaly a : c.getSuricataAnomalies()) {
+        if (!storedAnomalies.add(a)) continue;
+        anomalies.add(com.tracepcap.analysis.entity.SuricataAnomalyEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).time(a.time()).srcIp(a.srcIp())
+            .dstIp(a.dstIp()).type(a.type()).layer(a.layer()).appProto(a.appProto())
+            .event(a.event()).build());
+      }
+    }
+    // Apart, so a failed anomaly write can't take the alert records with it.
     try {
-      idsAlertWriter.replaceForFile(fileId, rows);
+      idsAlertWriter.replaceAlerts(fileId, rows);
     } catch (Exception ex) {
       log.warn("[{}] Saving {} IDS alert records failed: {}", fileId, rows.size(), ex.getMessage());
+    }
+    try {
+      idsAlertWriter.replaceAnomalies(fileId, anomalies);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} protocol anomalies failed: {}", fileId, anomalies.size(), ex.getMessage());
     }
   }
 

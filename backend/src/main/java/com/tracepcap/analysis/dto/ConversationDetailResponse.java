@@ -65,6 +65,26 @@ public class ConversationDetailResponse {
    */
   private List<IdsAlert> idsAlerts;
 
+  /** Suricata's protocol anomalies on this conversation (#1268), oldest first. */
+  private List<Anomaly> anomalies;
+
+  /** One protocol anomaly: malformed or one-sided traffic, not an attack signature. */
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  // Its own schema name: springdoc names schemas by simple class name, and NetworkInsightDto has an
+  // Anomaly too, so the two merged into one with that one's fields.
+  @io.swagger.v3.oas.annotations.media.Schema(name = "ProtocolAnomaly")
+  public static class Anomaly {
+    private LocalDateTime time;
+    private String srcIp;
+    private String type;
+    private String layer;
+    private String appProto;
+    private String event;
+  }
+
   /** One alert. {@code srcIp} is the side that sent the packet that fired it. */
   @Data
   @Builder

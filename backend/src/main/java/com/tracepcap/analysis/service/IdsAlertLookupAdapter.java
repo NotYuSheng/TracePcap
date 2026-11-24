@@ -15,6 +15,16 @@ import org.springframework.transaction.annotation.Transactional;
 class IdsAlertLookupAdapter implements IdsAlertLookup {
 
   private final IdsAlertRepository repository;
+  private final com.tracepcap.analysis.repository.SuricataAnomalyRepository anomalies;
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<AnomalyFacts> anomaliesFor(UUID conversationId) {
+    return anomalies.findByConversationIdOrderByTimeAsc(conversationId).stream()
+        .map(a -> new AnomalyFacts(a.getTime(), a.getSrcIp(), a.getDstIp(), a.getType(), a.getLayer(),
+            a.getAppProto(), a.getEvent()))
+        .toList();
+  }
 
   @Override
   @Transactional(readOnly = true)

@@ -52,6 +52,7 @@ export const API_ENDPOINTS = {
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancy-decisions/${decisionId}`,
   /** Deterministic answers to the standard investigation questions (#813). */
   ANSWERS: (fileId: string) => `/files/${fileId}/answers`,
+  CAPTURE_QUALITY: (fileId: string) => `/files/${fileId}/capture-quality`,
   /** Goal-driven autonomous investigation report — producers plus pivots (#819). */
   INVESTIGATION: (fileId: string) => `/files/${fileId}/investigation`,
   HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,

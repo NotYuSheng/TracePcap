@@ -848,4 +848,18 @@ public interface ConversationRepository
               + " GROUP BY f.id, f.file_name ORDER BY count(*) DESC, f.file_name LIMIT :lim",
       nativeQuery = true)
   List<Object[]> appCaptures(@Param("app") String app, @Param("lim") int limit);
+
+  /** TCP conversations in a capture (#1268). */
+  @Query(
+      value = "SELECT count(*) FROM conversations WHERE file_id = :fileId AND transport = 'TCP'",
+      nativeQuery = true)
+  long countTcp(@Param("fileId") UUID fileId);
+
+  /** TCP conversations whose handshake isn't in the capture: no connection outcome (#1233, #1268). */
+  @Query(
+      value =
+          "SELECT count(*) FROM conversations WHERE file_id = :fileId AND transport = 'TCP'"
+              + " AND connection_outcome IS NULL",
+      nativeQuery = true)
+  long countTcpWithoutHandshake(@Param("fileId") UUID fileId);
 }
