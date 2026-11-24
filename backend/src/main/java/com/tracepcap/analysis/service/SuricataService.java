@@ -121,9 +121,11 @@ public class SuricataService implements Extractor {
   record Eve(
       Map<String, Set<String>> alerts,
       Map<String, TlsRecord> tls,
-      Map<String, List<AlertEvent>> alertEvents) {
+      Map<String, List<AlertEvent>> alertEvents,
+      java.util.concurrent.atomic.AtomicInteger alertEventCount) {
     static Eve empty() {
-      return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>());
+      return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger());
     }
   }
 
@@ -395,7 +397,8 @@ public class SuricataService implements Extractor {
 
       String key = flowKey(srcIp, srcPort, dstIp, dstPort, proto);
       result.alerts().computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
-      if (result.alertEvents().values().stream().mapToInt(List::size).sum() < MAX_ALERT_EVENTS) {
+      // A running count: summing every flow's list on each line made a noisy capture quadratic.
+      if (result.alertEventCount().getAndIncrement() < MAX_ALERT_EVENTS) {
         result.alertEvents().computeIfAbsent(key, k -> new ArrayList<>())
             .add(alertEvent(root, alert, signature, sid, severity, srcIp, srcPort, dstIp, dstPort));
       }
@@ -538,7 +541,6 @@ public class SuricataService implements Extractor {
         : s;
   }
 
-  /** Looks up a flow's entry trying both directions (src→dst and dst→src). */
   /**
    * A conversation's alerts from both directions. Suricata keys an alert by the packet that fired
    * it, so a rule on the server's reply ("Remote Admin Response") sits under the reverse key; taking
@@ -557,6 +559,7 @@ public class SuricataService implements Extractor {
     return out;
   }
 
+  /** Looks up a flow's entry trying both directions (src→dst and dst→src). */
   private static <T> T resolve(Map<String, T> alertMap, PcapParserService.ConversationInfo conv) {
     String key1 =
         flowKey(

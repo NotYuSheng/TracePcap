@@ -82,4 +82,15 @@ class SuricataAlertRecordTest {
     c.setProtocol("TCP");
     return c;
   }
+
+  @Test
+  void atMostTheCapIsKept_countedAsTheyCome() {
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    for (int i = 0; i < SuricataService.MAX_ALERT_EVENTS + 50; i++) {
+      // a new client port each time: every alert on its own flow, the case the old sum was slow on
+      suricata.parseEveLine(CHECKIN.replace("53362", String.valueOf(1024 + i % 60000)), eve);
+    }
+    assertThat(eve.alertEvents().values().stream().mapToInt(List::size).sum())
+        .isEqualTo(SuricataService.MAX_ALERT_EVENTS);
+  }
 }

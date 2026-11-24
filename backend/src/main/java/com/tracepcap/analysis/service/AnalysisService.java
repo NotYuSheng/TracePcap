@@ -760,9 +760,14 @@ public class AnalysisService {
   /** Each Suricata alert in full (#1265). Never fatal: the conversations carry the alert messages. */
   private void saveIdsAlerts(UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
     List<com.tracepcap.analysis.entity.IdsAlertEntity> rows = new ArrayList<>();
+    // One alert once: conversations sharing a flow key (DHCP clients split by MAC, say) are each
+    // handed the same alert record, and storing it under each multiplied every count built on them.
+    java.util.Set<SuricataService.AlertEvent> stored =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     for (PcapParserService.ConversationInfo c : conversations) {
       if (c.getEntityId() == null) continue;
       for (SuricataService.AlertEvent e : c.getIdsAlertEvents()) {
+        if (!stored.add(e)) continue;
         rows.add(
             com.tracepcap.analysis.entity.IdsAlertEntity.builder()
                 .fileId(fileId)
