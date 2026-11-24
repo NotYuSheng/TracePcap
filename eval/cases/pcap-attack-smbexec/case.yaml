@@ -1,0 +1,7 @@
+case_id: pcap-attack-smbexec
+pcap: LM_smbexec_smb_dcerpc_svcctl_epm.pcapng
+source_url: https://github.com/sbousseaden/PCAP-ATTACK/raw/9ef5476dd6b083f565a1b9d2e59e4a3ae8be8c95/Lateral%20Movement/LM_smbexec_smb_dcerpc_svcctl_epm.pcapng
+sha256: 6581987a31be6839fe594172bcc1f567d1dd3086d41c0c6c6811c8644127d92b
+notes: >
+  From PCAP-ATTACK (github.com/sbousseaden/PCAP-ATTACK), a set of lab captures each labelled with the
+  ATT&CK technique it shows. Download into eval/pcaps/pcap-attack/.

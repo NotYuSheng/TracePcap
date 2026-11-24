@@ -99,6 +99,10 @@ lower here (3/7 in a scratch run) because the pivots that recover them (#819, PR
 ## What is scored today
 
 `victim.ip`, `victim.mac`, `victim.hostname`, `user.account`, `user.real_name`, `malware.family`,
-`c2.ip`. As the technique library grows (#819), extend `score_case` in `run_eval.py` (scope, entry
+`c2.ip`. `lateral_movement` (#1266): the client and server pairs the lateral-movement answer names. A key
+that lists `lateral_movement: []` says there is none (PCAP-ATTACK's discovery captures), so any such
+answer there is confidently wrong; a key without the field doesn't score it. The `pcap-attack-*`
+cases take their ground truth from the dataset's own labels and are fetched into
+`eval/pcaps/pcap-attack/`. As the technique library grows (#819), extend `score_case` in `run_eval.py` (scope, entry
 vector, timeline, …). `c2` port/proto are recorded in the key but not scored yet — `/answers` does not
 expose them.

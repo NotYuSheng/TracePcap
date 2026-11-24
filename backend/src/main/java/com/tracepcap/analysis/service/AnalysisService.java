@@ -820,6 +820,22 @@ public class AnalysisService {
     } catch (Exception ex) {
       log.warn("[{}] Saving {} protocol anomalies failed: {}", fileId, anomalies.size(), ex.getMessage());
     }
+    List<com.tracepcap.analysis.entity.RemoteOperationEntity> ops = new ArrayList<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SmbRpcRecords.Operation o : c.getRemoteOperations()) {
+        ops.add(com.tracepcap.analysis.entity.RemoteOperationEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).firstTime(o.firstTime())
+            .clientIp(o.client()).serverIp(o.server()).kind(o.kind()).share(o.share())
+            .path(o.path()).interfaceUuid(o.interfaceUuid()).opnum(o.opnum()).bytes(o.bytes())
+            .status(o.status()).count(o.count()).build());
+      }
+    }
+    try {
+      idsAlertWriter.replaceRemoteOperations(fileId, ops);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} SMB/RPC operations failed: {}", fileId, ops.size(), ex.getMessage());
+    }
   }
 
   // ── Stage 7: carve embedded files ───────────────────────────────────────────

@@ -241,5 +241,34 @@ class RecallOnly(unittest.TestCase):
         self.assertEqual(ev.classify(["aa", "bb"], ["aa", "bb", "cc"], recall_only=True)[0], ev.CORRECT)
         self.assertEqual(ev.classify(["aa", "bb"], ["aa", "cc"], recall_only=True)[0], ev.MISSED)
 
+
+
+class LateralMovementScoring(unittest.TestCase):
+    """#1266: the pair named must be the key's, and a key saying "none" makes any answer wrong."""
+
+    PSEXEC = {"case_id": "x", "lateral_movement": [{"client": "172.16.66.1", "server": "172.16.66.36"}]}
+    NONE = {"case_id": "x", "lateral_movement": []}
+
+    def test_the_right_pair_is_correct(self):
+        r = ev.score_case(self.PSEXEC, [ans("lateral-movement", client="172.16.66.1", server="172.16.66.36")], {})
+        self.assertEqual(status(r, "lateral_movement"), ev.CORRECT)
+
+    def test_the_pair_turned_round_is_wrong(self):
+        r = ev.score_case(self.PSEXEC, [ans("lateral-movement", client="172.16.66.36", server="172.16.66.1")], {})
+        self.assertEqual(status(r, "lateral_movement"), ev.WRONG)
+
+    def test_no_answer_is_missed(self):
+        self.assertEqual(status(ev.score_case(self.PSEXEC, [], {}), "lateral_movement"), ev.MISSED)
+
+    def test_a_key_saying_none_makes_any_answer_wrong(self):
+        r = ev.score_case(self.NONE, [ans("lateral-movement", client="10.0.0.5", server="10.0.0.10")], {})
+        self.assertEqual(status(r, "lateral_movement"), ev.WRONG)
+        self.assertEqual(status(ev.score_case(self.NONE, [], {}), "lateral_movement"), ev.CORRECT)
+
+    def test_a_key_without_the_field_does_not_score_it(self):
+        self.assertEqual(status(ev.score_case({"case_id": "x"}, [], {}), "lateral_movement"), ev.NA)
+
+
 if __name__ == "__main__":
     unittest.main()
+

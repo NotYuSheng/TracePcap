@@ -112,6 +112,11 @@ only through ``analysis.spi`` ports, never another module's repositories or enti
 - ``IdsAlertRecordContributor`` — from the full alert records, each outside server's alert count,
   first and last alert (UTC), and the HTTP requests the alerts fired on. The command-and-control
   and remote-access answers cite them ("Alerts fired on: POST http://…/fakeurl.htm (52×)").
+- ``LateralMovementContributor`` — one host making another run something, from the SMB and RPC
+  operations Suricata logged: a service created remotely, a scheduled task registered, a WMI method
+  called, a program copied to an admin share, or directory replication asked by a host that isn't a
+  domain controller (DCSync). Routine domain traffic (IPC$, SYSVOL and group-policy reads, share
+  and user enumeration, remote registry) is not posted.
 
 **Deterministic checks** (``StandardQuestion``) are the primary analysis layer — *not* the LLM. Each
 answers one standard investigation question by querying the board and posting an ``Answer`` (a
@@ -123,7 +128,9 @@ nDPI's own recognition of TeamViewer, AnyDesk, Radmin or NoMachine, for review: 
 these tools and so do attackers, so it never calls the server a C2), and downloads (executables,
 scripts, archives and installers a host fetched from outside over a real HTTP transfer, each with its
 SHA-256; never a file carved from raw bytes, never an operating-system update, and never a
-gzip-compressed web response; at most the three largest per host and server, then a count). The C2 and
+gzip-compressed web response; at most the three largest per host and server, then a count), and lateral movement (one answer per
+pair of hosts, from the contributor above, asking for it to be confirmed, since administrators'
+tools do the same). The C2 and
 remote-access answers also say when the server was first contacted, in UTC. They are deliberately precise
 — the victim and C2 checks key on the ``c2-of`` edge, not "any host or external in any IDS alert",
 so an informational alert never mislabels the domain controller as a victim or a benign CDN as a
