@@ -56,7 +56,7 @@ public class DownloadsQuestion implements StandardQuestion {
                     + " from " + first.attributes().get("external") + " (smaller ones; see the Files tab)",
                 Grade.MEASURED,
                 first.concerns(),
-                List.of(more + " more files from " + first.attributes().get("external")),
+                List.of(more + " more file" + (more == 1 ? "" : "s") + " from " + first.attributes().get("external")),
                 new LinkedHashMap<>(Map.of("host", first.attributes().get("host"),
                     "external", first.attributes().get("external"), "more", more))));
       }

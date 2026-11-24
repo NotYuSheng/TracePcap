@@ -81,6 +81,15 @@ public final class RemoteAccessTools {
     return ndpiApp == null ? null : NDPI_APPS.get(ndpiApp.trim().toLowerCase(Locale.ROOT));
   }
 
+  /**
+   * Whether the tool is known as a RAT in its own right (NetSupport), as opposed to an admin tool
+   * that is abused now and then (AnyDesk, TeamViewer). Only these are ever escalated to a C2: an IT
+   * install of AnyDesk looks the same on the wire as a planted one.
+   */
+  public static boolean isRat(String tool) {
+    return tool != null && RAT_NAMES.containsKey(tool);
+  }
+
   /** "NetSupport RAT" for NetSupport; "AnyDesk (unsanctioned use)" for a tool without one. */
   public static String abuseName(String tool) {
     return RAT_NAMES.getOrDefault(tool, tool + " (unsanctioned use)");

@@ -25,8 +25,8 @@ import java.util.regex.Pattern;
  *       Reputation alone never makes a C2.
  *       <i>2025-01-22 fake software site: 45.125.66.32 (three rounds on TLS port 2917) and
  *       45.125.66.252 (seconds after it in each round), both only on Spamhaus DROP.</i>
- *   <li><b>Probable unsanctioned remote access (install chain).</b> A remote-admin tool checking in
- *       to a bare IP becomes a C2 for the tool's abuse ("NetSupport RAT") only when, within minutes
+ *   <li><b>Probable unsanctioned remote access (install chain).</b> A remote-admin tool known as a
+ *       RAT (NetSupport) checking in to a bare IP becomes a C2 for the tool's abuse ("NetSupport RAT") only when, within minutes
  *       before its first check-in, the same host ran PowerShell (or another script engine) against
  *       another outside server that then sent it a large payload. IT pushes these tools too; an
  *       install chain to an unnamed address minutes before is what sets this one apart.
@@ -190,7 +190,9 @@ public final class C2Corroboration {
           firstCheckIn = c.flow().startTime();
         }
       }
-      if (tool == null) return;
+      // Only a tool known as a RAT: a PowerShell, curl or BITS download, a big installer and then
+      // TeamViewer or AnyDesk checking in is just as much an IT department installing it.
+      if (tool == null || !RemoteAccessTools.isRat(tool)) return;
       final LocalDateTime checkIn = firstCheckIn;
 
       // On the same host, within the window before: a script engine fetching from another server…

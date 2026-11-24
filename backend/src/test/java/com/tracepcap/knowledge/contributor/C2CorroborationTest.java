@@ -119,8 +119,18 @@ class C2CorroborationTest {
     l.add(c("10.10.1.128", "107.175.82.242", 0, "107.175.82.242", 1_600_000,
         "ET HUNTING curl User-Agent to Dotted Quad (sid:2034567 sev:2)",
         "ET INFO Executable Download from dotted-quad Host (sid:2016141 sev:2)"));
-    l.add(c("10.10.1.128", "51.89.1.1", 40, null, 9_000, "ET INFO AnyDesk Remote Desktop Software User-Agent (sid:1 sev:3)"));
+    l.add(c("10.10.1.128", "51.89.1.1", 40, null, 9_000, "ET INFO NetSupport Remote Admin Checkin (sid:1 sev:3)"));
     assertThat(C2Corroboration.find(l, Set.of())).singleElement()
-        .satisfies(x -> assertThat(x.family()).isEqualTo("AnyDesk (unsanctioned use)"));
+        .satisfies(x -> assertThat(x.family()).isEqualTo("NetSupport RAT"));
+  }
+
+  @Test
+  void anAdminToolsInstallChain_isNotACommandAndControl() {
+    // PowerShell fetching AnyDesk's installer, then AnyDesk checking in, is also IT installing it.
+    List<ConversationFacts> l = new ArrayList<>();
+    l.add(c("10.10.1.128", "107.175.82.242", 0, "107.175.82.242", 1_600_000,
+        "ET HUNTING curl User-Agent to Dotted Quad (sid:2034567 sev:2)"));
+    l.add(c("10.10.1.128", "51.89.1.1", 40, null, 9_000, "ET INFO AnyDesk Remote Desktop Software User-Agent (sid:1 sev:3)"));
+    assertThat(C2Corroboration.find(l, Set.of())).isEmpty();
   }
 }

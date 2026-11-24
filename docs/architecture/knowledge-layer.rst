@@ -78,10 +78,12 @@ chain as its evidence:
   rules carry them) that a host *already talking to a confirmed C2* contacts at a bare IP, in
   repeated rounds a minute or more apart (or seconds after another such server). Worded *suspected C2
   for unidentified malware*. Reputation alone never makes a C2.
-- **Probable unsanctioned remote access:** a remote-admin tool checking in to a bare IP, when within
+- **Probable unsanctioned remote access:** a remote-admin tool known as a RAT (NetSupport) checking
+  in to a bare IP, when within
   ten minutes before its first check-in the same host ran PowerShell, another script engine or a
   download tool (curl, BITS, certutil) against another outside server that then sent it at least 1 MB. Becomes a C2 for the tool's abuse
-  (*NetSupport RAT*); without the chain it stays a remote-access tool to confirm.
+  (*NetSupport RAT*); without the chain it stays a remote-access tool to confirm. AnyDesk, TeamViewer
+  and the like are never escalated: an IT install of one looks the same on the wire.
 
 On five malware-traffic-analysis.net exercises these recover the only answers the key asks that
 were missing (two C2s on the fake-software-site case; NetSupport's C2, family and victim), and on
