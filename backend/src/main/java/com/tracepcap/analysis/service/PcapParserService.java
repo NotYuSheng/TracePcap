@@ -371,6 +371,13 @@ public class PcapParserService {
             // "TCP" on the opening SYN, "TLSv1.2" once the handshake starts: show the specific one.
             if (isBareTransport(conv.getProtocol()) && !isBareTransport(fProtocol)) conv.setProtocol(fProtocol);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
+            // Which way the bytes went: a download and an upload of the same size are different
+            // findings ("sent 6 MB" was written for a 6 MB file the host received).
+            if (fSrcIp.equals(conv.getSrcIp()) && java.util.Objects.equals(fSrcPort, conv.getSrcPort())) {
+              conv.setBytesSrcToDst(conv.getBytesSrcToDst() + packetSize);
+            } else {
+              conv.setBytesDstToSrc(conv.getBytesDstToSrc() + packetSize);
+            }
             // Each side's MAC (#462): the first eth.src seen from it. A local host's own MAC, or for
             // traffic from outside the site's router MAC, which says which network it was on.
             if (srcMac != null) {
@@ -777,6 +784,9 @@ public class PcapParserService {
     private com.tracepcap.analysis.spi.ConversationLookup.CertFacts tlsCert;
     private Long packetCount;
     private Long totalBytes;
+    /** Bytes sent by {@link #srcIp} (to dstIp), and by dstIp (to srcIp). */
+    private long bytesSrcToDst;
+    private long bytesDstToSrc;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 

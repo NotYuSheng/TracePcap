@@ -345,7 +345,9 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getSrcMac(),
             e.getDstMac(),
             e.getConnectionOutcome(),
-            e.getTransport()),
+            e.getTransport(),
+            e.getBytesSrcToDst(),
+            e.getBytesDstToSrc()),
         new TlsFacts(
             e.getHostname(),
             e.getTlsIssuer(),

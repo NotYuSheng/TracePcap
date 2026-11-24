@@ -67,16 +67,36 @@ public interface ConversationLookup {
       String srcMac,
       String dstMac,
       String connectionOutcome,
-      String transport) {
+      String transport,
+      Long bytesSrcToDst,
+      Long bytesDstToSrc) {
 
-    /** Without the transport: unknown (captures analysed before it was kept). */
+    /** Without the transport and per-direction bytes: unknown (captures analysed before them). */
     public FlowIdentity(
         String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp,
         Integer initiatorPort, String protocol, long packetCount, long totalBytes,
         LocalDateTime startTime, LocalDateTime endTime, String srcMac, String dstMac,
         String connectionOutcome) {
       this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
-          totalBytes, startTime, endTime, srcMac, dstMac, connectionOutcome, null);
+          totalBytes, startTime, endTime, srcMac, dstMac, connectionOutcome, null, null, null);
+    }
+
+    /** Without per-direction bytes: unknown (captures analysed before they were kept). */
+    public FlowIdentity(
+        String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp,
+        Integer initiatorPort, String protocol, long packetCount, long totalBytes,
+        LocalDateTime startTime, LocalDateTime endTime, String srcMac, String dstMac,
+        String connectionOutcome, String transport) {
+      this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
+          totalBytes, startTime, endTime, srcMac, dstMac, connectionOutcome, transport, null, null);
+    }
+
+    /** Bytes {@code ip} sent in this flow, or null when unknown. */
+    public Long bytesSentBy(String ip) {
+      if (ip == null) return null;
+      if (ip.equals(srcIp)) return bytesSrcToDst;
+      if (ip.equals(dstIp)) return bytesDstToSrc;
+      return null;
     }
 
     /**
