@@ -38,4 +38,14 @@ describe('SuricataRulesetNote (#600)', () => {
     render(<SuricataRulesetNote />);
     expect(await screen.findByTestId('suricata-ruleset')).toHaveTextContent('Emerging Threats, imported');
   });
+
+  it('warns when the engine loaded no rules, which would make every capture look clean (#1269)', async () => {
+    server.use(
+      http.get('*/system/suricata', () =>
+        HttpResponse.json({ ...base, source: 'built-in', rulesetDate: '2026-11-23', ageDays: 0, stale: false, importError: null, loadedRuleCount: 0, failedRuleCount: 0 })
+      )
+    );
+    render(<SuricataRulesetNote />);
+    expect(await screen.findByTestId('suricata-no-rules')).toHaveTextContent('loaded no rules');
+  });
 });

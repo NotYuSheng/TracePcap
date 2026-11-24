@@ -322,6 +322,7 @@ public class SuricataService implements Extractor {
           return result;
         }
 
+        engine.recordLoad(outDir.resolve("suricata.log"), "per-file run");
         parseEveJson(outDir.resolve(EVE_JSON), result);
         log.debug("Suricata produced alerts for {} flow keys, TLS records for {}", result.alerts().size(), result.tls().size());
       } finally {

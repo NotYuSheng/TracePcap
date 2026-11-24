@@ -5137,8 +5137,12 @@ export interface components {
             /** Format: int64 */
             ageDays?: number;
             engineVersion?: string;
+            /** Format: int32 */
+            failedRuleCount?: number;
             importDir?: string;
             importError?: string;
+            /** Format: int32 */
+            loadedRuleCount?: number;
             /** Format: int32 */
             ruleCount?: number;
             /** Format: date */

@@ -5756,11 +5756,19 @@
           "engineVersion": {
             "type": "string"
           },
+          "failedRuleCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "importDir": {
             "type": "string"
           },
           "importError": {
             "type": "string"
+          },
+          "loadedRuleCount": {
+            "format": "int32",
+            "type": "integer"
           },
           "ruleCount": {
             "format": "int32",

@@ -22,7 +22,15 @@ public class SuricataStatusDto {
   /** Older than {@link #staleAfterDays}: its signatures may miss recent threats. */
   private boolean stale;
   private int staleAfterDays;
+  /** Rules in the ruleset file. */
   private int ruleCount;
+  /**
+   * Rules the engine reported loading on its last start, null until it has run. Zero while
+   * {@link #ruleCount} isn't means Suricata can't see the ruleset and no capture gets IDS alerts.
+   */
+  private Integer loadedRuleCount;
+  /** Rules Suricata reported failing to parse on its last start; null until it has run. */
+  private Integer failedRuleCount;
   /** The folder an operator drops a newer bundle into. */
   private String importDir;
   /** Why the last bundle in the import folder wasn't used, or null. */

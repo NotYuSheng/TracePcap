@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SuricataStatusController {
 
   private final SuricataRuleset ruleset;
+  private final com.tracepcap.analysis.service.SuricataEngine engine;
 
   @GetMapping
   @Operation(
@@ -26,6 +27,8 @@ public class SuricataStatusController {
               + " the last imported bundle wasn't used.")
   public SuricataStatusDto status() {
     SuricataRuleset.Status s = ruleset.status();
+    // Once: two reads could pair one run's loaded count with another's failed count.
+    var load = engine.lastLoad();
     return SuricataStatusDto.builder()
         .engineVersion(s.engineVersion())
         .source(s.source())
@@ -34,6 +37,8 @@ public class SuricataStatusController {
         .stale(s.stale())
         .staleAfterDays(s.staleAfterDays())
         .ruleCount(s.ruleCount())
+        .loadedRuleCount(load.loaded())
+        .failedRuleCount(load.failed())
         .importDir(s.importDir())
         .importError(s.importError())
         .build();
