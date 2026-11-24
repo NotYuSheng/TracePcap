@@ -38,8 +38,20 @@ public class DownloadContributor implements KnowledgeContributor {
   /** Types worth an analyst's look when they arrive from outside. */
   private static final Pattern RISKY_TYPE =
       Pattern.compile(
-          "msdownload|x-dosexec|executable|x-msi|java-archive|zip|x-rar|x-7z|javascript|vbscript"
+          // "(?<!g)zip": application/zip, x-zip-compressed — not gzip, which is how web pages and
+          // API responses are compressed (55 such "archives" from one ClickFix C2 in a holdout test).
+          "msdownload|x-dosexec|executable|x-msi|java-archive|(?<!g)zip|x-rar|x-7z|javascript|vbscript"
               + "|powershell|x-bat|hta|iso9660|x-sh",
+          Pattern.CASE_INSENSITIVE);
+
+  /**
+   * A risky file by its name, for what content detection can't tell: a PowerShell, JScript or batch
+   * script is plain text (Tika says text/plain), so only its extension says what it is. The
+   * 2025-01-22 fake software site's C2 served two .ps1 scripts this way.
+   */
+  private static final Pattern RISKY_NAME =
+      Pattern.compile(
+          "\\.(ps1|psm1|js|jse|vbs|vbe|hta|bat|cmd|wsf|wsh|lnk|scr|msi|exe|dll|jar|iso|img|zip|7z|rar)$",
           Pattern.CASE_INSENSITIVE);
 
   /** Windows/Defender/Office update hosts: routine, signed, and plentiful. */
@@ -59,6 +71,18 @@ public class DownloadContributor implements KnowledgeContributor {
   @Override
   public String name() {
     return "downloads";
+  }
+
+  /** The file's name, or its URL's last path part, ends in a risky extension. */
+  static boolean riskyName(ExtractedFileFacts f) {
+    if (f.filename() != null && RISKY_NAME.matcher(f.filename().trim()).find()) return true;
+    if (f.sourceUrl() == null) return false;
+    try {
+      String path = java.net.URI.create(f.sourceUrl().replace(" ", "%20")).getPath();
+      return path != null && RISKY_NAME.matcher(path).find();
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   /** The host of "http://host:port/path", or null. */
@@ -84,7 +108,8 @@ public class DownloadContributor implements KnowledgeContributor {
 
     for (ExtractedFileFacts f : all) {
       if (f.skipped() || !f.realTransfer() || f.sha256() == null) continue;
-      if (f.mimeType() == null || !RISKY_TYPE.matcher(f.mimeType()).find()) continue;
+      boolean riskyType = f.mimeType() != null && RISKY_TYPE.matcher(f.mimeType()).find();
+      if (!riskyType && !riskyName(f)) continue;
       ConversationFacts conv = f.conversationId() == null ? null : convs.get(f.conversationId());
       if (conv == null) continue;
       String src = conv.flow().srcIp();

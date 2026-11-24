@@ -3,10 +3,10 @@
     "cases": 5,
     "cases_scored": 5,
     "scored_fields": 34,
-    "correct": 30,
-    "missed": 4,
+    "correct": 34,
+    "missed": 0,
     "confidently_wrong": 0,
-    "accuracy": 0.882
+    "accuracy": 1.0
   },
   "cases": [
     {
@@ -165,13 +165,12 @@
         },
         {
           "field": "c2.ip",
-          "status": "missed",
-          "detail": {
-            "missing": [
-              "45.125.66.32",
-              "45.125.66.252"
-            ]
-          }
+          "status": "correct",
+          "detail": [
+            "5.252.153.241",
+            "45.125.66.32",
+            "45.125.66.252"
+          ]
         },
         {
           "field": "timeline.start",
@@ -257,8 +256,8 @@
       "fields": [
         {
           "field": "victim.ip",
-          "status": "missed",
-          "detail": null
+          "status": "correct",
+          "detail": "10.11.10.147"
         },
         {
           "field": "victim.mac",
@@ -282,13 +281,13 @@
         },
         {
           "field": "malware.family",
-          "status": "missed",
-          "detail": null
+          "status": "correct",
+          "detail": "NetSupport RAT"
         },
         {
           "field": "c2.ip",
-          "status": "missed",
-          "detail": null
+          "status": "correct",
+          "detail": "93.152.209.36"
         },
         {
           "field": "timeline.start",

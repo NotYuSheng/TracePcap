@@ -59,4 +59,21 @@ class RemoteAccessQuestionTest {
                 alert("ET MALWARE NetSupport RAT with System Information (sid:2035895 sev:1)", "10.11.10.147", "93.152.209.36")))
         .isEmpty();
   }
+
+  @Test
+  void aVendorLookupIsNotASession() {
+    // Holdout 2024-11-26: NetSupport's GeoLocation lookup to geo.netsupportsoftware.com.
+    assertThat(answers(alert("ET POLICY NetSupport GeoLocation Lookup Request (sid:2034559 sev:1)",
+        "10.11.26.183", "104.26.1.231"))).isEmpty();
+  }
+
+  @Test
+  void anNdpiIdentifiedTool_isASessionToo_withoutAnyAlert() {
+    Finding ndpi = new Finding(
+        com.tracepcap.knowledge.contributor.RemoteAccessAppContributor.REMOTE_ACCESS_APP,
+        "nDPI identified AnyDesk between 10.0.0.5 and 51.89.1.1", Severity.MEDIUM, Grade.INFERRED, "ndpi",
+        List.of(EntityRef.host("10.0.0.5"), EntityRef.external("51.89.1.1")), List.of(), Map.of("tool", "AnyDesk"));
+    assertThat(answers(ndpi)).singleElement()
+        .satisfies(x -> assertThat(x.attributes()).containsEntry("tool", "AnyDesk").containsEntry("external", "51.89.1.1"));
+  }
 }

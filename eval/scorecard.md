@@ -3,8 +3,8 @@
 Baseline of TracePcap's **deterministic** conclusions vs. published answer keys (#819, Workstream A). Regenerate with `python3 eval/run_eval.py`.
 
 - Cases scored: **5** of 5
-- Correct: **30** / 34 (accuracy 0.882)
-- Missed: **4**
+- Correct: **34** / 34 (accuracy 1.0)
+- Missed: **0**
 - Confidently wrong: **0** ✅
 
 ## 2024-07-30-strrat
@@ -48,7 +48,7 @@ Analysis: Suricata **on**, nDPI on.
 | user.account | ✅ correct | shutchenson |
 | user.real_name | — n/a |  |
 | malware.family | — n/a |  |
-| c2.ip | ◻️ missed | missing: 45.125.66.32, 45.125.66.252 |
+| c2.ip | ✅ correct | 5.252.153.241, 45.125.66.32, 45.125.66.252 |
 | timeline.start | — n/a |  |
 | files.sha256 | — n/a |  |
 
@@ -72,12 +72,12 @@ Analysis: Suricata **on**, nDPI on.
 
 | Field | Status | Detail |
 |---|---|---|
-| victim.ip | ◻️ missed |  |
+| victim.ip | ✅ correct | 10.11.10.147 |
 | victim.mac | ✅ correct | 00:12:f0:e5:17:43 |
 | victim.hostname | ✅ correct | DESKTOP-5OMVI3L |
 | user.account | ✅ correct | edward.winslow |
 | user.real_name | — n/a |  |
-| malware.family | ◻️ missed |  |
-| c2.ip | ◻️ missed |  |
+| malware.family | ✅ correct | NetSupport RAT |
+| c2.ip | ✅ correct | 93.152.209.36 |
 | timeline.start | ✅ correct | 2026-11-10T18:22:07Z |
 | files.sha256 | — n/a |  |
