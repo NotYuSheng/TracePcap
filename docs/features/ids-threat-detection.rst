@@ -21,6 +21,15 @@ starts faster. That engine runs with ``security.limit-noproc`` off: Suricata 7+
 otherwise sets its own process limit to zero once started, and in socket mode
 that stops it starting a worker for each capture.
 
+Suricata also inspects TCP streams that were **already open when the capture
+began** (``stream.midstream``). By default it skips any stream whose handshake it
+didn't see, which suits a live sensor but not a capture, which is a slice of
+time: a short excerpt of a PsExec session otherwise produces no alerts at all.
+Measured on 71 captures (the eval exercises, four holdouts, 36 clean samples and
+26 labelled attack captures from PCAP-ATTACK), it added alerts on six attack
+captures (PsExec, smbexec, Zerologon, DNS-over-TCP SIGRed, and NTLM sign-ins in
+two more) and changed no answer on any capture.
+
 How it works
 ------------
 

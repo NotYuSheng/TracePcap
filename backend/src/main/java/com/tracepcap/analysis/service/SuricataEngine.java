@@ -248,9 +248,8 @@ public class SuricataEngine implements DetectionEngineStatus {
                   // capture afterwards, so every pcap-file failed with pthread_create EAGAIN (#1269).
                   // The engine never runs anything but this app's captures.
                   "--set",
-                  "security.limit-noproc=false",
-                  "--set",
-                  SuricataService.JA3_ON));
+                  "security.limit-noproc=false"));
+      command.addAll(SuricataService.SHARED_SETTINGS);
       // The active ruleset (#600): nothing extra for the built-in one, -S for an imported one.
       if (ruleset != null) command.addAll(ruleset.suricataArgs());
       daemon =
