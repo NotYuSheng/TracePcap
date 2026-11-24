@@ -93,4 +93,31 @@ class SuricataAlertRecordTest {
     assertThat(eve.alertEvents().values().stream().mapToInt(List::size).sum())
         .isEqualTo(SuricataService.MAX_ALERT_EVENTS);
   }
+
+  @Test
+  void oneNoisyConnection_keepsItsFirstHundred_andItsTrueCount() {
+    // #1284: a single flow can't use up the capture's budget, and its count stays honest.
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    for (int i = 0; i < 150; i++) suricata.parseEveLine(CHECKIN, eve);
+    suricata.parseEveLine(RESPONSE, eve); // the reply direction, same conversation
+    PcapParserService.ConversationInfo conv = conversation();
+    suricata.apply(eve, List.of(conv));
+
+    assertThat(conv.getIdsAlertEvents()).hasSize(SuricataService.MAX_ALERT_EVENTS_PER_FLOW + 1);
+    assertThat(conv.getIdsAlertTotal()).isEqualTo(151);
+  }
+
+  @Test
+  void conversationsSharingAFlow_bothCarryItsCount_andTheSameFlow() {
+    // Saving counts it once (IdsAlertCountsTest): here each just knows its flow and that flow's count.
+    SuricataService.Eve eve = SuricataService.Eve.empty();
+    suricata.parseEveLine(CHECKIN, eve);
+    suricata.parseEveLine(RESPONSE, eve);
+    PcapParserService.ConversationInfo first = conversation(), second = conversation();
+    suricata.apply(eve, List.of(first, second));
+
+    assertThat(first.getIdsAlertTotal()).isEqualTo(2);
+    assertThat(second.getIdsAlertTotal()).isEqualTo(2);
+    assertThat(first.getIdsAlertFlow()).isNotNull().isEqualTo(second.getIdsAlertFlow());
+  }
 }

@@ -65,6 +65,12 @@ public class ConversationDetailResponse {
    */
   private List<IdsAlert> idsAlerts;
 
+  /**
+   * How many alerts fired on this conversation (#1284). More than {@code idsAlerts} holds when the
+   * records stopped at their cap: those are the first. Null for captures analysed before.
+   */
+  private Integer idsAlertCount;
+
   /** Suricata's protocol anomalies on this conversation (#1268), oldest first. */
   private List<Anomaly> anomalies;
 

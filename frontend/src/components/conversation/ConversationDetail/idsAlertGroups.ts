@@ -26,3 +26,14 @@ export function groupIdsAlerts(alerts: IdsAlert[]): AlertGroup[] {
   }
   return [...groups.values()];
 }
+
+/**
+ * The IDS alerts group's note (#1284): "N fired", or, when the records stopped at their cap,
+ * "N fired · first K shown" so the rows aren't read as all of them.
+ */
+export function alertsFiredNote(kept: number, total?: number | null): string {
+  const fired = Math.max(total ?? 0, kept);
+  const n = fired.toLocaleString('en-US');
+  if (fired > kept && kept === 0) return `${n} fired · no records kept`;
+  return fired > kept ? `${n} fired · first ${kept.toLocaleString('en-US')} shown` : `${n} fired`;
+}

@@ -77,16 +77,15 @@ public class C2Question implements StandardQuestion {
       List<String> evidence = new ArrayList<>(alertSummaries(board, c2));
       if (ent.get(IdsAlertRecordContributor.ALERT_REQUESTS) instanceof List<?> reqs && !reqs.isEmpty()) {
         attrs.put("requests", reqs);
-        evidence.add("Alerts fired on: " + String.join(", ", reqs.stream().map(String::valueOf).toList()));
+        Object keptN = ent.get(IdsAlertRecordContributor.ALERT_RECORDS_KEPT);
+        evidence.add((keptN != null ? "In the " + keptN + " alert records kept, alerts fired on: " : "Alerts fired on: ")
+            + String.join(", ", reqs.stream().map(String::valueOf).toList()));
       }
+      String span = alertSpan(ent);
+      if (span != null) evidence.add(span);
       if (ent.get(IdsAlertRecordContributor.FIRST_ALERT) != null) {
         attrs.put("firstAlert", ent.get(IdsAlertRecordContributor.FIRST_ALERT));
         attrs.put("lastAlert", ent.get(IdsAlertRecordContributor.LAST_ALERT));
-        Object n = ent.get(IdsAlertRecordContributor.ALERT_COUNT);
-        evidence.add(
-            (n == null ? "Alerts" : n + " alert" + ("1".equals(String.valueOf(n)) ? "" : "s"))
-                + " from " + TrafficContributor.readable(ent.get(IdsAlertRecordContributor.FIRST_ALERT))
-                + " to " + TrafficContributor.readable(ent.get(IdsAlertRecordContributor.LAST_ALERT)));
       }
       Map<String, String> basis = basisOf.getOrDefault(c2, Map.of("kind", "rule"));
       attrs.put("conclusion", basis.get("kind"));
@@ -148,5 +147,27 @@ public class C2Question implements StandardQuestion {
     if (country != null) return country.toString();
     return null;
   }
-}
 
+  /**
+   * "65 alerts from … to …"; when the records stopped at their cap (#1284), the true count and how
+   * many records were kept, since neither the first nor the last record kept is then certain to be
+   * the first or last alert.
+   */
+  static String alertSpan(Map<String, Object> ent) {
+    Object n = ent.get(IdsAlertRecordContributor.ALERT_COUNT);
+    String count = n == null ? "Alerts" : n + " alert" + ("1".equals(String.valueOf(n)) ? "" : "s");
+    Object kept = ent.get(IdsAlertRecordContributor.ALERT_RECORDS_KEPT);
+    if (kept != null) {
+      Object firstKept = ent.get(IdsAlertRecordContributor.FIRST_KEPT_ALERT);
+      return count + " (" + ("0".equals(String.valueOf(kept)) ? "no records kept"
+          : "records kept for " + kept + " of them only"
+              + (firstKept != null ? ", the earliest at " + TrafficContributor.readable(firstKept) : ""))
+          + ")";
+    }
+    Object first = ent.get(IdsAlertRecordContributor.FIRST_ALERT);
+    if (first == null) return null;
+    Object last = ent.get(IdsAlertRecordContributor.LAST_ALERT);
+    return count + " from " + TrafficContributor.readable(first)
+        + (last != null ? " to " + TrafficContributor.readable(last) : "");
+  }
+}

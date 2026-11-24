@@ -26,7 +26,15 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
 
   public static final String ALERT_COUNT = "alertCount";
   public static final String FIRST_ALERT = "firstAlert";
+  /** Absent when the records stopped at their cap before this server's last alert (#1284). */
   public static final String LAST_ALERT = "lastAlert";
+  /** Set only when fewer records were kept than alerts fired (#1284): how many were. */
+  public static final String ALERT_RECORDS_KEPT = "alertRecordsKept";
+  /**
+   * In place of {@link #FIRST_ALERT} when the records were cut (#1284): the earliest record kept.
+   * The capture's cap cuts in log order, so an earlier alert on another flow may have no record.
+   */
+  public static final String FIRST_KEPT_ALERT = "firstKeptAlert";
   /** "POST http://host/path (65×)", most frequent first, at most {@link #MAX_REQUESTS}. */
   public static final String ALERT_REQUESTS = "alertRequests";
 
@@ -48,19 +56,35 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     IdsAlertLookup lookup = alerts.getIfAvailable();
     if (lookup == null) return;
-    post(lookup.forFile(context.fileId()), board);
+    post(lookup.forFile(context.fileId()), lookup.countsForFile(context.fileId()), board);
+  }
+
+  static void post(List<IdsAlertFacts> records, CaseKnowledgeBuilder board) {
+    post(records, List.of(), board);
   }
 
   /** The board-facing part, unit-testable without a lookup. */
-  static void post(List<IdsAlertFacts> records, CaseKnowledgeBuilder board) {
+  static void post(
+      List<IdsAlertFacts> records, List<IdsAlertLookup.AlertCount> counts, CaseKnowledgeBuilder board) {
     Map<String, List<IdsAlertFacts>> byExternal = new LinkedHashMap<>();
     for (IdsAlertFacts a : records) {
-      String external = externalOf(a);
+      String external = externalOf(a.srcIp(), a.dstIp());
       if (external != null) byExternal.computeIfAbsent(external, k -> new ArrayList<>()).add(a);
+    }
+    // The true counts (#1284), when the capture has them: the records may be only the first.
+    Map<String, Integer> totals = new LinkedHashMap<>();
+    for (IdsAlertLookup.AlertCount c : counts) {
+      String external = externalOf(c.srcIp(), c.dstIp());
+      if (external == null) continue;
+      totals.merge(external, c.total(), Integer::sum);
+      byExternal.computeIfAbsent(external, k -> new ArrayList<>()); // every record cut, still counted
     }
     byExternal.forEach((external, list) -> {
       Map<String, Object> attrs = new LinkedHashMap<>();
-      attrs.put(ALERT_COUNT, list.size());
+      int total = Math.max(totals.getOrDefault(external, 0), list.size());
+      boolean truncated = total > list.size();
+      attrs.put(ALERT_COUNT, total);
+      if (truncated) attrs.put(ALERT_RECORDS_KEPT, list.size());
       LocalDateTime first = null, last = null;
       Map<String, Integer> requests = new LinkedHashMap<>();
       for (IdsAlertFacts a : list) {
@@ -71,8 +95,10 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
         String r = request(a);
         if (r != null) requests.merge(r, 1, Integer::sum);
       }
-      if (first != null) attrs.put(FIRST_ALERT, TrafficContributor.utc(first));
-      if (last != null) attrs.put(LAST_ALERT, TrafficContributor.utc(last));
+      if (first != null) attrs.put(truncated ? FIRST_KEPT_ALERT : FIRST_ALERT, TrafficContributor.utc(first));
+      // Past the cap, the last record kept isn't the last alert. Request counts are of the records
+      // kept: ALERT_RECORDS_KEPT says so.
+      if (last != null && !truncated) attrs.put(LAST_ALERT, TrafficContributor.utc(last));
       if (!requests.isEmpty()) {
         attrs.put(
             ALERT_REQUESTS,
@@ -87,11 +113,11 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
   }
 
   /** The outside side of an alert between a local host and the outside; null otherwise. */
-  private static String externalOf(IdsAlertFacts a) {
-    if (a.srcIp() == null || a.dstIp() == null) return null;
-    boolean srcLocal = IpLocality.isLocal(a.srcIp()), dstLocal = IpLocality.isLocal(a.dstIp());
+  private static String externalOf(String srcIp, String dstIp) {
+    if (srcIp == null || dstIp == null) return null;
+    boolean srcLocal = IpLocality.isLocal(srcIp), dstLocal = IpLocality.isLocal(dstIp);
     if (srcLocal == dstLocal) return null;
-    return srcLocal ? a.dstIp() : a.srcIp();
+    return srcLocal ? dstIp : srcIp;
   }
 
   /** "METHOD absolute-url" for an HTTP alert; null when it wasn't HTTP. */

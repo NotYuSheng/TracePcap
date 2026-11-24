@@ -593,7 +593,7 @@ public class ConversationQueryService {
     if (conversation.flow().dstIp() != null) detailIps.add(conversation.flow().dstIp());
     Map<String, GeoIpService.GeoResult> geoMap = geoIpService.lookupExternal(detailIps);
 
-    return ConversationDetailResponse.builder()
+    ConversationDetailResponse detail = ConversationDetailResponse.builder()
         .conversationId(conversation.id())
         .srcIp(conversation.flow().srcIp())
         .srcPort(conversation.flow().srcPort())
@@ -667,6 +667,12 @@ public class ConversationQueryService {
         .dstGeo(toGeoInfo(geoMap.get(conversation.flow().dstIp())))
         .packets(packetResponses)
         .build();
+    // How many fired (#1284): never fewer than the records shown, whatever the count row says.
+    int shown = detail.getIdsAlerts() == null ? 0 : detail.getIdsAlerts().size();
+    detail.setIdsAlertCount(idsAlertLookup.countFor(conversation.id())
+        .map(c -> Math.max(c.total(), shown))
+        .orElse(shown > 0 ? shown : null));
+    return detail;
   }
 
   private PacketResponse toPacketResponse(PacketFacts p) {

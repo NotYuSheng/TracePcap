@@ -60,6 +60,7 @@ interface ConversationApiResponse {
   bytesSrcToDst?: number | null;
   bytesDstToSrc?: number | null;
   idsAlerts?: Array<Omit<IdsAlert, 'time'> & { time?: string | number[] | null }> | null;
+  idsAlertCount?: number | null;
   anomalies?: Array<Omit<ProtocolAnomaly, 'time'> & { time?: string | number[] | null }> | null;
   startTime: string | number[];
   endTime: string | number[];
@@ -156,6 +157,7 @@ function transformConversation(
     packetCount: apiData.packetCount,
     totalBytes: apiData.totalBytes,
     bytesSrcToDst: apiData.bytesSrcToDst ?? null,
+    idsAlertCount: apiData.idsAlertCount ?? null,
     bytesDstToSrc: apiData.bytesDstToSrc ?? null,
     anomalies: (apiData.anomalies ?? []).map((a) => ({
       ...a,

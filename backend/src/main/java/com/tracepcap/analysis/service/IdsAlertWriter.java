@@ -23,6 +23,7 @@ public class IdsAlertWriter {
   private final com.tracepcap.analysis.repository.CaptureStatsRepository stats;
   private final com.tracepcap.analysis.repository.RemoteOperationRepository remoteOperations;
   private final com.tracepcap.analysis.repository.KerberosExchangeRepository kerberosExchanges;
+  private final com.tracepcap.analysis.repository.IdsAlertCountRepository alertCounts;
 
   /** Regenerates this file's Kerberos replies (#1267). */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -45,6 +46,14 @@ public class IdsAlertWriter {
   public void replaceAlerts(UUID fileId, List<IdsAlertEntity> alerts) {
     repository.deleteByFileId(fileId);
     if (!alerts.isEmpty()) repository.saveAll(alerts);
+  }
+
+  /** Regenerates this file's per-conversation alert counts (#1284). */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void replaceAlertCounts(
+      UUID fileId, List<com.tracepcap.analysis.entity.IdsAlertCountEntity> rows) {
+    alertCounts.deleteByFileId(fileId);
+    if (!rows.isEmpty()) alertCounts.saveAll(rows);
   }
 
   /** Regenerates this file's protocol anomalies (#1268). */

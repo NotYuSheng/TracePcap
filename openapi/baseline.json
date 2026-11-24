@@ -1080,6 +1080,10 @@
             },
             "type": "array"
           },
+          "idsAlertCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "idsAlerts": {
             "items": {
               "$ref": "#/components/schemas/IdsAlert"

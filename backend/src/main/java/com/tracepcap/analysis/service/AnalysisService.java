@@ -757,6 +757,32 @@ public class AnalysisService {
         run.parseResult.getConversations().size());
   }
 
+  /**
+   * Per conversation, how many alerts fired and how many records were kept (#1284), so a count built
+   * on the records can say when it's only the first of them.
+   */
+  static List<com.tracepcap.analysis.entity.IdsAlertCountEntity> alertCounts(
+      UUID fileId, List<PcapParserService.ConversationInfo> conversations,
+      List<com.tracepcap.analysis.entity.IdsAlertEntity> rows) {
+    Map<UUID, Integer> kept = new HashMap<>();
+    rows.forEach(r -> kept.merge(r.getConversationId(), 1, Integer::sum));
+    List<com.tracepcap.analysis.entity.IdsAlertCountEntity> out = new ArrayList<>();
+    // A flow shared by two conversations (DHCP clients split by MAC, say) is counted under the first
+    // saved one, as its records are (see saveIdsAlerts).
+    Set<String> counted = new HashSet<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      int k = kept.getOrDefault(c.getEntityId(), 0);
+      boolean first = c.getIdsAlertFlow() == null || counted.add(c.getIdsAlertFlow());
+      int total = Math.max(first ? c.getIdsAlertTotal() : 0, k);
+      if (total == 0) continue;
+      out.add(com.tracepcap.analysis.entity.IdsAlertCountEntity.builder()
+          .conversationId(c.getEntityId()).fileId(fileId).srcIp(c.getSrcIp()).dstIp(c.getDstIp())
+          .total(total).kept(k).build());
+    }
+    return out;
+  }
+
   /** Each Suricata alert in full (#1265). Never fatal: the conversations carry the alert messages. */
   private void saveIdsAlerts(UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
     List<com.tracepcap.analysis.entity.IdsAlertEntity> rows = new ArrayList<>();
@@ -810,10 +836,18 @@ public class AnalysisService {
       }
     }
     // Apart, so a failed anomaly write can't take the alert records with it.
+    boolean recordsSaved = false;
     try {
       idsAlertWriter.replaceAlerts(fileId, rows);
+      recordsSaved = true;
     } catch (Exception ex) {
       log.warn("[{}] Saving {} IDS alert records failed: {}", fileId, rows.size(), ex.getMessage());
+    }
+    try {
+      // Kept is what's in ids_alerts: none, if that write failed.
+      idsAlertWriter.replaceAlertCounts(fileId, alertCounts(fileId, conversations, recordsSaved ? rows : List.of()));
+    } catch (Exception ex) {
+      log.warn("[{}] Saving IDS alert counts failed: {}", fileId, ex.getMessage());
     }
     try {
       idsAlertWriter.replaceAnomalies(fileId, anomalies);

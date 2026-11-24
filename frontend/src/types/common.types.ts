@@ -96,6 +96,11 @@ export interface Conversation {
   bytesDstToSrc?: number | null;
   /** Each Suricata alert as it fired (#1265), oldest first; absent for captures analysed before. */
   idsAlerts?: IdsAlert[];
+  /**
+   * How many alerts fired (#1284). More than idsAlerts holds when the records stopped at their cap
+   * (100 each way on a connection, 20,000 per capture): those are the first. Absent for older captures.
+   */
+  idsAlertCount?: number | null;
   /** Suricata's protocol anomalies (#1268), oldest first; absent for captures analysed before. */
   anomalies?: ProtocolAnomaly[];
   packets: Packet[];

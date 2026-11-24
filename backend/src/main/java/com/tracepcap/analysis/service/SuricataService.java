@@ -136,14 +136,15 @@ public class SuricataService implements Extractor {
       Map<String, String> smbTrees,
       Map<String, List<KerberosRecords.Reply>> kerberos,
       java.util.concurrent.atomic.AtomicInteger kerberosCount,
-      Map<String, JsonNode> kerberosRequests) {
+      Map<String, JsonNode> kerberosRequests,
+      Map<String, Integer> alertTotals) {
     static Eve empty() {
       return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(),
           new java.util.concurrent.atomic.AtomicReference<>(), new HashMap<>(),
           new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(), new HashMap<>(),
-          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>());
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(), new HashMap<>());
     }
   }
 
@@ -195,9 +196,16 @@ public class SuricataService implements Extractor {
 
   /**
    * At most this many alert records are kept per capture (#1265). A scan or a noisy rule can fire
-   * hundreds of thousands of times; the deduplicated message lists are unaffected by the cap.
+   * hundreds of thousands of times; the deduplicated message lists are unaffected by the cap, and
+   * every flow's true count is kept beside the records (#1284).
    */
   static final int MAX_ALERT_EVENTS = 20_000;
+
+  /**
+   * At most this many alert records are kept per flow, each direction its own (#1284), so one noisy connection can't use up
+   * the capture's budget and leave the conversations after it with none.
+   */
+  static final int MAX_ALERT_EVENTS_PER_FLOW = 100;
 
   /**
    * One eve.json {@code alert} record in full (#1265): when it fired, the packet's direction, the
@@ -334,6 +342,9 @@ public class SuricataService implements Extractor {
             ops, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(),
             conv.getInitiatorIp()));
       }
+      // Every conversation on the flow gets its count; saving gives it to the one its records go to.
+      conv.setIdsAlertTotal(totalOf(eve.alertTotals(), conv));
+      conv.setIdsAlertFlow(flowOf(conv));
       List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
       if (!events.isEmpty()) {
         events.sort(Comparator.comparing(AlertEvent::time, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -538,8 +549,11 @@ public class SuricataService implements Extractor {
 
       String key = flowKey(srcIp, srcPort, dstIp, dstPort, proto);
       result.alerts().computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
+      // Every alert is counted; only the first of each flow's, and of the capture's, are kept (#1284).
+      int seenOnFlow = result.alertTotals().merge(key, 1, Integer::sum);
       // A running count: summing every flow's list on each line made a noisy capture quadratic.
-      if (result.alertEventCount().getAndIncrement() < MAX_ALERT_EVENTS) {
+      if (seenOnFlow <= MAX_ALERT_EVENTS_PER_FLOW
+          && result.alertEventCount().getAndIncrement() < MAX_ALERT_EVENTS) {
         result.alertEvents().computeIfAbsent(key, k -> new ArrayList<>())
             .add(alertEvent(root, alert, signature, sid, severity, srcIp, srcPort, dstIp, dstPort));
       }
@@ -734,6 +748,22 @@ public class SuricataService implements Extractor {
     if (map.get(forward) != null) out.addAll(map.get(forward));
     if (!reverse.equals(forward) && map.get(reverse) != null) out.addAll(map.get(reverse));
     return out;
+  }
+
+  /** The alerts Suricata logged on this conversation's flow, both directions. */
+  static int totalOf(Map<String, Integer> totals, PcapParserService.ConversationInfo conv) {
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    return totals.getOrDefault(forward, 0) + (reverse.equals(forward) ? 0 : totals.getOrDefault(reverse, 0));
+  }
+
+  /** The conversation's flow, the same whichever way round it is written. */
+  static String flowOf(PcapParserService.ConversationInfo conv) {
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    return forward.compareTo(reverse) <= 0 ? forward : reverse;
   }
 
   /** Looks up a flow's entry trying both directions (src→dst and dst→src). */

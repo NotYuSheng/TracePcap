@@ -73,4 +73,51 @@ class IdsAlertRecordContributorTest {
     assertThat(new com.tracepcap.knowledge.question.RemoteAccessQuestion().answer(b.build())).singleElement()
         .satisfies(a -> assertThat(a.basis()).contains("Alerts fired on: POST http://194.180.191.64/fakeurl.htm"));
   }
+
+  @Test
+  void pastTheCap_theCountIsTheTrueOne_andTheLastAlertIsntClaimed() {
+    // #1284: 2 records kept of 500 that fired. The last record kept isn't the last alert.
+    LocalDateTime t0 = LocalDateTime.of(2024, 11, 26, 12, 50, 45);
+    List<IdsAlertFacts> kept = List.of(
+        alert(t0, "10.11.26.183", "194.180.191.64", "POST", "194.180.191.64", "/fakeurl.htm"),
+        alert(t0.plusSeconds(5), "10.11.26.183", "194.180.191.64", "POST", "194.180.191.64", "/fakeurl.htm"));
+    var counts = List.of(new com.tracepcap.analysis.spi.IdsAlertLookup.AlertCount(
+        UUID.randomUUID(), "10.11.26.183", "194.180.191.64", 500, 2));
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("194.180.191.64");
+    b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "suricata"));
+    IdsAlertRecordContributor.post(kept, counts, b);
+    var board = b.build();
+
+    Map<String, Object> a = board.entity(c2).orElseThrow().attributes();
+    assertThat(a).containsEntry(IdsAlertRecordContributor.ALERT_COUNT, 500)
+        .containsEntry(IdsAlertRecordContributor.ALERT_RECORDS_KEPT, 2)
+        .containsEntry(IdsAlertRecordContributor.FIRST_KEPT_ALERT, TrafficContributor.utc(t0))
+        .doesNotContainKey(IdsAlertRecordContributor.FIRST_ALERT)
+        .doesNotContainKey(IdsAlertRecordContributor.LAST_ALERT);
+    assertThat(new C2Question().answer(board)).singleElement().satisfies(ans -> {
+      assertThat(ans.attributes()).doesNotContainKeys("firstAlert", "lastAlert");
+      assertThat(ans.basis()).anyMatch(s -> s.startsWith("500 alerts (records kept for 2 of them only, the earliest at "));
+      // the request count is of the records kept, and says so
+      assertThat(ans.basis()).contains("In the 2 alert records kept, alerts fired on: POST http://194.180.191.64/fakeurl.htm (2×)");
+    });
+  }
+
+  @Test
+  void aServerWhoseRecordsWereAllCut_isStillCounted() {
+    var counts = List.of(new com.tracepcap.analysis.spi.IdsAlertLookup.AlertCount(
+        UUID.randomUUID(), "10.11.26.183", "203.0.113.9", 7, 0));
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("203.0.113.9");
+    b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "suricata"));
+    IdsAlertRecordContributor.post(List.of(), counts, b);
+    var board = b.build();
+
+    assertThat(board.entity(c2).orElseThrow().attributes())
+        .containsEntry(IdsAlertRecordContributor.ALERT_COUNT, 7)
+        .containsEntry(IdsAlertRecordContributor.ALERT_RECORDS_KEPT, 0)
+        .doesNotContainKey(IdsAlertRecordContributor.FIRST_ALERT);
+    assertThat(new C2Question().answer(board)).singleElement()
+        .satisfies(ans -> assertThat(ans.basis()).contains("7 alerts (no records kept)"));
+  }
 }
