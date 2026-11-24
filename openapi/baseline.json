@@ -287,6 +287,12 @@
             },
             "type": "array"
           },
+          "derivation": {
+            "items": {
+              "$ref": "#/components/schemas/StepResponse"
+            },
+            "type": "array"
+          },
           "grade": {
             "type": "string"
           },
@@ -2670,6 +2676,12 @@
           "confidence": {
             "format": "int32",
             "type": "integer"
+          },
+          "derivation": {
+            "items": {
+              "$ref": "#/components/schemas/StepResponse"
+            },
+            "type": "array"
           },
           "goal": {
             "type": "string"
@@ -5471,6 +5483,26 @@
           "stepIndex": {
             "format": "int32",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StepResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "found": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
           }
         },
         "type": "object"

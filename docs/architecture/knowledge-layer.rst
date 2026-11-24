@@ -142,6 +142,14 @@ C2. A malware rule about command and control that names no family still marks it
 for *unidentified malware*: the victim follows, but no family is claimed. The data-transfer check excludes known CDN/cloud orgs by attribution, so an ordinary CDN
 download is not mistaken for exfiltration — the exact error an LLM narrating from volume alone made.
 
+**How each answer was reached.** Every answer carries its *derivation* (``Answer.derivation``, #1293):
+the steps its check took, each with what it found on the board, the rule that took it to the next
+claim (in words, from ``Derivations``), the grade of what was found, and the conversations it rests
+on. Steps without a rule are context (where a server is hosted, when it was first reached). The
+Investigation Summary shows them under **How we got here** on each answer, linking each step to its
+conversations. They are written by the checks as they run, so they can't drift from what the code
+did, and they are the answer to "it's deterministic, not the LLM": the reasoning is on screen.
+
 **The agent** is one final, additive knowledge source. The narrator and the Q&A consume the board's
 answers as authoritative ground truth (named, never contradicted); the investigation loop is a
 ReAct-style tool loop over the capture. The agent narrates and answers ad-hoc questions — it never

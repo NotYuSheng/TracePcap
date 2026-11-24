@@ -112,7 +112,7 @@ public class C2Question implements StandardQuestion {
               Grade.INFERRED,
               subjects,
               evidence,
-              attrs));
+              attrs).withDerivation(Derivations.c2(board, c2, families)));
     });
     return answers;
   }

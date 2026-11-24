@@ -110,3 +110,47 @@ describe('Answer links to conversations (#1264)', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
+
+describe('How we got here (#1293)', () => {
+  const c2: Answer = {
+    ...answer('c2', { address: '141.98.10.79' }),
+    headline: '141.98.10.79 (LT · UAB Host Baltic) — C2 for STRRAT',
+    derivation: [
+      {
+        found: 'Suricata rule "ET MALWARE STRRAT CnC Checkin" fired on 172.16.1.66 → 141.98.10.79.',
+        rule: "A Suricata malware rule that names a server makes it that malware family's command-and-control server.",
+        grade: 'INFERRED',
+        conversations: ['conv-1'],
+      },
+      { found: 'First contacted at 2024-07-30 02:54:23 UTC.', rule: null, grade: 'MEASURED', conversations: [] },
+    ],
+  };
+
+  it('walks the steps: what was found, the rule, and a link to the conversation', async () => {
+    render(
+      <MemoryRouter>
+        <ConfirmedFindingsPanel fileId="f1" answers={[c2]} />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /How we got here/ }));
+
+    const steps = await screen.findAllByTestId('derivation-step');
+    expect(steps).toHaveLength(2);
+    expect(steps[0]).toHaveTextContent('ET MALWARE STRRAT CnC Checkin');
+    expect(steps[0]).toHaveTextContent("Rule: A Suricata malware rule that names a server");
+    // A context step has no rule.
+    expect(steps[1]).not.toHaveTextContent('Rule:');
+    expect(screen.getByRole('link', { name: /Conversation 1/ }).getAttribute('href')).toBe(
+      '/analysis/f1/conversations?highlight=conv-1',
+    );
+  });
+
+  it('offers no walkthrough for an answer without steps', () => {
+    render(
+      <MemoryRouter>
+        <ConfirmedFindingsPanel fileId="f1" answers={[answer('c2', { address: '45.1.2.3' })]} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('button', { name: /How we got here/ })).not.toBeInTheDocument();
+  });
+});

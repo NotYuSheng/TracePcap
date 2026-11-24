@@ -120,28 +120,66 @@ knowledge board — not the LLM — and each answer carries a **grade** recordin
 
 .. list-table::
    :header-rows: 1
-   :widths: 20 50 14 16
+   :widths: 22 60 18
 
    * - Goal
      - Answer
      - Grade
-     - From
    * - Signed-in user
      - ``ccollier`` (Clark Collier) signed in on ``172.16.1.66``
      - MEASURED
-     - Kerberos AS-REQ + LDAP
    * - Victim host
      - ``172.16.1.66`` — contacted a known malware C2 (signed in as ``ccollier``)
      - INFERRED
-     - contacted the C2 below
    * - Malware
      - ``STRRAT``
      - INFERRED
-     - IDS + stream fingerprint
    * - Command & control
-     - ``141.98.10.79`` (LT · UAB Host Baltic) — C2 for STRRAT
+     - ``141.98.10.79`` — C2 for STRRAT
      - INFERRED
-     - IDS + beacon + GeoIP
+
+How each answer was reached
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*(From a later build than the rest of this page, #1293.)* "Not the LLM" shouldn't be taken on trust, so every answer has a **How we got here** button that
+walks the reasoning: what each check found, the rule that took it to the next claim, how directly
+each step is known, and links to the conversations it rests on. The steps are written by the checks
+as they run, so they are what the code did. For this capture:
+
+**Command & control.**
+
+1. Suricata rule *ET MALWARE STRRAT CnC Checkin* (sid 2030358) fired on ``172.16.1.66 →
+   141.98.10.79``. *Rule: a Suricata malware rule that names a server makes it that malware family's
+   command-and-control server.* (Inferred: a rule's judgment.)
+2. ``141.98.10.79`` is in LT (Lithuania), from the GeoIP database. (Context.)
+3. First contacted at 02:40:05 UTC. (Measured.)
+
+**Victim host.**
+
+1. ``141.98.10.79`` is a command-and-control server for STRRAT (the C2 answer above).
+2. ``172.16.1.66`` talked to it. *Rule: a host inside the network that talks to a known C2 is
+   treated as infected: the victim.* The step links to the conversation.
+3. ``172.16.1.66`` was signed in as ``ccollier`` (the signed-in user answer).
+
+**Signed-in user.**
+
+1. ``172.16.1.66`` identified itself as ``ccollier`` in its own Kerberos AS-REQ. *Rule: a host that
+   asks the domain controller for a ticket as an account is signed in as that account.* (Measured.)
+2. The directory names the account Clark Collier, from an LDAP lookup in the capture. (Reported: a
+   party's claim.)
+
+**Malware.** The same rule names the family. *Rule: a detector that names a malware family
+identifies it: a Suricata rule by name, or the stream classifier by the family's own check-in.*
+
+.. figure:: images/how-we-got-here.png
+   :alt: The "How we got here" walkthrough for the victim host
+   :width: 80%
+
+   The victim answer's walkthrough: each step, the rule that took it to the next, and a link to the
+   conversation it rests on.
+
+The grade of an answer follows from its steps: the victim is *Inferred* because it rests on the C2,
+which rests on a rule's judgment, however deterministic the code that applied it.
 
 The summary names *who, what, and where* at a glance, and it is honest about certainty: the signed-in
 user is ``MEASURED`` (the host authenticated as that principal), while the malware and C2 are

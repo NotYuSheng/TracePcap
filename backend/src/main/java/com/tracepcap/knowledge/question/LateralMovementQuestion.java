@@ -76,7 +76,12 @@ public class LateralMovementQuestion implements StandardQuestion {
           Grade.MEASURED,
           List.of(EntityRef.host(client), EntityRef.host(server)),
           List.copyOf(basis),
-          attrs));
+          attrs).withDerivation(findings.stream()
+              .map(f -> new com.tracepcap.knowledge.spi.Step(
+                  client + " → " + server + ": " + (f.attributes().get("operations") instanceof List<?> l
+                      ? String.join("; ", l.stream().map(String::valueOf).toList()) : f.summary()) + ".",
+                  Derivations.lateralRule(technique(f)), Grade.MEASURED, f.evidence()))
+              .toList()));
     });
     return answers;
   }

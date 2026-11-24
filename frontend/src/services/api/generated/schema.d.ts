@@ -3215,6 +3215,7 @@ export interface components {
                 [key: string]: Record<string, never>;
             };
             basis?: string[];
+            derivation?: components["schemas"]["StepResponse"][];
             grade?: string;
             headline?: string;
             question?: string;
@@ -4079,6 +4080,7 @@ export interface components {
             basis?: string[];
             /** Format: int32 */
             confidence?: number;
+            derivation?: components["schemas"]["StepResponse"][];
             goal?: string;
             grade?: string;
             headline?: string;
@@ -5063,6 +5065,12 @@ export interface components {
             explanation?: string;
             /** Format: int32 */
             stepIndex?: number;
+        };
+        StepResponse: {
+            conversations?: string[];
+            found?: string;
+            grade?: string;
+            rule?: string;
         };
         StoryAggregates: {
             beaconCandidates?: components["schemas"]["BeaconCandidate"][];

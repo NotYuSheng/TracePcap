@@ -49,12 +49,24 @@ public class SignedInUserQuestion implements StandardQuestion {
     attrs.put("host", host);
     if (realName != null) attrs.put("realName", realName);
 
+    Object onEdge = signedIn.attributes().get("signInSource");
+    String source = onEdge != null ? onEdge.toString()
+        : board.entity(signedIn.to()).map(e -> e.attributes().get("source")).map(Object::toString).orElse(null);
+    List<com.tracepcap.knowledge.spi.Step> steps = new java.util.ArrayList<>();
+    steps.add(com.tracepcap.knowledge.spi.Step.of(
+        host + " identified itself as " + user + " in " + Derivations.signInSource(source) + ".",
+        Derivations.signInRule(source), signedIn.grade()));
+    if (realName != null) {
+      steps.add(com.tracepcap.knowledge.spi.Step.of(
+          "The directory names the account " + realName + " (an LDAP lookup in the capture).", null,
+          com.tracepcap.knowledge.spi.Grade.REPORTED));
+    }
     return new Answer(
         QUESTION,
         who + " signed in on " + host,
         signedIn.grade(),
         List.of(signedIn.to(), signedIn.from()),
         List.of("from " + signedIn.source() + " (" + signedIn.grade() + ")"),
-        attrs);
+        attrs).withDerivation(steps);
   }
 }

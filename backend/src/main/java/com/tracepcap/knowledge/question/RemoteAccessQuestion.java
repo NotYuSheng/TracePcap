@@ -44,6 +44,7 @@ public class RemoteAccessQuestion implements StandardQuestion {
   public List<Answer> answer(CaseKnowledge board) {
     // (host, tool, external) -> the alerts that showed it
     Map<List<String>, List<String>> sessions = new LinkedHashMap<>();
+    Map<List<String>, java.util.Set<String>> convs = new LinkedHashMap<>();
     for (Finding f : java.util.stream.Stream.concat(
         board.findingsOfCategory("ids-alert").stream(),
         board.findingsOfCategory(com.tracepcap.knowledge.contributor.RemoteAccessAppContributor.REMOTE_ACCESS_APP).stream()).toList()) {
@@ -61,6 +62,8 @@ public class RemoteAccessQuestion implements StandardQuestion {
       }
       if (host == null || external == null) continue;
       sessions.computeIfAbsent(List.of(host.key(), tool, external.key()), k -> new ArrayList<>()).add(alert);
+      convs.computeIfAbsent(List.of(host.key(), tool, external.key()), k -> new java.util.LinkedHashSet<>())
+          .addAll(f.evidence());
     }
 
     List<Answer> answers = new ArrayList<>();
@@ -95,7 +98,11 @@ public class RemoteAccessQuestion implements StandardQuestion {
               Grade.INFERRED,
               List.of(EntityRef.host(host), EntityRef.external(external)),
               basis,
-              attrs));
+              attrs).withDerivation(List.of(new com.tracepcap.knowledge.spi.Step(
+                  host + " ran " + tool + " to " + external + ", outside the network: "
+                      + String.join("; ", alerts.stream().distinct().toList()) + ".",
+                  Derivations.RULE_REMOTE_ACCESS, Grade.INFERRED,
+                  new ArrayList<>(convs.getOrDefault(key, java.util.Set.of()))))));
     });
     return answers;
   }
