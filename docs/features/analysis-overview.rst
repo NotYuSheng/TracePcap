@@ -46,7 +46,15 @@ What Needs a Look (right)
   Below the count are the nDPI risk names and the custom rules matched; click
   one to see its conversations. The card also links to the files found in the
   traffic.
-- **Confirmed findings**, when the investigation has answers.
+- **Investigation Summary**, when the investigation has answers or ruled out candidates: each answer
+  with **How we got here**, and **Considered and ruled out** (see :doc:`story-mode`).
+- **Worth a look**: the protocols in this capture, grouped by the investigation question they help
+  answer, each with what it shows there and a link to its conversations. Kerberos and LDAP for *who
+  is signed in*, DHCP and NetBIOS for *which machine it is*, DNS, TLS and HTTP for *command and
+  control*, SMB, DCE-RPC and RDP for *lateral movement*, Kerberos and NTLM for *account attacks*,
+  mail and FTP for *data leaving*, remote-control tools for *remote access*. A question the
+  Investigation Summary answered is marked **Answered**; one nothing concluded is **Open**, so its
+  protocols are where to look. Questions with none of their protocols in the capture are left out.
 - **Applications detected** (from nDPI) and **Dissected protocols** (from
   tshark). Click a badge for its details.
 

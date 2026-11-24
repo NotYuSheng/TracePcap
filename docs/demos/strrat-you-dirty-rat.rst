@@ -91,7 +91,10 @@ Step 2 — Overview: the shape of the capture
 The **Overview** tab is the landing summary: 11,562 packets across 47 hosts and 426 conversations, the
 protocol mix, the applications nDPI identified, and a row of risk-alert badges. Two protocols worth
 noting immediately are **KRB5** (Kerberos) and **LDAP** — the directory-service traffic that will name
-the victim.
+the victim. In later builds the **Worth a look** card says this itself: it groups the capture's
+protocols by the question they help answer (Kerberos and LDAP under *who is signed in*, SMB and
+DCE-RPC under *lateral movement*, and so on), marks which the Investigation Summary already answered,
+and links each to its conversations.
 
 .. figure:: images/overview.png
    :alt: TracePcap analysis overview for the STRRAT capture

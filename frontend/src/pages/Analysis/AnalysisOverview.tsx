@@ -9,6 +9,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData, TimelineDataPoint } from '@/types';
 import { useHostGroups, groupSize } from '@/features/network/hooks/useHostGroups';
 import { SourceTag } from '@components/analysis/Overview/SourceTag';
+import { WorthALookCard } from '@components/analysis/Overview/WorthALookCard';
 import { MixBar, type MixRow } from '@components/analysis/Overview/MixBar';
 import '@components/analysis/Overview/Overview.css';
 import { getProtocolColor } from '@/features/network/constants';
@@ -508,6 +509,16 @@ export const AnalysisOverview = () => {
 
           {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4). */}
           {(answers.length > 0 || considered.length > 0) && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} considered={considered} fileId={fileId} />}
+
+          {/* The protocols worth opening, by the question they help answer (#1292). */}
+          {fileId && (
+            <WorthALookCard
+              fileId={fileId}
+              l7Protocols={data.detectedL7Protocols ?? []}
+              apps={detectedApps.map(a => a.name)}
+              answeredQuestions={answers.map(a => a.question)}
+            />
+          )}
 
           {(
             <section className="ov-card" aria-labelledby="ov-apps">
