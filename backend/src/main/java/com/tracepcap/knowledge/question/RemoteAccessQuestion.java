@@ -35,39 +35,6 @@ public class RemoteAccessQuestion implements StandardQuestion {
 
   static final String QUESTION = "remote-access";
 
-  /** The tools by the names ET's rules use, with how to show them. */
-  private static final Map<String, String> TOOLS = new LinkedHashMap<>();
-
-  static {
-    TOOLS.put("netsupport", "NetSupport");
-    TOOLS.put("anydesk", "AnyDesk");
-    TOOLS.put("screenconnect", "ScreenConnect");
-    TOOLS.put("connectwise control", "ScreenConnect");
-    TOOLS.put("teamviewer", "TeamViewer");
-    TOOLS.put("atera", "Atera");
-    TOOLS.put("splashtop", "Splashtop");
-    TOOLS.put("rustdesk", "RustDesk");
-    TOOLS.put("supremo", "Supremo");
-    TOOLS.put("remote utilities", "Remote Utilities");
-    TOOLS.put("logmein", "LogMeIn");
-    TOOLS.put("simplehelp", "SimpleHelp");
-    TOOLS.put("meshcentral", "MeshCentral");
-    TOOLS.put("action1", "Action1");
-    TOOLS.put("tactical rmm", "Tactical RMM");
-    TOOLS.put("kaseya", "Kaseya");
-    TOOLS.put("zoho assist", "Zoho Assist");
-    TOOLS.put("ninjaone", "NinjaOne");
-  }
-
-  private static final Pattern TOOL =
-      Pattern.compile(
-          "\\b(" + String.join("|", TOOLS.keySet().stream().map(Pattern::quote).toList()) + ")\\b",
-          Pattern.CASE_INSENSITIVE);
-
-  /** Rules about a name lookup: the far end is a resolver, not the tool's server. */
-  private static final Pattern DNS_RULE =
-      Pattern.compile("\\b(DNS (Lookup|Query)|in DNS)\\b", Pattern.CASE_INSENSITIVE);
-
   @Override
   public String question() {
     return QUESTION;
@@ -77,11 +44,15 @@ public class RemoteAccessQuestion implements StandardQuestion {
   public List<Answer> answer(CaseKnowledge board) {
     // (host, tool, external) -> the alerts that showed it
     Map<List<String>, List<String>> sessions = new LinkedHashMap<>();
-    for (Finding f : board.findingsOfCategory("ids-alert")) {
+    for (Finding f : java.util.stream.Stream.concat(
+        board.findingsOfCategory("ids-alert").stream(),
+        board.findingsOfCategory(com.tracepcap.knowledge.contributor.RemoteAccessAppContributor.REMOTE_ACCESS_APP).stream()).toList()) {
+      String tool =
+          f.attributes().get("tool") instanceof String t
+              ? t
+              : com.tracepcap.knowledge.contributor.RemoteAccessTools.toolIn(f.summary());
+      if (tool == null) continue;
       String alert = f.summary();
-      if (alert == null || alert.contains(" MALWARE ") || DNS_RULE.matcher(alert).find()) continue;
-      Matcher m = TOOL.matcher(alert);
-      if (!m.find()) continue;
       EntityRef host = null;
       EntityRef external = null;
       for (EntityRef r : f.concerns()) {
@@ -89,7 +60,6 @@ public class RemoteAccessQuestion implements StandardQuestion {
         else if (r.type() == EntityType.EXTERNAL_SERVICE) external = r;
       }
       if (host == null || external == null) continue;
-      String tool = TOOLS.get(m.group(1).toLowerCase(Locale.ROOT));
       sessions.computeIfAbsent(List.of(host.key(), tool, external.key()), k -> new ArrayList<>()).add(alert);
     }
 

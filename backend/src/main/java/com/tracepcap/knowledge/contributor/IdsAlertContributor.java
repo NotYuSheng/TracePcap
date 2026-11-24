@@ -146,13 +146,40 @@ public class IdsAlertContributor implements KnowledgeContributor {
     // A C2 that no rule names a family for (a "Fake Microsoft Teams CnC" request): still the C2,
     // so the host talking to it is the victim, but no family is claimed. Skipped where a named
     // family already covers the server, so a family-less rule beside a named one adds nothing.
+    java.util.Set<String> confirmed = new java.util.HashSet<>();
+    named.forEach(e -> confirmed.add(e.key()));
     for (EntityRef external : unnamedC2) {
+      confirmed.add(external.key());
       if (named.contains(external)) continue;
       EntityRef unidentified = EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE);
       board.addEntity(unidentified);
       board.addRelationship(Relationship.of(external, C2_OF, unidentified, Grade.INFERRED, "suricata"));
     }
+
+    // C2s no single alert proves: a chain of weaker signals, each link required (C2Corroboration).
+    for (C2Corroboration.Escalation e : C2Corroboration.find(context.conversationFacts(), confirmed)) {
+      EntityRef external = EntityRef.external(e.external());
+      EntityRef malware =
+          EntityRef.malware(e.family() != null ? e.family() : EntityRef.UNIDENTIFIED_MALWARE);
+      board.addEntity(malware);
+      board.addRelationship(
+          new Relationship(external, C2_OF, malware, Grade.INFERRED, "corroboration",
+              Map.of(CORROBORATION, e.kind(), "reason", e.reason())));
+      board.addFinding(
+          new Finding(
+              "c2-classification",
+              e.reason(),
+              Severity.HIGH,
+              Grade.INFERRED,
+              "corroboration",
+              List.of(external, EntityRef.host(e.host())),
+              List.of(),
+              Map.of(CORROBORATION, e.kind())));
+    }
   }
+
+  /** On a c2-of edge made by corroboration: which rule ("suspected-c2", "install-chain"). */
+  public static final String CORROBORATION = "corroboration";
 
   /** A host if internal, an external service if routable; null for a blank/unusable address. */
   private EntityRef endpointRef(String ip) {

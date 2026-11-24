@@ -37,8 +37,12 @@ public class C2Question implements StandardQuestion {
     // external C2 -> the malware families it serves (deduped: the same family can be named by
     // several rules on one conversation, or recur across conversations)
     Map<EntityRef, Set<String>> c2ToMalware = new LinkedHashMap<>();
+    // Servers only corroboration made a C2 (no alert of their own named them): worded "suspected".
+    Map<EntityRef, Boolean> suspectedOnly = new LinkedHashMap<>();
     for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
       c2ToMalware.computeIfAbsent(c2of.from(), k -> new LinkedHashSet<>()).add(c2of.to().key());
+      boolean suspected = "suspected-c2".equals(c2of.attributes().get("corroboration"));
+      suspectedOnly.merge(c2of.from(), suspected, Boolean::logicalAnd);
     }
 
     List<Answer> answers = new ArrayList<>();
@@ -59,10 +63,13 @@ public class C2Question implements StandardQuestion {
               QUESTION,
               c2.key()
                   + (place != null ? " (" + place + ")" : "")
-                  + " — C2 for "
+                  + (Boolean.TRUE.equals(suspectedOnly.get(c2)) ? " — suspected C2 for " : " — C2 for ")
                   + String.join(", ", families.stream()
                       .map(f -> EntityRef.UNIDENTIFIED_MALWARE.equals(f)
-                          ? "unidentified malware (the rule names no family)" : f)
+                          ? (Boolean.TRUE.equals(suspectedOnly.get(c2))
+                              ? "unidentified malware"
+                              : "unidentified malware (the rule names no family)")
+                          : f)
                       .toList())
                   + (first != null
                       ? ", first contacted "

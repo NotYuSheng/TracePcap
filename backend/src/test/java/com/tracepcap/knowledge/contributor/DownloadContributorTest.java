@@ -123,4 +123,45 @@ class DownloadContributorTest {
         .singleElement()
         .satisfies(x -> assertThat(x.headline()).contains("from http://72.5.43.29/data/0f60a3e7baecf2748b1c8183ed37d1e4 (72.5.43.29)"));
   }
+
+  @Test
+  void aPowerShellScriptTypedAsText_isADownload_byItsName() {
+    // 2025-01-22: the C2 served pas.ps1; content detection says text/plain.
+    UUID c = UUID.randomUUID();
+    assertThat(
+            run(
+                List.of(conv(c, "10.1.17.215", "5.252.153.241", null)),
+                List.of(new ExtractedFileFacts(c, "pas.ps1", "text/plain", 1_520L, "a833f27c", "tshark_http", false,
+                    "http://5.252.153.241/api/file/get-file/pas.ps1"))))
+        .singleElement()
+        .satisfies(x -> assertThat(x.headline()).contains("pas.ps1 (PowerShell script"));
+  }
+
+  @Test
+  void gzipIsNotAnArchiveDownload() {
+    // Holdout 2026-09-11 (Kongtuke): 55 gzip-compressed C2 responses counted as archives.
+    UUID c = UUID.randomUUID();
+    assertThat(
+            run(
+                List.of(conv(c, "10.9.11.135", "86.106.87.134", null)),
+                List.of(new ExtractedFileFacts(c, "ho", "application/gzip", 27_000L, "aa", "tshark_http", false,
+                    "http://know.mom-nower.com/0l6yonrds/we/ho"))))
+        .isEmpty();
+  }
+
+  @Test
+  void oneServerCannotFloodTheAnswers_threeLargestThenACount() {
+    List<ConversationFacts> convs = new java.util.ArrayList<>();
+    List<ExtractedFileFacts> files = new java.util.ArrayList<>();
+    for (int i = 0; i < 7; i++) {
+      UUID c = UUID.randomUUID();
+      convs.add(conv(c, "10.9.11.135", "86.106.87.134", null));
+      files.add(new ExtractedFileFacts(c, "f" + i + ".zip", "application/zip", 1_000L * (i + 1), "sha" + i,
+          "tshark_http", false));
+    }
+    List<Answer> a = run(convs, files);
+    assertThat(a).hasSize(4);
+    assertThat(a.get(0).headline()).contains("f6.zip");
+    assertThat(a.get(3).headline()).contains("4 more files from 86.106.87.134");
+  }
 }

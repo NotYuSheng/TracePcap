@@ -70,6 +70,28 @@ Grade         Meaning
 ``INFERRED``  a tool judged it (an IDS verdict, a device-type vote) — a guess with error modes.
 ============  ===========================================================================
 
+**Corroborated C2s.** Some command-and-control servers no single alert proves. Two rules
+recognise them by a chain of weaker signals; every link is required, and the answer carries the
+chain as its evidence:
+
+- **Suspected C2:** a reputation-listed server (Spamhaus DROP, CINS, known-compromised, as the ET
+  rules carry them) that a host *already talking to a confirmed C2* contacts at a bare IP, in
+  repeated rounds a minute or more apart (or seconds after another such server). Worded *suspected C2
+  for unidentified malware*. Reputation alone never makes a C2.
+- **Probable unsanctioned remote access:** a remote-admin tool known as a RAT (NetSupport) checking
+  in to a bare IP, when within
+  ten minutes before its first check-in the same host ran PowerShell, another script engine or a
+  download tool (curl, BITS, certutil) against another outside server that then sent it at least 1 MB. Becomes a C2 for the tool's abuse
+  (*NetSupport RAT*); without the chain it stays a remote-access tool to confirm. AnyDesk, TeamViewer
+  and the like are never escalated: an IT install of one looks the same on the wire.
+
+On five malware-traffic-analysis.net exercises these recover the only answers the key asks that
+were missing (two C2s on the fake-software-site case; NetSupport's C2, family and victim), and on
+26 clean sample captures neither rule fires. Four further exercises, run before reading their answer
+keys (a holdout), found nothing confidently wrong and showed three over-broad rules, since fixed: a
+tool's vendor lookup (NetSupport's GeoLocation request) counted as a session, gzip-compressed web
+responses counted as archive downloads, and a curl fetch didn't count as an install step.
+
 So a conclusion built from ``MEASURED`` facts outranks one built from ``REPORTED`` or ``INFERRED``
 ones, and every surface can show *how directly* something is known rather than asserting certainty.
 
@@ -93,10 +115,12 @@ answers one standard investigation question by querying the board and posting an
 conclusion, distinct from a finding). Because input and output are both deterministic, each is
 unit-testable against a fixture board. Today: victim, command-and-control, malware, signed-in user,
 data-transfer (a bulk transfer to a non-CDN external, for review), and remote-access (a remote-admin
-tool such as NetSupport or AnyDesk talking to a server outside the network, for review: IT uses
+tool such as NetSupport or AnyDesk talking to a server outside the network, from a Suricata alert or
+nDPI's own recognition of TeamViewer, AnyDesk, Radmin or NoMachine, for review: IT uses
 these tools and so do attackers, so it never calls the server a C2), and downloads (executables,
 scripts, archives and installers a host fetched from outside over a real HTTP transfer, each with its
-SHA-256; never a file carved from raw bytes, and never an operating-system update). The C2 and
+SHA-256; never a file carved from raw bytes, never an operating-system update, and never a
+gzip-compressed web response; at most the three largest per host and server, then a count). The C2 and
 remote-access answers also say when the server was first contacted, in UTC. They are deliberately precise
 — the victim and C2 checks key on the ``c2-of`` edge, not "any host or external in any IDS alert",
 so an informational alert never mislabels the domain controller as a victim or a benign CDN as a
