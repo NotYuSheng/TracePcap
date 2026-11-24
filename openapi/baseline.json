@@ -939,6 +939,14 @@
           "appName": {
             "type": "string"
           },
+          "bytesDstToSrc": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bytesSrcToDst": {
+            "format": "int64",
+            "type": "integer"
+          },
           "category": {
             "type": "string"
           },
@@ -1219,6 +1227,14 @@
         "properties": {
           "appName": {
             "type": "string"
+          },
+          "bytesDstToSrc": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bytesSrcToDst": {
+            "format": "int64",
+            "type": "integer"
           },
           "category": {
             "type": "string"
@@ -2581,6 +2597,12 @@
           "answered": {
             "type": "boolean"
           },
+          "attributes": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
           "basis": {
             "items": {
               "type": "string"
@@ -2677,6 +2699,9 @@
           "loggedInUserCount": {
             "format": "int32",
             "type": "integer"
+          },
+          "loggedInUserRealName": {
+            "type": "string"
           },
           "loggedInUserSource": {
             "type": "string"

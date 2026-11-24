@@ -91,6 +91,9 @@ export interface Conversation {
   endTime: number;
   packetCount: number;
   totalBytes: number;
+  /** Bytes from srcIp to dstIp and back (#1260); absent for conversations analysed before then. */
+  bytesSrcToDst?: number | null;
+  bytesDstToSrc?: number | null;
   packets: Packet[];
   direction: 'bidirectional' | 'unidirectional';
   srcGeo?: ConversationGeoInfo;
@@ -468,6 +471,8 @@ export interface HostClassification {
   loggedInUser?: string;
   /** How `loggedInUser` was discovered: kerberos_as_req or ntlm_auth (signed in) | ldap_dn (weaker). */
   loggedInUserSource?: string;
+  /** The person behind `loggedInUser` ("Gabriel McDowell"), from a SAMR reply or an LDAP person DN. */
+  loggedInUserRealName?: string;
   /**
    * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
    * 1. With more, show "N accounts" and the host's login timeline rather than picking one.
@@ -601,6 +606,8 @@ export interface GoalOutcome {
   confidence: number;
   basis: string[];
   subjects: AnswerEntityRef[];
+  /** The answer's structured detail (a C2's address, how it was concluded); absent from older backends. */
+  attributes?: Record<string, unknown>;
 }
 
 /**

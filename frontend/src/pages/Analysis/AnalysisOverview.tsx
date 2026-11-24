@@ -502,7 +502,7 @@ export const AnalysisOverview = () => {
           </section>
 
           {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4). */}
-          {answers.length > 0 && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} />}
+          {answers.length > 0 && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} fileId={fileId} />}
 
           {(
             <section className="ov-card" aria-labelledby="ov-apps">

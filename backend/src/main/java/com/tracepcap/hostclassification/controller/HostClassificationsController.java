@@ -71,6 +71,7 @@ public class HostClassificationsController {
                         .hostnameSource(h.hostnameSource())
                         .loggedInUser(h.loggedInUser())
                         .loggedInUserSource(h.loggedInUserSource())
+                        .loggedInUserRealName(h.loggedInUserRealName())
                         .loggedInUserCount(h.loggedInUserCount())
                         .ttl(h.ttl())
                         .ttls(h.ttls())

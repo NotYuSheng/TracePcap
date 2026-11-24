@@ -30,7 +30,7 @@ export function investigationToSummary(report: InvestigationReport): Investigati
       grade: g.grade ?? 'INFERRED',
       subjects: g.subjects,
       basis: g.basis,
-      attributes: {},
+      attributes: g.attributes ?? {},
     }));
   const answers = [...goalAnswers, ...report.additional];
   // "Not established" is only meaningful once there is an incident to be incomplete about. On a

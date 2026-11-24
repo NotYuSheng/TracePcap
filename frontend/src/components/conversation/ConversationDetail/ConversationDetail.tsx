@@ -515,6 +515,20 @@ export const ConversationDetail = ({
               <dl className="cd-kv">
                 <dt>Packets</dt><dd>{conversation.packetCount.toLocaleString()}</dd>
                 <dt>Bytes</dt><dd>{formatBytes(conversation.totalBytes)}</dd>
+                {conversation.bytesSrcToDst != null && conversation.bytesDstToSrc != null && (
+                  <>
+                    {/* Which way the bytes went (#1260): a big download and an upload look
+                        the same as a total, and only one of them is possible exfiltration. */}
+                    <dt>Sent</dt>
+                    <dd data-testid="bytes-src-to-dst">
+                      {formatBytes(conversation.bytesSrcToDst)} <small className="text-muted">by {source.ip}</small>
+                    </dd>
+                    <dt>Received</dt>
+                    <dd data-testid="bytes-dst-to-src">
+                      {formatBytes(conversation.bytesDstToSrc)} <small className="text-muted">from {destination.ip}</small>
+                    </dd>
+                  </>
+                )}
                 <dt>Start</dt><dd>{formatTimestamp(conversation.startTime)}</dd>
                 {conversation.connectionOutcome && (
                   <>

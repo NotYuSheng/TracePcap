@@ -17,6 +17,11 @@ public class HostClassificationResponse {
   /** How {@code loggedInUser} was discovered: {@code kerberos_as_req} or {@code ldap_dn}; null if unset. */
   String loggedInUserSource;
   /**
+   * The person behind {@code loggedInUser} (e.g. "Gabriel McDowell"), from a SAMR reply or an LDAP
+   * person DN; null when the capture doesn't name them.
+   */
+  String loggedInUserRealName;
+  /**
    * How many distinct accounts were seen signing in (#812). {@code loggedInUser} is only set when
    * this is 1. With more, show "N accounts" and the host's login timeline instead.
    */

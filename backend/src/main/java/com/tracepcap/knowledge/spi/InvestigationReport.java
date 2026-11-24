@@ -30,11 +30,21 @@ public record InvestigationReport(
       Grade grade,
       int confidence,
       List<String> basis,
-      List<EntityRef> subjects) {
+      List<EntityRef> subjects,
+      // The answer's structured detail (a C2's address and how it was concluded, say), so a goal
+      // renders like any other answer instead of losing it (#1264).
+      java.util.Map<String, Object> attributes) {
 
     public GoalOutcome {
       basis = basis == null ? List.of() : List.copyOf(basis);
       subjects = subjects == null ? List.of() : List.copyOf(subjects);
+      attributes = attributes == null ? java.util.Map.of() : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(attributes));
+    }
+
+    public GoalOutcome(
+        Goal goal, boolean answered, String headline, Grade grade, int confidence, List<String> basis,
+        List<EntityRef> subjects) {
+      this(goal, answered, headline, grade, confidence, basis, subjects, java.util.Map.of());
     }
   }
 

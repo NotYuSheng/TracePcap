@@ -52,7 +52,9 @@ class StandardQuestionsTest {
     assertThat(a).singleElement().satisfies(ans -> {
       assertThat(ans.attributes())
           .containsEntry("address", "141.98.10.79")
-          .containsEntry("malware", List.of("STRRAT")); // always a list, single family included
+          .containsEntry("malware", List.of("STRRAT")) // always a list, single family included
+          .containsEntry("conclusion", "rule") // a malware rule named it: no corroboration chip
+          .doesNotContainKey("conclusionReason");
       assertThat(ans.subjects()).contains(EntityRef.external("141.98.10.79"), EntityRef.malware("STRRAT"));
     });
   }
@@ -234,5 +236,33 @@ class StandardQuestionsTest {
     assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "UAB Host Baltic")))
         .singleElement()
         .satisfies(ans -> assertThat(ans.headline()).contains("exchanged 8.0 MB with "));
+  }
+
+  @Test
+  void c2_saysHowACorroboratedServerWasConcluded() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("45.1.2.3");
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE),
+        Grade.INFERRED, "corroboration",
+        java.util.Map.of("corroboration", "suspected-c2", "reason", "ET DROP listed; 4 rounds")));
+    assertThat(new C2Question().answer(b.build())).singleElement().satisfies(ans ->
+        assertThat(ans.attributes())
+            .containsEntry("conclusion", "suspected-c2")
+            .containsEntry("conclusionReason", "ET DROP listed; 4 rounds"));
+  }
+
+  @Test
+  void c2_theChipNamesTheStrongestConclusion_asTheHeadlineDoes() {
+    // Suspected first, then an install chain: not worded "suspected", so not chipped "Suspected".
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("45.1.2.3");
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE),
+        Grade.INFERRED, "corroboration", java.util.Map.of("corroboration", "suspected-c2", "reason", "listed")));
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware("NetSupport RAT"),
+        Grade.INFERRED, "corroboration", java.util.Map.of("corroboration", "install-chain", "reason", "chain")));
+    assertThat(new C2Question().answer(b.build())).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).doesNotContain("suspected");
+      assertThat(ans.attributes()).containsEntry("conclusion", "install-chain");
+    });
   }
 }

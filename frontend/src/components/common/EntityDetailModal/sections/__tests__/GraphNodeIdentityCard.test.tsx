@@ -72,6 +72,12 @@ describe('GraphNodeIdentityCard', () => {
     expect(screen.getByText('the signals disagree')).toBeInTheDocument()
   })
 
+  it('shows the person behind the signed-in account when the capture names them (#1264)', () => {
+    renderCard(node({ loggedInUser: 'gmcdowell', loggedInUserSource: 'kerberos_as_req', loggedInUserRealName: 'Gabriel McDowell' }));
+    expect(screen.getByText('gmcdowell')).toBeInTheDocument();
+    expect(screen.getByTestId('logged-in-user-real-name')).toHaveTextContent('(Gabriel McDowell)');
+  });
+
   it('confirms a candidate as a human override, best candidate first', async () => {
     mocked.setOverride.mockResolvedValue(undefined as never)
     renderCard(node())

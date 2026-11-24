@@ -55,6 +55,8 @@ interface ConversationApiResponse {
   dstAccount?: AccountAtTime | null;
   packetCount: number;
   totalBytes: number;
+  bytesSrcToDst?: number | null;
+  bytesDstToSrc?: number | null;
   startTime: string | number[];
   endTime: string | number[];
   durationMs: number;
@@ -149,6 +151,8 @@ function transformConversation(
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
     totalBytes: apiData.totalBytes,
+    bytesSrcToDst: apiData.bytesSrcToDst ?? null,
+    bytesDstToSrc: apiData.bytesDstToSrc ?? null,
     packets,
     direction: (apiData.flowRisks ?? []).includes('unidirectional_traffic')
       ? 'unidirectional'

@@ -77,6 +77,14 @@ public class ConversationResponse {
   private List<String> detectedFileTypes;
   private Long packetCount;
   private Long totalBytes;
+
+  /**
+   * Bytes sent from {@code srcIp} to {@code dstIp} and back (#1260); null for conversations
+   * analysed before they were measured. Together they make up {@code totalBytes}.
+   */
+  private Long bytesSrcToDst;
+
+  private Long bytesDstToSrc;
   private LocalDateTime startTime;
   private LocalDateTime endTime;
   private Long durationMs;
