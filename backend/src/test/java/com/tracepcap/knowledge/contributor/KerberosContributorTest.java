@@ -60,11 +60,33 @@ class KerberosContributorTest {
   }
 
   @Test
-  void manyWrongPasswordsForOneAccount_isGuessingAgainstIt() {
-    KerberosFacts many = new KerberosFacts(UUID.randomUUID(), AT, C, DC, "KRB_ERROR", "administrator", "krbtgt/CORP",
+  void aServiceRetryingAnOldPassword_isNotAnAttack() {
+    // 25 wrong passwords for one account: what a service left with a stale password does all day.
+    KerberosFacts many = new KerberosFacts(UUID.randomUUID(), AT, C, DC, "KRB_ERROR", "svc-backup", "krbtgt/CORP",
         "CORP", "KDC_ERR_PREAUTH_FAILED", null, false, 25);
-    assertThat(answers(List.of(many))).singleElement()
-        .satisfies(a -> assertThat(a.headline()).contains("25 wrong passwords for one").contains("one account"));
+    assertThat(answers(List.of(many))).isEmpty();
+  }
+
+  @Test
+  void typosFromManyUsersOverADay_areNotSpraying() {
+    // A terminal server: six users mistype once each, hours apart.
+    List<KerberosFacts> r = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      r.add(new KerberosFacts(UUID.randomUUID(), AT.plusHours(2L * i), C, DC, "KRB_ERROR", "user" + i,
+          "krbtgt/CORP", "CORP", "KDC_ERR_PREAUTH_FAILED", null, false, 1));
+    }
+    assertThat(answers(r)).isEmpty();
+  }
+
+  @Test
+  void theWeakTicketCountIsTicketsNotRows() {
+    List<KerberosFacts> r = List.of(
+        new KerberosFacts(UUID.randomUUID(), AT, C, DC, "KRB_TGS_REP", "jdoe", "MSSQLSvc/db:1433", "CORP", null, "rc4-hmac", true, 40),
+        ticket("KRB_AS_REP", "jdoe", "krbtgt/CORP", "aes256-cts-hmac-sha1-96", false));
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    KerberosContributor.post(r, b);
+    assertThat(b.build().findingsOfCategory(KerberosContributor.KERBEROS_ATTACK)).singleElement()
+        .satisfies(f -> assertThat(f.summary()).contains("issued 40 weak tickets"));
   }
 
   @Test

@@ -54,12 +54,14 @@ final class KerberosRecords {
     String type = k.path("msg_type").asText("");
     String flowId = root.path("flow_id").asText("");
     if (type.endsWith("_REQ")) {
-      requests.put(flowId, k);
+      // Without a flow id a request can't be matched to its reply; the map is bounded too.
+      if (!flowId.isEmpty() && requests.size() < MAX_EXCHANGES) requests.put(flowId, k);
       return;
     }
     if (!type.endsWith("_REP") && !ERROR.equals(type)) return;
     if (count.get() >= MAX_EXCHANGES) return;
-    JsonNode req = requests.get(flowId);
+    // The reply consumes its request, so a later error on the flow can't inherit a stale account.
+    JsonNode req = flowId.isEmpty() ? null : requests.remove(flowId);
     String account = name(k, "cname");
     if (account == null && req != null) account = name(req, "cname");
     String service = name(k, "sname");
@@ -67,10 +69,15 @@ final class KerberosRecords {
     String realm = name(k, "realm");
     if (realm == null && req != null) realm = name(req, "realm");
     replies.computeIfAbsent(flowKey, x -> new ArrayList<>()).add(new Reply(
-        SuricataService.eveTime(root.path("timestamp").asText(null)), type, account, service, realm,
-        name(k, "error_code"), ERROR.equals(type) ? null : name(k, "encryption"),
+        SuricataService.eveTime(root.path("timestamp").asText(null)), cut(type, 32), account, service,
+        realm, cut(name(k, "error_code"), 64), ERROR.equals(type) ? null : cut(name(k, "encryption"), 64),
         k.path("weak_encryption").asBoolean(false)));
     count.incrementAndGet();
+  }
+
+  /** To its column's width (V83), so one odd value can't fail the file's whole write. */
+  private static String cut(String s, int max) {
+    return s == null || s.length() <= max ? s : s.substring(0, max);
   }
 
   /** Suricata writes "<empty>" and "<none>" for a missing value. */

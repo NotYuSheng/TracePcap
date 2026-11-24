@@ -51,18 +51,14 @@ public class KerberosAttackQuestion implements StandardQuestion {
         ? " (from " + TrafficContributor.readable(a.get("firstSeen")) + ")" : "";
     if (KerberosContributor.PASSWORD_GUESSING.equals(a.get("technique"))) {
       int wrong = size(a.get("wrongPassword")), unknown = size(a.get("noSuchAccount"));
-      int most = a.get("mostWrongForOneAccount") instanceof Integer i ? i : 0;
-      String what = wrong + unknown >= 5
-          ? (unknown > wrong
-              ? "That is user enumeration (finding which accounts exist), or password spraying."
-              : "That is password spraying.")
-          : "That is password guessing against one account.";
+      String what = unknown > wrong
+          ? "That is user enumeration (finding which accounts exist), or password spraying."
+          : "That is password spraying.";
       return client + " failed to sign in at the domain controller " + kdc + when + ": "
           + (wrong > 0 ? "a wrong password for " + wrong + " account" + (wrong == 1 ? "" : "s") : "")
           + (wrong > 0 && unknown > 0 ? " and " : "")
           + (unknown > 0 ? unknown + " account name" + (unknown == 1 ? "" : "s") + " that don't exist" : "")
-          + (most >= 10 ? ", " + most + " wrong passwords for one" : "")
-          + ". " + what;
+          + ", within minutes. " + what;
     }
     boolean services = size(a.get("services")) > 0, signIns = size(a.get("signIns")) > 0;
     return "The domain controller " + kdc + " gave " + client + " " + (services && signIns ? "tickets"

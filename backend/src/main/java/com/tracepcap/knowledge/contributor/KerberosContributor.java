@@ -27,9 +27,10 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li><b>Password guessing</b>: one host failing to sign in as many different accounts (wrong
  *       password, {@code KDC_ERR_PREAUTH_FAILED}, or no such account, {@code
- *       KDC_ERR_C_PRINCIPAL_UNKNOWN}): password spraying, or user enumeration when the names
- *       mostly don't exist. Or many wrong passwords for one account (brute force).
- *       {@code KDC_ERR_PREAUTH_REQUIRED} is how every Windows sign-in starts and never counts.
+ *       KDC_ERR_C_PRINCIPAL_UNKNOWN}) within ten minutes: password spraying, or user enumeration
+ *       when the names mostly don't exist. {@code KDC_ERR_PREAUTH_REQUIRED} is how every Windows
+ *       sign-in starts and never counts. Many wrong passwords for <em>one</em> account isn't
+ *       posted: a service left with an old password retries all day and looks the same.
  *   <li><b>A weak ticket</b>: a ticket encrypted with RC4 or DES from a domain controller that
  *       issues AES tickets elsewhere in the capture. A domain that only does RC4 is old, not
  *       attacked; one that does both was asked for the weak one. Service tickets that way are how
@@ -55,8 +56,8 @@ public class KerberosContributor implements KnowledgeContributor {
   /** Distinct accounts one host failed as, from five up: kerbrute's 9, a clean domain's 0. */
   static final int MIN_ACCOUNTS = 5;
 
-  /** Wrong passwords for one account, from ten up: a user mistyping does a few. */
-  static final int MIN_WRONG_FOR_ONE = 10;
+  /** Failures this close together are one burst. Kerbrute's nine took seconds. */
+  static final java.time.Duration WINDOW = java.time.Duration.ofMinutes(10);
 
   private final ObjectProvider<KerberosLookup> kerberos;
 
@@ -90,24 +91,21 @@ public class KerberosContributor implements KnowledgeContributor {
       if (!WRONG_PASSWORD.equals(r.errorCode()) && !NO_SUCH_ACCOUNT.equals(r.errorCode())) continue;
       byPair.computeIfAbsent(List.of(r.client(), r.kdc()), k -> new ArrayList<>()).add(r);
     }
-    byPair.forEach((pair, errors) -> {
+    byPair.forEach((pair, all0) -> {
+      // The busiest burst, not the whole capture: a terminal server or NAT gateway sees ordinary
+      // typos from many users over a day; a guessing tool fails them within seconds.
+      List<KerberosFacts> errors = busiestWindow(all0);
       Set<String> wrong = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
       Set<String> unknown = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-      Map<String, Integer> wrongCount = new LinkedHashMap<>();
       for (KerberosFacts r : errors) {
         if (r.account() == null) continue;
-        if (WRONG_PASSWORD.equals(r.errorCode())) {
-          wrong.add(r.account());
-          wrongCount.merge(r.account().toLowerCase(java.util.Locale.ROOT), r.count(), Integer::sum);
-        } else {
-          unknown.add(r.account());
-        }
+        if (WRONG_PASSWORD.equals(r.errorCode())) wrong.add(r.account());
+        else unknown.add(r.account());
       }
       Set<String> all = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
       all.addAll(wrong);
       all.addAll(unknown);
-      int mostForOne = wrongCount.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-      if (all.size() < MIN_ACCOUNTS && mostForOne < MIN_WRONG_FOR_ONE) return;
+      if (all.size() < MIN_ACCOUNTS) return;
 
       List<String> lines = new ArrayList<>();
       if (!wrong.isEmpty()) lines.add("Wrong password for " + wrong.size() + " account" + plural(wrong.size()) + ": " + list(wrong));
@@ -118,7 +116,7 @@ public class KerberosContributor implements KnowledgeContributor {
       attrs.put("kdc", pair.get(1));
       attrs.put("wrongPassword", new ArrayList<>(wrong));
       attrs.put("noSuchAccount", new ArrayList<>(unknown));
-      attrs.put("mostWrongForOneAccount", mostForOne);
+      attrs.put("accounts", all.size());
       attrs.put("operations", lines);
       first(errors, attrs);
       board.addFinding(new Finding(
@@ -148,8 +146,10 @@ public class KerberosContributor implements KnowledgeContributor {
         String who = r.account() != null ? r.account() : "an account";
         if (signIn) signIns.add(who);
         else if (r.service() != null) services.add(r.service());
-        lines.add((signIn ? "Sign-in ticket for " + who : "Service ticket for " + r.service() + " (" + who + ")")
-            + ", " + r.encryption() + (r.count() > 1 ? " (" + r.count() + "×)" : ""));
+        String enc = r.encryption() != null ? r.encryption() : "weak encryption";
+        String svc = r.service() != null ? r.service() : "an unnamed service";
+        lines.add((signIn ? "Sign-in ticket for " + who : "Service ticket for " + svc + " (" + who + ")")
+            + ", " + enc + (r.count() > 1 ? " (" + r.count() + "×)" : ""));
       }
       Map<String, Object> attrs = new LinkedHashMap<>();
       attrs.put("technique", WEAK_TICKET);
@@ -159,14 +159,39 @@ public class KerberosContributor implements KnowledgeContributor {
       attrs.put("signIns", new ArrayList<>(signIns));
       attrs.put("operations", new ArrayList<>(lines));
       first(weak, attrs);
+      int tickets = weak.stream().mapToInt(KerberosFacts::count).sum();
+      attrs.put("tickets", tickets);
       board.addFinding(new Finding(
           KERBEROS_ATTACK,
-          pair.get(1) + " issued " + weak.size() + " weak ticket" + plural(weak.size()) + " to " + pair.get(0)
+          pair.get(1) + " issued " + tickets + " weak ticket" + plural(tickets) + " to " + pair.get(0)
               + " while using AES elsewhere",
           Severity.MEDIUM, Grade.MEASURED, "suricata",
           List.of(EntityRef.host(pair.get(0)), EntityRef.host(pair.get(1))),
           conversations(weak), attrs));
     });
+  }
+
+  /** The failures in the ten-minute stretch with the most distinct accounts. */
+  static List<KerberosFacts> busiestWindow(List<KerberosFacts> errors) {
+    if (errors.stream().anyMatch(r -> r.firstTime() == null)) return errors; // can't tell: all
+    List<KerberosFacts> sorted = new ArrayList<>(errors);
+    sorted.sort(java.util.Comparator.comparing(KerberosFacts::firstTime));
+    List<KerberosFacts> best = List.of();
+    int bestAccounts = -1;
+    for (int i = 0; i < sorted.size(); i++) {
+      LocalDateTime end = sorted.get(i).firstTime().plus(WINDOW);
+      List<KerberosFacts> w = new ArrayList<>();
+      Set<String> accounts = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+      for (int j = i; j < sorted.size() && !sorted.get(j).firstTime().isAfter(end); j++) {
+        w.add(sorted.get(j));
+        if (sorted.get(j).account() != null) accounts.add(sorted.get(j).account());
+      }
+      if (accounts.size() > bestAccounts) {
+        bestAccounts = accounts.size();
+        best = w;
+      }
+    }
+    return best;
   }
 
   private static boolean isTicket(KerberosFacts r) {

@@ -118,7 +118,7 @@ only through ``analysis.spi`` ports, never another module's repositories or enti
   domain controller (DCSync). Routine domain traffic (IPC$, SYSVOL and group-policy reads, share
   and user enumeration, remote registry) is not posted.
 - ``KerberosContributor`` — from the replies a domain controller sent: one host failing to sign in
-  as five or more accounts (wrong password or no such account; password spraying or user
+  as five or more accounts within ten minutes (wrong password or no such account; password spraying or user
   enumeration), or a ticket with RC4 or DES from a domain controller that uses AES elsewhere in the
   capture (Kerberoasting, Skeleton Key).
 
