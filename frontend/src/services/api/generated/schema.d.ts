@@ -1649,6 +1649,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/investigation-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every investigation category, with the questions that answer it
+         * @description Context, entities, then the 14 ATT&CK tactics, in that order. A category no question covers yet is listed with none. Each carries how much of it a capture can show and the traffic its questions read.
+         */
+        get: operations["listInvestigationCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ip-org-rules": {
         parameters: {
             query?: never;
@@ -3911,6 +3931,14 @@ export interface components {
             /** Format: int32 */
             weight?: number;
         };
+        EvidenceResponse: {
+            apps?: string[];
+            byL7?: boolean;
+            l7?: string[];
+            label?: string;
+            question?: string;
+            shows?: string;
+        };
         ExpiryRequest: {
             /** Format: int64 */
             expiresAt?: number;
@@ -4278,6 +4306,16 @@ export interface components {
             srcPort?: number;
             /** Format: date-time */
             time?: string;
+        };
+        InvestigationCategoryResponse: {
+            attackId?: string;
+            axis?: string;
+            evidence?: components["schemas"]["EvidenceResponse"][];
+            key?: string;
+            label?: string;
+            questions?: string[];
+            unseenReason?: string;
+            visibility?: string;
         };
         InvestigationQuery: {
             appName?: string;
@@ -7982,6 +8020,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["FilterGenerationResponse"];
+                };
+            };
+        };
+    };
+    listInvestigationCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvestigationCategoryResponse"][];
                 };
             };
         };

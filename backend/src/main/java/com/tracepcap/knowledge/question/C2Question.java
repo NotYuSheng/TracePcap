@@ -7,6 +7,7 @@ import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
 import com.tracepcap.knowledge.contributor.IdsAlertRecordContributor;
 import com.tracepcap.knowledge.contributor.TrafficContributor;
 import java.util.ArrayList;
@@ -32,6 +33,11 @@ public class C2Question implements StandardQuestion {
   @Override
   public String question() {
     return QUESTION;
+  }
+
+  @Override
+  public Set<Category> categories() {
+    return Set.of(Category.C2_SERVER, Category.COMMAND_AND_CONTROL);
   }
 
   @Override

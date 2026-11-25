@@ -8,9 +8,11 @@ import com.tracepcap.knowledge.spi.EntityType;
 import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -41,6 +43,11 @@ public class RemoteAccessQuestion implements StandardQuestion {
   @Override
   public String question() {
     return QUESTION;
+  }
+
+  @Override
+  public Set<Category> categories() {
+    return Set.of(Category.REMOTE_ACCESS_SERVER, Category.COMMAND_AND_CONTROL);
   }
 
   @Override
