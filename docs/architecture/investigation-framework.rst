@@ -317,9 +317,29 @@ Code changes
    ``features/insights/protocolInsights.ts``.
 3. **Coverage per capture** adds the *Not observable* status, computed from the catalogue, the
    questions' ``requires()`` and the protocols present.
-4. **The Investigation Summary and Story** frame their answers by the capture context.
+4. **The Investigation Summary and Story** frame their answers by the capture context, and Story
+   leads with a summary instead of the four fixed question cards (see `Story layout`_).
 5. **Honeypot detection** is a host role in identity adjudication (#499), fed by a contributor that
    reads banners, certificates and HTTP bodies against the bundled signature file.
+
+Story layout
+------------
+
+Story opens with **a summary, not a grid** (chosen over a full grid, an ATT&CK chain and a
+Diamond-first layout):
+
+1. **One sentence and one bar** say where the investigation stands, framed by the capture context:
+   "Nothing is concluded yet. 12 categories have evidence to look at, 4 were ruled out, and 5 can't
+   be seen in this capture." The bar splits all categories by status.
+2. **Worth a look next** lists only the *open* categories whose evidence is in the capture, each with
+   what to check and a link to it.
+3. **Ruled out** and **Not observable** fold away, each category with its reason ("no SMB or DCE-RPC
+   between internal hosts; a capture inside the LAN would answer it").
+4. **Show all** opens the full grid of every category and its status.
+5. **The narrative** sits beside it as a timeline, each step tagged with its ATT&CK tactic, and the
+   Q&A below suggests questions about the gaps ("What would show lateral movement?").
+
+Answered categories lead the summary when there are any, each opening its *How we got here*.
 
 Delivery plan
 -------------
@@ -328,9 +348,9 @@ Four phases, each its own PR into ``dev``:
 
 1. **Catalogue and tagging.** Add ``category()`` and ``requires()``, tag the nine questions, add the
    backend catalogue. Gate: existing tests pass; the catalogue matches `Coverage today`_.
-2. **Coverage grid on the Overview.** *Worth a look* shows every category with its four-way status,
-   from the API. Gate: on the four malware-traffic-analysis.net walkthrough captures, every status
-   is right by hand check.
+2. **Coverage on the Overview and Story.** *Worth a look* shows every category with its four-way
+   status, from the API, and Story takes the summary-first layout above. Gate: on the four
+   malware-traffic-analysis.net walkthrough captures, every status is right by hand check.
 3. **Capture context.** Infer the vantage point (internal, uplink, sensor) from address mix and
    direction, and frame the summary by it. Gate: a public honeypot capture reads as a sensor log.
 4. **Honeypot role.** Signature file, contributor, adjudicated role graded ``INFERRED`` from two or
