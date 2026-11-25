@@ -86,8 +86,8 @@ Step 2 — The Investigation Summary
      - the install chain + IDS (*ET REMOTE_ACCESS NetSupport Remote Admin Checkin*)
    * - Remote-access tool
      - ``10.11.10.147`` runs **NetSupport**, talking to ``93.152.209.36`` since 18:22:07 UTC;
-       *the command & control answer concludes this server is a C2 for NetSupport RAT, so this
-       isn't a sanctioned install*
+       *the command & control answer treats this server as a C2 for NetSupport RAT from how the
+       tool was installed, so this probably isn't a sanctioned install*
      - INFERRED
      - IDS + first contact
 
@@ -114,8 +114,10 @@ Executable Download* alert is a Windows Update at 18:30, not part of the chain.)
 **Two answers about one session.** The remote-access check fires on any remote-admin tool talking
 to a server outside the network, and on its own it asks the analyst to confirm the tool is
 sanctioned (as it does for TeamViewer in :doc:`fake-software-site`). Here the C2 answer has already
-concluded it isn't, so the remote-access answer says that instead of asking. *(From a later build
-than the rest of this page: earlier, it asked anyway, beside the C2 answer.)*
+made the server a C2 from the install chain, so the remote-access answer points to it, no more
+firmly than that answer puts it: *probably* not a sanctioned install. Its **How we got here** cites
+the C2 conclusion as a step. *(From a later build than the rest of this page: earlier, it asked
+anyway, beside the C2 answer.)*
 
 Step 3 — The session
 ~~~~~~~~~~~~~~~~~~~~

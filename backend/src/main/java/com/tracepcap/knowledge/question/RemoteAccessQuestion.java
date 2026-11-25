@@ -21,9 +21,10 @@ import org.springframework.stereotype.Component;
  * "Is a remote-access tool talking to the internet?" A remote-admin tool (NetSupport, AnyDesk,
  * ScreenConnect, TeamViewer…) seen checking in to a server outside the network. IT departments use
  * these tools, and so do attackers: NetSupport is a favourite RAT, and ET files its check-in under
- * INFO, not MALWARE, precisely because it may be sanctioned. So this neither calls the server a C2
- * nor names a malware family; it surfaces the session for an analyst to confirm. When another check
- * has concluded the server is a C2 (a RAT's install chain, say), it says so instead of asking.
+ * INFO, not MALWARE, precisely because it may be sanctioned. So this never calls the server a C2
+ * itself; it surfaces the session for an analyst to confirm. When another check has already made
+ * the server a C2 (a rule, a RAT's install chain, a suspicion), it points to that answer and its
+ * family instead of asking.
  *
  * <p>Found in the 2026-11-10 NetSupport RAT exercise, where the only IDS hit was "ET INFO NetSupport
  * Remote Admin Checkin" to 93.152.209.36, and nothing else in the answers mentioned it.
@@ -70,13 +71,11 @@ public class RemoteAccessQuestion implements StandardQuestion {
 
     // Servers another check already concluded are a C2 (#1262): the session isn't then a tool to
     // confirm, and saying so beside a C2 answer read as a contradiction.
-    Map<String, String> c2Families = new LinkedHashMap<>();
-    Map<String, Boolean> c2Suspected = new LinkedHashMap<>();
+    Map<String, C2Basis> c2s = new LinkedHashMap<>();
     for (com.tracepcap.knowledge.spi.Relationship r : board.relationshipsWithPredicate("c2-of")) {
-      c2Families.putIfAbsent(r.from().key(), r.to().key());
-      boolean suspected = "suspected-c2".equals(r.attributes().get("corroboration"));
-      // A firm conclusion from any check outweighs a suspicion from another.
-      c2Suspected.merge(r.from().key(), suspected, Boolean::logicalAnd);
+      C2Basis b = c2s.computeIfAbsent(r.from().key(), k -> new C2Basis());
+      b.families.add(r.to().key());
+      b.strength = Math.max(b.strength, strengthOf(r.attributes().get("corroboration")));
     }
 
     List<Answer> answers = new ArrayList<>();
@@ -100,9 +99,8 @@ public class RemoteAccessQuestion implements StandardQuestion {
           basis.add(IdsAlertRecordContributor.alertSpan(server));
         }
       }
-      if (c2Families.containsKey(external)) {
-        attrs.put("concludedC2", c2Suspected.getOrDefault(external, false) ? "suspected" : "c2");
-      }
+      C2Basis c2 = c2s.get(external);
+      if (c2 != null) attrs.put("concludedC2", c2.kind());
       answers.add(
           new Answer(
               QUESTION,
@@ -112,33 +110,74 @@ public class RemoteAccessQuestion implements StandardQuestion {
                       ? " since "
                           + com.tracepcap.knowledge.contributor.TrafficContributor.readable(first)
                       : "")
-                  + ". " + verdict(external, c2Families, c2Suspected),
+                  + ". " + verdict(c2s.get(external)),
               Grade.INFERRED,
               List.of(EntityRef.host(host), EntityRef.external(external)),
               basis,
-              attrs).withDerivation(List.of(new com.tracepcap.knowledge.spi.Step(
+              attrs).withDerivation(withC2(new com.tracepcap.knowledge.spi.Step(
                   host + " ran " + tool + " to " + external + ", outside the network: "
                       + String.join("; ", alerts.stream().distinct().toList()) + ".",
                   Derivations.RULE_REMOTE_ACCESS, Grade.INFERRED,
-                  new ArrayList<>(convs.getOrDefault(key, java.util.Set.of()))))));
+                  new ArrayList<>(convs.getOrDefault(key, java.util.Set.of()))), external, c2)));
     });
     return answers;
   }
 
+  /** How firmly another check made a server a C2: by rule, by a RAT's install chain, or suspected. */
+  static final class C2Basis {
+    final java.util.Set<String> families = new java.util.LinkedHashSet<>();
+    int strength;
+
+    String kind() {
+      return strength >= 2 ? "c2" : strength == 1 ? "install-chain" : "suspected";
+    }
+  }
+
+  /** A rule (no corroboration) is firmest, then the install chain, then a suspicion. */
+  static int strengthOf(Object corroboration) {
+    if (corroboration == null) return 2;
+    if ("suspected-c2".equals(corroboration)) return 0;
+    return 1;
+  }
+
+  /** The families, named ones first, without a tool's "(unsanctioned use)" qualifier. */
+  static String families(C2Basis c2) {
+    List<String> named = new ArrayList<>();
+    boolean unidentified = false;
+    for (String f : c2.families) {
+      if (EntityRef.UNIDENTIFIED_MALWARE.equals(f)) unidentified = true;
+      else named.add(f.replaceAll("\\s*\\([^)]*\\)$", ""));
+    }
+    if (named.isEmpty()) return unidentified ? "unidentified malware" : "malware";
+    return String.join(" and ", named.stream().distinct().toList());
+  }
+
   /**
    * What the analyst should do with the session: confirm it's sanctioned, or, when the server is
-   * already concluded a C2, read that answer, which says why.
+   * already a C2, read that answer, worded no more firmly than it is.
    */
-  static String verdict(String external, Map<String, String> families, Map<String, Boolean> suspected) {
-    String family = families.get(external);
-    if (family == null) {
+  static String verdict(C2Basis c2) {
+    if (c2 == null) {
       return "IT uses remote-access tools, and so do attackers: confirm this one is sanctioned.";
     }
-    String whose = EntityRef.UNIDENTIFIED_MALWARE.equals(family) ? "unidentified malware" : family;
-    return Boolean.TRUE.equals(suspected.get(external))
-        ? "The command & control answer suspects this server is a C2 for " + whose + ", so treat the"
-            + " session as unsanctioned unless IT confirms it."
-        : "The command & control answer concludes this server is a C2 for " + whose + ", so this"
-            + " isn't a sanctioned install.";
+    String who = families(c2);
+    return switch (c2.kind()) {
+      case "c2" -> "The command & control answer concludes this server is a C2 for " + who
+          + ", so this isn't a sanctioned install.";
+      case "install-chain" -> "The command & control answer treats this server as a C2 for " + who
+          + " from how the tool was installed, so this probably isn't a sanctioned install.";
+      default -> "The command & control answer suspects this server is a C2 for " + who
+          + ", so treat the session as unsanctioned unless IT confirms it.";
+    };
+  }
+
+  /** The session's step, then the C2 conclusion the headline relies on, when there is one. */
+  private static List<com.tracepcap.knowledge.spi.Step> withC2(
+      com.tracepcap.knowledge.spi.Step session, String external, C2Basis c2) {
+    if (c2 == null) return List.of(session);
+    return List.of(session, com.tracepcap.knowledge.spi.Step.of(
+        external + " is " + (c2.kind().equals("suspected") ? "a suspected" : "a") + " C2 for " + families(c2)
+            + " (the command & control answer shows how).",
+        null, Grade.INFERRED));
   }
 }
