@@ -112,7 +112,7 @@ The model
        Answered     Ruled out                       Open          Not observable (new)
 
 - **Capture context** frames every answer: where the capture was taken (inside the LAN, on the
-  internet uplink, on a honeypot sensor), whether it is complete (``ids completeness``, #1274), and
+  internet uplink, on a honeypot sensor), whether it is complete (the IDS *capture completeness* note, #1274), and
   how long it spans.
 - **Entities** are roles a host can hold, adjudicated from evidence like any other identity (see
   :doc:`adjudication-explainability`).
@@ -127,16 +127,30 @@ Status            Meaning
 ================  ==============================================================================
 Answered          A standard question concluded something for this category.
 Ruled out         Candidates were tested and rejected (the ``Considered`` records, #1298).
-Open              The evidence is present, but nothing was concluded.
-Not observable    No question covers the category, or the evidence it needs isn't in the capture
-                  (no SMB or DCE-RPC means lateral movement can't be judged). **New.**
+Open              Nothing was concluded, and the capture could show it. A category no check covers
+                  yet is Open too, marked *no check yet*, so a gap in TracePcap never reads as a
+                  gap in the capture.
+Not observable    The capture can't show it: the category never shows in traffic (Adversary,
+                  Resource Development), it mostly happens on a host and no check concluded it
+                  anyway (Persistence, Privilege Escalation), or none of the traffic its checks
+                  read is in the capture (no SMB or DCE-RPC means lateral movement can't be
+                  judged). **New.**
 ================  ==============================================================================
+
+Each category carries how much of it a capture can show (*wire*, *partly*, *rarely*, *never*), and
+each check declares the traffic it reads. The status follows from those two and the capture:
+
+1. A check concluded something: **Answered**. Its candidates were all rejected: **Ruled out**.
+2. Otherwise, a *never* category, or a *rarely* one: **Not observable**.
+3. Otherwise, if the category's checks read traffic and none of it is in the capture: **Not
+   observable**.
+4. Otherwise: **Open** (with *no check yet* when no check covers it).
 
 Coverage today
 --------------
 
-Of the 14 ATT&CK tactics, today's questions cover 6. At least four more are visible on the wire
-and uncovered: Reconnaissance, Discovery, Defense Evasion and Impact.
+Of the 14 ATT&CK tactics, today's questions cover 6. Five more are uncovered but show on the wire,
+fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Collection and Impact.
 
 .. list-table::
    :header-rows: 1
@@ -252,7 +266,8 @@ Signals a capture can show
      - Honeypots
      - Seen passively?
    * - Default service banner
-     - SSH ``SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2``
+     - SSH ``SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2`` (Cowrie), ``SSH-2.0-OpenSSH_5.1p1 Debian-5``
+       (Kippo)
      - Cowrie, Kippo
      - Yes, on any SSH connection
    * - Stale HTTP ``Server`` header
@@ -305,18 +320,19 @@ How a honeypot changes other answers
 Code changes
 ------------
 
-1. **``StandardQuestion`` gains two methods**, both with defaults so existing questions keep
+1. ``StandardQuestion`` **gains two methods**, both with defaults so existing questions keep
    compiling:
 
-   - ``category()`` — an entity role, an ATT&CK tactic id, or capture context.
-   - ``requires()`` — the evidence it reads, as protocols and Suricata event types (lateral
-     movement: SMB and DCE-RPC records).
+   - ``categories()`` — the categories it answers. One check can answer several: ``c2`` answers
+     both *C2 server* and *Command and Control*.
+   - ``requires()`` — the traffic it reads, as tshark protocol and nDPI application names, each
+     with what it shows for that check (lateral movement: SMB, DCE-RPC, RDP).
 
 2. **A category catalogue** in the backend lists every category, including those with no question
    yet, and is served through the API. It replaces the question groups the frontend keeps in
    ``features/insights/protocolInsights.ts``.
-3. **Coverage per capture** adds the *Not observable* status, computed from the catalogue, the
-   questions' ``requires()`` and the protocols present.
+3. **Coverage per capture** adds the *Not observable* status, computed from each category's
+   visibility, its checks' ``requires()`` and the protocols present (see `The four statuses`_).
 4. **The Investigation Summary and Story** frame their answers by the capture context, and Story
    leads with a summary instead of the four fixed question cards (see `Story layout`_).
 5. **Honeypot detection** is a host role in identity adjudication (#499), fed by a contributor that
@@ -346,7 +362,7 @@ Delivery plan
 
 Four phases, each its own PR into ``dev``:
 
-1. **Catalogue and tagging.** Add ``category()`` and ``requires()``, tag the nine questions, add the
+1. **Catalogue and tagging.** Add ``categories()`` and ``requires()``, tag the nine questions, add the
    backend catalogue. Gate: existing tests pass; the catalogue matches `Coverage today`_.
 2. **Coverage on the Overview and Story.** *Worth a look* shows every category with its four-way
    status, from the API, and Story takes the summary-first layout above. Gate: on the four
@@ -357,7 +373,8 @@ Four phases, each its own PR into ``dev``:
    more signals. Gate: a true positive on a Cowrie or Dionaea capture, and no false positive on the
    walkthrough captures.
 
-After that, each uncovered category (Reconnaissance, Discovery, Defense Evasion, Impact) is one PR.
+After that, each uncovered category (Reconnaissance, Defense Evasion, Discovery, Collection,
+Impact) is one PR.
 
 Open questions
 ~~~~~~~~~~~~~~
