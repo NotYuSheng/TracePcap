@@ -6,9 +6,11 @@ import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +29,12 @@ public class DownloadsQuestion implements StandardQuestion {
   public String question() {
     return QUESTION;
   }
+
+  @Override
+  public Set<Category> categories() {
+    return Set.of(Category.INITIAL_ACCESS, Category.EXECUTION);
+  }
+
 
   @Override
   public List<Answer> answer(CaseKnowledge board) {

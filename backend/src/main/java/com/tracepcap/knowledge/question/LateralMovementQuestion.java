@@ -8,6 +8,8 @@ import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
+import com.tracepcap.knowledge.spi.EvidenceSource;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,6 +45,18 @@ public class LateralMovementQuestion implements StandardQuestion {
   @Override
   public String question() {
     return QUESTION;
+  }
+
+  @Override
+  public Set<Category> categories() {
+    return Set.of(Category.LATERAL_MOVEMENT);
+  }
+
+  @Override
+  public List<EvidenceSource> requires() {
+    return List.of(
+        EvidenceSource.SMB.showing("shares connected to, admin shares, files copied to another machine"),
+        EvidenceSource.DCERPC.showing("remote calls: services created, tasks scheduled, directory replication"));
   }
 
   @Override

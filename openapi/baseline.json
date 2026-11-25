@@ -521,6 +521,35 @@
         },
         "type": "object"
       },
+      "CategoryEvidenceResponse": {
+        "properties": {
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "byL7": {
+            "type": "boolean"
+          },
+          "l7": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "shows": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CategoryStat": {
         "properties": {
           "bytes": {
@@ -3223,6 +3252,44 @@
           },
           "time": {
             "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvestigationCategoryResponse": {
+        "properties": {
+          "attackId": {
+            "type": "string"
+          },
+          "axis": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryEvidenceResponse"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "readsAnyTraffic": {
+            "type": "boolean"
+          },
+          "unseenReason": {
+            "type": "string"
+          },
+          "visibility": {
             "type": "string"
           }
         },
@@ -11355,6 +11422,31 @@
         ]
       }
     },
+    "/api/v1/investigation-categories": {
+      "get": {
+        "description": "Context, entities, then the 14 ATT&CK tactics, in that order. A category no question covers yet is listed with none. Each carries how much of it a capture can show and the traffic its questions read.",
+        "operationId": "listInvestigationCategories",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InvestigationCategoryResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Every investigation category, with the questions that answer it",
+        "tags": [
+          "Investigation categories"
+        ]
+      }
+    },
     "/api/v1/ip-org-rules": {
       "get": {
         "operationId": "list_10",
@@ -15346,6 +15438,10 @@
     {
       "description": "Personal preferences (theme, node labels, table columns)",
       "name": "Preferences"
+    },
+    {
+      "description": "The fixed set of things an investigation can say something about: capture context, host roles and the ATT&CK tactics, with the questions that answer each",
+      "name": "Investigation categories"
     }
   ]
 }

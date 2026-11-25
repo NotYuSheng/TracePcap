@@ -8,6 +8,7 @@ import com.tracepcap.knowledge.spi.EntityType;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -57,6 +58,11 @@ public class DataTransferQuestion implements StandardQuestion {
   @Override
   public String question() {
     return QUESTION;
+  }
+
+  @Override
+  public Set<Category> categories() {
+    return Set.of(Category.EXFILTRATION);
   }
 
   @Override

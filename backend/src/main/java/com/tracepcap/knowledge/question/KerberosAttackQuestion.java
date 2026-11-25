@@ -7,9 +7,12 @@ import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
+import com.tracepcap.knowledge.spi.EvidenceSource;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +30,17 @@ public class KerberosAttackQuestion implements StandardQuestion {
   @Override
   public String question() {
     return QUESTION;
+  }
+
+  @Override
+  public Set<Category> categories() {
+    return Set.of(Category.CREDENTIAL_ACCESS);
+  }
+
+  @Override
+  public List<EvidenceSource> requires() {
+    return List.of(
+        EvidenceSource.KERBEROS.showing("failed sign-ins by account, and each ticket\u2019s encryption"));
   }
 
   @Override

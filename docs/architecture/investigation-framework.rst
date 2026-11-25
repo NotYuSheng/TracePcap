@@ -3,9 +3,10 @@ Investigation Framework
 
 .. note::
 
-   **Status: planned.** This page is the design for how the investigation should be organised. Today's
-   nine standard questions exist; the categories, the coverage grid, capture context and honeypot
-   detection described here are not built yet. See `Delivery plan`_.
+   **Status: in progress.** The categories and their catalogue are built (phase 1): every category,
+   the questions that answer it and the traffic they read are served at
+   ``GET /api/v1/investigation-categories``. The coverage statuses, capture context and honeypot
+   detection are not built yet. See `Delivery plan`_.
 
 TracePcap should judge every capture against **one fixed set of categories**, and say for each one
 whether it was *answered*, *ruled out*, still *open*, or *not observable* in this capture. The
@@ -164,14 +165,34 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      -
      -
      -
-   * - Host role
-     - ``victim``, ``c2`` (partly)
+   * - Victim
+     - ``victim``
      - Yes
-     - DC, proxy, scanner, sinkhole, **honeypot**
+     -
    * - Who's signed in
      - ``signed-in-user``
      - Yes
      -
+   * - C2 server
+     - ``c2``
+     - Yes
+     -
+   * - Remote-access server
+     - ``remote-access``
+     - Yes
+     -
+   * - Scanner
+     - none
+     - Yes
+     - Hosts sweeping ports or addresses
+   * - Honeypot
+     - none
+     - Yes
+     - See `Honeypots`_
+   * - Adversary
+     - none
+     - No
+     - Not observable
    * - **Activities (ATT&CK)**
      -
      -
@@ -213,7 +234,7 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      - Yes
      - LDAP and SMB enumeration, AD queries
    * - Lateral Movement
-     - ``lateral-movement``, ``remote-access``
+     - ``lateral-movement``
      - Yes, internal captures only
      -
    * - Collection
@@ -237,13 +258,17 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      -
      -
    * - Completeness
-     - IDS completeness (#1274)
+     - none (the IDS completeness note, #1274, shows it today)
      - Yes
-     -
+     - Phase 3
    * - Vantage point
      - none
      - Yes
      - Internal, uplink, or honeypot sensor
+   * - Time span
+     - none
+     - Yes
+     - Phase 3
 
 Honeypots
 ---------
@@ -362,8 +387,10 @@ Delivery plan
 
 Four phases, each its own PR into ``dev``:
 
-1. **Catalogue and tagging.** Add ``categories()`` and ``requires()``, tag the nine questions, add the
-   backend catalogue. Gate: existing tests pass; the catalogue matches `Coverage today`_.
+1. **Catalogue and tagging** *(done)*. ``categories()`` and ``requires()`` on every question, the
+   ``Category`` enum and ``CategoryCatalogue`` in the knowledge layer, and
+   ``GET /investigation-categories``. ``CategoryCatalogueTest`` pins the mapping to
+   `Coverage today`_.
 2. **Coverage on the Overview and Story.** *Worth a look* shows every category with its four-way
    status, from the API, and Story takes the summary-first layout above. Gate: on the four
    malware-traffic-analysis.net walkthrough captures, every status is right by hand check.
