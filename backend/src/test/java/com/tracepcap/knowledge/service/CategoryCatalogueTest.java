@@ -106,5 +106,27 @@ class CategoryCatalogueTest {
     // A check that reads alerts on any traffic declares none, so its categories never go
     // not-observable for want of a protocol.
     assertThat(byCategory().get(Category.C2_SERVER).evidence()).isEmpty();
+    assertThat(byCategory().get(Category.C2_SERVER).readsAnyTraffic()).isTrue();
+    assertThat(byCategory().get(Category.LATERAL_MOVEMENT).readsAnyTraffic()).isFalse();
+  }
+
+  @Test
+  void downloadsReadAnyTraffic() {
+    // Files are carved from any stream, not only HTTP: no protocol's absence rules them out.
+    assertThat(byCategory().get(Category.INITIAL_ACCESS).readsAnyTraffic()).isTrue();
+    assertThat(byCategory().get(Category.INITIAL_ACCESS).evidence()).isEmpty();
+  }
+
+  @Test
+  void signedInUserReadsEveryProtocolItsSourcesRideOn() {
+    // Kerberos AS-REQ, NTLM (inside SMB, HTTP, DCE-RPC) and the LDAP and SAMR name lookups.
+    assertThat(byCategory().get(Category.SIGNED_IN_USER).evidence())
+        .extracting(e -> e.source().label())
+        .containsExactly("Kerberos", "LDAP", "NTLM", "SMB", "DCE-RPC", "HTTP");
+  }
+
+  @Test
+  void aCategoryNoQuestionCoversReadsNothing() {
+    assertThat(byCategory().get(Category.RECONNAISSANCE).readsAnyTraffic()).isFalse();
   }
 }

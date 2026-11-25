@@ -521,6 +521,35 @@
         },
         "type": "object"
       },
+      "CategoryEvidenceResponse": {
+        "properties": {
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "byL7": {
+            "type": "boolean"
+          },
+          "l7": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "shows": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CategoryStat": {
         "properties": {
           "bytes": {
@@ -2215,35 +2244,6 @@
         ],
         "type": "object"
       },
-      "EvidenceResponse": {
-        "properties": {
-          "apps": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "byL7": {
-            "type": "boolean"
-          },
-          "l7": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "label": {
-            "type": "string"
-          },
-          "question": {
-            "type": "string"
-          },
-          "shows": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "ExpiryRequest": {
         "properties": {
           "expiresAt": {
@@ -3267,7 +3267,7 @@
           },
           "evidence": {
             "items": {
-              "$ref": "#/components/schemas/EvidenceResponse"
+              "$ref": "#/components/schemas/CategoryEvidenceResponse"
             },
             "type": "array"
           },
@@ -3282,6 +3282,9 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "readsAnyTraffic": {
+            "type": "boolean"
           },
           "unseenReason": {
             "type": "string"

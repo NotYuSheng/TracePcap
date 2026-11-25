@@ -19,11 +19,20 @@ import org.springframework.stereotype.Component;
 public class CategoryCatalogue {
 
   /** One category, the questions that answer it, and what they read. */
-  public record Entry(Category category, List<String> questions, List<QuestionEvidence> evidence) {
+  public record Entry(
+      Category category, List<String> questions, List<QuestionEvidence> evidence, boolean anyTraffic) {
 
     public Entry {
       questions = List.copyOf(questions);
       evidence = List.copyOf(evidence);
+    }
+
+    /**
+     * True when one of its questions reads no particular protocol (IDS alerts on any traffic): then
+     * no protocol's absence makes the category not observable, whatever the others declare.
+     */
+    public boolean readsAnyTraffic() {
+      return anyTraffic;
     }
 
     /** True when no question covers this category yet. */
@@ -40,12 +49,14 @@ public class CategoryCatalogue {
   public CategoryCatalogue(List<StandardQuestion> questions) {
     Map<Category, List<String>> byCategory = new EnumMap<>(Category.class);
     Map<Category, List<QuestionEvidence>> evidence = new EnumMap<>(Category.class);
+    java.util.Set<Category> anyTraffic = java.util.EnumSet.noneOf(Category.class);
     // Sorted by key, so the order doesn't depend on how Spring happened to discover them.
     List<StandardQuestion> sorted = new ArrayList<>(questions);
     sorted.sort(java.util.Comparator.comparing(StandardQuestion::question));
     for (StandardQuestion q : sorted) {
       for (Category c : q.categories()) {
         byCategory.computeIfAbsent(c, k -> new ArrayList<>()).add(q.question());
+        if (q.requires().isEmpty()) anyTraffic.add(c);
         for (EvidenceSource s : q.requires()) {
           evidence.computeIfAbsent(c, k -> new ArrayList<>()).add(new QuestionEvidence(q.question(), s));
         }
@@ -53,7 +64,8 @@ public class CategoryCatalogue {
     }
     List<Entry> out = new ArrayList<>();
     for (Category c : Category.values()) {
-      out.add(new Entry(c, byCategory.getOrDefault(c, List.of()), evidence.getOrDefault(c, List.of())));
+      out.add(new Entry(c, byCategory.getOrDefault(c, List.of()), evidence.getOrDefault(c, List.of()),
+          anyTraffic.contains(c)));
     }
     this.entries = List.copyOf(out);
   }

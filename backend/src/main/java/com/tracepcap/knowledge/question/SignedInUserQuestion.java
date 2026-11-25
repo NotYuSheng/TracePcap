@@ -37,7 +37,11 @@ public class SignedInUserQuestion implements StandardQuestion {
     return List.of(
         EvidenceSource.KERBEROS.showing("the account a host asked the domain controller for a ticket as"),
         EvidenceSource.LDAP.showing("directory lookups, which name the person behind an account"),
-        EvidenceSource.NTLM.showing("sign-ins by account name where Kerberos wasn\u2019t used"));
+        EvidenceSource.NTLM.showing("sign-ins by account name where Kerberos wasn\u2019t used"),
+        // NTLM rides inside other protocols, and a conversation is named by the top of its stack.
+        EvidenceSource.SMB.showing("NTLM sign-ins to a share, and SAMR lookups naming the person"),
+        EvidenceSource.DCERPC.showing("SAMR lookups, which name the person behind an account"),
+        EvidenceSource.HTTP.showing("NTLM sign-ins to a web server"));
   }
 
   @Override

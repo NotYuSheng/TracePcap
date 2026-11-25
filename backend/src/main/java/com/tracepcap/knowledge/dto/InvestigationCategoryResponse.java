@@ -15,10 +15,13 @@ public record InvestigationCategoryResponse(
     String visibility,
     String unseenReason,
     List<String> questions,
-    List<EvidenceResponse> evidence) {
+    // True when one of its questions reads no particular protocol (IDS alerts on any traffic), so
+    // the evidence list alone never makes it not observable.
+    boolean readsAnyTraffic,
+    List<CategoryEvidenceResponse> evidence) {
 
   /** Traffic one question reads: tshark and nDPI names, and what it shows for that question. */
-  public record EvidenceResponse(
+  public record CategoryEvidenceResponse(
       String question, String label, List<String> l7, List<String> apps, String shows, boolean byL7) {}
 
   public static InvestigationCategoryResponse from(CategoryCatalogue.Entry e) {
@@ -31,8 +34,9 @@ public record InvestigationCategoryResponse(
         c.visibility().name(),
         c.unseenReason(),
         e.questions(),
+        e.readsAnyTraffic(),
         e.evidence().stream()
-            .map(q -> new EvidenceResponse(q.question(), q.source().label(), q.source().l7(),
+            .map(q -> new CategoryEvidenceResponse(q.question(), q.source().label(), q.source().l7(),
                 q.source().apps(), q.source().shows(), q.source().byL7()))
             .toList());
   }

@@ -165,14 +165,34 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      -
      -
      -
-   * - Host role
-     - ``victim``, ``c2`` (partly)
+   * - Victim
+     - ``victim``
      - Yes
-     - DC, proxy, scanner, sinkhole, **honeypot**
+     -
    * - Who's signed in
      - ``signed-in-user``
      - Yes
      -
+   * - C2 server
+     - ``c2``
+     - Yes
+     -
+   * - Remote-access server
+     - ``remote-access``
+     - Yes
+     -
+   * - Scanner
+     - none
+     - Yes
+     - Hosts sweeping ports or addresses
+   * - Honeypot
+     - none
+     - Yes
+     - See `Honeypots`_
+   * - Adversary
+     - none
+     - No
+     - Not observable
    * - **Activities (ATT&CK)**
      -
      -
@@ -238,13 +258,17 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      -
      -
    * - Completeness
-     - IDS completeness (#1274)
+     - none (the IDS completeness note, #1274, shows it today)
      - Yes
-     -
+     - Phase 3
    * - Vantage point
      - none
      - Yes
      - Internal, uplink, or honeypot sensor
+   * - Time span
+     - none
+     - Yes
+     - Phase 3
 
 Honeypots
 ---------

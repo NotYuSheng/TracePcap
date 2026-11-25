@@ -3324,6 +3324,14 @@ export interface components {
             findings?: components["schemas"]["FindingDto"][];
             relationships?: components["schemas"]["RelationshipDto"][];
         };
+        CategoryEvidenceResponse: {
+            apps?: string[];
+            byL7?: boolean;
+            l7?: string[];
+            label?: string;
+            question?: string;
+            shows?: string;
+        };
         CategoryStat: {
             /** Format: int64 */
             bytes?: number;
@@ -3931,14 +3939,6 @@ export interface components {
             /** Format: int32 */
             weight?: number;
         };
-        EvidenceResponse: {
-            apps?: string[];
-            byL7?: boolean;
-            l7?: string[];
-            label?: string;
-            question?: string;
-            shows?: string;
-        };
         ExpiryRequest: {
             /** Format: int64 */
             expiresAt?: number;
@@ -4310,10 +4310,11 @@ export interface components {
         InvestigationCategoryResponse: {
             attackId?: string;
             axis?: string;
-            evidence?: components["schemas"]["EvidenceResponse"][];
+            evidence?: components["schemas"]["CategoryEvidenceResponse"][];
             key?: string;
             label?: string;
             questions?: string[];
+            readsAnyTraffic?: boolean;
             unseenReason?: string;
             visibility?: string;
         };

@@ -7,7 +7,6 @@ import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.StandardQuestion;
 import com.tracepcap.knowledge.spi.Category;
-import com.tracepcap.knowledge.spi.EvidenceSource;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,13 +35,6 @@ public class DownloadsQuestion implements StandardQuestion {
     return Set.of(Category.INITIAL_ACCESS, Category.EXECUTION);
   }
 
-  @Override
-  public List<EvidenceSource> requires() {
-    return List.of(
-        EvidenceSource.HTTP.showing("files fetched in the clear, hashed in the Files tab"),
-        EvidenceSource.FTP.showing("files moved over FTP"),
-        EvidenceSource.SMB.showing("files copied from a share"));
-  }
 
   @Override
   public List<Answer> answer(CaseKnowledge board) {
