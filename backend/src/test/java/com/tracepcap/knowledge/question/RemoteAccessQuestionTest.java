@@ -96,4 +96,35 @@ class RemoteAccessQuestionTest {
       assertThat(x.attributes()).containsEntry("alertCount", 252).containsEntry("alertRecordsKept", 102);
     });
   }
+
+  @Test
+  void aServerAlreadyConcludedAC2_isntOfferedAsPossiblySanctioned() {
+    // 2026-11-10: the install chain makes 93.152.209.36 NetSupport RAT's C2. Asking the analyst to
+    // confirm the same session is sanctioned contradicted that answer.
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    b.addFinding(alert("ET REMOTE_ACCESS NetSupport Remote Admin Checkin (sid:2035892 sev:3)", "10.11.10.147", "93.152.209.36"));
+    b.addRelationship(new com.tracepcap.knowledge.spi.Relationship(EntityRef.external("93.152.209.36"), "c2-of",
+        EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "corroboration", Map.of("corroboration", "install-chain")));
+
+    assertThat(new RemoteAccessQuestion().answer(b.build())).singleElement().satisfies(x -> {
+      assertThat(x.headline()).doesNotContain("confirm this one is sanctioned")
+          .endsWith("The command & control answer concludes this server is a C2 for NetSupport RAT, so this"
+              + " isn't a sanctioned install.");
+      assertThat(x.attributes()).containsEntry("concludedC2", "c2");
+    });
+  }
+
+  @Test
+  void aSuspectedC2_saysSuspected() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    b.addFinding(alert("ET INFO TeamViewer Dyngate User-Agent (sid:2009475 sev:1)", "10.1.17.215", "185.188.32.26"));
+    b.addRelationship(new com.tracepcap.knowledge.spi.Relationship(EntityRef.external("185.188.32.26"), "c2-of",
+        EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE), Grade.INFERRED, "corroboration",
+        Map.of("corroboration", "suspected-c2")));
+
+    assertThat(new RemoteAccessQuestion().answer(b.build())).singleElement().satisfies(x -> {
+      assertThat(x.headline()).contains("suspects this server is a C2 for unidentified malware");
+      assertThat(x.attributes()).containsEntry("concludedC2", "suspected");
+    });
+  }
 }

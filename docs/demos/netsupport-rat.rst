@@ -57,8 +57,8 @@ Step 2 — The Investigation Summary
    :alt: Investigation Summary: victim, user, NetSupport RAT and its C2, and the remote-access session
    :width: 60%
 
-   The summary names the victim, the user, NetSupport RAT and its C2, and also lists the NetSupport
-   session as a remote-access tool to confirm.
+   The summary names the victim, the user, NetSupport RAT and its C2. The NetSupport session is
+   also listed as a remote-access tool, pointing back to the C2 answer.
 
 .. list-table::
    :header-rows: 1
@@ -86,7 +86,8 @@ Step 2 — The Investigation Summary
      - the install chain + IDS (*ET REMOTE_ACCESS NetSupport Remote Admin Checkin*)
    * - Remote-access tool
      - ``10.11.10.147`` runs **NetSupport**, talking to ``93.152.209.36`` since 18:22:07 UTC;
-       *confirm it's sanctioned*
+       *the command & control answer concludes this server is a C2 for NetSupport RAT, so this
+       isn't a sanctioned install*
      - INFERRED
      - IDS + first contact
 
@@ -110,10 +111,11 @@ got here** button on the C2 answer shows it as the first step, with the rule in 
 INFERRED, and the C2 answer says *probable unsanctioned install*. (The capture's *ET INFO Packed
 Executable Download* alert is a Windows Update at 18:30, not part of the chain.)
 
-**Two answers about one session.** The remote-access answer still asks the analyst to confirm the
-tool is sanctioned, beside a C2 answer that already concluded it isn't. They come from separate
-checks: the remote-access one fires on any remote-admin tool talking outside the network. Read the
-C2 answer as the conclusion and the remote-access one as the raw observation behind it.
+**Two answers about one session.** The remote-access check fires on any remote-admin tool talking
+to a server outside the network, and on its own it asks the analyst to confirm the tool is
+sanctioned (as it does for TeamViewer in :doc:`fake-software-site`). Here the C2 answer has already
+concluded it isn't, so the remote-access answer says that instead of asking. *(From a later build
+than the rest of this page: earlier, it asked anyway, beside the C2 answer.)*
 
 Step 3 — The session
 ~~~~~~~~~~~~~~~~~~~~

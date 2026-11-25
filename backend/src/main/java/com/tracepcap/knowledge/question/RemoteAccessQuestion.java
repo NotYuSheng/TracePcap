@@ -22,7 +22,8 @@ import org.springframework.stereotype.Component;
  * ScreenConnect, TeamViewer…) seen checking in to a server outside the network. IT departments use
  * these tools, and so do attackers: NetSupport is a favourite RAT, and ET files its check-in under
  * INFO, not MALWARE, precisely because it may be sanctioned. So this neither calls the server a C2
- * nor names a malware family; it surfaces the session for an analyst to confirm.
+ * nor names a malware family; it surfaces the session for an analyst to confirm. When another check
+ * has concluded the server is a C2 (a RAT's install chain, say), it says so instead of asking.
  *
  * <p>Found in the 2026-11-10 NetSupport RAT exercise, where the only IDS hit was "ET INFO NetSupport
  * Remote Admin Checkin" to 93.152.209.36, and nothing else in the answers mentioned it.
@@ -67,6 +68,17 @@ public class RemoteAccessQuestion implements StandardQuestion {
           .addAll(f.evidence());
     }
 
+    // Servers another check already concluded are a C2 (#1262): the session isn't then a tool to
+    // confirm, and saying so beside a C2 answer read as a contradiction.
+    Map<String, String> c2Families = new LinkedHashMap<>();
+    Map<String, Boolean> c2Suspected = new LinkedHashMap<>();
+    for (com.tracepcap.knowledge.spi.Relationship r : board.relationshipsWithPredicate("c2-of")) {
+      c2Families.putIfAbsent(r.from().key(), r.to().key());
+      boolean suspected = "suspected-c2".equals(r.attributes().get("corroboration"));
+      // A firm conclusion from any check outweighs a suspicion from another.
+      c2Suspected.merge(r.from().key(), suspected, Boolean::logicalAnd);
+    }
+
     List<Answer> answers = new ArrayList<>();
     sessions.forEach((key, alerts) -> {
       String host = key.get(0), tool = key.get(1), external = key.get(2);
@@ -88,6 +100,9 @@ public class RemoteAccessQuestion implements StandardQuestion {
           basis.add(IdsAlertRecordContributor.alertSpan(server));
         }
       }
+      if (c2Families.containsKey(external)) {
+        attrs.put("concludedC2", c2Suspected.getOrDefault(external, false) ? "suspected" : "c2");
+      }
       answers.add(
           new Answer(
               QUESTION,
@@ -97,8 +112,7 @@ public class RemoteAccessQuestion implements StandardQuestion {
                       ? " since "
                           + com.tracepcap.knowledge.contributor.TrafficContributor.readable(first)
                       : "")
-                  + ". IT uses remote-access tools, and so do attackers:"
-                  + " confirm this one is sanctioned.",
+                  + ". " + verdict(external, c2Families, c2Suspected),
               Grade.INFERRED,
               List.of(EntityRef.host(host), EntityRef.external(external)),
               basis,
@@ -109,5 +123,22 @@ public class RemoteAccessQuestion implements StandardQuestion {
                   new ArrayList<>(convs.getOrDefault(key, java.util.Set.of()))))));
     });
     return answers;
+  }
+
+  /**
+   * What the analyst should do with the session: confirm it's sanctioned, or, when the server is
+   * already concluded a C2, read that answer, which says why.
+   */
+  static String verdict(String external, Map<String, String> families, Map<String, Boolean> suspected) {
+    String family = families.get(external);
+    if (family == null) {
+      return "IT uses remote-access tools, and so do attackers: confirm this one is sanctioned.";
+    }
+    String whose = EntityRef.UNIDENTIFIED_MALWARE.equals(family) ? "unidentified malware" : family;
+    return Boolean.TRUE.equals(suspected.get(external))
+        ? "The command & control answer suspects this server is a C2 for " + whose + ", so treat the"
+            + " session as unsanctioned unless IT confirms it."
+        : "The command & control answer concludes this server is a C2 for " + whose + ", so this"
+            + " isn't a sanctioned install.";
   }
 }
