@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import type { NetworkSettings } from '@/features/monitor/types/monitor.types';
@@ -65,72 +66,13 @@ export const NetworkSettingsModal = ({ show, onHide, initial, onSave }: NetworkS
   };
 
   return (
-    <Modal show={show} onHide={() => !saving && onHide()}>
-      <Modal.Header closeButton>
-        <Modal.Title>Network settings</Modal.Title>
-      </Modal.Header>
-      <form onSubmit={handleSubmit}>
-        <Modal.Body>
-          {error && <Alert variant="danger" className="py-2">{error}</Alert>}
-          {!allowed && (
-            <Alert variant="info" className="py-2" data-testid="settings-locked">
-              <i className="bi bi-lock me-2" aria-hidden="true" />
-              You can view these settings but not change them: {reason ?? 'only admins can change this.'}
-            </Alert>
-          )}
-          <h6 className="mb-1">When does something count as "no longer seen"?</h6>
-          <p className="small text-muted">
-            A device, IP or protocol missing from the latest capture may simply have been quiet
-            during it. Until it passes this rule, the drift panels show it as <strong>quiet</strong>{' '}
-            (dashed) rather than <strong>no longer seen</strong> (struck through).
-          </p>
-
-          <Form.Group className="mb-3">
-            <Form.Label htmlFor="inactivity-mode">Count by</Form.Label>
-            <Form.Select
-              id="inactivity-mode"
-              value={mode}
-              onChange={e => setMode(e.target.value as NetworkSettings['inactivityMode'])}
-              disabled={locked}
-            >
-              <option value="SNAPSHOTS">Captures: missing from the last N captures</option>
-              <option value="DAYS">Days: not seen for N days before the latest capture</option>
-            </Form.Select>
-            <Form.Text muted>
-              {mode === 'SNAPSHOTS'
-                ? 'Suits irregular capture schedules.'
-                : 'Suits regular schedules. Counted from the latest capture, not today, so reviewing old captures works.'}
-            </Form.Text>
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label htmlFor="inactivity-threshold">
-              {mode === 'SNAPSHOTS' ? 'Number of captures' : 'Number of days'}
-            </Form.Label>
-            <Form.Control
-              id="inactivity-threshold"
-              type="number"
-              min={1}
-              max={MAX_THRESHOLD}
-              step={1}
-              value={threshold}
-              onChange={e => setThreshold(e.target.value)}
-              isInvalid={!valid}
-              disabled={locked}
-            />
-            <Form.Control.Feedback type="invalid">
-              Enter a whole number from 1 to {MAX_THRESHOLD}.
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          {valid && (
-            <p className="small mb-0" data-testid="rule-preview">
-              Something is <strong>{describeRule(draft)}</strong>.
-              {isDefault && ' This is the default, and how the panels have always behaved.'}
-            </p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
+    <SideDrawer
+      show={show}
+      onHide={() => !saving && onHide()}
+      title="Network settings"
+      titleId="network-settings-title"
+      footer={
+        <>
           <Button
             type="button"
             variant="link"
@@ -146,11 +88,72 @@ export const NetworkSettingsModal = ({ show, onHide, initial, onSave }: NetworkS
           <Button type="button" variant="secondary" onClick={onHide} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={locked || !valid}>
+          <Button type="submit" form="network-settings-form" variant="primary" disabled={locked || !valid}>
             {saving ? <><Spinner animation="border" size="sm" className="me-2" />Saving…</> : 'Save'}
           </Button>
-        </Modal.Footer>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} id="network-settings-form">
+        {error && <Alert variant="danger" className="py-2">{error}</Alert>}
+        {!allowed && (
+          <Alert variant="info" className="py-2" data-testid="settings-locked">
+            <i className="bi bi-lock me-2" aria-hidden="true" />
+            You can view these settings but not change them: {reason ?? 'only admins can change this.'}
+          </Alert>
+        )}
+        <h6 className="mb-1">When does something count as "no longer seen"?</h6>
+        <p className="small text-muted">
+          A device, IP or protocol missing from the latest capture may simply have been quiet
+          during it. Until it passes this rule, the drift panels show it as <strong>quiet</strong>{' '}
+          (dashed) rather than <strong>no longer seen</strong> (struck through).
+        </p>
+
+        <Form.Group className="mb-3">
+          <Form.Label htmlFor="inactivity-mode">Count by</Form.Label>
+          <Form.Select
+            id="inactivity-mode"
+            value={mode}
+            onChange={e => setMode(e.target.value as NetworkSettings['inactivityMode'])}
+            disabled={locked}
+          >
+            <option value="SNAPSHOTS">Captures: missing from the last N captures</option>
+            <option value="DAYS">Days: not seen for N days before the latest capture</option>
+          </Form.Select>
+          <Form.Text muted>
+            {mode === 'SNAPSHOTS'
+              ? 'Suits irregular capture schedules.'
+              : 'Suits regular schedules. Counted from the latest capture, not today, so reviewing old captures works.'}
+          </Form.Text>
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label htmlFor="inactivity-threshold">
+            {mode === 'SNAPSHOTS' ? 'Number of captures' : 'Number of days'}
+          </Form.Label>
+          <Form.Control
+            id="inactivity-threshold"
+            type="number"
+            min={1}
+            max={MAX_THRESHOLD}
+            step={1}
+            value={threshold}
+            onChange={e => setThreshold(e.target.value)}
+            isInvalid={!valid}
+            disabled={locked}
+          />
+          <Form.Control.Feedback type="invalid">
+            Enter a whole number from 1 to {MAX_THRESHOLD}.
+          </Form.Control.Feedback>
+        </Form.Group>
+
+        {valid && (
+          <p className="small mb-0" data-testid="rule-preview">
+            Something is <strong>{describeRule(draft)}</strong>.
+            {isDefault && ' This is the default, and how the panels have always behaved.'}
+          </p>
+        )}
       </form>
-    </Modal>
+    </SideDrawer>
   );
 };

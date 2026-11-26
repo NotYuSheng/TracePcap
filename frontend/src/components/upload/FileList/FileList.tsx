@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
@@ -712,51 +713,54 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={showMerge} onHide={() => !merging && setShowMerge(false)} centered>
-        <Modal.Header closeButton={!merging}>
-          <Modal.Title>Merge {selectedCount} captures into one</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {mergeError && (
-            <Alert variant="danger" className="py-2">
-              {mergeError}
-            </Alert>
-          )}
-          <p className="small text-muted">
-            The packets of all of them go into one new capture, which is then analysed. The
-            originals stay as they are. To look at them side by side instead, use Compare.
-          </p>
-          <Form.Label htmlFor="merge-name">Name</Form.Label>
-          <div className="input-group input-group-sm">
-            <Form.Control
-              id="merge-name"
-              value={mergeName}
-              onChange={e => setMergeName(e.target.value)}
+      <SideDrawer
+        show={showMerge}
+        onHide={() => !merging && setShowMerge(false)}
+        closable={!merging}
+        title={<>Merge {selectedCount} captures into one</>}
+        titleId="merge-captures-title"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline-secondary"
+              onClick={() => setShowMerge(false)}
               disabled={merging}
-            />
-            <span className="input-group-text">.pcap</span>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            type="button"
-            variant="outline-secondary"
-            onClick={() => setShowMerge(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={doMerge}
+              disabled={merging || !mergeName.trim()}
+            >
+              {merging && <Spinner animation="border" size="sm" className="me-2" />}
+              Merge and analyse
+            </Button>
+          </>
+        }
+      >
+        {mergeError && (
+          <Alert variant="danger" className="py-2">
+            {mergeError}
+          </Alert>
+        )}
+        <p className="small text-muted">
+          The packets of all of them go into one new capture, which is then analysed. The
+          originals stay as they are. To look at them side by side instead, use Compare.
+        </p>
+        <Form.Label htmlFor="merge-name">Name</Form.Label>
+        <div className="input-group input-group-sm">
+          <Form.Control
+            id="merge-name"
+            value={mergeName}
+            onChange={e => setMergeName(e.target.value)}
             disabled={merging}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={doMerge}
-            disabled={merging || !mergeName.trim()}
-          >
-            {merging && <Spinner animation="border" size="sm" className="me-2" />}
-            Merge and analyse
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          />
+          <span className="input-group-text">.pcap</span>
+        </div>
+      </SideDrawer>
     </section>
   );
 };

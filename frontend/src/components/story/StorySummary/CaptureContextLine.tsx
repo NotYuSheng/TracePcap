@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState } from 'react';
-import { Button, Modal } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
 import type { CaptureContext } from '@/types';
 import { AdjudicationPanel } from '@components/common/AdjudicationPanel/AdjudicationPanel';
 import { contextParts, vantageDescribed } from '@/features/insights/captureContext';
@@ -32,55 +33,56 @@ export function CaptureContextLine({ fileId, context, onChanged }: Props) {
         Why · change
       </Button>
 
-      <Modal show={open} onHide={() => setOpen(false)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>What this capture can show</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="small text-muted">
-            Where a capture was taken decides what it can show: traffic between internal hosts never
-            crosses an internet uplink, and a sensor sees only what reaches it. TracePcap infers it from
-            who talks to whom and who opens the connections. If you know better, say so: your answer
-            replaces the inference, and evidence you add counts toward it.
+      <SideDrawer
+        show={open}
+        onHide={() => setOpen(false)}
+        title="What this capture can show"
+        titleId="capture-context-title"
+        wide
+      >
+        <p className="small text-muted">
+          Where a capture was taken decides what it can show: traffic between internal hosts never
+          crosses an internet uplink, and a sensor sees only what reaches it. TracePcap infers it from
+          who talks to whom and who opens the connections. If you know better, say so: your answer
+          replaces the inference, and evidence you add counts toward it.
+        </p>
+        {!v.label && v.reason && (
+          <p className="small" data-testid="vantage-undetermined">
+            <b>Not determined:</b> {v.reason}.
           </p>
-          {!v.label && v.reason && (
-            <p className="small" data-testid="vantage-undetermined">
-              <b>Not determined:</b> {v.reason}.
-            </p>
-          )}
-          <AdjudicationPanel
-            fileId={fileId}
-            question={v.question}
-            entityKey={v.entityKey}
-            title="Vantage point"
-            verdict={{
-              label: vantageDescribed(v) ?? 'Not determined',
-              basis: v.basis,
-              confidence: v.label ? v.confidence : undefined,
-              contested: v.contested,
-              candidates: v.candidates.map(c => ({
-                label: c.label,
-                source: 'address mix',
-                score: c.score,
-                reasons: c.reasons,
-              })),
-            }}
-            labelOptions={v.options}
-            onChanged={onChanged}
-          />
+        )}
+        <AdjudicationPanel
+          fileId={fileId}
+          question={v.question}
+          entityKey={v.entityKey}
+          title="Vantage point"
+          verdict={{
+            label: vantageDescribed(v) ?? 'Not determined',
+            basis: v.basis,
+            confidence: v.label ? v.confidence : undefined,
+            contested: v.contested,
+            candidates: v.candidates.map(c => ({
+              label: c.label,
+              source: 'address mix',
+              score: c.score,
+              reasons: c.reasons,
+            })),
+          }}
+          labelOptions={v.options}
+          onChanged={onChanged}
+        />
 
-          <h6 className="border-bottom pb-1 mb-2">Completeness</h6>
-          <p className="small mb-1">{context.completeness.label}</p>
-          {context.completeness.notes.length > 0 && (
-            <ul className="small text-muted">
-              {context.completeness.notes.map(n => <li key={n.kind}>{n.text}</li>)}
-            </ul>
-          )}
+        <h6 className="border-bottom pb-1 mb-2">Completeness</h6>
+        <p className="small mb-1">{context.completeness.label}</p>
+        {context.completeness.notes.length > 0 && (
+          <ul className="small text-muted">
+            {context.completeness.notes.map(n => <li key={n.kind}>{n.text}</li>)}
+          </ul>
+        )}
 
-          <h6 className="border-bottom pb-1 mb-2 mt-3">Time span</h6>
-          <p className="small mb-0">{context.timeSpan.label ?? 'Not known yet'}</p>
-        </Modal.Body>
-      </Modal>
+        <h6 className="border-bottom pb-1 mb-2 mt-3">Time span</h6>
+        <p className="small mb-0">{context.timeSpan.label ?? 'Not known yet'}</p>
+      </SideDrawer>
     </div>
   );
 }

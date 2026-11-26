@@ -67,7 +67,13 @@ export function HostDetailModal({ fileId, ip, mac, onClose, onNavigate, monitor 
 
   if (loading) {
     return (
-      <Modal show onHide={onClose} centered aria-label={`Loading ${label}`}>
+      <Modal
+        show
+        onHide={onClose}
+        dialogClassName="side-drawer side-drawer-host"
+        contentClassName="side-drawer-content"
+        aria-label={`Loading ${label}`}
+      >
         <Modal.Body className="d-flex align-items-center gap-2 py-4 justify-content-center text-muted">
           <span className="spinner-border spinner-border-sm" aria-hidden="true" />
           Loading {label}…

@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
@@ -345,11 +346,24 @@ function SplitModal({
   };
 
   return (
-    <Modal show={show} onHide={busy ? undefined : onHide} centered>
-      <Modal.Header closeButton={!busy}>
-        <Modal.Title style={{ fontSize: '1rem' }}>Split {data.ip} by time</Modal.Title>
-      </Modal.Header>
-      <Modal.Body style={{ fontSize: '0.85rem' }}>
+    <SideDrawer
+      show={show}
+      onHide={() => !busy && onHide()}
+      closable={!busy}
+      title={<>Split {data.ip} by time</>}
+      titleId="split-by-time-title"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onHide} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={submit} disabled={busy || !at || !reason.trim()}>
+            Split
+          </Button>
+        </>
+      }
+    >
+      <div style={{ fontSize: '0.85rem' }}>
         <p>
           From the time you pick, this address is treated as a different device. Labels, roles and
           evidence already on the device stay with the part before that time.
@@ -414,16 +428,8 @@ function SplitModal({
             {error}
           </Alert>
         )}
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide} disabled={busy}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={submit} disabled={busy || !at || !reason.trim()}>
-          Split
-        </Button>
-      </Modal.Footer>
-    </Modal>
+      </div>
+    </SideDrawer>
   );
 }
 
@@ -457,11 +463,24 @@ function MergeModal({
   };
 
   return (
-    <Modal show={!!target} onHide={busy ? undefined : onHide} centered>
-      <Modal.Header closeButton={!busy}>
-        <Modal.Title style={{ fontSize: '1rem' }}>Not a different device?</Modal.Title>
-      </Modal.Header>
-      <Modal.Body style={{ fontSize: '0.85rem' }}>
+    <SideDrawer
+      show={!!target}
+      onHide={() => !busy && onHide()}
+      closable={!busy}
+      title="Not a different device?"
+      titleId="not-different-device-title"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onHide} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={submit} disabled={busy || !reason.trim()}>
+            Merge
+          </Button>
+        </>
+      }
+    >
+      <div style={{ fontSize: '0.85rem' }}>
         <p>
           This joins the device from {target ? fmt(target.startsAt) : ''} with the one before it.
           {target?.startEvidence && <> The split came from: {target.startEvidence}.</>}
@@ -487,15 +506,7 @@ function MergeModal({
             {error}
           </Alert>
         )}
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide} disabled={busy}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={submit} disabled={busy || !reason.trim()}>
-          Merge
-        </Button>
-      </Modal.Footer>
-    </Modal>
+      </div>
+    </SideDrawer>
   );
 }

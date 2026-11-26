@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { PermissionLock } from '@components/common/PermissionLock';
 import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
@@ -89,72 +90,78 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
   };
 
   return (
-    <Modal show onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title style={{ fontSize: '1rem' }}>
+    <SideDrawer
+      show
+      onHide={onClose}
+      title={
+        <>
           Edit label for this snapshot
           <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshot.fileName}</span>
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted small mb-2">
-          Sets <code className="font-monospace">{cidr}</code>'s label for this snapshot only. It
-          overrides the present-day label here without changing the global definition or other
-          snapshots. Leave blank to fall back to the global label.
-        </p>
-        {error && (
-          <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
-            <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
-          </Alert>
-        )}
-        <Form.Label className="small mb-1">Label</Form.Label>
-        <Form.Control
-          size="sm"
-          className="mb-2"
-          placeholder="e.g. IoT sensor cluster"
-          value={label}
-          onChange={e => setLabel(e.target.value)}
-          autoFocus
-        />
-        <Form.Label className="small mb-1">Description (optional)</Form.Label>
-        <Form.Control
-          as="textarea"
-          size="sm"
-          className="mb-2"
-          rows={3}
-          placeholder="What this subnet was in this snapshot"
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-        />
-        <Button
-          variant="outline-primary"
-          size="sm"
-          onClick={suggest}
-          disabled={suggesting || saving || !ai.allowed}
-        >
-          {suggesting
-            ? <><Spinner size="sm" className="me-1" />Suggesting…</>
-            : <><i className="bi bi-stars me-1" />Suggest with AI</>}
-        </Button>
-        <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
-        {labelJob.active && labelJob.job && (
-          <div className="mt-2">
-            <AiJobStatus
-              compact
-              job={labelJob.job}
-              doing="Suggesting a label"
-              whenDone="You can close this; the suggestion fills in here when you're back."
-              onCancel={() => { labelJob.cancel().catch(() => {}); }}
-            />
+        </>
+      }
+      titleId="subnet-snapshot-edit-title"
+      footer={
+        <>
+          <div className="d-flex justify-content-end gap-2 w-100">
+            <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={save} disabled={saving}>
+              {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
+            </Button>
           </div>
-        )}
-      </Modal.Body>
-      <Modal.Footer className="d-flex justify-content-end gap-2">
-        <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button variant="primary" size="sm" onClick={save} disabled={saving}>
-          {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
-        </Button>
-      </Modal.Footer>
-    </Modal>
+        </>
+      }
+    >
+      <p className="text-muted small mb-2">
+        Sets <code className="font-monospace">{cidr}</code>'s label for this snapshot only. It
+        overrides the present-day label here without changing the global definition or other
+        snapshots. Leave blank to fall back to the global label.
+      </p>
+      {error && (
+        <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
+          <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
+        </Alert>
+      )}
+      <Form.Label className="small mb-1">Label</Form.Label>
+      <Form.Control
+        size="sm"
+        className="mb-2"
+        placeholder="e.g. IoT sensor cluster"
+        value={label}
+        onChange={e => setLabel(e.target.value)}
+        autoFocus
+      />
+      <Form.Label className="small mb-1">Description (optional)</Form.Label>
+      <Form.Control
+        as="textarea"
+        size="sm"
+        className="mb-2"
+        rows={3}
+        placeholder="What this subnet was in this snapshot"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+      />
+      <Button
+        variant="outline-primary"
+        size="sm"
+        onClick={suggest}
+        disabled={suggesting || saving || !ai.allowed}
+      >
+        {suggesting
+          ? <><Spinner size="sm" className="me-1" />Suggesting…</>
+          : <><i className="bi bi-stars me-1" />Suggest with AI</>}
+      </Button>
+      <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
+      {labelJob.active && labelJob.job && (
+        <div className="mt-2">
+          <AiJobStatus
+            compact
+            job={labelJob.job}
+            doing="Suggesting a label"
+            whenDone="You can close this; the suggestion fills in here when you're back."
+            onCancel={() => { labelJob.cancel().catch(() => {}); }}
+          />
+        </div>
+      )}
+    </SideDrawer>
   );
 }

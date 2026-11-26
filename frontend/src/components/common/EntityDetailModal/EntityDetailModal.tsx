@@ -176,7 +176,13 @@ export function EntityDetailModal({
     ];
     return (
       <>
-        <Modal show onHide={onClose} size="xl" dialogClassName="node-dialog" aria-labelledby="entity-detail-title">
+        <Modal
+          show
+          onHide={onClose}
+          dialogClassName="side-drawer side-drawer-host node-dialog"
+          contentClassName="side-drawer-content"
+          aria-labelledby="entity-detail-title"
+        >
           <Modal.Body className="p-0 node-dialog-body">
             <GraphNodeIdentityCard
               node={node}
@@ -298,19 +304,10 @@ export function EntityDetailModal({
     );
   }
 
-  // Protocols and apps open in the right-hand drawer, like the app's other side panels; the
-  // centred dialog stays for the rest.
-  const asDrawer = entityType === 'PROTOCOL' || entityType === 'APPLICATION';
-
+  // Every entity opens in the right-hand drawer, like the app's other side panels.
   return (
     <>
-    <Modal
-      show
-      onHide={onClose}
-      {...(asDrawer
-        ? { dialogClassName: 'side-drawer side-drawer-wide', contentClassName: 'side-drawer-content' }
-        : { size: 'lg' as const, scrollable: true })}
-    >
+    <Modal show onHide={onClose} dialogClassName="side-drawer side-drawer-wide" contentClassName="side-drawer-content">
       <Modal.Header closeButton closeLabel="Close (Esc)">
             <Modal.Title as="h5" className="d-flex align-items-center gap-2 flex-wrap">
               {displayName}
@@ -345,7 +342,7 @@ export function EntityDetailModal({
             </ul>
           </div>
 
-          <Modal.Body className={asDrawer ? 'side-drawer-body' : undefined}>
+          <Modal.Body className="side-drawer-body">
 
             {/* ── DETAILS TAB ──────────────────────────────────────── */}
             {activeTab === 'details' && (
