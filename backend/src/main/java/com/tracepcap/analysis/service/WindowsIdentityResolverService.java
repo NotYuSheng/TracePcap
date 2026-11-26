@@ -73,6 +73,30 @@ public class WindowsIdentityResolverService {
   /** An LDAP directory lookup queried this account's DN. REPORTED-grade (weaker, see class doc). */
   public static final String SOURCE_LDAP_DN = "ldap_dn";
 
+  /**
+   * An NTLM AUTHENTICATE message (#1234) named this account: the client signed in as it, over SMB,
+   * HTTP, LDAP, DCE-RPC or anything else that carries NTLM. Sent by the client itself, so
+   * MEASURED-grade like a Kerberos AS-REQ. Anonymous sessions (no user) and machine accounts are
+   * skipped; the NTLM workstation name is a hostname claim instead ({@link HostnameResolverService}).
+   */
+  public static final String SOURCE_NTLM_AUTH = "ntlm_auth";
+
+  /**
+   * A domain controller answered an SMB/SAMR "QueryUserInfo" with an account's full name: the row's
+   * {@code directoryEntry} is the account ({@code gwyatt}), its {@code username} the full name
+   * ({@code Gabriel Wyatt}), its {@code ip} the client that asked. A lookup, REPORTED-grade like LDAP,
+   * never a sign-in; it names the person behind an account the host signed in as.
+   */
+  public static final String SOURCE_SAMR_USER_INFO = "samr_user_info";
+
+  /** NTLM message type 3 (AUTHENTICATE), the client's own sign-in, per MS-NLMP. */
+  private static final String NTLM_MSG_TYPE_AUTHENTICATE = "3";
+
+  /** Sources where the host itself signed in as the account (as opposed to looking one up). */
+  public static boolean isSignIn(String source) {
+    return SOURCE_KERBEROS_AS_REQ.equals(source) || SOURCE_NTLM_AUTH.equals(source);
+  }
+
   /** AS-REQ, per the RFC 4120 message-type registry — the only Kerberos message this class reads. */
   private static final String KERBEROS_MSG_TYPE_AS_REQ = "10";
 
@@ -151,6 +175,8 @@ public class WindowsIdentityResolverService {
   public static List<Claim> toClaims(List<Logon> logons) {
     return logons.stream()
         .filter(l -> !l.isCandidateOnly())
+        // A SAMR answer names a person, it isn't evidence of a sign-in: see fullNamesByIp.
+        .filter(l -> !SOURCE_SAMR_USER_INFO.equals(l.source()))
         .map(l -> new Claim(l.ip(), l.username(), l.source()))
         .distinct()
         .toList();
@@ -169,6 +195,8 @@ public class WindowsIdentityResolverService {
     //   3 ldap.baseObject
     //   4 kerberos.msg_type  5 kerberos.CNameString
     //   6 frame.time_epoch
+    //   7 ntlmssp.messagetype  8 ntlmssp.auth.username  9 ntlmssp.auth.domain
+    //   10 samr UserInfo21 account_name  11 samr UserInfo21 full_name (a reply: ip.dst asked)
     // Every occurrence, not just the first (#812 item 4): one TCP-reassembled frame can carry
     // several Kerberos or LDAP messages, and reading only the first skipped a real AS-REQ when an
     // earlier message in the frame had another type. The aggregator is a control character, not
@@ -185,7 +213,9 @@ public class WindowsIdentityResolverService {
             "-r",
             pcapFile.getAbsolutePath(),
             "-Y",
-            "ldap.baseObject || (kerberos.msg_type==10 and kerberos.CNameString)",
+            "ldap.baseObject || (kerberos.msg_type==10 and kerberos.CNameString)"
+                + " || ntlmssp.messagetype==" + NTLM_MSG_TYPE_AUTHENTICATE
+                + " || samr.samr_UserInfo21.full_name",
             "-T",
             "fields",
             "-E",
@@ -207,7 +237,17 @@ public class WindowsIdentityResolverService {
             "-e",
             "kerberos.CNameString",
             "-e",
-            "frame.time_epoch");
+            "frame.time_epoch",
+            "-e",
+            "ntlmssp.messagetype",
+            "-e",
+            "ntlmssp.auth.username",
+            "-e",
+            "ntlmssp.auth.domain",
+            "-e",
+            "samr.samr_UserInfo21.account_name",
+            "-e",
+            "samr.samr_UserInfo21.full_name");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -275,11 +315,32 @@ public class WindowsIdentityResolverService {
       if (ioExecutor != null) ioExecutor.shutdownNow();
     }
 
-    log.info("Collected {} Windows login record(s) from Kerberos/LDAP", result.size());
+    log.info("Collected {} Windows login record(s) from Kerberos/LDAP/NTLM", result.size());
     return result.values().stream()
         .map(LogonAgg::toLogon)
         .sorted(java.util.Comparator.comparing(Logon::firstSeen, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
         .toList();
+  }
+
+  /**
+   * Full names a domain controller gave out (SAMR), per client and account: {@code ip → (account,
+   * lower-case → full name)}. Used to name the person behind the account a host signed in as.
+   */
+  public static Map<String, Map<String, String>> fullNamesByIp(List<Logon> logons) {
+    Map<String, Map<String, String>> out = new java.util.HashMap<>();
+    for (Logon l : logons) {
+      if (!SOURCE_SAMR_USER_INFO.equals(l.source()) || l.directoryEntry() == null) continue;
+      out.computeIfAbsent(l.ip(), k -> new java.util.HashMap<>())
+          .putIfAbsent(l.directoryEntry().toLowerCase(java.util.Locale.ROOT), l.username());
+    }
+    return out;
+  }
+
+  /** For tests: tshark output rows (fields as {@link #resolveLogons} requests them) to logins. */
+  List<Logon> logonsFromRows(List<String> rows) {
+    Map<LogonKey, LogonAgg> result = new java.util.LinkedHashMap<>();
+    for (String row : rows) parseRow(row.split("\\|", -1), result);
+    return result.values().stream().map(LogonAgg::toLogon).toList();
   }
 
   /** Separates multiple occurrences of a field in one frame. ASCII unit separator: never in a DN. */
@@ -326,6 +387,20 @@ public class WindowsIdentityResolverService {
     String ip = firstValue(f[1]);
     LocalDateTime at = f.length > 6 ? epochToLocal(first(split(f[6]))) : null;
 
+    // NTLM sign-ins ride inside other protocols (SMB, HTTP, LDAP binds), so they are read first and
+    // don't end the row: the same frame can also carry an LDAP search or a Kerberos message.
+    if (f.length > 9) recordNtlm(result, ip, split(f[7]), split(f[8]), split(f[9]), at);
+
+    // A SAMR QueryUserInfo reply: the DC tells the client (ip.dst) an account's full name.
+    if (f.length > 11) {
+      String account = first(split(f[10]));
+      String fullName = first(split(f[11]));
+      if (account != null && fullName != null && !isMachineAccount(account)) {
+        record(result, firstValue(f[2]), fullName, SOURCE_SAMR_USER_INFO, account.trim(), null, null, null, at);
+      }
+      if (fullName != null) return;
+    }
+
     // Every LDAP searchRequest DN in the frame.
     List<String> dns = split(f[3]);
     if (!dns.isEmpty()) {
@@ -353,6 +428,35 @@ public class WindowsIdentityResolverService {
         record(result, ip, principal, SOURCE_KERBEROS_AS_REQ, null, null, null, null, at);
       }
     }
+  }
+
+  /**
+   * The AUTHENTICATE messages' accounts. Fields list one value per NTLM message; when the counts
+   * line up they're paired by position, otherwise only an unambiguous single account is taken.
+   */
+  private void recordNtlm(
+      Map<LogonKey, LogonAgg> result, String ip, List<String> types, List<String> users,
+      List<String> domains, LocalDateTime at) {
+    if (!types.contains(NTLM_MSG_TYPE_AUTHENTICATE) || users.isEmpty()) return;
+    List<String[]> accounts = new ArrayList<>();
+    List<String> authTypes = types.stream().filter(NTLM_MSG_TYPE_AUTHENTICATE::equals).toList();
+    if (authTypes.size() == users.size()) {
+      for (int i = 0; i < users.size(); i++) {
+        accounts.add(new String[] {users.get(i), i < domains.size() ? domains.get(i) : null});
+      }
+    } else if (users.stream().distinct().count() == 1) {
+      accounts.add(new String[] {users.get(0), domains.size() == 1 ? domains.get(0) : null});
+    }
+    for (String[] a : accounts) {
+      if (isAnonymousNtlm(a[0]) || isMachineAccount(a[0])) continue;
+      String domain = isAnonymousNtlm(a[1]) ? null : a[1];
+      record(result, ip, a[0], SOURCE_NTLM_AUTH, null, null, null, domain, at);
+    }
+  }
+
+  /** tshark prints an anonymous NTLM session's empty user and domain as the literal "NULL". */
+  static boolean isAnonymousNtlm(String value) {
+    return value == null || value.isBlank() || "NULL".equals(value.trim());
   }
 
   private void recordLdap(Map<LogonKey, LogonAgg> result, String ip, String dn, LocalDateTime at) {

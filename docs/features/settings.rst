@@ -62,8 +62,10 @@ is listed with its **effective value**, including values derived from ``APP_MEMO
 such as the upload cap. They are grouped as:
 
 - **Analysis policy**: detection thresholds, retention, display limits.
-- **LLM**: the server Story and Insights use, with **Test connection** (see
-  :doc:`../configuration/llm-setup`).
+- **LLM**: the server Story and Insights use. **Change connection…** sets its URL,
+  key and model in one form, picking the model from the server's own list, and
+  **Test connection** checks it, warning when the model is too small or slow for a
+  story (see :doc:`../configuration/llm-setup`).
 - **Memory and capacity**: limits tied to how much memory the backend has.
 - **Infrastructure**: servers, storage and login.
 
@@ -126,13 +128,30 @@ Every change to these items is recorded with **who** made it, **when**, and the 
 ``system``, because there are no accounts. Entries are recorded in the same transaction
 as the change, so a change is never saved without its entry.
 
+**Every other action is recorded too.** Uploading or deleting a capture, marking a
+favourite, keeping a capture, creating a monitored network or adding a snapshot to it,
+labelling a host, writing a note, asking for a story or a question, downloading a
+capture or exporting conversations: any change anyone makes through the app or the API
+gets an entry, with who, when, what (the action in words, such as *Added a snapshot to
+a network* or *Deleted file: ftp.pcap*) and what it was done to. Attempts refused for
+lack of permission are recorded as well (*Tried to delete file: … (refused, no
+permission)*). These entries are written automatically for any action that doesn't
+write its own, more detailed entry, so a new feature can't be added without being
+audited. They hold no before/after values, and never a request's contents (which can
+hold secrets or capture data).
+
+Not recorded: page views and other reads, and four requests that change nothing:
+previewing a rule, running a packet filter query, previewing an AI role suggestion,
+and saving your own layout and theme preferences.
+
 Read it on the Settings page's **Audit log** tab: newest first, paged, and searchable by
 who, action or target. It's also available from the API at ``GET /api/v1/audit-log``.
 
 Each change is one line: when, who, a tag for the kind of thing (*Rule*, *Map*,
 *Device*, *Address*, *Setting*) and what happened in words (*Changed live_check_tcp:
 Enabled*, *Moved 1 device*, *Added the group “Point of sale”*). Narrow it with the
-chips (**Rules**, **Maps**, **Devices**, **Addresses**, **Settings and access**) and
+chips (**Rules**, **Maps**, **Devices**, **Addresses**, **Settings and access**,
+**Captures**, **Monitoring**, **Labels and notes**) and
 the search box. **Select a line** for its details beside the table: when, who, what
 it was about, and each field that changed with its old value (struck through) and
 new one, or the fields it had when it was added or removed. **Show the raw record**

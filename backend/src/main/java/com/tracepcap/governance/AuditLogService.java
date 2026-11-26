@@ -35,6 +35,8 @@ public class AuditLogService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void record(String action, String targetType, String targetId, Object before, Object after) {
+    // This request now has its own, richer entry: the automatic one would only repeat it.
+    AuditContext.markRecorded();
     repository.save(
         AuditLogEntity.builder()
             .at(LocalDateTime.now())
@@ -44,6 +46,24 @@ public class AuditLogService {
             .targetId(targetId)
             .before(toJson(before))
             .after(toJson(after))
+            .build());
+  }
+
+  /**
+   * The automatic entry for a request no service recorded ({@link RequestAuditInterceptor}). Its
+   * own transaction: by now the request's work has committed (or never had one).
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void recordRequest(String action, String targetType, String targetId, Map<String, Object> after) {
+    repository.save(
+        AuditLogEntity.builder()
+            .at(LocalDateTime.now())
+            .actor(currentActor.username())
+            .action(action)
+            .targetType(targetType)
+            .targetId(targetId)
+            .before(null)
+            .after(after)
             .build());
   }
 

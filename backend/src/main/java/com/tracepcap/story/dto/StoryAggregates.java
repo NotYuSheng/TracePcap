@@ -37,6 +37,38 @@ public class StoryAggregates {
    */
   private List<BeaconCandidate> beaconCandidates;
 
+  /** How the capture's TCP connections went (#1233); null when it couldn't be computed. */
+  private ConnectionOutcomes connectionOutcomes;
+
+  /**
+   * TCP connections by outcome, and where the unanswered and refused ones were aimed: a host
+   * trying many closed or silent targets is scanning, one retrying a single silent server may be
+   * a dead C2 or a misconfiguration.
+   */
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class ConnectionOutcomes {
+    private long answered;
+    private long noAnswer;
+    private long rejected;
+    /** Unanswered or refused targets, most attempts first. */
+    private List<FailedTarget> topFailedTargets;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class FailedTarget {
+    private String srcIp;
+    private String dstIp;
+    private Integer dstPort;
+    private long noAnswer;
+    private long rejected;
+  }
+
   @Data
   @Builder
   @NoArgsConstructor
@@ -80,6 +112,10 @@ public class StoryAggregates {
     private long selfSigned;
     private long expired;
     private long unknownCa;
+    /** From the certificate itself (#1235); 0 when no certificate was seen. */
+    private long weakKey;
+    private long weakSignature;
+    private long nameMismatch;
     private long total;
   }
 

@@ -208,5 +208,85 @@ class RunSummaryTest(unittest.TestCase):
             json.loads((Path(d) / "scorecard.json").read_text())  # still valid JSON
 
 
+
+class BeyondTheKey(unittest.TestCase):
+    """An evidenced finding the key doesn't mention is neither right nor wrong (2026-01-31 Lumma)."""
+
+    def test_an_evidenced_extra_is_left_out_of_the_score(self):
+        status, detail = ev.classify(["153.92.1.49"], ["153.92.1.49", "62.72.32.156"], beyond=["62.72.32.156"])
+        self.assertEqual(status, ev.CORRECT)
+        self.assertEqual(detail["beyond_key"], ["62.72.32.156"])
+
+    def test_an_unlisted_extra_is_still_wrong(self):
+        status, _ = ev.classify(["153.92.1.49"], ["153.92.1.49", "6.6.6.6"], beyond=["62.72.32.156"])
+        self.assertEqual(status, ev.WRONG)
+
+    def test_only_the_extra_found_is_a_miss(self):
+        status, detail = ev.classify(["153.92.1.49"], ["62.72.32.156"], beyond=["62.72.32.156"])
+        self.assertEqual(status, ev.MISSED)
+        self.assertEqual(detail["beyond_key"], ["62.72.32.156"])
+
+    def test_an_entry_without_evidence_is_refused(self):
+        with self.assertRaises(ValueError):
+            ev.beyond_key({"beyond_key": {"c2.ip": [{"value": "1.2.3.4"}]}}, "c2.ip")
+        self.assertEqual(
+            ev.beyond_key({"beyond_key": {"c2.ip": [{"value": "1.2.3.4", "evidence": "ET sid 1"}]}}, "c2.ip"),
+            ["1.2.3.4"])
+
+
+class RecallOnly(unittest.TestCase):
+    """Downloads aren't accusations: every key hash must be found; other downloads are fine."""
+
+    def test_extras_are_fine_and_a_missing_hash_is_a_miss(self):
+        self.assertEqual(ev.classify(["aa", "bb"], ["aa", "bb", "cc"], recall_only=True)[0], ev.CORRECT)
+        self.assertEqual(ev.classify(["aa", "bb"], ["aa", "cc"], recall_only=True)[0], ev.MISSED)
+
+
+
+class LateralMovementScoring(unittest.TestCase):
+    """#1266: the pair named must be the key's, and a key saying "none" makes any answer wrong."""
+
+    PSEXEC = {"case_id": "x", "lateral_movement": [{"client": "172.16.66.1", "server": "172.16.66.36"}]}
+    NONE = {"case_id": "x", "lateral_movement": []}
+
+    def test_the_right_pair_is_correct(self):
+        r = ev.score_case(self.PSEXEC, [ans("lateral-movement", client="172.16.66.1", server="172.16.66.36")], {})
+        self.assertEqual(status(r, "lateral_movement"), ev.CORRECT)
+
+    def test_the_pair_turned_round_is_wrong(self):
+        r = ev.score_case(self.PSEXEC, [ans("lateral-movement", client="172.16.66.36", server="172.16.66.1")], {})
+        self.assertEqual(status(r, "lateral_movement"), ev.WRONG)
+
+    def test_no_answer_is_missed(self):
+        self.assertEqual(status(ev.score_case(self.PSEXEC, [], {}), "lateral_movement"), ev.MISSED)
+
+    def test_a_key_saying_none_makes_any_answer_wrong(self):
+        r = ev.score_case(self.NONE, [ans("lateral-movement", client="10.0.0.5", server="10.0.0.10")], {})
+        self.assertEqual(status(r, "lateral_movement"), ev.WRONG)
+        self.assertEqual(status(ev.score_case(self.NONE, [], {}), "lateral_movement"), ev.CORRECT)
+
+    def test_a_key_without_the_field_does_not_score_it(self):
+        self.assertEqual(status(ev.score_case({"case_id": "x"}, [], {}), "lateral_movement"), ev.NA)
+
+
+class KerberosScoring(unittest.TestCase):
+    """#1267: the technique and the pair must be the key's; a key saying "none" makes any answer wrong."""
+
+    SPRAY = {"case_id": "x", "kerberos_attack": [{"technique": "password-guessing", "client": "172.16.66.1", "kdc": "172.16.66.36"}]}
+
+    def test_the_right_technique_and_pair_is_correct(self):
+        r = ev.score_case(self.SPRAY, [ans("kerberos-attack", technique="password-guessing", client="172.16.66.1", kdc="172.16.66.36")], {})
+        self.assertEqual(status(r, "kerberos_attack"), ev.CORRECT)
+
+    def test_another_technique_is_wrong(self):
+        r = ev.score_case(self.SPRAY, [ans("kerberos-attack", technique="weak-ticket", client="172.16.66.1", kdc="172.16.66.36")], {})
+        self.assertEqual(status(r, "kerberos_attack"), ev.WRONG)
+
+    def test_a_key_saying_none_makes_any_answer_wrong(self):
+        r = ev.score_case({"case_id": "x", "kerberos_attack": []}, [ans("kerberos-attack", technique="weak-ticket", client="a", kdc="b")], {})
+        self.assertEqual(status(r, "kerberos_attack"), ev.WRONG)
+
+
 if __name__ == "__main__":
     unittest.main()
+

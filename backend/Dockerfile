@@ -65,6 +65,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM eclipse-temurin:21-jre-jammy
 
 ARG TARGETARCH
+# Signing key of Launchpad's ~oisf/suricata-8.0 PPA (api.launchpad.net …/suricata-8.0 → signing_key_fingerprint).
+ARG SURICATA_PPA_KEY=121504ADE276E141AD704A75AC10378CF205C960
 
 WORKDIR /app
 
@@ -72,7 +74,8 @@ WORKDIR /app
 #   tshark    — PCAP/pcapng parser
 #   ndpi      — ndpiReader for application-layer DPI (latest from ntop apt repo on amd64,
 #               compiled in the `ndpi` stage on arm64)
-#   suricata  — offline IDS engine for signature-based threat detection (eve.json)
+#   suricata  — offline IDS engine for signature-based threat detection (eve.json), 8.0.x from
+#               OISF's suricata-8.0 PPA (#1269): jammy's own package is 6.0.4, an end-of-life line
 #   tzdata    — timezone data
 #   gosu      — privilege-drop helper for entrypoint
 #
@@ -103,6 +106,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     else \
         NDPI_PACKAGES="libpcap0.8"; \
     fi && \
+    # OISF's suricata-8.0 PPA: stays on the 8.x line (suricata-stable would jump majors), built for
+    # amd64 and arm64. The key is fetched by its pinned fingerprint and the build fails if the
+    # keyserver hands back anything else.
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x${SURICATA_PPA_KEY}" \
+        | gpg --dearmor -o /usr/share/keyrings/oisf-suricata.gpg && \
+    gpg --show-keys --with-colons /usr/share/keyrings/oisf-suricata.gpg | grep -q "^fpr:::::::::${SURICATA_PPA_KEY}:" && \
+    echo "deb [signed-by=/usr/share/keyrings/oisf-suricata.gpg] https://ppa.launchpadcontent.net/oisf/suricata-8.0/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/oisf-suricata.list && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         tshark \
@@ -113,6 +124,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     { [ "$TARGETARCH" != "amd64" ] || dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version; } && \
     ldconfig && \
     dpkg-query -W -f='${Version}' suricata > /opt/suricata-version && \
+    suricata -V | grep -q 'version 8\.' && \
     apt-get purge -y --auto-remove gnupg curl
 
 # Fetch the Emerging Threats Open ruleset at build time (internet is available during build,
@@ -125,20 +137,39 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 #
 # Rules are made world-readable so the non-root `spring` runtime user can load them.
 #
-# To refresh the ruleset in air-gapped deployments: rebuild the image and redeploy
-# (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh) —
-# analogous to the nDPI refresh flow above.
+# To use a newer ruleset without rebuilding, drop ET's emerging.rules.tar.gz into the mounted
+# suricata-rules folder (#600, SuricataRuleset): it's test-loaded and used instead of these rules,
+# whose build date the app shows next to Suricata's alerts. Rebuilding refreshes the baked-in copy.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     DEBIAN_FRONTEND=noninteractive apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl && \
     mkdir -p /etc/suricata/rules /tmp/etrules && \
-    curl -fsSL "https://rules.emergingthreats.net/open/suricata/emerging.rules.tar.gz" \
+    # The ruleset for this engine version, the path suricata-update asks for (ET serves its newest
+    # compatible ruleset there): the generic open/suricata/ path is the 5.0-era set.
+    SURICATA_VERSION=$(suricata -V | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p') && \
+    curl -fsSL "https://rules.emergingthreats.net/open/suricata-${SURICATA_VERSION}/emerging.rules.tar.gz" \
         | tar -xz -C /tmp/etrules && \
     cat /tmp/etrules/rules/*.rules > /etc/suricata/rules/suricata.rules && \
-    cp /tmp/etrules/rules/*.config /etc/suricata/ 2>/dev/null || true && \
+    # Braced: a bare "|| true" here also swallowed a failed download above, leaving no rules.
+    { cp /tmp/etrules/rules/*.config /etc/suricata/ 2>/dev/null || true; } && \
+    test "$(grep -c '^alert' /etc/suricata/rules/suricata.rules)" -gt 10000 && \
     rm -rf /tmp/etrules && \
     date -u +%Y-%m-%d > /opt/suricata-ruleset-version && \
+    # Log each TLS session's certificate and chain (#1235), on top of the fields already read.
+    # The packaged yaml ships this list commented out; the grep fails the build if a Suricata
+    # upgrade moves it, rather than silently losing certificate detail.
+    sed -i 's|^\( *\)#custom: \[subject, issuer, session_resumed.*\]|\1custom: [subject, issuer, serial, fingerprint, sni, version, not_before, not_after, certificate, chain, ja3, ja3s]|' /etc/suricata/suricata.yaml && \
+    grep -q '^ *custom: \[subject, issuer, serial, fingerprint, sni, version, not_before, not_after, certificate, chain' /etc/suricata/suricata.yaml && \
+    # The PPA's yaml reads rules from suricata-update's /var/lib/suricata/rules; ours are baked into
+    # /etc/suricata/rules (SuricataRuleset.BAKED_RULES). Without this Suricata 8 loads no rules and
+    # still exits 0, so the grep fails the build instead.
+    sed -i 's|^default-rule-path: .*|default-rule-path: /etc/suricata/rules|' /etc/suricata/suricata.yaml && \
+    grep -q '^default-rule-path: /etc/suricata/rules$' /etc/suricata/suricata.yaml && \
+    # Compiled Hyperscan rule groups are cached so a restarted engine skips recompiling. The packaged
+    # path is under /var/lib/suricata (mode 2770, owner suricata), which the runtime user can't enter.
+    sed -i 's|^\( *\)sgh-mpm-caching-path: .*|\1sgh-mpm-caching-path: /opt/suricata-cache/sgh|' /etc/suricata/suricata.yaml && \
+    grep -q '^ *sgh-mpm-caching-path: /opt/suricata-cache/sgh$' /etc/suricata/suricata.yaml && \
     chmod -R a+rX /etc/suricata && \
     apt-get purge -y --auto-remove curl
 
@@ -167,6 +198,9 @@ RUN groupadd -r spring && useradd -r -g spring spring
 
 # Create config directories owned by spring
 RUN mkdir -p /app/config /app/config-defaults && chown spring:spring /app/config /app/config-defaults
+# Suricata 8 caches compiled Hyperscan rule groups here (sgh-mpm-caching), so a warm-engine restart
+# reuses them instead of recompiling; it must be writable by the runtime user.
+RUN mkdir -p /opt/suricata-cache/sgh && chown -R spring:spring /opt/suricata-cache
 
 # Copy entrypoint script and make executable while still root
 COPY docker-entrypoint.sh /docker-entrypoint.sh

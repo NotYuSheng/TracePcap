@@ -1,4 +1,5 @@
 package com.tracepcap.conversation.controller;
+import com.tracepcap.governance.AuditedAccess;
 
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
@@ -122,6 +123,12 @@ public class ConversationsController {
           String dstIp,
       @Parameter(
               description =
+                  "Comma-separated connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED,"
+                      + " UNKNOWN (not TCP, or the capture joined after the SYN)")
+          @RequestParam(required = false)
+          String outcomes,
+      @Parameter(
+              description =
                   "View in this network (#925): its own detection rules' matches are added to"
                       + " customSignatures and count for that filter")
           @RequestParam(required = false)
@@ -151,7 +158,8 @@ public class ConversationsController {
             deviceTypes,
             countries,
             srcIp,
-            dstIp);
+            dstIp,
+            outcomes);
 
     log.info(
         "GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, l7Protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
@@ -261,6 +269,7 @@ public class ConversationsController {
   }
 
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
+  @AuditedAccess
   @GetMapping("/{fileId}/export")
   @Operation(summary = "Export filtered conversations as CSV")
   public void exportConversations(
@@ -284,6 +293,7 @@ public class ConversationsController {
       @RequestParam(required = false) String countries,
       @RequestParam(required = false) String srcIp,
       @RequestParam(required = false) String dstIp,
+      @RequestParam(required = false) String outcomes,
       HttpServletResponse response)
       throws IOException {
     permissionService.require(PermissionAction.EXPORT_PACKETS);
@@ -308,7 +318,8 @@ public class ConversationsController {
             deviceTypes,
             countries,
             srcIp,
-            dstIp);
+            dstIp,
+            outcomes);
     List<ConversationResponse> rows = conversationQueryService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -346,6 +357,7 @@ public class ConversationsController {
   }
 
   /** Export all matching conversations as PCAP (no pagination, same filters as listing) */
+  @AuditedAccess
   @GetMapping("/{fileId}/export-pcap")
   @Operation(summary = "Export filtered conversations as PCAP")
   public void exportConversationsAsPcap(
@@ -369,6 +381,7 @@ public class ConversationsController {
       @RequestParam(required = false) String countries,
       @RequestParam(required = false) String srcIp,
       @RequestParam(required = false) String dstIp,
+      @RequestParam(required = false) String outcomes,
       HttpServletResponse response)
       throws IOException {
     permissionService.require(PermissionAction.EXPORT_PACKETS);
@@ -393,7 +406,8 @@ public class ConversationsController {
             deviceTypes,
             countries,
             srcIp,
-            dstIp);
+            dstIp,
+            outcomes);
 
     String filename = conversationQueryService.getBulkPcapFilename(fileId);
     response.setContentType("application/vnd.tcpdump.pcap");
@@ -425,6 +439,7 @@ public class ConversationsController {
   }
 
   /** Export a single conversation as a PCAP file filtered from the original capture. */
+  @AuditedAccess
   @GetMapping("/detail/{conversationId}/export-pcap")
   @Operation(summary = "Export a single conversation as PCAP")
   public void exportConversationAsPcap(
@@ -459,7 +474,8 @@ public class ConversationsController {
       String deviceTypes,
       String countries,
       String srcIp,
-      String dstIp) {
+      String dstIp,
+      String outcomes) {
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
         .ip(resolvedIp)
@@ -479,6 +495,7 @@ public class ConversationsController {
         // Blank is "no filter", not "match the empty address".
         .srcIp(srcIp == null || srcIp.isBlank() ? null : srcIp.trim())
         .dstIp(dstIp == null || dstIp.isBlank() ? null : dstIp.trim())
+        .outcomes(splitComma(outcomes).stream().map(o -> o.toUpperCase(java.util.Locale.ROOT)).toList())
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

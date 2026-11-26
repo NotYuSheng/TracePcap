@@ -20,6 +20,14 @@
   display: flex;
   height: min(780px, calc(100vh - 64px));
 }
+/* In the right-hand drawer: as wide as the page allows, the full height. */
+.modal-dialog.side-drawer.side-drawer-host {
+  width: min(1040px, calc(100vw - 48px));
+  max-width: none;
+}
+.side-drawer-host .node-dialog-body {
+  height: 100%;
+}
 .node-card {
   width: 340px;
   flex: none;

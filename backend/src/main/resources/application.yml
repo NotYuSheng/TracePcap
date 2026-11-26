@@ -174,7 +174,8 @@ llm:
     api-key: ${LLM_API_KEY:your-api-key-here}
     model: ${LLM_MODEL:gpt-4}
     temperature: ${LLM_TEMPERATURE:0.7}
-    max-tokens: ${LLM_MAX_TOKENS:2000}
+    # 0 = size each reply to what the context has left after the prompt; a number caps it.
+    max-tokens: ${LLM_MAX_TOKENS:0}
     # Empty default (not #{null}): @ConfigurationProperties binding does not evaluate SpEL, so an
     # unset LLM_CONTEXT_LENGTH must resolve to "" (which binds to a null Integer = auto-detect),
     # not the literal "#{null}". Compose already passes an empty value; this keeps it working when
@@ -218,6 +219,12 @@ tracepcap:
     # analysis cost (#452), so disabling it here is the single biggest throughput lever. Defaults
     # to true to preserve threat detection; set SURICATA_ENABLED=false to turn it off across the board.
     enabled: ${SURICATA_ENABLED:true}
+    # A newer ruleset than the one baked into the image (#600): drop ET's emerging.rules.tar.gz, or
+    # .rules files, into this folder (mounted from the host). It's checked every minute, test-loaded,
+    # and used only if Suricata loads it; otherwise the built-in rules stay. Nothing is downloaded.
+    rules-import-dir: ${SURICATA_RULES_IMPORT_DIR:/var/lib/tracepcap/suricata-rules}
+    # A ruleset older than this many days is flagged as stale next to Suricata's alerts.
+    ruleset-stale-days: ${SURICATA_RULESET_STALE_DAYS:30}
     warm-engine:
       # Keep one Suricata engine loaded across analyses instead of building the ~50,000-rule
       # detection engine per file (#569). Measured 45.9s -> ~0.5s per capture, identical alerts.

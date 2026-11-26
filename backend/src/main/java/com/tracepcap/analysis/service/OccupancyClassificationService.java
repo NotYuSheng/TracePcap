@@ -232,6 +232,7 @@ public class OccupancyClassificationService {
     i.setInitiatorIp(c.getInitiatorIp());
     i.setInitiatorPort(c.getInitiatorPort());
     i.setProtocol(c.getProtocol());
+    i.setTransport(c.getTransport());
     i.setAppName(c.getAppName());
     i.setTsharkProtocol(c.getTsharkProtocol());
     i.setCategory(c.getCategory());

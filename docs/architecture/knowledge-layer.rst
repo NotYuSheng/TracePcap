@@ -65,10 +65,32 @@ Every artifact carries a **grade** — the same three-way provenance the Extract
 ============  ===========================================================================
 Grade         Meaning
 ============  ===========================================================================
-``MEASURED``  the traffic itself exhibited it (a Kerberos AS-REQ principal). Strongest.
+``MEASURED``  the traffic itself exhibited it (a Kerberos AS-REQ or NTLM sign-in principal). Strongest.
 ``REPORTED``  a party asserted it on the wire (an LDAP display name) — testimony.
 ``INFERRED``  a tool judged it (an IDS verdict, a device-type vote) — a guess with error modes.
 ============  ===========================================================================
+
+**Corroborated C2s.** Some command-and-control servers no single alert proves. Two rules
+recognise them by a chain of weaker signals; every link is required, and the answer carries the
+chain as its evidence:
+
+- **Suspected C2:** a reputation-listed server (Spamhaus DROP, CINS, known-compromised, as the ET
+  rules carry them) that a host *already talking to a confirmed C2* contacts at a bare IP, in
+  repeated rounds a minute or more apart (or seconds after another such server). Worded *suspected C2
+  for unidentified malware*. Reputation alone never makes a C2.
+- **Probable unsanctioned remote access:** a remote-admin tool known as a RAT (NetSupport) checking
+  in to a bare IP, when within
+  ten minutes before its first check-in the same host ran PowerShell, another script engine or a
+  download tool (curl, BITS, certutil) against another outside server that then sent it at least 1 MB. Becomes a C2 for the tool's abuse
+  (*NetSupport RAT*); without the chain it stays a remote-access tool to confirm. AnyDesk, TeamViewer
+  and the like are never escalated: an IT install of one looks the same on the wire.
+
+On five malware-traffic-analysis.net exercises these recover the only answers the key asks that
+were missing (two C2s on the fake-software-site case; NetSupport's C2, family and victim), and on
+26 clean sample captures neither rule fires. Four further exercises, run before reading their answer
+keys (a holdout), found nothing confidently wrong and showed three over-broad rules, since fixed: a
+tool's vendor lookup (NetSupport's GeoLocation request) counted as a session, gzip-compressed web
+responses counted as archive downloads, and a curl fetch didn't count as an install step.
 
 So a conclusion built from ``MEASURED`` facts outranks one built from ``REPORTED`` or ``INFERRED``
 ones, and every surface can show *how directly* something is known rather than asserting certainty.
@@ -87,16 +109,53 @@ only through ``analysis.spi`` ports, never another module's repositories or enti
 - ``GeoOrgContributor`` — country / ASN / org for the external endpoints the capture talked to.
 - ``TrafficContributor`` — a ``communicates-with`` edge per host→external pair carrying the total
   bytes, for pairs above a threshold.
+- ``IdsAlertRecordContributor`` — from the full alert records, each outside server's alert count,
+  first and last alert (UTC), and the HTTP requests the alerts fired on. The command-and-control
+  and remote-access answers cite them ("Alerts fired on: POST http://…/fakeurl.htm (52×)").
+- ``LateralMovementContributor`` — one host making another run something, from the SMB and RPC
+  operations Suricata logged: a service created remotely, a scheduled task registered, a WMI method
+  called, a program copied to an admin share, or directory replication asked by a host that isn't a
+  domain controller (DCSync). Routine domain traffic (IPC$, SYSVOL and group-policy reads, share
+  and user enumeration, remote registry) is not posted.
+- ``KerberosContributor`` — from the replies a domain controller sent: one host failing to sign in
+  as five or more accounts within ten minutes (wrong password or no such account; password spraying or user
+  enumeration), or a ticket with RC4 or DES from a domain controller that uses AES elsewhere in the
+  capture (Kerberoasting, Skeleton Key).
 
 **Deterministic checks** (``StandardQuestion``) are the primary analysis layer — *not* the LLM. Each
 answers one standard investigation question by querying the board and posting an ``Answer`` (a
 conclusion, distinct from a finding). Because input and output are both deterministic, each is
 unit-testable against a fixture board. Today: victim, command-and-control, malware, signed-in user,
-and data-transfer (a bulk transfer to a non-CDN external, for review). They are deliberately precise
+data-transfer (a bulk transfer to a non-CDN external, for review), and remote-access (a remote-admin
+tool such as NetSupport or AnyDesk talking to a server outside the network, from a Suricata alert or
+nDPI's own recognition of TeamViewer, AnyDesk, Radmin or NoMachine, for review: IT uses
+these tools and so do attackers, so it never calls the server a C2), and downloads (executables,
+scripts, archives and installers a host fetched from outside over a real HTTP transfer, each with its
+SHA-256; never a file carved from raw bytes, never an operating-system update, and never a
+gzip-compressed web response; at most the three largest per host and server, then a count), and lateral movement (one answer per
+pair of hosts, from the contributor above, asking for it to be confirmed, since administrators'
+tools do the same), and Kerberos attacks (one answer per finding above). The C2 and
+remote-access answers also say when the server was first contacted, in UTC. They are deliberately precise
 — the victim and C2 checks key on the ``c2-of`` edge, not "any host or external in any IDS alert",
 so an informational alert never mislabels the domain controller as a victim or a benign CDN as a
-C2; and the data-transfer check excludes known CDN/cloud orgs by attribution, so an ordinary CDN
+C2. A malware rule about command and control that names no family still marks its server as a C2,
+for *unidentified malware*: the victim follows, but no family is claimed. The data-transfer check excludes known CDN/cloud orgs by attribution, so an ordinary CDN
 download is not mistaken for exfiltration — the exact error an LLM narrating from volume alone made.
+
+**How each answer was reached.** Every answer carries its *derivation* (``Answer.derivation``, #1293):
+the steps its check took, each with what it found on the board, the rule that took it to the next
+claim (in words, from ``Derivations``), the grade of what was found, and the conversations it rests
+on. Steps without a rule are context (where a server is hosted, when it was first reached). The
+Investigation Summary shows them under **How we got here** on each answer, linking each step to its
+conversations. They are written by the checks as they run, so they can't drift from what the code
+did, and they are the answer to "it's deterministic, not the LLM": the reasoning is on screen.
+
+**What was ruled out.** Checks also record the candidates they tested and ruled out (#1294): a
+``Considered`` (the question, the candidate, the rule, the reason, its conversations) posted as a
+finding of category ``considered``, read back by ``InvestigationOrchestrator.considered``, which adds
+beacons whose server didn't end up a C2. The investigation report carries them, the Investigation
+Summary lists them under **Considered and ruled out**, and the narrative gets them as alternatives,
+marked so it can't promote one to a finding.
 
 **The agent** is one final, additive knowledge source. The narrator and the Q&A consume the board's
 answers as authoritative ground truth (named, never contradicted); the investigation loop is a

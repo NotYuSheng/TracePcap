@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
@@ -6,7 +7,7 @@ import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import type { Answer, GoalOutcome, TimelineDataPoint } from '@/types';
+import type { Answer, CaptureContext, CategoryStatus, GoalOutcome, Honeypots, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { storyService } from '@/features/story/services/storyService';
@@ -17,7 +18,7 @@ import {
 import { StoryProgress } from '@components/story/StoryProgress/StoryProgress';
 import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 import { placeInLine } from '@/features/aiJobs/aiJobText';
-import { StoryGoals } from '@components/story/StoryGoals';
+import { StorySummary } from '@components/story/StorySummary';
 import { StoryNarrative } from '@components/story/StoryNarrative';
 import { StoryHowItWorks, StoryPromptSettings } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
@@ -34,7 +35,7 @@ const written = (ms: number) =>
   new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /**
- * Story mode, laid out as an investigation (design B): the four standing questions first, the
+ * Story mode, laid out as an investigation: where it stands first (summary-first, design F), the
  * narrative told as a timeline, Q&A open beside it, and the evidence the story rests on in tabs
  * underneath. Settings live in the Regenerate dialog rather than on the page.
  */
@@ -65,6 +66,13 @@ export const StoryPage = () => {
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [goals, setGoals] = useState<GoalOutcome[]>([]);
   const [additional, setAdditional] = useState<Answer[]>([]);
+  const [categories, setCategories] = useState<CategoryStatus[] | null>(null);
+  const [captureContext, setCaptureContext] = useState<CaptureContext | null>(null);
+  const [honeypots, setHoneypots] = useState<Honeypots | null>(null);
+  // Bumped when an analyst overrides or adds evidence to the capture context or a host's honeypot
+  // role, to re-read it.
+  const [investigationRev, setInvestigationRev] = useState(0);
+  const loadedFileId = useRef<string | null>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [showRegenerate, setShowRegenerate] = useState(false);
   const ai = usePermission('ASK_AI');
@@ -104,14 +112,33 @@ export const StoryPage = () => {
   // following a lead (a beacon classified as a C2 with no IDS rule) shows on its card too.
   useEffect(() => {
     let alive = true;
-    setGoalsLoaded(false);
+    // Only a new capture shows the loading state: re-reading after an override keeps the summary
+    // (and the modal the analyst is in) on screen.
+    const refresh = loadedFileId.current === fileId;
+    if (!refresh) setGoalsLoaded(false);
+    loadedFileId.current = fileId;
     storyService
       .getInvestigationReport(fileId)
-      .then(r => { if (alive) { setGoals(r.goals); setAdditional(r.additional); } })
-      .catch(() => { if (alive) { setGoals([]); setAdditional([]); } })
+      .then(r => {
+        if (!alive) return;
+        setGoals(r.goals);
+        setAdditional(r.additional);
+        setCategories(r.categories ?? null);
+        setCaptureContext(r.context ?? null);
+        setHoneypots(r.honeypots ?? null);
+      })
+      .catch(() => {
+        // A failed re-read keeps what was shown; only a new capture starts from nothing.
+        if (!alive || refresh) return;
+        setGoals([]);
+        setAdditional([]);
+        setCategories(null);
+        setCaptureContext(null);
+        setHoneypots(null);
+      })
       .finally(() => { if (alive) setGoalsLoaded(true); });
     return () => { alive = false; };
-  }, [fileId]);
+  }, [fileId, investigationRev]);
 
   useEffect(() => {
     const fetchTimeline = async () => {
@@ -156,6 +183,20 @@ export const StoryPage = () => {
     />
   );
 
+  // Where the investigation stands needs no model, so it shows before a story is written too.
+  const summary = (
+    <StorySummary
+      fileId={fileId}
+      goals={goals}
+      additional={additional}
+      categories={categories}
+      context={captureContext}
+      honeypots={honeypots}
+      onContextChanged={() => setInvestigationRev(r => r + 1)}
+      loading={!goalsLoaded}
+    />
+  );
+
   const howItWorks = (
     <Modal show={showHowItWorks} onHide={() => setShowHowItWorks(false)} size="lg" scrollable>
       <Modal.Header closeButton>
@@ -171,6 +212,7 @@ export const StoryPage = () => {
   if (generating && !story && job?.status === 'WAITING') {
     return (
       <div className="story-start">
+        {summary}
         <Card className="story-start-card" data-testid="story-waiting">
           <Card.Body>
             <span className="story-pill story-pill-writing">Queued</span>
@@ -262,6 +304,7 @@ export const StoryPage = () => {
   if (!story && background && background.status !== 'FAILED') {
     return (
       <div className="story-start">
+        {summary}
         <Card className="story-start-card" data-testid="story-background">
           <Card.Body>
             <span className="story-pill story-pill-writing">
@@ -306,6 +349,7 @@ export const StoryPage = () => {
     return (
       <div className={gridClass}>
       <div className="story-start">
+        {summary}
         {background?.status === 'FAILED' && (
           <Alert variant="warning" className="mb-3">
             The story asked for at upload couldn&apos;t be written
@@ -369,7 +413,7 @@ export const StoryPage = () => {
 
       <div className={gridClass}>
         <div className="story-main">
-          <StoryGoals goals={goals} additional={additional} loading={!goalsLoaded} />
+          {summary}
 
           {generating && job && (
             <AiJobStatus
@@ -421,32 +465,35 @@ export const StoryPage = () => {
         {chat}
       </div>
 
-      <Modal show={showRegenerate} onHide={() => setShowRegenerate(false)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Regenerate the story</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted small mb-0">
-            The LLM writes the story again from the current findings. Tell it anything it can't see, or
-            lower the limits if the last attempt ran out of context.
-          </p>
-          {settings}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowRegenerate(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setShowRegenerate(false);
-              handleGenerateStory();
-            }}
-          >
-            Regenerate
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <SideDrawer
+        show={showRegenerate}
+        onHide={() => setShowRegenerate(false)}
+        title="Regenerate the story"
+        titleId="regenerate-story-title"
+        wide
+        footer={
+          <>
+            <Button variant="outline-secondary" onClick={() => setShowRegenerate(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setShowRegenerate(false);
+                handleGenerateStory();
+              }}
+            >
+              Regenerate
+            </Button>
+          </>
+        }
+      >
+        <p className="text-muted small mb-0">
+          The LLM writes the story again from the current findings. Tell it anything it can't see, or
+          lower the limits if the last attempt ran out of context.
+        </p>
+        {settings}
+      </SideDrawer>
       {howItWorks}
     </div>
   );

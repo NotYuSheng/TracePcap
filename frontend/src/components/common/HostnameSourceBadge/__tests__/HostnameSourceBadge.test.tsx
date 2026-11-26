@@ -15,6 +15,7 @@ describe('HostnameSourceBadge', () => {
     ['dhcp', 'DHCP'],
     ['mdns', 'mDNS'],
     ['nbns', 'NBNS'],
+    ['ntlm', 'NTLM'],
     ['reverse_dns', 'rDNS'],
     ['manual', 'Manual'],
   ])('labels %s as %s', (source, label) => {

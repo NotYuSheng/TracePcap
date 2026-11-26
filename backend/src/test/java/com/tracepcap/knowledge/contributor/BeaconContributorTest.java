@@ -26,7 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class BeaconContributorTest {
 
   private static final UUID FILE = UUID.randomUUID();
-  private static final TlsFacts NO_TLS = new TlsFacts(null, null, null, null, null, null, null);
+  private static final TlsFacts NO_TLS = new TlsFacts(null, null, null, null, null, null, null, null, null);
 
   @Mock private ConversationLookup conversationLookup;
 
@@ -97,7 +97,7 @@ class BeaconContributorTest {
   @Test
   void ignoresTlsSessions() {
     // Same shape, but it's TLS (has a JA3) → ordinary HTTPS on an odd port, not a raw beacon.
-    TlsFacts tls = new TlsFacts("cdn.example.com", null, null, null, null, "ja3abc", null);
+    TlsFacts tls = new TlsFacts("cdn.example.com", null, null, null, null, "ja3abc", null, null, null);
     CaseKnowledge k = run(flow("172.16.1.66", "23.1.2.3", 44300, 206, 40_000, 300, tls, "172.16.1.66"));
     assertThat(k.findings()).isEmpty();
   }

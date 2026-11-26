@@ -1,6 +1,7 @@
 package com.tracepcap.knowledge.spi;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * A deterministic check that answers one standard investigation question by querying the {@link
@@ -19,4 +20,21 @@ public interface StandardQuestion {
 
   /** Zero or more answers this question can support from the board (e.g. multiple victims). */
   List<Answer> answer(CaseKnowledge board);
+
+  /**
+   * The framework categories this question answers (docs/architecture/investigation-framework.rst).
+   * One check can answer several: a C2 is both a host role and the Command and Control tactic.
+   */
+  default Set<Category> categories() {
+    return Set.of();
+  }
+
+  /**
+   * The traffic this question reads, each with what it shows for it. A capture with none of it
+   * can't answer the question, so its categories are not observable there. Empty: it reads no
+   * particular protocol (IDS alerts on any traffic, say).
+   */
+  default List<EvidenceSource> requires() {
+    return List.of();
+  }
 }

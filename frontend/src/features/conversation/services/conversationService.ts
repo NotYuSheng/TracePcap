@@ -9,10 +9,13 @@ import type {
   NetworkEndpoint,
   Protocol,
   PaginatedResponse,
+  TlsCertificate,
   Packet,
   HostClassification,
   HostIdentity,
   HostIdentityEvidence,
+  IdsAlert,
+  ProtocolAnomaly,
 } from '@/types';
 import type { ConversationFacetCounts, ConversationFilters, WindowsLogon } from '../types';
 
@@ -35,6 +38,10 @@ interface ConversationApiResponse {
   hostname?: string | null;
   ja3Client?: string | null;
   ja3Server?: string | null;
+  ja4Client?: string | null;
+  tlsVersion?: string | null;
+  connectionOutcome?: string | null;
+  tlsCertificate?: TlsCertificate | null;
   tlsIssuer?: string | null;
   tlsSubject?: string | null;
   tlsNotBefore?: string | number[] | null;
@@ -50,6 +57,11 @@ interface ConversationApiResponse {
   dstAccount?: AccountAtTime | null;
   packetCount: number;
   totalBytes: number;
+  bytesSrcToDst?: number | null;
+  bytesDstToSrc?: number | null;
+  idsAlerts?: Array<Omit<IdsAlert, 'time'> & { time?: string | number[] | null }> | null;
+  idsAlertCount?: number | null;
+  anomalies?: Array<Omit<ProtocolAnomaly, 'time'> & { time?: string | number[] | null }> | null;
   startTime: string | number[];
   endTime: string | number[];
   durationMs: number;
@@ -123,6 +135,10 @@ function transformConversation(
     hostname: apiData.hostname ?? undefined,
     ja3Client: apiData.ja3Client ?? undefined,
     ja3Server: apiData.ja3Server ?? undefined,
+    ja4Client: apiData.ja4Client ?? undefined,
+    tlsVersion: apiData.tlsVersion ?? undefined,
+    connectionOutcome: apiData.connectionOutcome ?? null,
+    tlsCertificate: apiData.tlsCertificate ?? null,
     tlsIssuer: apiData.tlsIssuer ?? undefined,
     tlsSubject: apiData.tlsSubject ?? undefined,
     tlsNotBefore: apiData.tlsNotBefore != null ? parseDateTime(apiData.tlsNotBefore) : undefined,
@@ -140,6 +156,17 @@ function transformConversation(
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
     totalBytes: apiData.totalBytes,
+    bytesSrcToDst: apiData.bytesSrcToDst ?? null,
+    idsAlertCount: apiData.idsAlertCount ?? null,
+    bytesDstToSrc: apiData.bytesDstToSrc ?? null,
+    anomalies: (apiData.anomalies ?? []).map((a) => ({
+      ...a,
+      time: a.time != null ? parseDateTime(a.time) : undefined,
+    })),
+    idsAlerts: (apiData.idsAlerts ?? []).map((a) => ({
+      ...a,
+      time: a.time != null ? parseDateTime(a.time) : undefined,
+    })),
     packets,
     direction: (apiData.flowRisks ?? []).includes('unidirectional_traffic')
       ? 'unidirectional'
@@ -268,6 +295,7 @@ export const conversationService = {
     if (filters.l7Protocols.length > 0) params.l7Protocols = filters.l7Protocols.join(',');
     if (filters.apps.length > 0) params.apps = filters.apps.join(',');
     if (filters.categories.length > 0) params.categories = filters.categories.join(',');
+    if (filters.outcomes?.length) params.outcomes = filters.outcomes.join(',');
     if (filters.hasRisks) params.hasRisks = 'true';
     if (filters.fileTypes.length > 0) params.fileTypes = filters.fileTypes.join(',');
     if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
@@ -312,6 +340,7 @@ export const conversationService = {
     if (filters.l7Protocols.length > 0) params.set('l7Protocols', filters.l7Protocols.join(','));
     if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));
     if (filters.categories.length > 0) params.set('categories', filters.categories.join(','));
+    if (filters.outcomes?.length) params.set('outcomes', filters.outcomes.join(','));
     if (filters.hasRisks) params.set('hasRisks', 'true');
     if (filters.fileTypes.length > 0) params.set('fileTypes', filters.fileTypes.join(','));
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
@@ -350,6 +379,7 @@ export const conversationService = {
     if (filters.l7Protocols.length > 0) params.set('l7Protocols', filters.l7Protocols.join(','));
     if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));
     if (filters.categories.length > 0) params.set('categories', filters.categories.join(','));
+    if (filters.outcomes?.length) params.set('outcomes', filters.outcomes.join(','));
     if (filters.hasRisks) params.set('hasRisks', 'true');
     if (filters.fileTypes.length > 0) params.set('fileTypes', filters.fileTypes.join(','));
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));

@@ -109,7 +109,17 @@ This means a packet from ``10.0.0.1:55000`` → ``10.0.0.2:443`` and a reply fro
 row**. The ``srcIp``/``dstIp`` shown in the UI are from the **first packet** that
 created the conversation entry, not necessarily the initiating direction.
 
-The full key format is: ``ip1:port1-ip2:port2-PROTOCOL``.
+The full key format is: ``ip1:port1-ip2:port2-TRANSPORT``, where the transport is
+``TCP`` or ``UDP`` (or, for traffic without ports, the packet's own protocol, such as
+``ICMP`` or ``ARP``). One TCP connection is therefore one conversation, whatever
+Wireshark labels its individual packets: the handshake is labelled ``TCP`` and the
+records ``TLSv1.2``, but they share a row. The row's **Protocol** is the most specific
+label the connection showed (``TLSv1.2`` rather than the ``TCP`` of its opening SYN).
+
+.. note::
+
+   Captures analysed before this fix split such a connection into a row per label
+   (often half the rows of a real capture). Re-analyse a capture to regroup it.
 
 Packet Count and Byte Count
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,6 +143,32 @@ These timestamps come directly from the PCAP frame timestamps, which are set
 by the capturing host's clock at the moment each packet was recorded. They do
 not reflect any clock synchronisation — if the capture machine's clock was
 skewed, all timestamps will be skewed equally.
+
+Connection Outcome
+~~~~~~~~~~~~~~~~~~
+
+For TCP conversations, the parser reads the handshake as the packets go by and
+records how the connection went:
+
+- **Answered**: the server replied with SYN+ACK. Also counted as answered: the
+  client sending plain ACKs or data after its SYN, or the server sending
+  anything but a reset. Both only happen on an open connection, so a capture that
+  missed the SYN+ACK, or saw only the client's direction, isn't mistaken for a
+  failure.
+- **No answer**: SYNs went out and nothing came back (Zeek's ``S0``).
+- **Refused**: the server sent a reset instead of SYN+ACK (Zeek's ``REJ``).
+- **Unknown**: not TCP, or the capture started after the SYN.
+
+There is deliberately no "reset" outcome. Many ordinary connections end with a
+reset (82 of 210 on a real Windows-domain capture), so it would flag normal
+traffic. A connection that was answered and later reset is *Answered*.
+
+Many unanswered or refused connections from one host usually mean a scan; one
+host retrying a single silent server can be a dead command-and-control server or
+a misconfiguration. The counts and the most-tried failed targets are passed to
+the AI story. A SYN in the last moments of a capture, whose reply wasn't
+recorded, reads as *No answer*. Captures analysed before this existed show
+*Unknown* until re-analysed.
 
 Payload Storage
 ~~~~~~~~~~~~~~~
@@ -285,6 +321,10 @@ with AND logic — a conversation must satisfy all active filters to be shown.
    * - **Category** (pills)
      - The nDPI traffic category (e.g. Web, Media, VPN, Social Network).
        Multiple selections are OR-matched.
+   * - **Connection outcome** (pills)
+     - How the TCP connection went: Answered, No answer, Refused, or Unknown
+       (see `Connection Outcome`_). Multiple selections are OR-matched. Shown
+       once the capture has outcomes. URL parameter ``outcomes``.
    * - **File Types** (pills)
      - Shows only conversations containing at least one packet where a file
        magic-byte signature was detected in the stored 64-byte payload
@@ -354,11 +394,32 @@ what data was available during analysis:
 - **Custom Rules** — names of fired custom signature rules, color-coded by
   severity (critical=red, high=orange, medium=amber, low=purple).
 
-**TLS metadata** (when nDPI analysis was enabled and a TLS handshake was
-observed)
+**IDS alerts** (when Suricata ran and a rule fired on the conversation)
 
-- **JA3 Client** — MD5 hash of the TLS ClientHello parameters.
-- **JA3S Server** — MD5 hash of the TLS ServerHello parameters.
+Each Suricata alert as it fired, not just its name. Alerts that differ only in
+time fold into one row with a count and the first and last time ("52× from …
+to …"). Each row shows:
+
+- the rule's message, its category, and its sid;
+- the rule's own **rating** (Critical, Major, Minor or Informational) and
+  **confidence** (High, Medium or Low), from the rule's metadata. These are more
+  telling than the 1–3 priority, which most ET rules set to 2 or 3;
+- whether it fired **on the client's request or the server's reply**. Alerts
+  from both directions are kept, so a rule on the reply (NetSupport's "Remote
+  Admin Response") shows alongside the client's check-ins;
+- the **HTTP request** it fired on (``POST http://194.180.191.64/fakeurl.htm →
+  200``), the indicator an incident report lists.
+
+Captures analysed before this record only the alert names; re-analyse one to
+see the full alerts.
+
+**TLS** (when nDPI or Suricata ran and a TLS handshake was observed)
+
+- **Version** — the negotiated version (e.g. ``TLS 1.2``), from Suricata. TLS
+  1.0, TLS 1.1 and SSL are marked **Legacy**.
+- **JA3** — MD5 hash of the TLS ClientHello parameters, from Suricata.
+- **JA3S** — MD5 hash of the TLS ServerHello parameters, from nDPI or Suricata.
+- **JA4** — the newer client fingerprint, from nDPI.
 - **TLS Issuer** — Issuer DN from the server certificate.
 - **TLS Subject** — Subject DN from the server certificate.
 - **Cert Valid From / Cert Valid To** — certificate validity dates from

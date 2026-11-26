@@ -1,0 +1,8 @@
+# Where to get this case's capture, and the hash it must match (the pcap itself is kept out of git,
+# see eval/.gitignore). The runner does NOT download it.
+case_id: 2026-01-31-lumma
+pcap: 2026-01-31-traffic-analysis-exercise.pcap
+source_url: https://www.malware-traffic-analysis.net/2026/01/31/2026-01-31-traffic-analysis-exercise.pcap.zip
+sha256: f755444d0b6eac847e07b73dea0774084b232d8577f536547a12f39b959d7833
+notes: >
+  Password-protected zip; the site's password scheme is on its "about" page. Unzip into eval/pcaps/.

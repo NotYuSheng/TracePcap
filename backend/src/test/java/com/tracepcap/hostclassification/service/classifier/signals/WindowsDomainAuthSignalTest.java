@@ -70,4 +70,20 @@ class WindowsDomainAuthSignalTest {
 
     assertThat(board.scores()).isEmpty();
   }
+
+  @Test
+  void ntlmClaim_votesLaptopDesktop_belowKerberos_andNamesTheAccount() {
+    ScoreBoard board = new ScoreBoard();
+    signal.contribute(
+        ctx(List.of(new Claim("172.16.1.66", "jsmith", WindowsIdentityResolverService.SOURCE_NTLM_AUTH))),
+        board);
+
+    assertThat(board.scores())
+        .containsEntry(DeviceTypes.LAPTOP_DESKTOP, WindowsDomainAuthSignal.NTLM_WEIGHT);
+    assertThat(WindowsDomainAuthSignal.NTLM_WEIGHT)
+        .isLessThan(WindowsDomainAuthSignal.KERBEROS_WEIGHT)
+        .isGreaterThan(WindowsDomainAuthSignal.LDAP_WEIGHT);
+    assertThat(board.reasonsFor(DeviceTypes.LAPTOP_DESKTOP))
+        .anySatisfy(r -> assertThat(r).contains("\"jsmith\"").contains("NTLM"));
+  }
 }

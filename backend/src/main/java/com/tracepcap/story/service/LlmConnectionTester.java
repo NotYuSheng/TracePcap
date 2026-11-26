@@ -40,10 +40,25 @@ public class LlmConnectionTester {
   static final int REPLY_TIMEOUT_CAP_MS = 120_000;
   /** Enough for a reasoning model to show that it reasons, still a quick reply. */
   static final int REPLY_TOKENS = 24;
+  /** Asks for more than {@link #REPLY_TOKENS}, so every model writes the whole reply and its speed shows. */
+  static final String SPEED_PROMPT = "Count from 1 to 40, separated by spaces.";
+  /** A reply shorter than this says too little about speed (an "OK", a cold load): no estimate. */
+  static final int MIN_SPEED_TOKENS = REPLY_TOKENS / 2;
+
+  /** A Story on a busy capture sends 10,000–20,000 tokens; under this it may be refused. */
+  static final int STORY_MIN_CONTEXT = 16_384;
+  /** A reasoning model thinks before the story too, so it wants twice that. */
+  static final int REASONING_MIN_CONTEXT = 32_768;
+  /** About how long a story's reply is, in tokens; a reasoning model's thinking triples it. */
+  static final int STORY_REPLY_TOKENS = 4_000;
+  /** Under this cap a story's reply is cut off; a reasoning model needs the higher one. */
+  static final int STORY_MIN_CAP = 4_000;
+  static final int REASONING_MIN_CAP = 24_000;
 
   private final LlmSettings settings;
   private final PolicyEditGate editGate;
   private final ObjectMapper objectMapper;
+  private final com.tracepcap.config.LlmConfig llmConfig;
 
   public LlmTestResult test(LlmTestRequest request) {
     // Testing what's in effect points nowhere new, so anyone may. Testing other values sends
@@ -109,9 +124,11 @@ public class LlmConnectionTester {
     steps.add(ok("key", "Key accepted", "The server accepted the request.", listMs));
 
     // 3. The model is among the server's.
+    JsonNode entry = null;
     if (listed != null && listed.path("data").isArray()) {
       for (JsonNode m : listed.path("data")) {
         if (m.hasNonNull("id")) models.add(m.get("id").asText());
+        if (model.equals(m.path("id").asText(null))) entry = m;
       }
     }
     ModelProfiles.Profile profile = ModelProfiles.describe(template(LIST_TIMEOUT_MS), objectMapper, baseUrl, apiKey, model);
@@ -138,19 +155,21 @@ public class LlmConnectionTester {
 
     // 4. A one-token reply.
     long t1 = System.currentTimeMillis();
+    String reply = null;
+    long replyMs = 0;
     try {
       Map<String, Object> body = Map.of(
           "model", model,
-          "messages", List.of(Map.of("role", "user", "content", "Reply with OK.")),
+          "messages", List.of(Map.of("role", "user", "content", SPEED_PROMPT)),
           "max_tokens", REPLY_TOKENS,
           "temperature", 0);
       HttpHeaders h = headers(apiKey);
       h.setContentType(MediaType.APPLICATION_JSON);
-      String reply = template(Math.min(settings.timeoutSeconds() * 1000, REPLY_TIMEOUT_CAP_MS))
+      reply = template(Math.min(settings.timeoutSeconds() * 1000, REPLY_TIMEOUT_CAP_MS))
           .exchange(baseUrl + "/chat/completions", HttpMethod.POST, new HttpEntity<>(body, h), String.class)
           .getBody();
-      long ms = System.currentTimeMillis() - t1;
-      steps.add(replyStep(model, reply, ms));
+      replyMs = System.currentTimeMillis() - t1;
+      steps.add(replyStep(model, reply, replyMs));
     } catch (HttpStatusCodeException e) {
       steps.add(fail("reply", "Model replies",
           "The server answered " + e.getStatusCode().value() + ": " + shorten(e.getResponseBodyAsString()),
@@ -164,26 +183,148 @@ public class LlmConnectionTester {
           : warn("tools", "Takes tools",
               "The server says it doesn't take tools, so the chat will answer from the findings and the story only.", null));
     }
+    // 5. Whether it can carry a story: its context, the cap, its speed. Warnings only.
+    if (reply != null) {
+      // A configured LLM_CONTEXT_LENGTH is what replies are sized to, so it's what counts here.
+      Integer context = llmConfig.getApi() == null ? null : llmConfig.getApi().getContextLength();
+      if (context == null) context = LlmClient.contextLengthOf(entry);
+      if (context == null && entry != null && LlmClient.namesItsLimit(entry.path("owned_by").asText(null))) {
+        context = LlmClient.probe(template(LIST_TIMEOUT_MS), baseUrl, apiKey, model).contextLength();
+      }
+      ReplyFacts facts = replyFacts(reply);
+      steps.add(capacityStep(context, facts.reasoning(), facts.completionTokens(), replyMs,
+          settings.maxTokens(), settings.timeoutSeconds()));
+    }
     return result(steps, models, baseUrl, model);
+  }
+
+  /** A model the server offers, with its context length when the server says. */
+  public record ModelOption(String id, Integer contextLength) {}
+
+  /** The server's models, or why they couldn't be listed. */
+  public record ModelList(boolean ok, String baseUrl, List<ModelOption> models, String detail) {}
+
+  /**
+   * The server's models, for picking one before saving. Blank fields use the current settings;
+   * other values take the permission to change the LLM connection, as with {@link #test}.
+   */
+  public ModelList listModels(LlmTestRequest request) {
+    boolean candidate =
+        request != null && (!blank(request.getBaseUrl()) || !blank(request.getApiKey()));
+    if (candidate && !editGate.canEdit(EditablePolicy.Kind.LLM)) {
+      throw new ForbiddenException(editGate.reason(EditablePolicy.Kind.LLM));
+    }
+    String baseUrl = blank(request == null ? null : request.getBaseUrl())
+        ? settings.baseUrl()
+        : EditablePolicy.LLM_API_BASE_URL.normalise(request.getBaseUrl());
+    String apiKey = blank(request == null ? null : request.getApiKey()) ? settings.apiKey() : request.getApiKey().trim();
+    try {
+      String body = template(LIST_TIMEOUT_MS)
+          .exchange(baseUrl + "/models", HttpMethod.GET, new HttpEntity<>(headers(apiKey)), String.class)
+          .getBody();
+      JsonNode listed = body == null ? null : objectMapper.readTree(body);
+      List<ModelOption> models = new ArrayList<>();
+      if (listed != null && listed.path("data").isArray()) {
+        for (JsonNode m : listed.path("data")) {
+          if (m.hasNonNull("id")) models.add(new ModelOption(m.get("id").asText(), LlmClient.contextLengthOf(m)));
+        }
+      }
+      return new ModelList(true, baseUrl, models,
+          models.isEmpty() ? "The server doesn't list its models: type the model's name." : null);
+    } catch (HttpStatusCodeException e) {
+      int status = e.getStatusCode().value();
+      return new ModelList(false, baseUrl, List.of(), status == 401 || status == 403
+          ? "The server refused the key (" + status + ")."
+          : "The server answered " + status + " for /models. Is " + baseUrl + " the API's base URL (it usually ends in /v1)?");
+    } catch (Exception e) {
+      return new ModelList(false, baseUrl, List.of(), "Couldn't reach " + baseUrl + ": " + rootMessage(e));
+    }
+  }
+
+  /** What the test reply shows about the model. */
+  record ReplyFacts(String answered, boolean reasoning, Integer completionTokens) {}
+
+  ReplyFacts replyFacts(String reply) {
+    try {
+      JsonNode r = reply == null ? null : objectMapper.readTree(reply);
+      if (r == null) return new ReplyFacts(null, false, null);
+      JsonNode msg = r.path("choices").path(0).path("message");
+      String thought = msg.path("reasoning_content").asText(msg.path("reasoning").asText(""));
+      boolean reasoning = !thought.isBlank() || msg.path("content").asText("").contains("<think>");
+      JsonNode used = r.path("usage").path("completion_tokens");
+      return new ReplyFacts(r.path("model").asText(null), reasoning, used.canConvertToInt() ? used.asInt() : null);
+    } catch (Exception e) {
+      // A reply that isn't JSON still counts as a reply.
+      return new ReplyFacts(null, false, null);
+    }
+  }
+
+  /**
+   * Whether this model can carry a story, from what the test saw: a context too small for a
+   * story's prompt, a reasoning model with no room to think, a cap that cuts replies off, or a
+   * speed that runs past the timeout. Warns, never fails: it may still do for small captures.
+   *
+   * @param context the context length, null when the server didn't say
+   * @param completionTokens the test reply's tokens, null when the server didn't count them
+   * @param ceiling LLM_MAX_TOKENS, 0 for none
+   */
+  static Step capacityStep(
+      Integer context, boolean reasoning, Integer completionTokens, long replyMs, int ceiling, int timeoutSeconds) {
+    List<String> warnings = new ArrayList<>();
+    List<String> notes = new ArrayList<>();
+    if (context == null) {
+      notes.add("The server doesn't say how large its context is; replies get "
+          + (ceiling > 0 ? n(ceiling) + " tokens (LLM_MAX_TOKENS)" : n(LlmClient.FALLBACK_REPLY_TOKENS) + " tokens, then the rest if cut off")
+          + ". Set LLM_CONTEXT_LENGTH to size them to it.");
+    } else if (reasoning && context < REASONING_MIN_CONTEXT) {
+      warnings.add("Its context holds " + n(context) + " tokens. A reasoning model thinks before it writes, so a story"
+          + " needs " + n(REASONING_MIN_CONTEXT) + " or more: on a busy capture it may be cut off or refused.");
+    } else if (context < STORY_MIN_CONTEXT) {
+      warnings.add("Its context holds " + n(context) + " tokens. A story on a busy capture sends 10,000–20,000, so it"
+          + " may be refused; " + n(STORY_MIN_CONTEXT) + " or more is comfortable.");
+    } else {
+      notes.add("Its context holds " + n(context) + " tokens; each reply gets what the prompt leaves.");
+    }
+    int minCap = reasoning ? REASONING_MIN_CAP : STORY_MIN_CAP;
+    if (ceiling > 0 && ceiling < minCap) {
+      warnings.add("LLM_MAX_TOKENS caps replies at " + n(ceiling) + "; " + (reasoning ? "a reasoning model's" : "a")
+          + " story needs " + n(minCap) + " or more. Set it to 0 to size replies to the context.");
+    }
+    if (completionTokens != null && completionTokens >= MIN_SPEED_TOKENS && replyMs > 0) {
+      // A 24-token reply includes the prompt's processing, so this is a floor on its speed.
+      double perSecond = completionTokens * 1000.0 / replyMs;
+      int storyTokens = reasoning ? STORY_REPLY_TOKENS * 3 : STORY_REPLY_TOKENS;
+      long storySeconds = Math.round(storyTokens / perSecond);
+      String speed = "about " + Math.round(perSecond) + " tokens a second";
+      if (storySeconds > timeoutSeconds) {
+        warnings.add("It writes " + speed + ", so a story (about " + n(storyTokens) + " tokens) may take "
+            + minutes(storySeconds) + ", past LLM_TIMEOUT of " + timeoutSeconds + " s. Raise LLM_TIMEOUT to "
+            + n(storySeconds + 60) + " or more, or use a faster model or server.");
+      } else {
+        notes.add("It writes " + speed + ": a story takes about " + minutes(storySeconds) + ".");
+      }
+    }
+    String detail = String.join(" ", warnings.isEmpty() ? notes : warnings);
+    return warnings.isEmpty()
+        ? ok("capacity", "Can carry a story", detail, null)
+        : warn("capacity", "Can carry a story", detail, null);
+  }
+
+  private static String n(long v) {
+    return String.format(java.util.Locale.ROOT, "%,d", v);
+  }
+
+  private static String minutes(long seconds) {
+    return seconds < 90 ? seconds + " s" : Math.round(seconds / 60.0) + " minutes";
   }
 
   /** The reply's own model and form: a different model answering, or a reasoning model. */
   Step replyStep(String asked, String reply, long ms) {
-    String answered = null;
-    boolean reasoning = false;
-    try {
-      JsonNode r = reply == null ? null : objectMapper.readTree(reply);
-      if (r != null) {
-        answered = r.path("model").asText(null);
-        JsonNode msg = r.path("choices").path(0).path("message");
-        String thought = msg.path("reasoning_content").asText(msg.path("reasoning").asText(""));
-        reasoning = !thought.isBlank() || msg.path("content").asText("").contains("<think>");
-      }
-    } catch (Exception ignored) {
-      // A reply that isn't JSON still counts as a reply.
-    }
+    ReplyFacts facts = replyFacts(reply);
+    String answered = facts.answered();
+    boolean reasoning = facts.reasoning();
     String think = reasoning
-        ? " It's a reasoning model: it thinks before it answers, so give it a large LLM_MAX_TOKENS (24000 or more) and a long LLM_TIMEOUT."
+        ? " It's a reasoning model: it thinks before it answers, so leave LLM_MAX_TOKENS at 0 (or 24000 or more) and give it a long LLM_TIMEOUT."
         : "";
     if (!ModelProfiles.sameModel(asked, answered)) {
       return warn("reply", "Model replies",

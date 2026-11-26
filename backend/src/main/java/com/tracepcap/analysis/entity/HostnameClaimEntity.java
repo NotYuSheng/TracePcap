@@ -41,7 +41,7 @@ public class HostnameClaimEntity {
   @Column(nullable = false, length = 255)
   private String hostname;
 
-  /** Which protocol asserted it: dhcp | mdns | nbns | reverse_dns. */
+  /** Which protocol asserted it: dhcp | mdns | nbns | ntlm | reverse_dns. */
   @Column(nullable = false, length = 20)
   private String source;
 

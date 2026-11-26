@@ -64,6 +64,12 @@ calling on ``auto``, asks it afresh whether it supports tools. The API key is
 never shown again once saved, and the audit log records only that it changed.
 **Reset to the deployment's value** goes back to ``.env``.
 
+**Change connection…** opens the URL, key and model as one form. Once a URL is
+typed (and a key, if it needs one), the server is asked for its models and the
+model becomes a dropdown of them, with each one's context length when the server
+says. A server that doesn't list its models leaves the model to be typed. Test the
+values there, then **Save**: each changed setting is saved and audited on its own.
+
 Testing the Connection
 -----------------------
 
@@ -76,9 +82,20 @@ and says which one fails, or warns:
    server's models are listed, and clicking one makes it the model.
 4. **Model replies**: a short chat completion comes back, from that model.
 5. **Takes tools** (when the server says): whether the chat can look things up.
+6. **Can carry a story**: from the model's context, the reply's speed and
+   ``LLM_MAX_TOKENS``. It warns, without failing, when:
 
-Anyone can test what's in effect. When changing the URL, key or model, **Test this
-value** tests the typed value before saving it (that needs the permission, since it
+   * the context is under 16,384 tokens (a story on a busy capture sends
+     10,000–20,000), or under 32,768 for a reasoning model, which thinks first;
+   * ``LLM_MAX_TOKENS`` caps replies under 4,000 (24,000 for a reasoning model);
+   * at the speed it replied, a story (about 4,000 tokens, three times that for
+     a reasoning model) would run past ``LLM_TIMEOUT``. The test reply's time
+     includes reading the prompt, so the speed is a floor.
+
+   Otherwise it says the context and how long a story takes.
+
+Anyone can test what's in effect. When changing the URL, key or model, **Test these
+values** tests the typed values before saving them (that needs the permission, since it
 sends requests to the typed address). If a step fails, check:
 
 1. The inference server is running.
@@ -105,8 +122,9 @@ TracePcap needs a model that chats. What it does with the other kinds:
    * - **Reasoning** (thinks before it answers: DeepSeek-R1, Qwen3 thinking, …)
      - Works. Its thinking is dropped before the answer is read, whether the server sends
        it apart or inline as ``<think>…</think>``. The test says it's a reasoning model:
-       give it ``LLM_MAX_TOKENS`` of 24000 or more and a long ``LLM_TIMEOUT``, or it can
-       spend the whole reply thinking. If it does, the error says so and what to raise.
+       leave ``LLM_MAX_TOKENS`` at ``0`` (each reply gets what the context has left) or
+       give it 24000 or more, and a long ``LLM_TIMEOUT``, or it can spend the whole reply
+       thinking. If it does, the error says so and what to raise.
    * - **Embedding** (``text-embedding-…``, ``bge-…``)
      - Refused, with a clear message: it turns text into numbers for search and can't
        write answers. The test stops at *Model available*; Story and the chat fail at

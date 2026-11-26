@@ -149,7 +149,12 @@ export function GraphNodeIdentityCard({
               {/* "Looked up" for LDAP-only evidence: a lookup isn't proof of a sign-in (#812). */}
               <dt>{d.loggedInUserSource === 'ldap_dn' ? 'Looked up' : 'Signed in'}</dt>
               <dd className="d-flex align-items-center gap-1 flex-wrap">
-                <span>{d.loggedInUser}</span>
+                <span>
+                  {d.loggedInUser}
+                  {d.loggedInUserRealName && (
+                    <span className="text-muted" data-testid="logged-in-user-real-name"> ({d.loggedInUserRealName})</span>
+                  )}
+                </span>
                 <LoggedInUserSourceBadge source={d.loggedInUserSource} />
               </dd>
             </>

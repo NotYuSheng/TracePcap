@@ -25,6 +25,12 @@ public record EntityRef(EntityType type, String key) {
     return new EntityRef(EntityType.EXTERNAL_SERVICE, ip);
   }
 
+  /**
+   * The malware behind a C2 when no rule names a family: a marker, not a family. The C2 and victim
+   * questions treat it like any family; the malware question skips it, so no family is claimed.
+   */
+  public static final String UNIDENTIFIED_MALWARE = "unidentified";
+
   public static EntityRef malware(String family) {
     return new EntityRef(EntityType.MALWARE, family);
   }

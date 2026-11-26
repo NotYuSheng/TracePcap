@@ -244,6 +244,9 @@ services:
       SURICATA_WARM_ENGINE_RUN_TIMEOUT: ${SURICATA_WARM_ENGINE_RUN_TIMEOUT:-600}
       SURICATA_WARM_ENGINE_LOCK_WAIT: ${SURICATA_WARM_ENGINE_LOCK_WAIT:-900}
       SURICATA_WARM_ENGINE_COMMAND_TIMEOUT: ${SURICATA_WARM_ENGINE_COMMAND_TIMEOUT:-30}
+      # A newer Suricata ruleset (#600): drop it into SURICATA_RULES_DIR on the host (mounted below).
+      SURICATA_RULES_IMPORT_DIR: ${SURICATA_RULES_IMPORT_DIR:-/var/lib/tracepcap/suricata-rules}
+      SURICATA_RULESET_STALE_DAYS: ${SURICATA_RULESET_STALE_DAYS:-30}
       ASYNC_CORE_POOL_SIZE: ${ASYNC_CORE_POOL_SIZE:-5}
       ASYNC_MAX_POOL_SIZE: ${ASYNC_MAX_POOL_SIZE:-10}
       ASYNC_QUEUE_CAPACITY: ${ASYNC_QUEUE_CAPACITY:-100}
@@ -271,7 +274,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
       LLM_MODEL: ${LLM_MODEL:-gpt-4}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
-      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-0}
       LLM_CONTEXT_LENGTH: ${LLM_CONTEXT_LENGTH:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       LLM_TOOL_CALLING: ${LLM_TOOL_CALLING:-auto}
@@ -281,6 +284,8 @@ services:
       TZ: Asia/Singapore
     volumes:
       - config_data:/app/config
+      # Newer Suricata rules, read-only (#600). Empty means the rules built into the image.
+      - ${SURICATA_RULES_DIR:-./suricata-rules}:/var/lib/tracepcap/suricata-rules:ro
     depends_on:
       postgres:
         condition: service_healthy

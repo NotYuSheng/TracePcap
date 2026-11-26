@@ -1,5 +1,6 @@
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
 import { NetworkSegmentsPanel } from '@/features/networkSegments/NetworkSegmentsPanel';
 import { usePermission } from '@/features/me/useMe';
@@ -8,6 +9,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData, TimelineDataPoint } from '@/types';
 import { useHostGroups, groupSize } from '@/features/network/hooks/useHostGroups';
 import { SourceTag } from '@components/analysis/Overview/SourceTag';
+import { WorthALookCard } from '@components/analysis/Overview/WorthALookCard';
 import { MixBar, type MixRow } from '@components/analysis/Overview/MixBar';
 import '@components/analysis/Overview/Overview.css';
 import { getProtocolColor } from '@/features/network/constants';
@@ -31,7 +33,8 @@ import { storyService } from '@/features/story/services/storyService';
 import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
-import type { Answer } from '@/types';
+import { CaptureQualityNote } from '@components/common/CaptureQualityNote/CaptureQualityNote';
+import type { Answer, CategoryStatus, Considered } from '@/types';
 
 /** "Where the hosts are" lists this many groups per heading before "Show all". */
 const HOSTS_SHOWN = 6;
@@ -46,7 +49,7 @@ const ndpiPopoverBody = (
   <>
     <p className="mb-2">
       Application labels are identified by{' '}
-      <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
+      <a href="/reference/protocols" target="_blank" rel="noopener noreferrer">
         nDPI
       </a>{' '}
       deep packet inspection, which recognises services such as YouTube, WhatsApp, and Zoom by
@@ -60,7 +63,7 @@ const ndpiPopoverBody = (
       Treat labels as strong indicators, not definitive classifications. Cross-reference the
       destination IP/port and packet payload if a label looks unexpected.
     </p>
-    <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer" className="small">
+    <a href="/reference/protocols" target="_blank" rel="noopener noreferrer" className="small">
       View protocol reference →
     </a>
   </>
@@ -95,6 +98,10 @@ export const AnalysisOverview = () => {
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [considered, setConsidered] = useState<Considered[]>([]);
+  // Every category's status: null until the investigation is in (or if it failed), so nothing is
+  // called open before it has been looked at.
+  const [categories, setCategories] = useState<CategoryStatus[] | null>(null);
   const [activity, setActivity] = useState<TimelineDataPoint[]>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const { tops: hostTops } = useHostGroups(fileId, data);
@@ -178,10 +185,14 @@ export const AnalysisOverview = () => {
       .then(s => {
         setAnswers(s.answers);
         setUnknowns(s.unknowns);
+        setConsidered(s.considered);
+        setCategories(s.categories);
       })
       .catch(() => {
         setAnswers([]);
         setUnknowns([]);
+        setConsidered([]);
+        setCategories(null);
       });
     if (networkContext) {
       conversationService
@@ -402,11 +413,9 @@ export const AnalysisOverview = () => {
                     and this capture's own).
                   </li>
                 </ul>
-                <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
-                  nDPI risk reference →
-                </a>
               </SourceTag>
             </div>
+            <SuricataRulesetNote className="mb-2" />
             {flagged.total === 0 ? (
               <p className="small text-muted mb-0">Nothing flagged in this capture.</p>
             ) : (
@@ -500,10 +509,16 @@ export const AnalysisOverview = () => {
                 traffic
               </button>
             )}
+            <CaptureQualityNote fileId={fileId} />
           </section>
 
           {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4). */}
-          {answers.length > 0 && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} />}
+          {(answers.length > 0 || considered.length > 0) && <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} considered={considered} fileId={fileId} />}
+
+          {/* The protocols worth opening, by the question they help answer (#1292). */}
+          {fileId && (
+            <WorthALookCard fileId={fileId} categories={categories} />
+          )}
 
           {(
             <section className="ov-card" aria-labelledby="ov-apps">

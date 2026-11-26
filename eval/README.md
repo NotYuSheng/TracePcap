@@ -17,6 +17,13 @@ Each field is one of:
 | `missed` | no answer was produced, or only some of the key's values were |
 | `wrong` | an answer was produced that the key does not list — **even if the right value is also present** |
 
+**Beyond the key.** An answer key can be narrower than the capture (it may name one C2 when the
+malware tried two). A case can list such findings under `beyond_key`, per scored field, each with
+`evidence` from outside TracePcap (an IDS rule's own text, an observed connection, a vendor report)
+and who reviewed it. Producing one is neither correct nor wrong: it's left out of the score and shown
+as "also, beyond the key". An entry without evidence is refused, and anything not listed still counts
+as wrong. Never add one from TracePcap's output alone.
+
 The last rule matters: a spurious extra victim or C2 next to the right one is a false accusation, so
 it counts as confidently wrong. (An earlier version scored it `correct`, which meant a regression that
 added spurious answers could never trip the gate.)
@@ -53,6 +60,14 @@ python3 eval/run_eval.py --out-dir /tmp/x   # write the scorecard elsewhere (a s
 python3 eval/test_run_eval.py               # the scoring tests; no stack needed
 ```
 
+**With login on**, set `TRACEPCAP_TOKEN` to an access token; the runner sends it as a bearer token on
+every request and upload. For a local stack, a password grant on Keycloak's `admin-cli` client works:
+
+```bash
+export TRACEPCAP_TOKEN=$(curl -s -d client_id=admin-cli -d username=<user> --data-urlencode password=<pw> \
+  -d grant_type=password http://localhost/realms/tracepcap/protocol/openid-connect/token | jq -r .access_token)
+```
+
 A case's capture is resolved as: an analyzed file of that name on the server (newest completed one) →
 else, with `--upload-missing`, a local copy in `eval/pcaps/` or `backend/target/ctf-demo/` → else the
 case is reported `pcap_unavailable`. **The runner does not download anything**: `case.yaml`'s
@@ -84,6 +99,10 @@ lower here (3/7 in a scratch run) because the pivots that recover them (#819, PR
 ## What is scored today
 
 `victim.ip`, `victim.mac`, `victim.hostname`, `user.account`, `user.real_name`, `malware.family`,
-`c2.ip`. As the technique library grows (#819), extend `score_case` in `run_eval.py` (scope, entry
+`c2.ip`. `lateral_movement` (#1266): the client and server pairs the lateral-movement answer names. A key
+that lists `lateral_movement: []` says there is none (PCAP-ATTACK's discovery captures), so any such
+answer there is confidently wrong; a key without the field doesn't score it. The `pcap-attack-*`
+cases take their ground truth from the dataset's own labels and are fetched into
+`eval/pcaps/pcap-attack/`. `kerberos_attack` (#1267) scores "technique client -> kdc" the same way. As the technique library grows (#819), extend `score_case` in `run_eval.py` (scope, entry
 vector, timeline, …). `c2` port/proto are recorded in the key but not scored yet — `/answers` does not
 expose them.

@@ -1,0 +1,6 @@
+case_id: 2024-08-15-warmcookie
+pcap: 2024-08-15-traffic-analysis-exercise.pcap
+source_url: https://www.malware-traffic-analysis.net/2024/08/15/2024-08-15-traffic-analysis-exercise.pcap.zip
+sha256: e154de6895c5f0a9edd07b1279b33014507236dbb44a449790c255b87a327a3c
+notes: >
+  Password-protected zip; the site's password scheme is on its "about" page. Unzip into eval/pcaps/.

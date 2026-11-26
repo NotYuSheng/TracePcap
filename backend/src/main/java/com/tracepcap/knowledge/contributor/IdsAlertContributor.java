@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
+import com.tracepcap.analysis.spi.IdsRuleMetadata;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,12 +25,35 @@ import org.springframework.stereotype.Component;
  * a query over these findings, not a metric-based guess.
  */
 @Component
-@RequiredArgsConstructor
 public class IdsAlertContributor implements KnowledgeContributor {
+
+  /** The active ruleset's metadata: names a family from the rule's own {@code malware_family} tag. */
+  private final IdsRuleMetadata ruleMetadata;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public IdsAlertContributor(IdsRuleMetadata ruleMetadata) {
+    this.ruleMetadata = ruleMetadata;
+  }
+
+  /** Without a ruleset (tests): families come from the rule message alone. */
+  IdsAlertContributor() {
+    this(IdsRuleMetadata.NONE);
+  }
+
+  /** The sid in a stored alert label, "… (sid:2066606 sev:1)". */
+  private static final Pattern SID = Pattern.compile("\\(sid:(\\d+)");
 
   static final String IDS_ALERT = "ids-alert";
   static final String COMMUNICATES_WITH = "communicates-with";
   static final String C2_OF = "c2-of";
+
+  /**
+   * A malware rule about command and control: "Fake Microsoft Teams CnC Payload Request", "… C2
+   * Checkin", "… Beacon". Only these make an unnamed C2; an informational or reputation rule (a
+   * Spamhaus DROP hit, a PowerShell user agent) never does.
+   */
+  private static final Pattern C2_RULE =
+      Pattern.compile("\\bMALWARE\\b.*\\b(CnC|C2|Check-?in|Beacon(ing)?)\\b", Pattern.CASE_INSENSITIVE);
 
   /**
    * The token(s) after "MALWARE" in an ET rule name. Group 1 is an all-caps lead token (a family
@@ -66,6 +89,9 @@ public class IdsAlertContributor implements KnowledgeContributor {
 
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    // Externals some rule tied to a named family, and externals only a family-less C2 rule hit.
+    java.util.Set<EntityRef> named = new java.util.HashSet<>();
+    java.util.Set<EntityRef> unnamedC2 = new java.util.LinkedHashSet<>();
     for (ConversationFacts conv : context.conversationFacts()) {
       List<String> alerts = conv.findings().suricataAlerts();
       if (alerts == null || alerts.isEmpty()) continue;
@@ -105,7 +131,9 @@ public class IdsAlertContributor implements KnowledgeContributor {
 
       for (String alert : alerts) {
         String family = malwareFamily(alert);
+        if (family == null && C2_RULE.matcher(alert).find()) unnamedC2.add(external);
         if (family != null) {
+          named.add(external);
           EntityRef malwareRef = EntityRef.malware(family);
           board.addEntity(malwareRef);
           // The external endpoint is this malware's C2.
@@ -114,7 +142,52 @@ public class IdsAlertContributor implements KnowledgeContributor {
         }
       }
     }
+
+    // A C2 that no rule names a family for (a "Fake Microsoft Teams CnC" request): still the C2,
+    // so the host talking to it is the victim, but no family is claimed. Skipped where a named
+    // family already covers the server, so a family-less rule beside a named one adds nothing.
+    java.util.Set<String> confirmed = new java.util.HashSet<>();
+    named.forEach(e -> confirmed.add(e.key()));
+    for (EntityRef external : unnamedC2) {
+      confirmed.add(external.key());
+      if (named.contains(external)) continue;
+      EntityRef unidentified = EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE);
+      board.addEntity(unidentified);
+      board.addRelationship(Relationship.of(external, C2_OF, unidentified, Grade.INFERRED, "suricata"));
+    }
+
+    // C2s no single alert proves: a chain of weaker signals, each link required (C2Corroboration).
+    C2Corroboration.Analysis corroboration = C2Corroboration.analyse(context.conversationFacts(), confirmed);
+    // Reputation-listed servers the rule tested and ruled out, with why (#1294).
+    for (C2Corroboration.Rejection r : corroboration.rejections()) {
+      board.addFinding(new com.tracepcap.knowledge.spi.Considered(
+              "c2", r.external(), C2Corroboration.SUSPECTED_RULE,
+              "on " + r.listedBy() + ", but " + r.reason() + ".", r.conversations())
+          .toFinding("corroboration", List.of(EntityRef.external(r.external()), EntityRef.host(r.host()))));
+    }
+    for (C2Corroboration.Escalation e : corroboration.escalations()) {
+      EntityRef external = EntityRef.external(e.external());
+      EntityRef malware =
+          EntityRef.malware(e.family() != null ? e.family() : EntityRef.UNIDENTIFIED_MALWARE);
+      board.addEntity(malware);
+      board.addRelationship(
+          new Relationship(external, C2_OF, malware, Grade.INFERRED, "corroboration",
+              Map.of(CORROBORATION, e.kind(), "reason", e.reason())));
+      board.addFinding(
+          new Finding(
+              "c2-classification",
+              e.reason(),
+              Severity.HIGH,
+              Grade.INFERRED,
+              "corroboration",
+              List.of(external, EntityRef.host(e.host())),
+              List.of(),
+              Map.of(CORROBORATION, e.kind())));
+    }
   }
+
+  /** On a c2-of edge made by corroboration: which rule ("suspected-c2", "install-chain"). */
+  public static final String CORROBORATION = "corroboration";
 
   /** A host if internal, an external service if routable; null for a blank/unusable address. */
   private EntityRef endpointRef(String ip) {
@@ -122,8 +195,37 @@ public class IdsAlertContributor implements KnowledgeContributor {
     return IpLocality.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
   }
 
-  private String malwareFamily(String alert) {
+  /**
+   * The malware family an alert names. When the rule is in the active ruleset, its {@code
+   * malware_family} tag decides: ET tags 12,000 of its ~19,500 malware rules, and a
+   * rule with metadata but no family tag names none. That fixed "Win32/Lumma Stealer" (no family
+   * read) and "W32/Badspace.Backdoor" (a spurious "Badspace" beside WarmCookie). Only a rule the
+   * ruleset doesn't know falls back to reading the message.
+   */
+  String malwareFamily(String alert) {
     if (alert == null) return null;
+    Matcher sid = SID.matcher(alert);
+    if (sid.find()) {
+      var info = ruleMetadata.rule(Long.parseLong(sid.group(1)));
+      if (info.isPresent() && info.get().hasMetadata()) {
+        return spelledAsInMessage(info.get().malwareFamily(), alert);
+      }
+    }
+    return familyFromMessage(alert);
+  }
+
+  /**
+   * ET writes some tags in capitals ("WARMCOOKIE"); the message usually spells the name properly
+   * ("BadSpace/WarmCookie"), so that spelling is used when the two match ignoring case.
+   */
+  static String spelledAsInMessage(String family, String alert) {
+    if (family == null) return null;
+    if (!family.equals(family.toUpperCase(java.util.Locale.ROOT))) return family;
+    Matcher w = Pattern.compile("(?i)(?<![A-Za-z0-9])" + Pattern.quote(family) + "(?![A-Za-z0-9])").matcher(alert);
+    return w.find() ? w.group() : family;
+  }
+
+  private String familyFromMessage(String alert) {
     Matcher m = MALWARE_FAMILY.matcher(alert);
     while (m.find()) {
       // Prefer the family after a platform prefix ("MSIL/Ramnit" → Ramnit); else the lead token.

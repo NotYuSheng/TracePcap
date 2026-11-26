@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@govtechsg/sgds-react';
+import '@components/common/SideDrawer/SideDrawer.css';
 import { useEntityRole } from './hooks/useEntityRole';
 import { useEntityStats } from './hooks/useEntityStats';
 import { useEntityNote } from './hooks/useEntityNote';
@@ -16,6 +17,11 @@ import { GraphNodeDetailsSection } from './sections/GraphNodeDetailsSection';
 import { GraphHistoryTab } from './sections/GraphHistoryTab';
 import { GraphNodeIdentityCard } from './sections/GraphNodeIdentityCard';
 import { HostDetailModal } from './HostDetailModal';
+import {
+  findNdpiProtocol,
+  protocolReferenceUrl,
+  useNdpiProtocols,
+} from '@/features/ndpiReference/ndpiReference';
 import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
 import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { EntityDetailModalProps, Tab } from './types';
@@ -42,6 +48,8 @@ export function EntityDetailModal({
   const [nestedIp, setNestedIp] = useState<string | null>(null);
 
   const showRole = entityType === 'IP' || entityType === 'DEVICE';
+  // What nDPI says a protocol or app is (the protocol reference), shown at the top of its drawer.
+  const ndpiProtocols = useNdpiProtocols(entityType === 'PROTOCOL' || entityType === 'APPLICATION');
 
   // Graph context (#578): when a node is supplied, the modal renders the network-graph host detail —
   // traffic counters + Connections table + a History tab + service-role log tabs.
@@ -168,7 +176,13 @@ export function EntityDetailModal({
     ];
     return (
       <>
-        <Modal show onHide={onClose} size="xl" dialogClassName="node-dialog" aria-labelledby="entity-detail-title">
+        <Modal
+          show
+          onHide={onClose}
+          dialogClassName="side-drawer side-drawer-host node-dialog"
+          contentClassName="side-drawer-content"
+          aria-labelledby="entity-detail-title"
+        >
           <Modal.Body className="p-0 node-dialog-body">
             <GraphNodeIdentityCard
               node={node}
@@ -290,9 +304,10 @@ export function EntityDetailModal({
     );
   }
 
+  // Every entity opens in the right-hand drawer, like the app's other side panels.
   return (
     <>
-    <Modal show onHide={onClose} size="lg" scrollable>
+    <Modal show onHide={onClose} dialogClassName="side-drawer side-drawer-wide" contentClassName="side-drawer-content">
       <Modal.Header closeButton closeLabel="Close (Esc)">
             <Modal.Title as="h5" className="d-flex align-items-center gap-2 flex-wrap">
               {displayName}
@@ -327,11 +342,24 @@ export function EntityDetailModal({
             </ul>
           </div>
 
-          <Modal.Body>
+          <Modal.Body className="side-drawer-body">
 
             {/* ── DETAILS TAB ──────────────────────────────────────── */}
             {activeTab === 'details' && (
               <div>
+                {(() => {
+                  const ref = ndpiProtocols ? findNdpiProtocol(ndpiProtocols, entityKey) : undefined;
+                  if (!ref) return null;
+                  return (
+                    <div className="mb-3 small" data-testid="ndpi-protocol-about">
+                      <div className="fw-semibold">{ref.title}</div>
+                      <p className="mb-1 text-muted">{ref.description}</p>
+                      <a href={protocolReferenceUrl(ref.name)} target="_blank" rel="noopener noreferrer">
+                        In the protocol reference →
+                      </a>
+                    </div>
+                  );
+                })()}
                 {/* Change-event highlight banner (Monitor snapshot / Compare diff). */}
                 {changeHighlight && (
                   <div

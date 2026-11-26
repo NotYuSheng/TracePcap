@@ -1,4 +1,6 @@
 package com.tracepcap.file.controller;
+import com.tracepcap.governance.AuditedAccess;
+import com.tracepcap.governance.AuditContext;
 
 import com.tracepcap.governance.PermissionService;
 import com.tracepcap.governance.PermissionAction;
@@ -77,6 +79,7 @@ public class FileController {
     FileUploadResponse response =
         fileService.uploadFile(
             file, enableNdpi, enableSuricata, enableFileExtraction, source, generateStory, !expires);
+    AuditContext.describe(response.getFileId(), response.getFileName());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -209,6 +212,7 @@ public class FileController {
     return fileService.versions(fileId);
   }
 
+  @AuditedAccess
   @GetMapping("/{fileId}/download")
   @Operation(summary = "Download file", description = "Download a PCAP file")
   public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String fileId) {
@@ -229,7 +233,10 @@ public class FileController {
   @Operation(summary = "Delete file", description = "Delete a PCAP file")
   public ResponseEntity<Void> deleteFile(@PathVariable String fileId) {
     UUID id = UUID.fromString(fileId);
-    permissionService.requireDeleteCapture(fileService.getFileMetadata(id).getUploadedBy());
+    var meta = fileService.getFileMetadata(id);
+    // Named now: after the delete there is no capture left to look the name up from.
+    AuditContext.describe(fileId, meta.getFileName());
+    permissionService.requireDeleteCapture(meta.getUploadedBy());
     fileService.deleteFile(id);
 
     return ResponseEntity.noContent().build();

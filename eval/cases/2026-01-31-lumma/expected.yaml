@@ -1,0 +1,35 @@
+# Ground truth from the exercise's published answer key (2026-01-31-traffic-analysis-exercise-answers.pdf),
+# NOT from TracePcap's output.
+case_id: 2026-01-31-lumma
+title: "Lumma in the Room-ah!"
+source: https://www.malware-traffic-analysis.net/2026/01/31/index.html
+
+victim:
+  # The key's "Victim Details" says 10.1.28.58, but its LAN range (10.1.21.0/24), its hints and
+  # every screenshot say 10.1.21.58: a typo in the key. The capture agrees with 10.1.21.58.
+  ip: 10.1.21.58
+  mac: "00:21:5d:c8:0e:f2"
+  hostname: DESKTOP-ES9F3ML
+user:
+  account: gwyatt
+  real_name: Gabriel Wyatt      # from an SMB/SAMR QueryUserInfo reply, not LDAP
+malware:
+  family: Lumma Stealer
+c2:
+  - ip: 153.92.1.49
+    port: 80                    # whitepepper.su; also 443
+    proto: TCP
+# Also in the key, not scored today: the alert's domain whitepepper.su, and follow-up HTTPS to
+# holiday-forever.cc (80.97.160.24) and communicationfirewall-security.cc (104.21.9.36).
+
+# Findings the key doesn't mention, each with evidence from outside TracePcap (see run_eval.beyond_key).
+# Producing one is neither right nor wrong; anything not listed here still counts as wrong.
+beyond_key:
+  c2.ip:
+    - value: 62.72.32.156
+      evidence: >
+        whooptm.cyou. ET Open sid 2066851, "ET MALWARE Observed Win32/Lumma Stealer Related Domain
+        (whooptm .cyou) in TLS SNI". The victim 10.1.21.58 opened TLS to it at 2026-01-27 23:05:34
+        UTC, two seconds before the key's whitepepper.su traffic, and it answered (~9.6 KB back).
+        Lumma carries a list of C2 domains; the key's question asked only for 153.92.1.49's domain.
+      reviewed: 2026-11-22 (agreed with the maintainer)

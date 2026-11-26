@@ -1,0 +1,6 @@
+case_id: 2026-11-10-netsupport
+pcap: 2026-11-10-traffic-analysis-exercise.pcap
+source_url: https://www.malware-traffic-analysis.net/2026/11/10/2026-11-10-traffic-analysis-exercise.pcap.zip
+sha256: b52bd2a4ec9d747266206e10df01283197cc3e8ace8af20f1c1e5fb8f0b61533
+notes: >
+  Password-protected zip; the site's password scheme is on its "about" page. Unzip into eval/pcaps/.

@@ -12,7 +12,6 @@ import com.tracepcap.file.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.*;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -201,14 +200,17 @@ public class FileExtractionService implements FileExtractionStage {
     // Load all conversations once — shared by both extraction strategies
     List<ConversationFacts> allConvs = conversationLookup.conversationFactsByIds(savedConversationIds);
 
+    // Conversations whose HTTP objects were exported properly: carving them again only finds the
+    // same files' fragments.
+    Set<UUID> httpCovered = new java.util.HashSet<>();
     try {
-      extractHttpObjects(file, tempPcapFile, allConvs);
+      httpCovered.addAll(extractHttpObjects(file, tempPcapFile, allConvs));
     } catch (Exception e) {
       log.warn("HTTP object extraction failed for {}: {}", file.getId(), e.getMessage());
     }
 
     try {
-      extractFromRawStreams(file, tempPcapFile, allConvs);
+      extractFromRawStreams(file, tempPcapFile, allConvs, httpCovered);
     } catch (Exception e) {
       log.warn("Raw stream extraction failed for {}: {}", file.getId(), e.getMessage());
     }
@@ -220,8 +222,22 @@ public class FileExtractionService implements FileExtractionStage {
   // HTTP export via tshark --export-objects
   // -------------------------------------------------------------------------
 
-  private void extractHttpObjects(
+  private static final java.util.regex.Pattern ENCRYPTED =
+      java.util.regex.Pattern.compile("TLS|SSL|QUIC|SSH|DTLS|WIREGUARD|OPENVPN|IPSEC|ESP");
+
+  /** TLS, QUIC, SSH… by the dissector or nDPI, or a TLS handshake seen (a JA3 or a version). */
+  static boolean isEncrypted(ConversationFacts c) {
+    String tp = c.findings().tsharkProtocol();
+    String app = c.findings().appName();
+    if (tp != null && ENCRYPTED.matcher(tp.toUpperCase()).find()) return true;
+    if (app != null && ENCRYPTED.matcher(app.toUpperCase()).find()) return true;
+    return c.tls() != null && (c.tls().ja3Client() != null || c.tls().tlsVersion() != null);
+  }
+
+  /** Exports HTTP objects; returns the conversations they came from. */
+  private Set<UUID> extractHttpObjects(
       FileEntity file, File tempPcapFile, List<ConversationFacts> convs) throws Exception {
+    Set<UUID> covered = new java.util.HashSet<>();
     File tmpDir = Files.createTempDirectory("tshark-http-").toFile();
     try {
       ProcessBuilder pb =
@@ -239,14 +255,16 @@ public class FileExtractionService implements FileExtractionStage {
       File[] files = tmpDir.listFiles();
       if (files == null || files.length == 0) {
         log.debug("No HTTP objects found in PCAP {}", file.getId());
-        return;
+        return covered;
       }
 
       log.info("tshark exported {} HTTP object(s) from PCAP {}", files.length, file.getId());
 
-      // Build filename → conversationId map via a second tshark pass
-      Map<String, UUID> filenameToConvId =
+      // Build filename → (conversation, URL) via a second tshark pass, and URL → the file name the
+      // server gave (Content-Disposition) via a third.
+      Map<String, HttpOrigin> filenameToConvId =
           convs.isEmpty() ? new HashMap<>() : buildHttpFilenameConvMap(tempPcapFile, convs);
+      Map<String, String> serverNames = contentDispositionNames(tempPcapFile);
 
       // Fallback: numbered variants like "xcms(1).asp" share the same TCP stream as "xcms.asp"
       // (tshark exports both POST request body and response body under the same basename).
@@ -257,7 +275,7 @@ public class FileExtractionService implements FileExtractionStage {
         if (!filenameToConvId.containsKey(name)) {
           String base = stripNumberSuffix(name);
           if (base != null) {
-            UUID fallback = filenameToConvId.get(base);
+            HttpOrigin fallback = filenameToConvId.get(base);
             if (fallback != null) filenameToConvId.put(name, fallback);
           }
         }
@@ -266,8 +284,12 @@ public class FileExtractionService implements FileExtractionStage {
       for (File f : files) {
         if (!f.isFile()) continue;
         try {
-          UUID convId = filenameToConvId.get(f.getName());
-          processLocalFile(file, convId, f, "tshark_http");
+          HttpOrigin origin = filenameToConvId.get(f.getName());
+          UUID convId = origin == null ? null : origin.conversationId();
+          String url = origin == null ? null : origin.url();
+          String shown = url == null ? null : serverNames.get(url);
+          if (convId != null) covered.add(convId);
+          processLocalFile(file, convId, f, "tshark_http", shown != null ? shown : f.getName(), url);
         } catch (Exception e) {
           log.warn("Failed to store HTTP object {}: {}", f.getName(), e.getMessage());
         }
@@ -275,6 +297,7 @@ public class FileExtractionService implements FileExtractionStage {
     } finally {
       deleteDir(tmpDir);
     }
+    return covered;
   }
 
   /**
@@ -285,11 +308,11 @@ public class FileExtractionService implements FileExtractionStage {
    * {@code dagbok.html}, {@code dagbok(1).html}, {@code dagbok(2).html}). We replicate this
    * numbering by processing URIs in pcap order and tracking per-basename counts.
    *
-   * @return map from tshark-exported filename → conversation UUID
+   * @return map from tshark-exported filename → its conversation and full URL
    */
-  private Map<String, UUID> buildHttpFilenameConvMap(
+  private Map<String, HttpOrigin> buildHttpFilenameConvMap(
       File pcapFile, List<ConversationFacts> convs) {
-    Map<String, UUID> result = new HashMap<>();
+    Map<String, HttpOrigin> result = new HashMap<>();
     // Must track counts in pcap order — LinkedHashMap preserves insertion order
     Map<String, Integer> basenameCount = new LinkedHashMap<>();
     try {
@@ -318,7 +341,9 @@ public class FileExtractionService implements FileExtractionStage {
               "-e",
               "ipv6.dst",
               "-e",
-              "tcp.dstport");
+              "tcp.dstport",
+              "-e",
+              "http.host");
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
 
@@ -344,8 +369,10 @@ public class FileExtractionService implements FileExtractionStage {
           Integer sp = parsePort(srcPort);
           Integer dp = parsePort(dstPort);
           ConversationFacts conv = findConvByEndpoints(convs, srcIp, sp, dstIp, dp);
-          if (conv != null) {
-            result.put(filename, conv.id());
+          String host = cols.length > 7 ? cols[7].trim() : "";
+          String url = absoluteUrl(uri, host);
+          if (conv != null || url != null) {
+            result.put(filename, new HttpOrigin(conv == null ? null : conv.id(), url));
           }
         }
       }
@@ -361,27 +388,102 @@ public class FileExtractionService implements FileExtractionStage {
    * URL-decoded, with unsafe chars replaced by {@code _}. Returns {@code %2f} for root/empty paths
    * (matching tshark's observed behaviour).
    */
-  private static String uriToBasename(String uri) {
-    try {
-      String path = uri;
-      int schemeEnd = uri.indexOf("://");
-      if (schemeEnd >= 0) {
-        int slashAfterHost = uri.indexOf('/', schemeEnd + 3);
-        path = slashAfterHost >= 0 ? uri.substring(slashAfterHost) : "/";
-      }
-      int q = path.indexOf('?');
-      if (q >= 0) path = path.substring(0, q);
-      int f = path.indexOf('#');
-      if (f >= 0) path = path.substring(0, f);
-      int lastSlash = path.lastIndexOf('/');
-      String segment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
-      segment = URLDecoder.decode(segment, StandardCharsets.UTF_8);
-      segment = segment.replaceAll("[/\\\\:*?\"<>|\t]", "_");
-      return segment.isBlank() ? "%2f" : segment;
-    } catch (Exception e) {
-      return "%2f";
-    }
+  /** Where an exported HTTP object came from: its conversation and full URL (either may be null). */
+  record HttpOrigin(UUID conversationId, String url) {}
+
+  /** "http://host/path?q" from a request's URI and Host header (the URI may already be absolute). */
+  static String absoluteUrl(String uri, String host) {
+    if (uri == null || uri.isBlank()) return null;
+    if (uri.startsWith("http://") || uri.startsWith("https://")) return uri;
+    if (host == null || host.isBlank()) return null;
+    return "http://" + host + (uri.startsWith("/") ? uri : "/" + uri);
   }
+
+  private static final java.util.regex.Pattern DISPOSITION_NAME =
+      java.util.regex.Pattern.compile(
+          "filename(\\*?)\\s*=\\s*(?:[A-Za-z0-9-]+'[^']*')?(?:\"([^\"]+)\"|([^;]+))",
+          java.util.regex.Pattern.CASE_INSENSITIVE);
+
+  /**
+   * The file name in a Content-Disposition header ({@code attachment; filename="Invoice 1.zip"}),
+   * percent-decoded for the RFC 5987 {@code filename*=} form (which wins when both are present),
+   * with any path stripped; null when there is none.
+   */
+  static String dispositionFileName(String header) {
+    if (header == null) return null;
+    java.util.regex.Matcher m = DISPOSITION_NAME.matcher(header);
+    String plain = null;
+    String encoded = null;
+    while (m.find()) {
+      String v = (m.group(2) != null ? m.group(2) : m.group(3)).trim();
+      if (!m.group(1).isEmpty()) {
+        try {
+          encoded = java.net.URLDecoder.decode(v.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+          encoded = v;
+        }
+      } else if (plain == null) {
+        plain = v;
+      }
+    }
+    String best = encoded != null ? encoded : plain;
+    if (best == null) return null;
+    best = best.substring(Math.max(best.lastIndexOf('/'), best.lastIndexOf('\\')) + 1).trim();
+    return best.isEmpty() ? null : best;
+  }
+
+  /** URL → the file name its server gave in Content-Disposition, from one tshark pass. */
+  private Map<String, String> contentDispositionNames(File pcapFile) {
+    Map<String, String> out = new HashMap<>();
+    try {
+      ProcessBuilder pb =
+          new ProcessBuilder(
+              "tshark", "-r", pcapFile.getAbsolutePath(), "-Y", "http.content_disposition",
+              "-T", "fields", "-e", "http.response_for.uri", "-e", "http.content_disposition");
+      pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+      Process proc = pb.start();
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+        String line;
+        while ((line = br.readLine()) != null) {
+          String[] cols = line.split("\t", -1);
+          if (cols.length < 2 || cols[0].isBlank()) continue;
+          String name = dispositionFileName(cols[1]);
+          if (name != null) out.putIfAbsent(cols[0].trim(), name);
+        }
+      }
+      proc.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+    } catch (Exception e) {
+      log.debug("Content-Disposition pass failed: {}", e.getMessage());
+    }
+    return out;
+  }
+
+  /**
+   * The file name tshark's {@code --export-objects http} gives a request's object, so an exported
+   * file can be matched back to its conversation. tshark takes the last path component of the
+   * <em>whole</em> request URI, query string included ({@code g_path_get_basename}), then
+   * percent-encodes the characters a file name can't hold ({@code eo_massage_str}):
+   * {@code /managements?a=1} → {@code managements%3fa=1}, {@code /fwlink/?LinkID=1} →
+   * {@code %3fLinkID=1}, {@code /} → {@code %2f}, a proxy-style {@code http://host/} → {@code host}.
+   * An earlier version stripped the query and URL-decoded, so every download with a query string
+   * (58 of 166 across five training captures, including WarmCookie's ZIP) lost its conversation.
+   */
+  static String uriToBasename(String uri) {
+    if (uri == null || uri.isEmpty()) return ".";
+    // g_path_get_basename: strip trailing separators, then take what follows the last one.
+    int end = uri.length();
+    while (end > 0 && uri.charAt(end - 1) == '/') end--;
+    if (end == 0) return "%2f";
+    String trimmed = uri.substring(0, end);
+    String base = trimmed.substring(trimmed.lastIndexOf('/') + 1);
+    StringBuilder out = new StringBuilder(base.length());
+    for (char c : base.toCharArray()) {
+      if (c < 0x20 || "<>:\"/\\|?*".indexOf(c) >= 0) out.append(String.format("%%%02x", (int) c));
+      else out.append(c);
+    }
+    return out.toString();
+  }
+
 
   /**
    * Strips a tshark duplicate-numbering suffix from a filename. e.g. {@code "xcms(1).asp"} → {@code
@@ -470,7 +572,7 @@ public class FileExtractionService implements FileExtractionStage {
    * per-stream match cap and how many streams were skipped by the conversation cap.
    */
   private void extractFromRawStreams(
-      FileEntity file, File tempPcapFile, List<ConversationFacts> allConvs) {
+      FileEntity file, File tempPcapFile, List<ConversationFacts> allConvs, Set<UUID> httpCovered) {
 
     if (allConvs.isEmpty()) return;
 
@@ -489,6 +591,10 @@ public class FileExtractionService implements FileExtractionStage {
                   String tp = c.findings().tsharkProtocol();
                   return tp == null || !tp.toUpperCase().contains("HTTP");
                 })
+            // Already exported as HTTP objects: carving finds the same files' fragments again.
+            .filter(c -> !httpCovered.contains(c.id()))
+            // Encrypted: any "file" found in ciphertext is a coincidence of bytes.
+            .filter(c -> !isEncrypted(c))
             .toList();
 
     if (eligible.size() > limits.getMaxStreamConversations()) {
@@ -593,7 +699,7 @@ public class FileExtractionService implements FileExtractionStage {
       if (extractedFileRepository.existsByFileIdAndSha256(file.getId(), sha256)) continue;
 
       String mime = detectMime(fileData);
-      storeExtractedFile(file, conv.id(), fileData, name, mime, sha256, "magic_bytes");
+      storeExtractedFile(file, conv.id(), fileData, name, mime, sha256, "magic_bytes", null);
     }
     return capReached;
   }
@@ -937,7 +1043,8 @@ public class FileExtractionService implements FileExtractionStage {
   // File handling helpers
   // -------------------------------------------------------------------------
 
-  private void processLocalFile(FileEntity file, UUID conversationId, File localFile, String method)
+  private void processLocalFile(
+      FileEntity file, UUID conversationId, File localFile, String method, String shownName, String sourceUrl)
       throws Exception {
     long rawSize = localFile.length();
     if (rawSize == 0) return;
@@ -947,7 +1054,7 @@ public class FileExtractionService implements FileExtractionStage {
           localFile.getName(),
           rawSize,
           limits.getMaxFileSizeMb());
-      recordSkippedFile(file, conversationId, localFile.getName(), rawSize, method);
+      recordSkippedFile(file, conversationId, shownName, rawSize, method);
       return;
     }
     byte[] data = Files.readAllBytes(localFile.toPath());
@@ -955,7 +1062,7 @@ public class FileExtractionService implements FileExtractionStage {
     if (extractedFileRepository.existsByFileIdAndSha256(file.getId(), sha256)) return;
 
     String mime = detectMime(data);
-    storeExtractedFile(file, conversationId, data, localFile.getName(), mime, sha256, method);
+    storeExtractedFile(file, conversationId, data, shownName, mime, sha256, method, sourceUrl);
   }
 
   private void storeExtractedFile(
@@ -965,7 +1072,8 @@ public class FileExtractionService implements FileExtractionStage {
       String filename,
       String mimeType,
       String sha256,
-      String method) {
+      String method,
+      String sourceUrl) {
 
     String minioPath =
         StorageService.extractedPrefix(file.getId()) + UUID.randomUUID() + "/" + sanitize(filename);
@@ -982,6 +1090,7 @@ public class FileExtractionService implements FileExtractionStage {
             .sha256(sha256)
             .minioPath(minioPath)
             .extractionMethod(method)
+            .sourceUrl(sourceUrl == null || sourceUrl.length() <= 2000 ? sourceUrl : sourceUrl.substring(0, 2000))
             .build();
 
     extractedFileRepository.save(entity);

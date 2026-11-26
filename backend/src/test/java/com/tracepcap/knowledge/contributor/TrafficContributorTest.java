@@ -32,7 +32,7 @@ class TrafficContributorTest {
     return new ConversationFacts(
         UUID.randomUUID(), FILE,
         new FlowIdentity(src, 443, dst, 443, src, 443, "TCP", 10, bytes, null, null),
-        new TlsFacts(null, null, null, null, null, null, null),
+        new TlsFacts(null, null, null, null, null, null, null, null, null),
         new Findings(null, null, null, List.of(), List.of(), List.of(), List.of()));
   }
 

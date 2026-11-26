@@ -310,6 +310,7 @@ public class RuleSyncService {
       c.setDstIp(f.flow().dstIp());
       c.setDstPort(f.flow().dstPort());
       c.setProtocol(f.flow().protocol());
+      c.setTransport(f.flow().transport());
       c.setHostname(f.tls().hostname());
       c.setJa3Client(f.tls().ja3Client());
       c.setJa3Server(f.tls().ja3Server());

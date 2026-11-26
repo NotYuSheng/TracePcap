@@ -183,6 +183,7 @@ public class AnalysisService {
   private final OccupancyClassificationService occupancyClassificationService;
   private final com.tracepcap.analysis.repository.HostTtlWindowRepository hostTtlWindowRepository;
   private final WindowsLogonWriter windowsLogonWriter;
+  private final IdsAlertWriter idsAlertWriter;
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -582,7 +583,9 @@ public class AnalysisService {
       if (board != null) RuleVoteRescoreService.applyBoard(h, board);
     }
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
-    applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
+    applyWindowsSignIn(
+        hostClassifications, windowsIdentityClaimsByIp,
+        WindowsIdentityResolverService.fullNamesByIp(run.logons));
     try {
       persistIpMacObservations(
           run.file, run.parseResult.getHostMacObservations(), run.parseResult.getArpClaimWindows());
@@ -690,8 +693,15 @@ public class AnalysisService {
       ConversationEntity conversation =
           entityManager.getReference(ConversationEntity.class, convInfo.getEntityId());
       conversation.setInitiatorIp(convInfo.getInitiatorIp());
+      // The most specific label the connection showed ("TLSV1.2" rather than its SYN's "TCP").
+      conversation.setProtocol(convInfo.getProtocol());
+      conversation.setTransport(convInfo.getTransport());
+      conversation.setBytesSrcToDst(convInfo.getBytesSrcToDst());
+      conversation.setBytesDstToSrc(convInfo.getBytesDstToSrc());
       conversation.setSrcMac(convInfo.getSrcMac());
       conversation.setDstMac(convInfo.getDstMac());
+      conversation.setConnectionOutcome(
+          convInfo.getConnectionOutcome() == null ? null : convInfo.getConnectionOutcome().name());
       conversation.setInitiatorPort(convInfo.getInitiatorPort());
       conversation.setAppName(convInfo.getAppName());
       conversation.setTsharkProtocol(convInfo.getTsharkProtocol());
@@ -699,6 +709,20 @@ public class AnalysisService {
       conversation.setHostname(convInfo.getHostname());
       conversation.setJa3Client(convInfo.getJa3Client());
       conversation.setJa3Server(convInfo.getJa3Server());
+      conversation.setJa4Client(convInfo.getJa4Client());
+      conversation.setTlsVersion(convInfo.getTlsVersion());
+      if (convInfo.getTlsCert() != null) {
+        var cert = convInfo.getTlsCert();
+        conversation.setTlsSans(cert.sans().toArray(String[]::new));
+        conversation.setTlsKeyType(cert.keyType());
+        conversation.setTlsKeyBits(cert.keyBits());
+        conversation.setTlsSigAlg(
+            cert.signatureAlgorithm() == null || cert.signatureAlgorithm().length() <= 64
+                ? cert.signatureAlgorithm()
+                : cert.signatureAlgorithm().substring(0, 64));
+        conversation.setTlsSelfSigned(cert.selfSigned());
+        conversation.setTlsChainLength(cert.chainLength());
+      }
       conversation.setTlsIssuer(convInfo.getTlsIssuer());
       conversation.setTlsSubject(convInfo.getTlsSubject());
       conversation.setTlsNotBefore(convInfo.getTlsNotBefore());
@@ -725,11 +749,143 @@ public class AnalysisService {
     }
 
     run.savedConversationIds = savedConversationIds;
+    saveIdsAlerts(fileId, run.parseResult.getConversations());
     log.info(
         "[{}] [6/7] Conversations finalized: {}ms  ({} conversations)",
         fileId,
         System.currentTimeMillis() - t,
         run.parseResult.getConversations().size());
+  }
+
+  /**
+   * Per conversation, how many alerts fired and how many records were kept (#1284), so a count built
+   * on the records can say when it's only the first of them.
+   */
+  static List<com.tracepcap.analysis.entity.IdsAlertCountEntity> alertCounts(
+      UUID fileId, List<PcapParserService.ConversationInfo> conversations,
+      List<com.tracepcap.analysis.entity.IdsAlertEntity> rows) {
+    Map<UUID, Integer> kept = new HashMap<>();
+    rows.forEach(r -> kept.merge(r.getConversationId(), 1, Integer::sum));
+    List<com.tracepcap.analysis.entity.IdsAlertCountEntity> out = new ArrayList<>();
+    // A flow shared by two conversations (DHCP clients split by MAC, say) is counted under the first
+    // saved one, as its records are (see saveIdsAlerts).
+    Set<String> counted = new HashSet<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      int k = kept.getOrDefault(c.getEntityId(), 0);
+      boolean first = c.getIdsAlertFlow() == null || counted.add(c.getIdsAlertFlow());
+      int total = Math.max(first ? c.getIdsAlertTotal() : 0, k);
+      if (total == 0) continue;
+      out.add(com.tracepcap.analysis.entity.IdsAlertCountEntity.builder()
+          .conversationId(c.getEntityId()).fileId(fileId).srcIp(c.getSrcIp()).dstIp(c.getDstIp())
+          .total(total).kept(k).build());
+    }
+    return out;
+  }
+
+  /** Each Suricata alert in full (#1265). Never fatal: the conversations carry the alert messages. */
+  private void saveIdsAlerts(UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
+    List<com.tracepcap.analysis.entity.IdsAlertEntity> rows = new ArrayList<>();
+    // One alert once: conversations sharing a flow key (DHCP clients split by MAC, say) are each
+    // handed the same alert record, and storing it under each multiplied every count built on them.
+    java.util.Set<SuricataService.AlertEvent> stored =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SuricataService.AlertEvent e : c.getIdsAlertEvents()) {
+        if (!stored.add(e)) continue;
+        rows.add(
+            com.tracepcap.analysis.entity.IdsAlertEntity.builder()
+                .fileId(fileId)
+                .conversationId(c.getEntityId())
+                .alertTime(e.time())
+                .srcIp(e.srcIp())
+                .srcPort(e.srcPort())
+                .dstIp(e.dstIp())
+                .dstPort(e.dstPort())
+                .sid(e.sid())
+                .gid(e.gid())
+                .rev(e.rev())
+                .signature(e.signature())
+                .category(e.category())
+                .severity(e.severity())
+                .signatureSeverity(e.meta("signature_severity"))
+                .confidence(e.meta("confidence"))
+                .attackTarget(e.meta("attack_target"))
+                .metadata(e.metadata())
+                .httpMethod(e.httpMethod())
+                .httpHost(e.httpHost())
+                .httpUrl(e.httpUrl())
+                .httpUserAgent(e.httpUserAgent())
+                .httpStatus(e.httpStatus())
+                .build());
+      }
+    }
+    List<com.tracepcap.analysis.entity.SuricataAnomalyEntity> anomalies = new ArrayList<>();
+    // Once each, as for alerts: conversations sharing a flow key are handed the same anomaly.
+    java.util.Set<SuricataService.Anomaly> storedAnomalies =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SuricataService.Anomaly a : c.getSuricataAnomalies()) {
+        if (!storedAnomalies.add(a)) continue;
+        anomalies.add(com.tracepcap.analysis.entity.SuricataAnomalyEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).time(a.time()).srcIp(a.srcIp())
+            .dstIp(a.dstIp()).type(a.type()).layer(a.layer()).appProto(a.appProto())
+            .event(a.event()).build());
+      }
+    }
+    // Apart, so a failed anomaly write can't take the alert records with it.
+    boolean recordsSaved = false;
+    try {
+      idsAlertWriter.replaceAlerts(fileId, rows);
+      recordsSaved = true;
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} IDS alert records failed: {}", fileId, rows.size(), ex.getMessage());
+    }
+    try {
+      // Kept is what's in ids_alerts: none, if that write failed.
+      idsAlertWriter.replaceAlertCounts(fileId, alertCounts(fileId, conversations, recordsSaved ? rows : List.of()));
+    } catch (Exception ex) {
+      log.warn("[{}] Saving IDS alert counts failed: {}", fileId, ex.getMessage());
+    }
+    try {
+      idsAlertWriter.replaceAnomalies(fileId, anomalies);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} protocol anomalies failed: {}", fileId, anomalies.size(), ex.getMessage());
+    }
+    List<com.tracepcap.analysis.entity.RemoteOperationEntity> ops = new ArrayList<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (SmbRpcRecords.Operation o : c.getRemoteOperations()) {
+        ops.add(com.tracepcap.analysis.entity.RemoteOperationEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).firstTime(o.firstTime())
+            .clientIp(o.client()).serverIp(o.server()).kind(o.kind()).share(o.share())
+            .path(o.path()).interfaceUuid(o.interfaceUuid()).opnum(o.opnum()).bytes(o.bytes())
+            .status(o.status()).count(o.count()).build());
+      }
+    }
+    try {
+      idsAlertWriter.replaceRemoteOperations(fileId, ops);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} SMB/RPC operations failed: {}", fileId, ops.size(), ex.getMessage());
+    }
+    List<com.tracepcap.analysis.entity.KerberosExchangeEntity> krb = new ArrayList<>();
+    for (PcapParserService.ConversationInfo c : conversations) {
+      if (c.getEntityId() == null) continue;
+      for (KerberosRecords.Exchange x : c.getKerberosExchanges()) {
+        krb.add(com.tracepcap.analysis.entity.KerberosExchangeEntity.builder()
+            .fileId(fileId).conversationId(c.getEntityId()).firstTime(x.firstTime())
+            .clientIp(x.client()).kdcIp(x.kdc()).msgType(x.msgType()).account(x.account())
+            .service(x.service()).realm(x.realm()).errorCode(x.errorCode())
+            .encryption(x.encryption()).weak(x.weak()).count(x.count()).build());
+      }
+    }
+    try {
+      idsAlertWriter.replaceKerberosExchanges(fileId, krb);
+    } catch (Exception ex) {
+      log.warn("[{}] Saving {} Kerberos replies failed: {}", fileId, krb.size(), ex.getMessage());
+    }
   }
 
   // ── Stage 7: carve embedded files ───────────────────────────────────────────
@@ -1070,6 +1226,11 @@ public class AnalysisService {
                   .hostname(conv.getHostname())
                   .ja3Client(conv.getJa3Client())
                   .ja3Server(conv.getJa3Server())
+                  .ja4Client(conv.getJa4Client())
+                  .tlsVersion(conv.getTlsVersion())
+                  .connectionOutcome(conv.getConnectionOutcome())
+                  .bytesSrcToDst(conv.getBytesSrcToDst())
+                  .bytesDstToSrc(conv.getBytesDstToSrc())
                   .tlsIssuer(conv.getTlsIssuer())
                   .tlsSubject(conv.getTlsSubject())
                   .tlsNotBefore(conv.getTlsNotBefore())
@@ -1234,14 +1395,17 @@ public class AnalysisService {
    */
   private void applyWindowsSignIn(
       List<HostClassificationEntity> hostClassifications,
-      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
+      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp,
+      Map<String, Map<String, String>> fullNamesByIp) {
     if (windowsIdentityClaimsByIp.isEmpty()) return;
     for (HostClassificationEntity host : hostClassifications) {
       List<WindowsIdentityResolverService.Claim> claims =
           windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of());
-      List<String> kerberos = claims.stream()
-          .filter(c -> WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source()))
-          .map(WindowsIdentityResolverService.Claim::username).distinct().toList();
+      // Kerberos and NTLM sign-ins (#1234) both mean the host signed in as the account.
+      List<WindowsIdentityResolverService.Claim> signIns = claims.stream()
+          .filter(c -> WindowsIdentityResolverService.isSignIn(c.source())).toList();
+      List<String> kerberos = distinctIgnoreCase(
+          signIns.stream().map(WindowsIdentityResolverService.Claim::username).toList());
       List<String> ldap = NO_LDAP_SIGN_IN.contains(host.getDeviceType())
           ? List.<String>of()
           : claims.stream()
@@ -1252,12 +1416,24 @@ public class AnalysisService {
       if (accounts.size() == 1) {
         host.setLoggedInUser(accounts.get(0));
         host.setLoggedInUserSource(!kerberos.isEmpty()
-            ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
+            ? (signIns.stream().anyMatch(c -> WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source()))
+                ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
+                : WindowsIdentityResolverService.SOURCE_NTLM_AUTH)
             : WindowsIdentityResolverService.SOURCE_LDAP_DN);
-        if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
+        // The person's name: what the domain controller said this account's full name is (SAMR),
+        // else the one name an LDAP lookup gave.
+        String samr = fullNamesByIp.getOrDefault(host.getIp(), Map.of())
+            .get(accounts.get(0).toLowerCase(java.util.Locale.ROOT));
+        if (samr != null) host.setLoggedInUserRealName(samr);
+        else if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
       }
     }
   }
 
-
+  /** Accounts once each, ignoring case: Kerberos and NTLM can spell the same account differently. */
+  private static List<String> distinctIgnoreCase(List<String> names) {
+    java.util.Map<String, String> seen = new java.util.LinkedHashMap<>();
+    for (String n : names) seen.putIfAbsent(n.toLowerCase(java.util.Locale.ROOT), n);
+    return List.copyOf(seen.values());
+  }
 }

@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState } from 'react';
 import { Button, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -56,83 +57,84 @@ export const ManagePcapsModal = ({
 
   return (
     <>
-    <Modal show={show} onHide={handleHide} size="lg" centered>
-      <Modal.Header closeButton>
-        <Modal.Title>
-          <i className="bi bi-collection me-2"></i>Manage PCAPs
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <span className="text-muted">
-            {snapshots.length} PCAP{snapshots.length !== 1 ? 's' : ''} in this network
-          </span>
-          <Button size="sm" variant="primary" onClick={onAddSnapshot}>
-            <i className="bi bi-plus-lg me-1"></i>Add PCAP
+    <SideDrawer
+      show={show}
+      onHide={handleHide}
+      title={<><i className="bi bi-collection me-2"></i>Manage PCAPs</>}
+      titleId="manage-pcaps-title"
+      wide
+      footer={
+        <>
+          <Button variant="outline-secondary" onClick={handleHide}>
+            Done
           </Button>
-        </div>
-
-        {snapshots.length === 0 ? (
-          <div className="text-muted text-center py-4">
-            No PCAPs yet. Click "Add PCAP" to get started.
-          </div>
-        ) : (
-          <div className="border rounded overflow-hidden">
-            <ScrollableTable maxHeight="50vh">
-              <table className="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th className="text-muted fw-normal" style={{ whiteSpace: 'nowrap' }}>Captured</th>
-                    <th className="text-muted fw-normal">File</th>
-                    <th className="text-muted fw-normal">Packets</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map(snap => (
-                    <tr key={snap.id}>
-                      <td>
-                        <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
-                      </td>
-                      <td>
-                        <span className="fw-medium text-break">{snap.fileName}</span>
-                      </td>
-                      <td>
-                        <small className="text-muted">
-                          {snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}
-                        </small>
-                      </td>
-                      <td className="text-end">
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => setConfirmTarget(snap)}
-                          disabled={removing !== null}
-                          title="Remove PCAP"
-                          aria-label={`Remove PCAP ${snap.fileName}`}
-                        >
-                          <i className="bi bi-trash"></i>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollableTable>
-          </div>
-        )}
-
-        <p className="text-muted small mt-3 mb-0">
-          <i className="bi bi-info-circle me-1"></i>
-          Removing a PCAP only detaches it from this network — the original file is not deleted.
-        </p>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="outline-secondary" onClick={handleHide}>
-          Done
+        </>
+      }
+    >
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <span className="text-muted">
+          {snapshots.length} PCAP{snapshots.length !== 1 ? 's' : ''} in this network
+        </span>
+        <Button size="sm" variant="primary" onClick={onAddSnapshot}>
+          <i className="bi bi-plus-lg me-1"></i>Add PCAP
         </Button>
-      </Modal.Footer>
-    </Modal>
+      </div>
+
+      {snapshots.length === 0 ? (
+        <div className="text-muted text-center py-4">
+          No PCAPs yet. Click "Add PCAP" to get started.
+        </div>
+      ) : (
+        <div className="border rounded overflow-hidden">
+          <ScrollableTable maxHeight="50vh">
+            <table className="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th className="text-muted fw-normal" style={{ whiteSpace: 'nowrap' }}>Captured</th>
+                  <th className="text-muted fw-normal">File</th>
+                  <th className="text-muted fw-normal">Packets</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map(snap => (
+                  <tr key={snap.id}>
+                    <td>
+                      <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
+                    </td>
+                    <td>
+                      <span className="fw-medium text-break">{snap.fileName}</span>
+                    </td>
+                    <td>
+                      <small className="text-muted">
+                        {snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}
+                      </small>
+                    </td>
+                    <td className="text-end">
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        onClick={() => setConfirmTarget(snap)}
+                        disabled={removing !== null}
+                        title="Remove PCAP"
+                        aria-label={`Remove PCAP ${snap.fileName}`}
+                      >
+                        <i className="bi bi-trash"></i>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollableTable>
+        </div>
+      )}
+
+      <p className="text-muted small mt-3 mb-0">
+        <i className="bi bi-info-circle me-1"></i>
+        Removing a PCAP only detaches it from this network — the original file is not deleted.
+      </p>
+    </SideDrawer>
 
     <Modal show={confirmTarget !== null} onHide={() => removing === null && setConfirmTarget(null)} centered>
       <Modal.Header closeButton>

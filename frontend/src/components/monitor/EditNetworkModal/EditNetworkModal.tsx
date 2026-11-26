@@ -1,6 +1,7 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 
 interface EditNetworkModalProps {
@@ -52,46 +53,17 @@ export const EditNetworkModal = ({
   };
 
   return (
-    <Modal show={show} onHide={handleHide}>
-      <Modal.Header closeButton>
-        <Modal.Title>Edit Network</Modal.Title>
-      </Modal.Header>
-      <form onSubmit={handleSubmit}>
-        <Modal.Body>
-          {error && <Alert variant="danger" className="py-2">{error}</Alert>}
-          <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold" htmlFor="edit-network-name">
-              Name <span className="text-danger">*</span>
-            </Form.Label>
-            <Form.Control
-              id="edit-network-name"
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              maxLength={255}
-              required
-              autoFocus
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold" htmlFor="edit-network-desc">
-              Description
-            </Form.Label>
-            <Form.Control
-              id="edit-network-desc"
-              as="textarea"
-              rows={3}
-              placeholder="Optional description of this network segment"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
+    <SideDrawer
+      show={show}
+      onHide={handleHide}
+      title="Edit Network"
+      titleId="edit-network-title"
+      footer={
+        <>
           <Button variant="secondary" onClick={handleHide} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={saving || !name.trim()}>
+          <Button type="submit" form="edit-network-form" variant="primary" disabled={saving || !name.trim()}>
             {saving ? (
               <>
                 <Spinner animation="border" size="sm" className="me-2" />
@@ -101,8 +73,39 @@ export const EditNetworkModal = ({
               'Save Changes'
             )}
           </Button>
-        </Modal.Footer>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} id="edit-network-form">
+        {error && <Alert variant="danger" className="py-2">{error}</Alert>}
+        <Form.Group className="mb-3">
+          <Form.Label className="fw-semibold" htmlFor="edit-network-name">
+            Name <span className="text-danger">*</span>
+          </Form.Label>
+          <Form.Control
+            id="edit-network-name"
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={255}
+            required
+            autoFocus
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label className="fw-semibold" htmlFor="edit-network-desc">
+            Description
+          </Form.Label>
+          <Form.Control
+            id="edit-network-desc"
+            as="textarea"
+            rows={3}
+            placeholder="Optional description of this network segment"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+          />
+        </Form.Group>
       </form>
-    </Modal>
+    </SideDrawer>
   );
 };

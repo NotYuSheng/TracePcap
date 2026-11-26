@@ -47,6 +47,9 @@ public class ConversationResponse {
 
   private String dstMac;
 
+  /** How the TCP connection went (#1233): ANSWERED, NO_ANSWER, REJECTED; null when unknown. */
+  private String connectionOutcome;
+
   private Integer initiatorPort;
 
   private String protocol;
@@ -56,6 +59,13 @@ public class ConversationResponse {
   private String hostname;
   private String ja3Client;
   private String ja3Server;
+  /** JA4 client fingerprint, from nDPI (#599). */
+  private String ja4Client;
+  /** Negotiated TLS version, from Suricata (#599). */
+  private String tlsVersion;
+
+  /** The server certificate's detail and checks (#1235); null when the certificate wasn't seen. */
+  private TlsCertificateDto tlsCertificate;
   private String tlsIssuer;
   private String tlsSubject;
   private LocalDateTime tlsNotBefore;
@@ -67,6 +77,14 @@ public class ConversationResponse {
   private List<String> detectedFileTypes;
   private Long packetCount;
   private Long totalBytes;
+
+  /**
+   * Bytes sent from {@code srcIp} to {@code dstIp} and back (#1260); null for conversations
+   * analysed before they were measured. Together they make up {@code totalBytes}.
+   */
+  private Long bytesSrcToDst;
+
+  private Long bytesDstToSrc;
   private LocalDateTime startTime;
   private LocalDateTime endTime;
   private Long durationMs;

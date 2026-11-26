@@ -7,6 +7,7 @@ import { kindOf, summarize } from '@/features/me/auditDiff';
 import { parseDateTime } from '@/utils/dateUtils';
 import { ownExpiry } from '@/features/captureKeep/captureKeepService';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { actorWords, uploaderWords } from '@utils/actorWords';
 
 /** How many events the feed shows. */
 const SHOWN = 3;
@@ -30,6 +31,14 @@ export interface ActivityFile {
   keepForever?: boolean;
   /** Its own deletion time (#1139), which replaces the retention window. */
   expiresAt?: string | number[] | null;
+  /** Who uploaded it; null for captures from before uploaders were recorded. */
+  uploadedBy?: string | null;
+}
+
+/** " · by ana", or nothing when the uploader isn't known (or is the shared login-off profile). */
+/** " · by alice", " · uploaded without sign-in" or " · uploader not recorded". */
+function byWhom(f: ActivityFile): string {
+  return ` · ${uploaderWords(f.uploadedBy)}`;
 }
 
 export type Tone = 'done' | 'busy' | 'failed' | 'warn' | 'change';
@@ -86,7 +95,10 @@ export function buildActivity(
         tone: 'done',
         text: f.source === 'MONITOR' ? 'Snapshot analysed:' : 'Analysed',
         link: { label: f.fileName, to },
-        meta: f.packetCount != null ? `${f.packetCount.toLocaleString()} packets` : undefined,
+        meta:
+          f.packetCount != null
+            ? `${f.packetCount.toLocaleString()} packets${byWhom(f)}`
+            : `Uploaded${byWhom(f)}`,
       });
       // Its own expiry if it has one, else the install's retention window from upload.
       const own = ownExpiry(f.expiresAt);
@@ -115,6 +127,7 @@ export function buildActivity(
         tone: 'failed',
         text: 'Analysis failed:',
         link: { label: f.fileName, to },
+        meta: `Uploaded${byWhom(f)}`,
       });
     } else {
       events.push({
@@ -123,6 +136,7 @@ export function buildActivity(
         tone: 'busy',
         text: 'Analysing',
         link: { label: f.fileName, to },
+        meta: `Uploaded${byWhom(f)}`,
       });
     }
   }
@@ -130,7 +144,8 @@ export function buildActivity(
   // session doesn't push every capture out of the feed. At most three such lines.
   const names = new Map(files.map(f => [f.fileId, f.fileName]));
   const groups: AuditLogEntry[][] = [];
-  for (const e of audit) {
+  // An upload already has its own line from the captures above; its audit entry would repeat it.
+  for (const e of audit.filter(x => x.action !== 'file.create')) {
     const last = groups[groups.length - 1]?.[0];
     if (
       last &&
@@ -157,7 +172,7 @@ export function buildActivity(
           label: names.get(latest.targetId) ?? 'a capture',
           to: `/analysis/${latest.targetId}/network-diagram`,
         },
-        meta: `${n === 1 ? summarize(latest) : `${n} changes, latest: ${summarize(latest)}`} · by ${latest.actor}`,
+        meta: `${n === 1 ? summarize(latest, names) : `${n} changes, latest: ${summarize(latest, names)}`} · ${actorWords(latest.actor)}`,
       });
     } else {
       events.push({
@@ -166,9 +181,9 @@ export function buildActivity(
         tone: 'change',
         text:
           n === 1
-            ? summarize(latest)
-            : `${summarize(latest)}, and ${n - 1} more change${n === 2 ? '' : 's'}`,
-        meta: `${kindOf(latest.targetType)} · by ${latest.actor}`,
+            ? summarize(latest, names)
+            : `${summarize(latest, names)}, and ${n - 1} more change${n === 2 ? '' : 's'}`,
+        meta: `${kindOf(latest.targetType)} · ${actorWords(latest.actor)}`,
       });
     }
   }

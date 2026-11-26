@@ -1,0 +1,7 @@
+case_id: pcap-attack-netshareenum
+pcap: Discovery_dcerp_srvsvc_NetShareEnum.pcapng
+source_url: https://github.com/sbousseaden/PCAP-ATTACK/raw/9ef5476dd6b083f565a1b9d2e59e4a3ae8be8c95/Discovery/Discovery_dcerp_srvsvc_NetShareEnum.pcapng
+sha256: 47901d303a065065d190c6eeb6ba29f4ff054c088a6c93d14ed6f21d626bc9ca
+notes: >
+  From PCAP-ATTACK (github.com/sbousseaden/PCAP-ATTACK), a set of lab captures each labelled with the
+  ATT&CK technique it shows. Download into eval/pcaps/pcap-attack/.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { SideDrawer } from '@components/common/SideDrawer';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -77,21 +77,22 @@ export function NetworkAddressConfigModal({
 }: Props) {
   const source = useMemo(() => networkSource(networkId), [networkId]);
   return (
-    <Modal show={show} onHide={onHide} size="lg" centered>
-      <Modal.Header closeButton>
-        <Modal.Title style={{ fontSize: '1rem' }}>
-          Address configuration · {networkName}
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body style={{ fontSize: '0.85rem' }}>
+    <SideDrawer
+      show={show}
+      onHide={onHide}
+      title={<>Address configuration · {networkName}</>}
+      titleId="network-address-title"
+      wide
+    >
+      <div style={{ fontSize: '0.85rem' }}>
         <p className="text-muted small">
           Each list starts from the shared default, which applies to every network. Entries you set
           here apply in this network only, to its existing snapshots too: override a default entry,
           hide it, or add one only this network has.
         </p>
         <AddressTabs source={source} idPrefix="network-address" onChanged={onChanged} />
-      </Modal.Body>
-    </Modal>
+      </div>
+    </SideDrawer>
   );
 }
 

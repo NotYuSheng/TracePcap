@@ -1,6 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import type { Answer, InvestigationReport, Story } from '@/types';
+import type { Answer, InvestigationReport, Story, Considered, CategoryStatus } from '@/types';
 
 /** Goal → the standard-question key the panel already has a label and icon for. */
 export const GOAL_QUESTION: Record<string, string> = {
@@ -18,6 +18,10 @@ export interface InvestigationSummary {
   answers: Answer[];
   /** Goals no technique could close on this capture, e.g. ['C2', 'MALWARE']. */
   unknowns: string[];
+  /** Candidates tested and ruled out (#1294). */
+  considered: Considered[];
+  /** Every category's status on this capture; null from a backend that doesn't report them. */
+  categories: CategoryStatus[] | null;
 }
 
 /** Flattens a report into panel answers: each answered goal, then any non-goal answers. */
@@ -30,14 +34,20 @@ export function investigationToSummary(report: InvestigationReport): Investigati
       grade: g.grade ?? 'INFERRED',
       subjects: g.subjects,
       basis: g.basis,
-      attributes: {},
+      attributes: g.attributes ?? {},
+      derivation: g.derivation ?? [],
     }));
   const answers = [...goalAnswers, ...report.additional];
   // "Not established" is only meaningful once there is an incident to be incomplete about. On a
   // capture whose only answer is, say, a signed-in user, listing victim/malware/C2 as unestablished
   // reads like a failure on a benign capture — there was never a lead to follow.
   const incidentLead = answers.some((a) => INCIDENT_QUESTIONS.has(a.question));
-  return { answers, unknowns: incidentLead ? report.unknowns : [] };
+  return {
+    answers,
+    unknowns: incidentLead ? report.unknowns : [],
+    considered: report.considered ?? [],
+    categories: report.categories ?? null,
+  };
 }
 
 export const storyService = {

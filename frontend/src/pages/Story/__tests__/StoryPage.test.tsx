@@ -18,7 +18,7 @@ vi.mock('@/features/story/services/storyService', () => ({
 vi.mock('@components/story/StoryNarrative', () => ({
   StoryNarrative: () => <div>narrative</div>,
 }));
-vi.mock('@components/story/StoryGoals', () => ({ StoryGoals: () => null }));
+vi.mock('@components/story/StorySummary', () => ({ StorySummary: () => null }));
 vi.mock('@components/story/StoryProgress/StoryProgress', () => ({
   StoryProgress: () => <div>generating</div>,
 }));

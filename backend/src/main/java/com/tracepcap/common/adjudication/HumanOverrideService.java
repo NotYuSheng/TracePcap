@@ -2,6 +2,7 @@ package com.tracepcap.common.adjudication;
 
 import com.tracepcap.common.event.AdjudicationOverriddenEvent;
 import com.tracepcap.config.security.CurrentActor;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,11 @@ public class HumanOverrideService {
   /** The current override for one question about one entity, if a human has set one. */
   public Optional<HumanOverrideEntity> find(String question, UUID fileId, String entityKey) {
     return repository.findByQuestionAndFileIdAndEntityKey(question, fileId, entityKey);
+  }
+
+  /** Every override for one question in this file: one query, for a question asked of many entities. */
+  public List<HumanOverrideEntity> findAll(String question, UUID fileId) {
+    return repository.findByQuestionAndFileId(question, fileId);
   }
 
   /**

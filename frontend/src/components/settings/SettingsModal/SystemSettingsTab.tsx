@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { settingsService, type SystemSetting } from '@/features/settings';
 import { EditSystemSettingModal } from './EditSystemSettingModal';
 import { LlmTestPanel } from './LlmTestPanel';
+import { LlmConnectionDrawer } from './LlmConnectionDrawer';
+import { LLM_CONNECTION_KEYS } from './llmConnection';
 
 const GROUPS: { key: SystemSetting['group']; title: string; blurb: string }[] = [
   {
@@ -107,6 +110,12 @@ export function SystemSettingsTab() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<SystemSetting | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  // The URL, key and model change together, in one form; the rest one at a time.
+  const edit = (s: SystemSetting) =>
+    (LLM_CONNECTION_KEYS as readonly string[]).includes(s.key) ? setConnecting(true) : setEditing(s);
+  const canConnect =
+    settings?.some(s => (LLM_CONNECTION_KEYS as readonly string[]).includes(s.key) && s.editable) ?? false;
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -145,6 +154,7 @@ export function SystemSettingsTab() {
         retention, detection thresholds and the LLM connection can also be changed here, if you
         have permission. Click any setting to see more.
       </p>
+      <SuricataRulesetNote className="mb-3" />
       <Form.Control
         type="search"
         size="sm"
@@ -162,7 +172,13 @@ export function SystemSettingsTab() {
             <h6 className="mb-0">{g.title}</h6>
             <p className="small text-muted mb-1">{g.blurb}</p>
             {g.key === 'LLM' && (
-              <div className="mb-2">
+              <div className="mb-2 d-flex flex-wrap gap-2 align-items-start">
+                {canConnect && (
+                  <Button size="sm" variant="primary" onClick={() => setConnecting(true)}>
+                    <i className="bi bi-hdd-network me-1" aria-hidden="true" />
+                    Change connection…
+                  </Button>
+                )}
                 <LlmTestPanel
                   onPickModel={
                     rows.find(s => s.key === 'LLM_MODEL')?.editable
@@ -178,13 +194,20 @@ export function SystemSettingsTab() {
             )}
             <ul className="list-unstyled mb-0">
               {rows.map(s => (
-                <SettingRow key={s.key} setting={s} onEdit={setEditing} />
+                <SettingRow key={s.key} setting={s} onEdit={edit} />
               ))}
             </ul>
           </section>
         );
       })}
       {filtered.length === 0 && <p className="small text-muted">No settings match "{search}".</p>}
+      {connecting && (
+        <LlmConnectionDrawer
+          settings={settings}
+          onHide={() => setConnecting(false)}
+          onSaved={() => setReload(n => n + 1)}
+        />
+      )}
       <EditSystemSettingModal
         setting={editing}
         onHide={() => setEditing(null)}

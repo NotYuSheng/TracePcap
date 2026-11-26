@@ -1,4 +1,5 @@
-import { Button, Modal } from '@govtechsg/sgds-react';
+import { SideDrawer } from '@components/common/SideDrawer';
+import { Button } from '@govtechsg/sgds-react';
 import { useNavigate } from 'react-router-dom';
 import type { AbsentEntity } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
@@ -25,43 +26,45 @@ export const LastSeenModal = ({ show, onHide, entity }: LastSeenModalProps) => {
     : 'Unknown';
 
   return (
-    <Modal show={show} onHide={onHide}>
-      <Modal.Header closeButton>
-        <Modal.Title>Last Seen: {entity.key}</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted mb-3">
-          This {entityTypeLabel} was last observed in a previous capture.
-        </p>
-        <div className="d-flex flex-column gap-2">
-          <div>
-            <small className="text-muted d-block">File</small>
-            <span className="fw-semibold">{entity.lastSeenFileName}</span>
-          </div>
-          <div>
-            <small className="text-muted d-block">Capture started</small>
-            <span>{formattedDate}</span>
-          </div>
-        </div>
-      </Modal.Body>
-      <Modal.Footer>
-        {entity.lastSeenFileId && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-primary"
-            onClick={() => {
-              onHide();
-              navigate(`/analysis/${entity.lastSeenFileId}`);
-            }}
-          >
-            <i className="bi bi-box-arrow-up-right me-1"></i>Open in Analysis
+    <SideDrawer
+      show={show}
+      onHide={onHide}
+      title={<>Last Seen: {entity.key}</>}
+      titleId="last-seen-title"
+      footer={
+        <>
+          {entity.lastSeenFileId && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-primary"
+              onClick={() => {
+                onHide();
+                navigate(`/analysis/${entity.lastSeenFileId}`);
+              }}
+            >
+              <i className="bi bi-box-arrow-up-right me-1"></i>Open in Analysis
+            </Button>
+          )}
+          <Button type="button" size="sm" variant="secondary" onClick={onHide}>
+            Close
           </Button>
-        )}
-        <Button type="button" size="sm" variant="secondary" onClick={onHide}>
-          Close
-        </Button>
-      </Modal.Footer>
-    </Modal>
+        </>
+      }
+    >
+      <p className="text-muted mb-3">
+        This {entityTypeLabel} was last observed in a previous capture.
+      </p>
+      <div className="d-flex flex-column gap-2">
+        <div>
+          <small className="text-muted d-block">File</small>
+          <span className="fw-semibold">{entity.lastSeenFileName}</span>
+        </div>
+        <div>
+          <small className="text-muted d-block">Capture started</small>
+          <span>{formattedDate}</span>
+        </div>
+      </div>
+    </SideDrawer>
   );
 };

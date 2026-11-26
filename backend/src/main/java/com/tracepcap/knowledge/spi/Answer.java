@@ -17,7 +17,8 @@ public record Answer(
     Grade grade,
     List<EntityRef> subjects,
     List<String> basis,
-    Map<String, Object> attributes) {
+    Map<String, Object> attributes,
+    List<Step> derivation) {
 
   public Answer {
     if (question == null || question.isBlank()) {
@@ -28,5 +29,18 @@ public record Answer(
     subjects = subjects == null ? List.of() : List.copyOf(subjects);
     basis = basis == null ? List.of() : List.copyOf(basis);
     attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
+    derivation = derivation == null ? List.of() : List.copyOf(derivation);
+  }
+
+  /** An answer without its steps written out. */
+  public Answer(
+      String question, String headline, Grade grade, List<EntityRef> subjects, List<String> basis,
+      Map<String, Object> attributes) {
+    this(question, headline, grade, subjects, basis, attributes, List.of());
+  }
+
+  /** The same answer with how it was reached (#1293). */
+  public Answer withDerivation(List<Step> steps) {
+    return new Answer(question, headline, grade, subjects, basis, attributes, steps);
   }
 }

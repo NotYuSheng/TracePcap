@@ -35,7 +35,7 @@ export interface paths {
          * One job's progress or result
          * @description WAITING with its place in line, RUNNING, then DONE with the result or FAILED with why.
          */
-        get: operations["get_4"];
+        get: operations["get_5"];
         put?: never;
         post?: never;
         delete?: never;
@@ -714,7 +714,7 @@ export interface paths {
             cookie?: never;
         };
         /** How many captures are out of date with the enabled rules */
-        get: operations["status"];
+        get: operations["status_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -731,7 +731,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get one detection rule */
-        get: operations["get_3"];
+        get: operations["get_4"];
         /** Replace a detection rule (audited; bumps its version if anything changed) */
         put: operations["update"];
         post?: never;
@@ -927,7 +927,7 @@ export interface paths {
             cookie?: never;
         };
         /** The human override for a question about an entity, if one is set */
-        get: operations["get_2"];
+        get: operations["get_3"];
         /** Set or replace the human override; re-runs adjudication (actor from token) */
         put: operations["put_1"];
         post?: never;
@@ -947,6 +947,26 @@ export interface paths {
         };
         /** Deterministic answers to the standard investigation questions for a file */
         get: operations["getAnswers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/capture-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How complete a capture is
+         * @description Connections already open when the capture began, gaps in TCP streams, undecodable packets, and sessions Suricata stopped inspecting, as plain-language notes. Suricata's counters are null for captures it didn't run on (or analysed before they were kept).
+         */
+        get: operations["get_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1308,7 +1328,7 @@ export interface paths {
         };
         /**
          * Autonomous investigation report for a file
-         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).
+         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look; where the capture was taken; and which hosts read as honeypots.
          */
         get: operations["getInvestigation"];
         put?: never;
@@ -1623,6 +1643,26 @@ export interface paths {
          * @description Uses AI to convert a natural language query into a BPF filter expression
          */
         post: operations["generateFilter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/investigation-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every investigation category, with the questions that answer it
+         * @description Context, entities, then the 14 ATT&CK tactics, in that order. A category no question covers yet is listed with none. Each carries how much of it a capture can show and the traffic its questions read.
+         */
+        get: operations["listInvestigationCategories"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2463,6 +2503,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/protocol-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every nDPI application name in your captures, with how many captures and conversations
+         * @description Counts original captures only; a re-analysis is a copy of one.
+         */
+        get: operations["usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/protocol-usage/{appName}/captures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The captures an nDPI application name appears in, most conversations first */
+        get: operations["captures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -2816,6 +2893,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List the LLM server's models
+         * @description The models the server at the given URL offers, with each one's context length when the server says, for picking one before saving. Blank fields use the current settings; a POST because the key travels in the body. Other values than the current ones require the permission to edit the LLM connection.
+         */
+        post: operations["models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/llm/test": {
         parameters: {
             query?: never;
@@ -2853,7 +2950,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Override several editable settings together, all or none
+         * @description For settings that only work as a set, such as the LLM's URL, key and model: if one is refused, none is changed. Each needs its own permission and is audited on its own.
+         */
+        patch: operations["setAll"];
         trace?: never;
     };
     "/api/v1/system/settings/{key}": {
@@ -2872,6 +2973,26 @@ export interface paths {
         post?: never;
         /** Remove an override, so the deployment's value applies again (audited) */
         delete: operations["reset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/suricata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which Suricata ruleset is in use, and how old it is
+         * @description source is built-in (baked into the image) or imported (from the import folder). stale is true once the ruleset is older than SURICATA_RULESET_STALE_DAYS. importError says why the last imported bundle wasn't used.
+         */
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3138,6 +3259,7 @@ export interface components {
                 [key: string]: Record<string, never>;
             };
             basis?: string[];
+            derivation?: components["schemas"]["StepResponse"][];
             grade?: string;
             headline?: string;
             question?: string;
@@ -3192,6 +3314,11 @@ export interface components {
             protocol?: string;
             srcIp?: string;
         };
+        CaptureContextResponse: {
+            completeness?: components["schemas"]["CompletenessResponse"];
+            timeSpan?: components["schemas"]["TimeSpanResponse"];
+            vantage?: components["schemas"]["VantageResponse"];
+        };
         CaptureMark: {
             baseline?: boolean;
             /** Format: date-time */
@@ -3201,10 +3328,43 @@ export interface components {
             /** Format: uuid */
             snapshotId?: string;
         };
+        CaptureQualityResponse: {
+            /** Format: int64 */
+            invalidPackets?: number;
+            /** Format: int64 */
+            memcapDrops?: number;
+            notes?: components["schemas"]["Note"][];
+            /** Format: int64 */
+            packets?: number;
+            /** Format: int64 */
+            reassemblyGaps?: number;
+            /** Format: int64 */
+            streamDepthReached?: number;
+            /** Format: int64 */
+            tcpConversations?: number;
+            /** Format: int64 */
+            tcpSessions?: number;
+            /** Format: int64 */
+            tcpWithoutHandshake?: number;
+            verdict?: string;
+        };
         CaseKnowledgeResponse: {
             entities?: components["schemas"]["EntityDto"][];
             findings?: components["schemas"]["FindingDto"][];
             relationships?: components["schemas"]["RelationshipDto"][];
+        };
+        CategoryEvidenceResponse: {
+            apps?: string[];
+            byL7?: boolean;
+            l7?: string[];
+            label?: string;
+            question?: string;
+            shows?: string;
+        };
+        CategoryLeadResponse: {
+            label?: string;
+            query?: string;
+            shows?: string;
         };
         CategoryStat: {
             /** Format: int64 */
@@ -3214,6 +3374,16 @@ export interface components {
             count?: number;
             /** Format: double */
             percentage?: number;
+        };
+        CategoryStatusResponse: {
+            attackId?: string;
+            axis?: string;
+            key?: string;
+            label?: string;
+            leads?: components["schemas"]["CategoryLeadResponse"][];
+            reason?: string;
+            status?: string;
+            unchecked?: boolean;
         };
         ChangeEventDto: {
             changeType?: string;
@@ -3350,6 +3520,11 @@ export interface components {
             hierarchicalImage?: string;
             nodeLimitNote?: string;
         };
+        CompletenessResponse: {
+            label?: string;
+            level?: string;
+            notes?: components["schemas"]["QualityNoteResponse"][];
+        };
         CompositionHistoryEntry: {
             deviceTypes?: string[];
             /** Format: uuid */
@@ -3363,9 +3538,31 @@ export interface components {
             /** Format: int32 */
             snapshotOrder?: number;
         };
+        ConnectionOutcomes: {
+            /** Format: int64 */
+            answered?: number;
+            /** Format: int64 */
+            noAnswer?: number;
+            /** Format: int64 */
+            rejected?: number;
+            topFailedTargets?: components["schemas"]["FailedTarget"][];
+        };
+        ConsideredResponse: {
+            candidate?: string;
+            conversations?: string[];
+            question?: string;
+            reason?: string;
+            rule?: string;
+        };
         ConversationDetailResponse: {
+            anomalies?: components["schemas"]["ProtocolAnomaly"][];
             appName?: string;
+            /** Format: int64 */
+            bytesDstToSrc?: number;
+            /** Format: int64 */
+            bytesSrcToDst?: number;
             category?: string;
+            connectionOutcome?: string;
             /** Format: uuid */
             conversationId?: string;
             customSignatures?: string[];
@@ -3381,11 +3578,15 @@ export interface components {
             flowRisks?: string[];
             hostname?: string;
             httpUserAgents?: string[];
+            /** Format: int32 */
+            idsAlertCount?: number;
+            idsAlerts?: components["schemas"]["IdsAlert"][];
             initiatorIp?: string;
             /** Format: int32 */
             initiatorPort?: number;
             ja3Client?: string;
             ja3Server?: string;
+            ja4Client?: string;
             /** Format: int64 */
             packetCount?: number;
             packets?: components["schemas"]["PacketResponse"][];
@@ -3398,12 +3599,14 @@ export interface components {
             /** Format: date-time */
             startTime?: string;
             suricataAlerts?: string[];
+            tlsCertificate?: components["schemas"]["TlsCertificateDto"];
             tlsIssuer?: string;
             /** Format: date-time */
             tlsNotAfter?: string;
             /** Format: date-time */
             tlsNotBefore?: string;
             tlsSubject?: string;
+            tlsVersion?: string;
             /** Format: int64 */
             totalBytes?: number;
             tsharkProtocol?: string;
@@ -3452,6 +3655,9 @@ export interface components {
             l7Protocols?: {
                 [key: string]: number;
             };
+            outcomes?: {
+                [key: string]: number;
+            };
             protocols?: {
                 [key: string]: number;
             };
@@ -3464,7 +3670,12 @@ export interface components {
         };
         ConversationResponse: {
             appName?: string;
+            /** Format: int64 */
+            bytesDstToSrc?: number;
+            /** Format: int64 */
+            bytesSrcToDst?: number;
             category?: string;
+            connectionOutcome?: string;
             /** Format: uuid */
             conversationId?: string;
             customSignatures?: string[];
@@ -3487,6 +3698,7 @@ export interface components {
             initiatorPort?: number;
             ja3Client?: string;
             ja3Server?: string;
+            ja4Client?: string;
             /** Format: int64 */
             packetCount?: number;
             protocol?: string;
@@ -3499,12 +3711,14 @@ export interface components {
             /** Format: date-time */
             startTime?: string;
             suricataAlerts?: string[];
+            tlsCertificate?: components["schemas"]["TlsCertificateDto"];
             tlsIssuer?: string;
             /** Format: date-time */
             tlsNotAfter?: string;
             /** Format: date-time */
             tlsNotBefore?: string;
             tlsSubject?: string;
+            tlsVersion?: string;
             /** Format: int64 */
             totalBytes?: number;
             tsharkProtocol?: string;
@@ -3793,6 +4007,7 @@ export interface components {
             mimeType?: string;
             sha256?: string;
             skippedReason?: string;
+            sourceUrl?: string;
         };
         ExtractionWarningsResponse: {
             /** Format: int32 */
@@ -3806,6 +4021,16 @@ export interface components {
             /** Format: int32 */
             maxStreamConversations?: number;
             sizeLimitFiles?: components["schemas"]["SkippedFile"][];
+        };
+        FailedTarget: {
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            /** Format: int64 */
+            noAnswer?: number;
+            /** Format: int64 */
+            rejected?: number;
+            srcIp?: string;
         };
         FileMetadataDto: {
             derivedFrom?: string;
@@ -3935,9 +4160,13 @@ export interface components {
         };
         GoalOutcomeDto: {
             answered?: boolean;
+            attributes?: {
+                [key: string]: Record<string, never>;
+            };
             basis?: string[];
             /** Format: int32 */
             confidence?: number;
+            derivation?: components["schemas"]["StepResponse"][];
             goal?: string;
             grade?: string;
             headline?: string;
@@ -3956,6 +4185,39 @@ export interface components {
             role?: string;
             text?: string;
         };
+        HoneypotHostResponse: {
+            basis?: string;
+            candidates?: components["schemas"]["VantageCandidateResponse"][];
+            /** Format: int32 */
+            confidence?: number;
+            contested?: boolean;
+            described?: string;
+            honeypot?: string;
+            host?: string;
+            label?: string;
+            overriddenBy?: string;
+            reason?: string;
+            signals?: components["schemas"]["HoneypotSignalResponse"][];
+        };
+        HoneypotSignalResponse: {
+            honeypot?: string;
+            id?: string;
+            /** Format: int32 */
+            points?: number;
+            source?: string;
+            strength?: string;
+            text?: string;
+        };
+        HoneypotsResponse: {
+            hosts?: components["schemas"]["HoneypotHostResponse"][];
+            options?: string[];
+            question?: string;
+            /** Format: int32 */
+            serversChecked?: number;
+            signaturesVersion?: string;
+            /** Format: int32 */
+            singleSignal?: number;
+        };
         HostClassificationResponse: {
             addressKind?: string;
             /** Format: int32 */
@@ -3968,6 +4230,7 @@ export interface components {
             loggedInUser?: string;
             /** Format: int32 */
             loggedInUserCount?: number;
+            loggedInUserRealName?: string;
             loggedInUserSource?: string;
             mac?: string;
             manufacturer?: string;
@@ -4099,6 +4362,44 @@ export interface components {
             id?: string;
             queryRef?: string;
         };
+        IdsAlert: {
+            attackTarget?: string;
+            category?: string;
+            confidence?: string;
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            httpHost?: string;
+            httpMethod?: string;
+            /** Format: int32 */
+            httpStatus?: number;
+            httpUrl?: string;
+            httpUserAgent?: string;
+            /** Format: int32 */
+            rev?: number;
+            /** Format: int32 */
+            severity?: number;
+            /** Format: int64 */
+            sid?: number;
+            signature?: string;
+            signatureSeverity?: string;
+            srcIp?: string;
+            /** Format: int32 */
+            srcPort?: number;
+            /** Format: date-time */
+            time?: string;
+        };
+        InvestigationCategoryResponse: {
+            attackId?: string;
+            axis?: string;
+            evidence?: components["schemas"]["CategoryEvidenceResponse"][];
+            key?: string;
+            label?: string;
+            questions?: string[];
+            readsAnyTraffic?: boolean;
+            unseenReason?: string;
+            visibility?: string;
+        };
         InvestigationQuery: {
             appName?: string;
             category?: string;
@@ -4121,8 +4422,12 @@ export interface components {
         };
         InvestigationReportResponse: {
             additional?: components["schemas"]["AnswerResponse"][];
+            categories?: components["schemas"]["CategoryStatusResponse"][];
+            considered?: components["schemas"]["ConsideredResponse"][];
+            context?: components["schemas"]["CaptureContextResponse"];
             coverage?: string[];
             goals?: components["schemas"]["GoalOutcomeDto"][];
+            honeypots?: components["schemas"]["HoneypotsResponse"];
             unknowns?: string[];
         };
         InvestigationStep: {
@@ -4204,6 +4509,17 @@ export interface components {
         MergeFilesRequest: {
             fileIds: string[];
             mergedFileName?: string;
+        };
+        ModelList: {
+            baseUrl?: string;
+            detail?: string;
+            models?: components["schemas"]["ModelOption"][];
+            ok?: boolean;
+        };
+        ModelOption: {
+            /** Format: int32 */
+            contextLength?: number;
+            id?: string;
         };
         NarrativeSection: {
             content?: string;
@@ -4395,6 +4711,11 @@ export interface components {
             staleSince?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        Note: {
+            kind?: string;
+            level?: string;
+            text?: string;
         };
         Occupancy: {
             automatic?: boolean;
@@ -4603,6 +4924,22 @@ export interface components {
             name?: string;
             version?: string;
         };
+        ProtocolAnomaly: {
+            appProto?: string;
+            event?: string;
+            layer?: string;
+            srcIp?: string;
+            /** Format: date-time */
+            time?: string;
+            type?: string;
+        };
+        ProtocolCaptureDto: {
+            /** Format: int64 */
+            conversations?: number;
+            /** Format: uuid */
+            fileId?: string;
+            fileName?: string;
+        };
         ProtocolRiskEntry: {
             /** Format: int64 */
             atRisk?: number;
@@ -4625,6 +4962,18 @@ export interface components {
             protocols?: {
                 [key: string]: components["schemas"]["ProtocolStat"];
             };
+        };
+        ProtocolUsageDto: {
+            appName?: string;
+            /** Format: int64 */
+            captures?: number;
+            /** Format: int64 */
+            conversations?: number;
+        };
+        QualityNoteResponse: {
+            kind?: string;
+            level?: string;
+            text?: string;
         };
         ReanalyseRequest: {
             enableFileExtraction?: boolean;
@@ -4833,6 +5182,11 @@ export interface components {
         SetValueRequest: {
             value: string;
         };
+        SetValuesRequest: {
+            values: {
+                [key: string]: string;
+            };
+        };
         SkippedFile: {
             /** Format: uuid */
             conversationId?: string;
@@ -4867,8 +5221,15 @@ export interface components {
             /** Format: int32 */
             stepIndex?: number;
         };
+        StepResponse: {
+            conversations?: string[];
+            found?: string;
+            grade?: string;
+            rule?: string;
+        };
         StoryAggregates: {
             beaconCandidates?: components["schemas"]["BeaconCandidate"][];
+            connectionOutcomes?: components["schemas"]["ConnectionOutcomes"];
             coverage?: components["schemas"]["Coverage"];
             protocolRiskMatrix?: components["schemas"]["ProtocolRiskEntry"][];
             tlsAnomalySummary?: components["schemas"]["TlsAnomalySummary"];
@@ -4990,6 +5351,25 @@ export interface components {
             key?: string;
             kind?: string;
         };
+        SuricataStatusDto: {
+            /** Format: int64 */
+            ageDays?: number;
+            engineVersion?: string;
+            /** Format: int32 */
+            failedRuleCount?: number;
+            importDir?: string;
+            importError?: string;
+            /** Format: int32 */
+            loadedRuleCount?: number;
+            /** Format: int32 */
+            ruleCount?: number;
+            /** Format: date */
+            rulesetDate?: string;
+            source?: string;
+            stale?: boolean;
+            /** Format: int32 */
+            staleAfterDays?: number;
+        };
         SystemSettingDto: {
             choices?: string[];
             defaultValue?: string;
@@ -5008,6 +5388,15 @@ export interface components {
             type?: string;
             value?: string;
         };
+        TimeSpanResponse: {
+            /** Format: int64 */
+            durationMs?: number;
+            /** Format: date-time */
+            end?: string;
+            label?: string;
+            /** Format: date-time */
+            start?: string;
+        };
         TimelineDataDto: {
             /** Format: int64 */
             bytes?: number;
@@ -5023,11 +5412,30 @@ export interface components {
             /** Format: int64 */
             expired?: number;
             /** Format: int64 */
+            nameMismatch?: number;
+            /** Format: int64 */
             selfSigned?: number;
             /** Format: int64 */
             total?: number;
             /** Format: int64 */
             unknownCa?: number;
+            /** Format: int64 */
+            weakKey?: number;
+            /** Format: int64 */
+            weakSignature?: number;
+        };
+        TlsCertificateDto: {
+            /** Format: int32 */
+            chainLength?: number;
+            coversServerName?: boolean;
+            /** Format: int32 */
+            keyBits?: number;
+            keyType?: string;
+            sans?: string[];
+            selfSigned?: boolean;
+            signatureAlgorithm?: string;
+            weakKey?: boolean;
+            weakSignature?: boolean;
         };
         TlsInfo: {
             issuer?: string;
@@ -5160,6 +5568,27 @@ export interface components {
             name: string;
             parentId: string;
         };
+        VantageCandidateResponse: {
+            label?: string;
+            reasons?: string[];
+            /** Format: int32 */
+            score?: number;
+        };
+        VantageResponse: {
+            basis?: string;
+            candidates?: components["schemas"]["VantageCandidateResponse"][];
+            /** Format: int32 */
+            confidence?: number;
+            contested?: boolean;
+            entityKey?: string;
+            host?: string;
+            key?: string;
+            label?: string;
+            options?: string[];
+            overriddenBy?: string;
+            question?: string;
+            reason?: string;
+        };
         WebServerDetailResponse: {
             api?: boolean;
             /** Format: int64 */
@@ -5228,7 +5657,7 @@ export interface operations {
             };
         };
     };
-    get_4: {
+    get_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -5687,6 +6116,8 @@ export interface operations {
                 srcIp?: string;
                 /** @description Exact destination address (see srcIp) */
                 dstIp?: string;
+                /** @description Comma-separated connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN (not TCP, or the capture joined after the SYN) */
+                outcomes?: string;
                 /** @description View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter */
                 networkId?: string;
             };
@@ -5870,6 +6301,7 @@ export interface operations {
                 countries?: string;
                 srcIp?: string;
                 dstIp?: string;
+                outcomes?: string;
             };
             header?: never;
             path: {
@@ -5910,6 +6342,7 @@ export interface operations {
                 countries?: string;
                 srcIp?: string;
                 dstIp?: string;
+                outcomes?: string;
             };
             header?: never;
             path: {
@@ -6216,7 +6649,7 @@ export interface operations {
             };
         };
     };
-    status: {
+    status_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6236,7 +6669,7 @@ export interface operations {
             };
         };
     };
-    get_3: {
+    get_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -6685,7 +7118,7 @@ export interface operations {
             };
         };
     };
-    get_2: {
+    get_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -6786,6 +7219,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnswerResponse"][];
+                };
+            };
+        };
+    };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CaptureQualityResponse"];
                 };
             };
         };
@@ -7702,6 +8157,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["FilterGenerationResponse"];
+                };
+            };
+        };
+    };
+    listInvestigationCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvestigationCategoryResponse"][];
                 };
             };
         };
@@ -9237,6 +9712,50 @@ export interface operations {
             };
         };
     };
+    usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProtocolUsageDto"][];
+                };
+            };
+        };
+    };
+    captures: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                appName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProtocolCaptureDto"][];
+                };
+            };
+        };
+    };
     list_2: {
         parameters: {
             query?: never;
@@ -9772,6 +10291,30 @@ export interface operations {
             };
         };
     };
+    models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LlmTestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ModelList"];
+                };
+            };
+        };
+    };
     test: {
         parameters: {
             query?: never;
@@ -9804,6 +10347,30 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"][];
+                };
+            };
+        };
+    };
+    setAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetValuesRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -9859,6 +10426,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SuricataStatusDto"];
+                };
             };
         };
     };

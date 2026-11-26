@@ -29,7 +29,7 @@ class StoryAggregatesBeaconTest {
 
   private static final UUID FILE = UUID.randomUUID();
   private static final LocalDateTime T0 = LocalDateTime.of(2024, 7, 30, 10, 41, 10);
-  private static final TlsFacts NO_TLS = new TlsFacts(null, null, null, null, null, null, null);
+  private static final TlsFacts NO_TLS = new TlsFacts(null, null, null, null, null, null, null, null, null);
 
   private static ConversationFacts flow(
       String client, int clientPort, String server, int serverPort, String proto, String app,

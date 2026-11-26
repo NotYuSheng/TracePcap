@@ -33,12 +33,14 @@ export interface NodeData {
   /** True when this node is identified by a MAC address (pure L2 device with no IP). */
   isL2?: boolean;
   hostname?: string;
-  /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
+  /** How `hostname` was discovered: reverse_dns | mdns | nbns | ntlm | dhcp | manual. */
   hostnameSource?: string;
   /** Windows sign-in username observed from this host (Kerberos AS-REQ / LDAP); person-level (#809). */
   loggedInUser?: string;
-  /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
+  /** How `loggedInUser` was discovered: kerberos_as_req or ntlm_auth (signed in) | ldap_dn (weaker). */
   loggedInUserSource?: string;
+  /** The person behind `loggedInUser` ("Gabriel McDowell"), from a SAMR reply or an LDAP person DN. */
+  loggedInUserRealName?: string;
   /**
    * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
    * 1. With more, show "N accounts" and the host's login timeline rather than picking one.

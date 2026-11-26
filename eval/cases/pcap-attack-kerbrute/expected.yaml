@@ -1,0 +1,10 @@
+# Ground truth from the dataset's own label (its file name and folder), NOT from TracePcap's output.
+case_id: pcap-attack-kerbrute
+title: "kerbrute password spray over Kerberos AS-REQ"
+source: https://github.com/sbousseaden/PCAP-ATTACK
+# The label says password spraying over Kerberos AS-REQ; the capture has two hosts, 172.16.66.1
+# asking the domain controller 172.16.66.36.
+kerberos_attack:
+  - technique: password-guessing
+    client: 172.16.66.1
+    kdc: 172.16.66.36

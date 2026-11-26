@@ -10,12 +10,20 @@ import java.util.UUID;
  * makes "what we still don't know" a first-class, honest part of the answer, not an omission.
  */
 public record InvestigationReport(
-    UUID fileId, List<GoalOutcome> outcomes, List<Answer> additional, List<String> coverage) {
+    UUID fileId, List<GoalOutcome> outcomes, List<Answer> additional, List<String> coverage,
+    // Candidates the checks tested and ruled out, with why (#1294).
+    List<Considered> considered) {
 
   public InvestigationReport {
     outcomes = outcomes == null ? List.of() : List.copyOf(outcomes);
     additional = additional == null ? List.of() : List.copyOf(additional);
     coverage = coverage == null ? List.of() : List.copyOf(coverage);
+    considered = considered == null ? List.of() : List.copyOf(considered);
+  }
+
+  public InvestigationReport(
+      UUID fileId, List<GoalOutcome> outcomes, List<Answer> additional, List<String> coverage) {
+    this(fileId, outcomes, additional, coverage, List.of());
   }
 
   /**
@@ -30,11 +38,30 @@ public record InvestigationReport(
       Grade grade,
       int confidence,
       List<String> basis,
-      List<EntityRef> subjects) {
+      List<EntityRef> subjects,
+      // The answer's structured detail (a C2's address and how it was concluded, say), so a goal
+      // renders like any other answer instead of losing it (#1264).
+      java.util.Map<String, Object> attributes,
+      // How the answer was reached (#1293), so the goal shows it like any other answer.
+      List<Step> derivation) {
 
     public GoalOutcome {
       basis = basis == null ? List.of() : List.copyOf(basis);
       subjects = subjects == null ? List.of() : List.copyOf(subjects);
+      attributes = attributes == null ? java.util.Map.of() : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(attributes));
+      derivation = derivation == null ? List.of() : List.copyOf(derivation);
+    }
+
+    public GoalOutcome(
+        Goal goal, boolean answered, String headline, Grade grade, int confidence, List<String> basis,
+        List<EntityRef> subjects, java.util.Map<String, Object> attributes) {
+      this(goal, answered, headline, grade, confidence, basis, subjects, attributes, List.of());
+    }
+
+    public GoalOutcome(
+        Goal goal, boolean answered, String headline, Grade grade, int confidence, List<String> basis,
+        List<EntityRef> subjects) {
+      this(goal, answered, headline, grade, confidence, basis, subjects, java.util.Map.of());
     }
   }
 

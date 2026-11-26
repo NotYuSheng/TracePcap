@@ -12,14 +12,18 @@ function when(dt: WindowsLogon['firstSeen']): string | null {
   return ms ? new Date(ms).toLocaleString() : null;
 }
 
-/** "Signed in" for a Kerberos login, "Looked up" for an LDAP lookup: the wording never overclaims. */
+/** "Signed in" for a Kerberos or NTLM login, "Looked up" for an LDAP lookup: the wording never overclaims. */
 function evidenceWords(l: WindowsLogon): string {
-  return l.evidence === 'kerberos_as_req' ? 'Signed in (Kerberos login)' : 'Looked up (LDAP directory)';
+  if (l.evidence === 'kerberos_as_req') return 'Signed in (Kerberos login)';
+  if (l.evidence === 'ntlm_auth') return 'Signed in (NTLM login)';
+  if (l.evidence === 'samr_user_info')
+    return `Named by the domain controller (account ${l.directoryEntry ?? 'unknown'})`;
+  return 'Looked up (LDAP directory)';
 }
 
 /** Where the account lives, in words an analyst can act on without reading CN=/OU= syntax. */
 function folderWords(l: WindowsLogon): string | null {
-  if (!l.folder) return null;
+  if (!l.folder) return l.domain ? `Domain ${l.domain}.` : null;
   const domain = l.domain ? `, domain ${l.domain}` : '';
   return l.folderKind === 'USERS'
     ? `Windows' default Users folder${domain}. Normally people.`

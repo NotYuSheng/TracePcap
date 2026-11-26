@@ -7,7 +7,7 @@ import { HttpResponse, http } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import { server } from '@/test/msw'
-import { storyService } from '../storyService'
+import { investigationToSummary, storyService } from '../storyService'
 
 const FILE_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -100,5 +100,28 @@ describe('storyService', () => {
 
     await expect(storyService.getStory('s1')).resolves.toMatchObject({ id: 's1' })
     expect(path).toBe('/api/v1/stories/s1')
+  })
+})
+
+describe('investigationToSummary', () => {
+  it('keeps a goal answer\'s attributes, so its chip and conversations link render (#1264)', () => {
+    const { answers } = investigationToSummary({
+      goals: [
+        {
+          goal: 'C2',
+          answered: true,
+          headline: '93.152.209.36 — C2 for NetSupport RAT',
+          grade: 'INFERRED',
+          confidence: 55,
+          basis: [],
+          subjects: [],
+          attributes: { address: '93.152.209.36', conclusion: 'install-chain' },
+        },
+      ],
+      additional: [],
+      unknowns: [],
+      coverage: [],
+    })
+    expect(answers[0].attributes).toEqual({ address: '93.152.209.36', conclusion: 'install-chain' })
   })
 })

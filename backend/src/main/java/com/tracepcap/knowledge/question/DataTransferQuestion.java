@@ -8,6 +8,7 @@ import com.tracepcap.knowledge.spi.EntityType;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -60,12 +61,22 @@ public class DataTransferQuestion implements StandardQuestion {
   }
 
   @Override
+  public Set<Category> categories() {
+    return Set.of(Category.EXFILTRATION);
+  }
+
+  @Override
   public List<Answer> answer(CaseKnowledge board) {
     List<Answer> answers = new ArrayList<>();
     for (Relationship r : board.relationshipsWithPredicate("communicates-with")) {
       Object bytesObj = r.attributes().get("bytes");
       if (!(bytesObj instanceof Number)) continue; // only the traffic edges carry a byte count
-      long bytes = ((Number) bytesObj).longValue();
+      long total = ((Number) bytesObj).longValue();
+      // What the host sent, when known: a large download is not exfiltration (a 6 MB file the
+      // host received used to read "sent 6 MB"). Older captures only have the total.
+      Object sentObj = r.attributes().get(com.tracepcap.knowledge.contributor.TrafficContributor.SENT_BYTES);
+      boolean directional = sentObj instanceof Number;
+      long bytes = directional ? ((Number) sentObj).longValue() : total;
       if (bytes < BULK_THRESHOLD_BYTES) continue;
       if (r.from().type() != EntityType.HOST || r.to().type() != EntityType.EXTERNAL_SERVICE) continue;
 
@@ -87,9 +98,9 @@ public class DataTransferQuestion implements StandardQuestion {
           new Answer(
               QUESTION,
               r.from().key()
-                  + " sent "
+                  + (directional ? " sent " : " exchanged ")
                   + megabytes(bytes)
-                  + " to "
+                  + (directional ? " to " : " with ")
                   + r.to().key()
                   + " ("
                   + where
@@ -97,7 +108,14 @@ public class DataTransferQuestion implements StandardQuestion {
               Grade.INFERRED,
               List.of(r.from(), r.to()),
               List.of(megabytes(bytes) + " transferred; external org: " + (org != null ? org : "unknown")),
-              attrs));
+              attrs).withDerivation(List.of(
+                  com.tracepcap.knowledge.spi.Step.of(r.from().key() + (directional ? " sent " : " exchanged ")
+                      + megabytes(bytes) + (directional ? " to " : " with ") + r.to().key()
+                      + ", counted from the capture's own byte totals.", null, Grade.MEASURED),
+                  com.tracepcap.knowledge.spi.Step.of(r.to().key() + (org != null
+                      ? " belongs to " + where + " (GeoIP), which isn't a known CDN or cloud provider."
+                      : " has no network named in the GeoIP database, so nothing marks it as a CDN or cloud provider."),
+                      Derivations.RULE_TRANSFER, Grade.INFERRED))));
     }
     return answers;
   }

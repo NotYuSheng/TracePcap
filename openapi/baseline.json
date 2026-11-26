@@ -287,6 +287,12 @@
             },
             "type": "array"
           },
+          "derivation": {
+            "items": {
+              "$ref": "#/components/schemas/StepResponse"
+            },
+            "type": "array"
+          },
           "grade": {
             "type": "string"
           },
@@ -424,6 +430,20 @@
         },
         "type": "object"
       },
+      "CaptureContextResponse": {
+        "properties": {
+          "completeness": {
+            "$ref": "#/components/schemas/CompletenessResponse"
+          },
+          "timeSpan": {
+            "$ref": "#/components/schemas/TimeSpanResponse"
+          },
+          "vantage": {
+            "$ref": "#/components/schemas/VantageResponse"
+          }
+        },
+        "type": "object"
+      },
       "CaptureMark": {
         "properties": {
           "baseline": {
@@ -441,6 +461,52 @@
           },
           "snapshotId": {
             "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CaptureQualityResponse": {
+        "properties": {
+          "invalidPackets": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "memcapDrops": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "array"
+          },
+          "packets": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reassemblyGaps": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "streamDepthReached": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpConversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpSessions": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpWithoutHandshake": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "verdict": {
             "type": "string"
           }
         },
@@ -469,6 +535,49 @@
         },
         "type": "object"
       },
+      "CategoryEvidenceResponse": {
+        "properties": {
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "byL7": {
+            "type": "boolean"
+          },
+          "l7": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "shows": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CategoryLeadResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "shows": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CategoryStat": {
         "properties": {
           "bytes": {
@@ -485,6 +594,38 @@
           "percentage": {
             "format": "double",
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CategoryStatusResponse": {
+        "properties": {
+          "attackId": {
+            "type": "string"
+          },
+          "axis": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "leads": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryLeadResponse"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "unchecked": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -875,6 +1016,23 @@
         },
         "type": "object"
       },
+      "CompletenessResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/QualityNoteResponse"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "CompositionHistoryEntry": {
         "properties": {
           "deviceTypes": {
@@ -911,12 +1069,75 @@
         },
         "type": "object"
       },
+      "ConnectionOutcomes": {
+        "properties": {
+          "answered": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "noAnswer": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rejected": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "topFailedTargets": {
+            "items": {
+              "$ref": "#/components/schemas/FailedTarget"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ConsideredResponse": {
+        "properties": {
+          "candidate": {
+            "type": "string"
+          },
+          "conversations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ConversationDetailResponse": {
         "properties": {
+          "anomalies": {
+            "items": {
+              "$ref": "#/components/schemas/ProtocolAnomaly"
+            },
+            "type": "array"
+          },
           "appName": {
             "type": "string"
           },
+          "bytesDstToSrc": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bytesSrcToDst": {
+            "format": "int64",
+            "type": "integer"
+          },
           "category": {
+            "type": "string"
+          },
+          "connectionOutcome": {
             "type": "string"
           },
           "conversationId": {
@@ -965,6 +1186,16 @@
             },
             "type": "array"
           },
+          "idsAlertCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "idsAlerts": {
+            "items": {
+              "$ref": "#/components/schemas/IdsAlert"
+            },
+            "type": "array"
+          },
           "initiatorIp": {
             "type": "string"
           },
@@ -976,6 +1207,9 @@
             "type": "string"
           },
           "ja3Server": {
+            "type": "string"
+          },
+          "ja4Client": {
             "type": "string"
           },
           "packetCount": {
@@ -1014,6 +1248,9 @@
             },
             "type": "array"
           },
+          "tlsCertificate": {
+            "$ref": "#/components/schemas/TlsCertificateDto"
+          },
           "tlsIssuer": {
             "type": "string"
           },
@@ -1026,6 +1263,9 @@
             "type": "string"
           },
           "tlsSubject": {
+            "type": "string"
+          },
+          "tlsVersion": {
             "type": "string"
           },
           "totalBytes": {
@@ -1149,6 +1389,13 @@
             },
             "type": "object"
           },
+          "outcomes": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
           "protocols": {
             "additionalProperties": {
               "format": "int64",
@@ -1178,7 +1425,18 @@
           "appName": {
             "type": "string"
           },
+          "bytesDstToSrc": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bytesSrcToDst": {
+            "format": "int64",
+            "type": "integer"
+          },
           "category": {
+            "type": "string"
+          },
+          "connectionOutcome": {
             "type": "string"
           },
           "conversationId": {
@@ -1249,6 +1507,9 @@
           "ja3Server": {
             "type": "string"
           },
+          "ja4Client": {
+            "type": "string"
+          },
           "packetCount": {
             "format": "int64",
             "type": "integer"
@@ -1282,6 +1543,9 @@
             },
             "type": "array"
           },
+          "tlsCertificate": {
+            "$ref": "#/components/schemas/TlsCertificateDto"
+          },
           "tlsIssuer": {
             "type": "string"
           },
@@ -1294,6 +1558,9 @@
             "type": "string"
           },
           "tlsSubject": {
+            "type": "string"
+          },
+          "tlsVersion": {
             "type": "string"
           },
           "totalBytes": {
@@ -2098,6 +2365,9 @@
           },
           "skippedReason": {
             "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2139,6 +2409,29 @@
               "$ref": "#/components/schemas/SkippedFile"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "FailedTarget": {
+        "properties": {
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "noAnswer": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rejected": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "srcIp": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2501,6 +2794,12 @@
           "answered": {
             "type": "boolean"
           },
+          "attributes": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
           "basis": {
             "items": {
               "type": "string"
@@ -2510,6 +2809,12 @@
           "confidence": {
             "format": "int32",
             "type": "integer"
+          },
+          "derivation": {
+            "items": {
+              "$ref": "#/components/schemas/StepResponse"
+            },
+            "type": "array"
           },
           "goal": {
             "type": "string"
@@ -2567,6 +2872,106 @@
         },
         "type": "object"
       },
+      "HoneypotHostResponse": {
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/VantageCandidateResponse"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contested": {
+            "type": "boolean"
+          },
+          "described": {
+            "type": "string"
+          },
+          "honeypot": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "overriddenBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/HoneypotSignalResponse"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HoneypotSignalResponse": {
+        "properties": {
+          "honeypot": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "points": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HoneypotsResponse": {
+        "properties": {
+          "hosts": {
+            "items": {
+              "$ref": "#/components/schemas/HoneypotHostResponse"
+            },
+            "type": "array"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          },
+          "serversChecked": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "signaturesVersion": {
+            "type": "string"
+          },
+          "singleSignal": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "HostClassificationResponse": {
         "properties": {
           "addressKind": {
@@ -2597,6 +3002,9 @@
           "loggedInUserCount": {
             "format": "int32",
             "type": "integer"
+          },
+          "loggedInUserRealName": {
+            "type": "string"
           },
           "loggedInUserSource": {
             "type": "string"
@@ -2960,6 +3368,110 @@
         },
         "type": "object"
       },
+      "IdsAlert": {
+        "properties": {
+          "attackTarget": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "httpHost": {
+            "type": "string"
+          },
+          "httpMethod": {
+            "type": "string"
+          },
+          "httpStatus": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "httpUrl": {
+            "type": "string"
+          },
+          "httpUserAgent": {
+            "type": "string"
+          },
+          "rev": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "severity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sid": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signatureSeverity": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvestigationCategoryResponse": {
+        "properties": {
+          "attackId": {
+            "type": "string"
+          },
+          "axis": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryEvidenceResponse"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "readsAnyTraffic": {
+            "type": "boolean"
+          },
+          "unseenReason": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "InvestigationQuery": {
         "properties": {
           "appName": {
@@ -3019,6 +3531,21 @@
             },
             "type": "array"
           },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryStatusResponse"
+            },
+            "type": "array"
+          },
+          "considered": {
+            "items": {
+              "$ref": "#/components/schemas/ConsideredResponse"
+            },
+            "type": "array"
+          },
+          "context": {
+            "$ref": "#/components/schemas/CaptureContextResponse"
+          },
           "coverage": {
             "items": {
               "type": "string"
@@ -3030,6 +3557,9 @@
               "$ref": "#/components/schemas/GoalOutcomeDto"
             },
             "type": "array"
+          },
+          "honeypots": {
+            "$ref": "#/components/schemas/HoneypotsResponse"
           },
           "unknowns": {
             "items": {
@@ -3287,6 +3817,38 @@
         "required": [
           "fileIds"
         ],
+        "type": "object"
+      },
+      "ModelList": {
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOption"
+            },
+            "type": "array"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ModelOption": {
+        "properties": {
+          "contextLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "NarrativeSection": {
@@ -3805,6 +4367,20 @@
           },
           "updatedAt": {
             "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Note": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "text": {
             "type": "string"
           }
         },
@@ -4409,6 +4985,46 @@
         },
         "type": "object"
       },
+      "ProtocolAnomaly": {
+        "properties": {
+          "appProto": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolCaptureDto": {
+        "properties": {
+          "conversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ProtocolRiskEntry": {
         "properties": {
           "atRisk": {
@@ -4456,6 +5072,36 @@
               "$ref": "#/components/schemas/ProtocolStat"
             },
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolUsageDto": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "captures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "conversations": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "QualityNoteResponse": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -5083,13 +5729,27 @@
       "SetValueRequest": {
         "properties": {
           "value": {
-            "maxLength": 64,
+            "maxLength": 255,
             "minLength": 0,
             "type": "string"
           }
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "SetValuesRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "values"
         ],
         "type": "object"
       },
@@ -5176,6 +5836,26 @@
         },
         "type": "object"
       },
+      "StepResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "found": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "StoryAggregates": {
         "properties": {
           "beaconCandidates": {
@@ -5183,6 +5863,9 @@
               "$ref": "#/components/schemas/BeaconCandidate"
             },
             "type": "array"
+          },
+          "connectionOutcomes": {
+            "$ref": "#/components/schemas/ConnectionOutcomes"
           },
           "coverage": {
             "$ref": "#/components/schemas/Coverage"
@@ -5535,6 +6218,50 @@
         },
         "type": "object"
       },
+      "SuricataStatusDto": {
+        "properties": {
+          "ageDays": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "failedRuleCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "importDir": {
+            "type": "string"
+          },
+          "importError": {
+            "type": "string"
+          },
+          "loadedRuleCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ruleCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rulesetDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "staleAfterDays": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "SystemSettingDto": {
         "properties": {
           "choices": {
@@ -5591,6 +6318,26 @@
         },
         "type": "object"
       },
+      "TimeSpanResponse": {
+        "properties": {
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TimelineDataDto": {
         "properties": {
           "bytes": {
@@ -5621,6 +6368,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "nameMismatch": {
+            "format": "int64",
+            "type": "integer"
+          },
           "selfSigned": {
             "format": "int64",
             "type": "integer"
@@ -5632,6 +6383,51 @@
           "unknownCa": {
             "format": "int64",
             "type": "integer"
+          },
+          "weakKey": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "weakSignature": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TlsCertificateDto": {
+        "properties": {
+          "chainLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "coversServerName": {
+            "type": "boolean"
+          },
+          "keyBits": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "keyType": {
+            "type": "string"
+          },
+          "sans": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "selfSigned": {
+            "type": "boolean"
+          },
+          "signatureAlgorithm": {
+            "type": "string"
+          },
+          "weakKey": {
+            "type": "boolean"
+          },
+          "weakSignature": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -6049,6 +6845,72 @@
         ],
         "type": "object"
       },
+      "VantageCandidateResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "score": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "VantageResponse": {
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/VantageCandidateResponse"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contested": {
+            "type": "boolean"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "overriddenBy": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "WebServerDetailResponse": {
         "properties": {
           "api": {
@@ -6205,7 +7067,7 @@
     "/api/v1/ai-jobs/{jobId}": {
       "get": {
         "description": "WAITING with its place in line, RUNNING, then DONE with the result or FAILED with why.",
-        "operationId": "get_4",
+        "operationId": "get_5",
         "parameters": [
           {
             "in": "path",
@@ -7185,6 +8047,15 @@
             }
           },
           {
+            "description": "Comma-separated connection outcomes (#1233): ANSWERED, NO_ANSWER, REJECTED, UNKNOWN (not TCP, or the capture joined after the SYN)",
+            "in": "query",
+            "name": "outcomes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter",
             "in": "query",
             "name": "networkId",
@@ -7612,6 +8483,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "outcomes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7786,6 +8665,14 @@
           {
             "in": "query",
             "name": "dstIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcomes",
             "required": false,
             "schema": {
               "type": "string"
@@ -8209,7 +9096,7 @@
     },
     "/api/v1/detection-rules/status": {
       "get": {
-        "operationId": "status",
+        "operationId": "status_1",
         "responses": {
           "200": {
             "content": {
@@ -8253,7 +9140,7 @@
         ]
       },
       "get": {
-        "operationId": "get_3",
+        "operationId": "get_4",
         "parameters": [
           {
             "in": "path",
@@ -9153,7 +10040,7 @@
         ]
       },
       "get": {
-        "operationId": "get_2",
+        "operationId": "get_3",
         "parameters": [
           {
             "in": "path",
@@ -9297,6 +10184,39 @@
         "summary": "Deterministic answers to the standard investigation questions for a file",
         "tags": [
           "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/capture-quality": {
+      "get": {
+        "description": "Connections already open when the capture began, gaps in TCP streams, undecodable packets, and sessions Suricata stopped inspecting, as plain-language notes. Suricata's counters are null for captures it didn't run on (or analysed before they were kept).",
+        "operationId": "get_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureQualityResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "How complete a capture is",
+        "tags": [
+          "Capture quality"
         ]
       }
     },
@@ -10084,7 +11004,7 @@
     },
     "/api/v1/files/{fileId}/investigation": {
       "get": {
-        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).",
+        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look; where the capture was taken; and which hosts read as honeypots.",
         "operationId": "getInvestigation",
         "parameters": [
           {
@@ -10834,6 +11754,31 @@
         "summary": "Generate filter from natural language",
         "tags": [
           "Filter Generator"
+        ]
+      }
+    },
+    "/api/v1/investigation-categories": {
+      "get": {
+        "description": "Context, entities, then the 14 ATT&CK tactics, in that order. A category no question covers yet is listed with none. Each carries how much of it a capture can show and the traffic its questions read.",
+        "operationId": "listInvestigationCategories",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InvestigationCategoryResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Every investigation category, with the questions that answer it",
+        "tags": [
+          "Investigation categories"
         ]
       }
     },
@@ -13274,6 +14219,75 @@
         ]
       }
     },
+    "/api/v1/protocol-usage": {
+      "get": {
+        "description": "Counts original captures only; a re-analysis is a copy of one.",
+        "operationId": "usage",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProtocolUsageDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Every nDPI application name in your captures, with how many captures and conversations",
+        "tags": [
+          "Protocol usage"
+        ]
+      }
+    },
+    "/api/v1/protocol-usage/{appName}/captures": {
+      "get": {
+        "operationId": "captures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProtocolCaptureDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The captures an nDPI application name appears in, most conversations first",
+        "tags": [
+          "Protocol usage"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "list_2",
@@ -14066,6 +15080,37 @@
         ]
       }
     },
+    "/api/v1/system/llm/models": {
+      "post": {
+        "description": "The models the server at the given URL offers, with each one's context length when the server says, for picking one before saving. Blank fields use the current settings; a POST because the key travels in the body. Other values than the current ones require the permission to edit the LLM connection.",
+        "operationId": "models",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List the LLM server's models",
+        "tags": [
+          "LLM Connection"
+        ]
+      }
+    },
     "/api/v1/system/llm/test": {
       "post": {
         "description": "Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Testing other values than the current ones requires the permission to edit the LLM connection.",
@@ -14119,6 +15164,39 @@
         "summary": "Every deploy-time setting with its effective value (read-only)",
         "tags": [
           "System Settings"
+        ]
+      },
+      "patch": {
+        "description": "For settings that only work as a set, such as the LLM's URL, key and model: if one is refused, none is changed. Each needs its own permission and is audited on its own.",
+        "operationId": "setAll",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetValuesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemSettingDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Override several editable settings together, all or none",
+        "tags": [
+          "Policy Settings"
         ]
       }
     },
@@ -14183,6 +15261,28 @@
         "summary": "Override an editable policy setting (retention, detection thresholds)",
         "tags": [
           "Policy Settings"
+        ]
+      }
+    },
+    "/api/v1/system/suricata": {
+      "get": {
+        "description": "source is built-in (baked into the image) or imported (from the import folder). stale is true once the ruleset is older than SURICATA_RULESET_STALE_DAYS. importError says why the last imported bundle wasn't used.",
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuricataStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Which Suricata ruleset is in use, and how old it is",
+        "tags": [
+          "Suricata"
         ]
       }
     },
@@ -14571,6 +15671,14 @@
       "name": "Reports"
     },
     {
+      "description": "How complete a capture is, and how fully it was inspected",
+      "name": "Capture quality"
+    },
+    {
+      "description": "The IDS engine and the age of the ruleset behind its alerts",
+      "name": "Suricata"
+    },
+    {
       "description": "Baseline rules used to detect drift in a monitored network",
       "name": "Monitor Baseline Definitions"
     },
@@ -14617,6 +15725,10 @@
     {
       "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",
       "name": "Host Identities"
+    },
+    {
+      "description": "Which nDPI protocols appear in your captures, and where",
+      "name": "Protocol usage"
     },
     {
       "description": "AI-generated insights for a monitored network",
@@ -14725,6 +15837,10 @@
     {
       "description": "Personal preferences (theme, node labels, table columns)",
       "name": "Preferences"
+    },
+    {
+      "description": "The fixed set of things an investigation can say something about: capture context, host roles and the ATT&CK tactics, with the questions that answer each",
+      "name": "Investigation categories"
     }
   ]
 }

@@ -48,7 +48,10 @@ public class HostIdentityContributor implements KnowledgeContributor {
         if (realName != null && !realName.isBlank()) userAttrs.put("realName", realName);
         board.addEntity(EntityRef.user(user), userAttrs);
         board.addRelationship(
-            Relationship.of(hostRef, SIGNED_IN_AS, EntityRef.user(user), gradeForSource(source), name()));
+            // How this host's sign-in was seen, on the edge: the user entity is shared by every host
+            // the account signed in on, so a source there is the last host's (#1293).
+            new Relationship(hostRef, SIGNED_IN_AS, EntityRef.user(user), gradeForSource(source), name(),
+                Map.of("signInSource", nullToUnknown(source))));
       }
     }
   }
@@ -69,12 +72,13 @@ public class HostIdentityContributor implements KnowledgeContributor {
   }
 
   /**
-   * A Kerberos AS-REQ is MEASURED (the client authenticated as this principal); an LDAP directory
+   * A Kerberos AS-REQ or NTLM sign-in is MEASURED (the client authenticated as this principal); an LDAP directory
    * lookup is REPORTED (a party named an account). Anything else is treated as inferred.
    */
   private Grade gradeForSource(String source) {
-    if (WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(source)) return Grade.MEASURED;
-    if (WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(source)) return Grade.REPORTED;
+    if (WindowsIdentityResolverService.isSignIn(source)) return Grade.MEASURED;
+    if (WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(source)
+        || WindowsIdentityResolverService.SOURCE_SAMR_USER_INFO.equals(source)) return Grade.REPORTED;
     return Grade.INFERRED;
   }
 

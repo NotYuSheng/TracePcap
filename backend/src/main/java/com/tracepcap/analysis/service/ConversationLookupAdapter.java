@@ -128,7 +128,8 @@ public class ConversationLookupAdapter implements ConversationLookup {
         counts(repository.countByCustomSignature(fileId)),
         counts(repository.countBySuricataAlert(fileId)),
         counts(repository.countByCountry(fileId)),
-        counts(repository.countByDeviceType(fileId)));
+        counts(repository.countByDeviceType(fileId)),
+        counts(repository.countByConnectionOutcome(fileId)));
   }
 
   /** (value, count) rows into a map; null or blank values dropped. */
@@ -259,6 +260,18 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public List<HostPair> hostPairs(UUID fileId) {
+    return repository.findHostPairsByFileId(fileId).stream()
+        .map(r -> new HostPair((String) r[0], (String) r[1], asLong(r[2]), asLong(r[3]), asLong(r[4])))
+        .toList();
+  }
+
+  @Override
+  public long distinctAnsweredPorts(UUID fileId, String ip) {
+    return repository.countDistinctAnsweredPorts(fileId, ip);
+  }
+
+  @Override
   public List<HostVolume> topSenders(UUID fileId) {
     return repository.findTopSendersByFileId(fileId).stream()
         .map(r -> new HostVolume((String) r[0], asLong(r[1]), asLong(r[2])))
@@ -342,7 +355,11 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getStartTime(),
             e.getEndTime(),
             e.getSrcMac(),
-            e.getDstMac()),
+            e.getDstMac(),
+            e.getConnectionOutcome(),
+            e.getTransport(),
+            e.getBytesSrcToDst(),
+            e.getBytesDstToSrc()),
         new TlsFacts(
             e.getHostname(),
             e.getTlsIssuer(),
@@ -350,7 +367,10 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getTlsNotBefore(),
             e.getTlsNotAfter(),
             e.getJa3Client(),
-            e.getJa3Server()),
+            e.getJa3Server(),
+            e.getJa4Client(),
+            e.getTlsVersion(),
+            certFacts(e)),
         new Findings(
             e.getAppName(),
             e.getTsharkProtocol(),
@@ -369,5 +389,33 @@ public class ConversationLookupAdapter implements ConversationLookup {
   private static List<String> immutable(String[] values) {
     if (values == null || values.length == 0) return List.of();
     return Arrays.stream(values).filter(v -> v != null).toList();
+  }
+
+  @Override
+  public List<AppUsage> appUsage() {
+    return repository.appUsage().stream()
+        .map(r -> new AppUsage((String) r[0], ((Number) r[1]).longValue(), ((Number) r[2]).longValue()))
+        .toList();
+  }
+
+  @Override
+  public List<AppCapture> appCaptures(String appName, int limit) {
+    return repository.appCaptures(appName, limit).stream()
+        .map(r -> new AppCapture((UUID) r[0], (String) r[1], ((Number) r[2]).longValue()))
+        .toList();
+  }
+
+  /** The stored certificate detail (#1235), or null when none was recorded. */
+  private static ConversationLookup.CertFacts certFacts(ConversationEntity e) {
+    if (e.getTlsSelfSigned() == null && e.getTlsKeyType() == null && e.getTlsSigAlg() == null) {
+      return null;
+    }
+    return new ConversationLookup.CertFacts(
+        e.getTlsSans() == null ? List.of() : List.of(e.getTlsSans()),
+        e.getTlsKeyType(),
+        e.getTlsKeyBits(),
+        e.getTlsSigAlg(),
+        Boolean.TRUE.equals(e.getTlsSelfSigned()),
+        e.getTlsChainLength() == null ? 1 : e.getTlsChainLength());
   }
 }

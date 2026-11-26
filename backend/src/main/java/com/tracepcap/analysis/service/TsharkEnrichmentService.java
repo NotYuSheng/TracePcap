@@ -171,7 +171,7 @@ public class TsharkEnrichmentService implements Extractor {
               conv.getSrcPort(),
               conv.getDstIp(),
               conv.getDstPort(),
-              conv.getProtocol());
+              transportOf(conv));
 
       Map<String, Integer> freq = lookupFreq(conv, flowFreq, ipPairFreq);
       String detected = (freq != null) ? selectBestProtocol(freq) : null;
@@ -351,7 +351,7 @@ public class TsharkEnrichmentService implements Extractor {
             conv.getSrcPort(),
             conv.getDstIp(),
             conv.getDstPort(),
-            conv.getProtocol());
+            transportOf(conv));
     Map<String, Integer> freq = flowFreq.get(key);
     if (freq == null && conv.getSrcPort() == null && conv.getDstPort() == null) {
       freq = ipPairFreq.get(ipPairKey(conv.getSrcIp(), conv.getDstIp()));
@@ -440,5 +440,10 @@ public class TsharkEnrichmentService implements Extractor {
   private boolean isNotFound(Exception e) {
     String msg = e.getMessage();
     return msg != null && (msg.contains("No such file") || msg.contains("error=2"));
+  }
+
+  /** The transport a flow record is matched by (TCP/UDP); the display label for older rows. */
+  private static String transportOf(PcapParserService.ConversationInfo conv) {
+    return conv.getTransport() != null ? conv.getTransport() : conv.getProtocol();
   }
 }

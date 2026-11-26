@@ -11,6 +11,26 @@ command-and-control, malware, signed-in user) are shown directly and fed to the
 LLM as authoritative ground truth, so the narrative names what the deterministic
 layers already established rather than re-deriving a weaker picture from metrics.
 
+Alternatives considered
+-----------------------
+
+A good report says why the other candidates aren't the answer. The deterministic checks record the
+candidates they tested and ruled out, with the rule and the reason, and the narrator gets them as
+their own block, marked as ruled out: it may describe each as an alternative that was considered,
+never as a finding. When there are any, the narrative has an **Alternatives considered** section
+before its conclusion. Today these are:
+
+- a reputation-listed server (Spamhaus DROP, CINS…) that the suspected-C2 rule tested and didn't
+  escalate, with the requirement it failed: the host wasn't talking to a confirmed C2 (or reached it
+  before it did), the server was reached by name, or it was reached once rather than in rounds;
+- a beacon whose server didn't end up a C2: no rule named it and no known family's check-in was in
+  its stream;
+- a host that failed to sign in as two to four accounts within ten minutes, short of the five that
+  make password guessing.
+
+The same list is on the Overview's Investigation Summary, folded under **Considered and ruled out**,
+which also answers "did it even look at that server?".
+
 Requirements
 ------------
 
@@ -112,11 +132,15 @@ investigation steps, but the narrative prompt itself is not rebuilt).
 Output-truncation handling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If the model's *response* hits its output-token cap and is cut off (a
-``finish_reason`` of ``length``), generation fails deliberately with a clear
-``OUTPUT_TRUNCATED`` error — "the response exceeded the output token budget and
-was cut off; raise ``LLM_MAX_TOKENS`` or reduce the amount to narrate" — rather
-than letting the truncated JSON surface later as a cryptic parse error. This is
+Each reply's budget is what the model's context has left after the prompt
+(under ``LLM_MAX_TOKENS`` when that is set). The prompt's size is a deliberate
+overestimate, so when a reply is cut off (a ``finish_reason`` of ``length``) and
+the server's own count of the prompt leaves clearly more room, it is asked once
+more with that. A server that refuses the budget and names its limit is asked
+again within it. If the reply is still cut off, generation fails deliberately
+with a clear ``OUTPUT_TRUNCATED`` error, saying whether the cap or the context
+ran out and what to change, rather than letting the truncated JSON surface
+later as a cryptic parse error. This is
 distinct from the *prompt*-too-large case above, which is caught before the call.
 
 Known analysis limitations (embedded in every prompt)
@@ -136,14 +160,31 @@ The Story Page
 The Story tab is laid out as an investigation, read top to bottom, with the
 questions and answers beside it:
 
-- **The four questions** come first, as cards: *Victim* (which host was
-  attacked?), *User* (who was signed in?), *Malware* (what ran on it?) and *C2*
-  (where did it call home?). A card is **Answered** with the headline, its grade,
-  confidence and how many reasons back it; **Not established** when an incident
-  was found but nothing settled that part of it; or **No lead** when nothing in
-  the capture pointed there, which on a benign capture is the expected outcome.
-  Answers that aren't one of the four (a bulk transfer to review, say) are listed
-  under the cards as *Also found*.
+- **Where the investigation stands** comes first, summary first (see
+  :doc:`../architecture/investigation-framework`). A line first says what the
+  capture can show: where it was taken, how complete it is and how long it spans
+  ("On a honeypot or sensor (192.168.100.28) · inferred · complete · 24 h").
+  Where it was taken is inferred from who talks to whom, so *Why · change* opens
+  the reasons, and lets you set it yourself or add evidence toward one answer.
+  A host that reads as a honeypot gets a line of its own ("198.51.100.45 is a
+  Dionaea honeypot · inferred, 95%"), and its *Why · change* lists the signals:
+  the signatures it matched (a stock banner or certificate) and how it behaves.
+  You can mark it *Not a honeypot*, or add evidence either way.
+  Then one sentence and one bar count the investigation's categories by status:
+  "Nothing is concluded yet. 17 are still open and 4 can't be seen in this
+  capture." Under it:
+
+  - **Answered**: each answer with its grade and confidence.
+  - **Worth a look next**: the open categories, those with traffic in this capture
+    first, each linking to that traffic's conversations. Three show, and the rest
+    open with *and N more open*.
+  - **Ruled out** and **Not observable** fold away, each category with why ("no SMB
+    or DCE-RPC in this capture", "happens on the host, and rarely shows on the
+    wire").
+  - **Show all** opens every category with its status, by axis: capture context,
+    hosts and activities (with each ATT&CK tactic id).
+
+  It needs no LLM, so it shows before a story is written too.
 - **The story** follows: the summary, then *What happened* as a timeline of
   events (suspicious and critical ones marked with an amber or red edge), then
   the rest of the narrative (anomalies, the conclusion) under its own headings.
@@ -170,7 +211,7 @@ Story Mode returns a response containing several components:
 Investigation Summary
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The **Investigation Summary** (the question cards at the top of the Story tab) surfaces the deterministic answers to the
+The **Investigation Summary** (the answers at the top of the Story tab) surfaces the deterministic answers to the
 standard investigation questions — **victim**, **command-and-control**,
 **malware**, and **signed-in user** — from the :doc:`../architecture/knowledge-layer`,
 each labelled with its :ref:`grade <knowledge-grade>` (measured, reported, or
@@ -180,6 +221,14 @@ same panel also appears on the Analysis **Overview** tab when a capture has any
 such findings, so the key answers are visible without opening Story Mode. When a
 capture matches none of the questions (a benign DNS capture, say), the panel shows
 an explicit empty state rather than disappearing.
+
+A command-and-control answer that no malware rule named directly carries a chip
+saying how it was concluded: **Suspected** for a reputation-listed server that an
+already-infected host kept returning to, or **Install chain** for a remote-access
+tool planted by a script or download tool fetching a large payload just before.
+The info button beside the chip explains the rule and gives this capture's reason.
+Answers about an outside server (command and control, remote access, downloads, bulk
+transfers) link to the **Conversations** tab filtered to that address.
 
 Deterministic Findings
 ~~~~~~~~~~~~~~~~~~~~~~

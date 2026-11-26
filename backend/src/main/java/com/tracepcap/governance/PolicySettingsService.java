@@ -55,6 +55,15 @@ public class PolicySettingsService {
     if (!value.equals(before) || !wasOverridden) audit(key, before, wasOverridden, value, true);
   }
 
+  /**
+   * Sets several together, all or none: settings that only work as a set (the LLM's URL, key and
+   * model) never end up half changed. Each is checked, applied and audited as {@link #set} does.
+   */
+  @Transactional
+  public void setAll(Map<String, String> values) {
+    values.forEach(this::set);
+  }
+
   /** Removes the override, so the deployment's value applies again. */
   @Transactional
   public void reset(String key) {

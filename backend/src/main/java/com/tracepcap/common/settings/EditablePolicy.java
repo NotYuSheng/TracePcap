@@ -33,7 +33,7 @@ public enum EditablePolicy {
   LLM_API_KEY(Kind.LLM, Type.SECRET, 0, 0, "From the next LLM call."),
   LLM_MODEL(Kind.LLM, Type.TEXT, 0, 0, "From the next LLM call."),
   LLM_TEMPERATURE(Kind.LLM, Type.DECIMAL, 0, 2, "From the next LLM call."),
-  LLM_MAX_TOKENS(Kind.LLM, Type.INT, 1, 1_000_000, "From the next LLM call."),
+  LLM_MAX_TOKENS(Kind.LLM, Type.INT, 0, 1_000_000, "From the next LLM call."),
   LLM_TIMEOUT(Kind.LLM, Type.INT, 5, 7_200, "From the next LLM call."),
   LLM_TOOL_CALLING(Kind.LLM, Type.CHOICE, 0, 0, "From the next story.", "auto", "on", "off");
 

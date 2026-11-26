@@ -46,9 +46,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = Path(__file__).resolve().parent
 CASES_DIR = EVAL_DIR / "cases"
 # Where a locally-fetched pcap may live (gitignored eval/pcaps/, or the demo copy in the build tree).
-PCAP_SEARCH_DIRS = [EVAL_DIR / "pcaps", REPO_ROOT / "backend" / "target" / "ctf-demo"]
+PCAP_SEARCH_DIRS = [EVAL_DIR / "pcaps", EVAL_DIR / "pcaps" / "pcap-attack", REPO_ROOT / "backend" / "target" / "ctf-demo"]
 
 CORRECT, MISSED, WRONG, NA = "correct", "missed", "wrong", "n/a"
+
+
+def auth_headers() -> dict:
+    """With login on, set TRACEPCAP_TOKEN to an access token; it's sent as a bearer token."""
+    token = os.environ.get("TRACEPCAP_TOKEN")
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 class ApiError(Exception):
@@ -57,7 +63,7 @@ class ApiError(Exception):
 
 # --------------------------------------------------------------------------- HTTP helpers
 def http_get_json(url: str, timeout: int = 60):
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    req = urllib.request.Request(url, headers={"Accept": "application/json", **auth_headers()})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -121,6 +127,7 @@ def upload_and_wait(api_base: str, pcap_path: Path, expected_sha256: str | None,
     with tempfile.NamedTemporaryFile(suffix=".json") as body:
         out = subprocess.run(
             ["curl", "-sS", "-o", body.name, "-w", "%{http_code}", "-X", "POST",
+             *[arg for k, v in auth_headers().items() for arg in ("-H", f"{k}: {v}")],
              f"{api_base}/files", "-F", f"file=@{pcap_path}"],
             capture_output=True, text=True, timeout=300,
         )
@@ -171,12 +178,19 @@ def norm_host(v):
 
 
 # --------------------------------------------------------------------------- scoring
-def classify(expected, candidates, normalizer=norm_text):
+def classify(expected, candidates, normalizer=norm_text, beyond=(), recall_only=False):
     """Score one field. `expected` is a value or a list of values (a key may list several C2s).
 
     Extras count against the answer: producing a value the key does not list is `wrong` even when
     the right value is present too -- otherwise a regression that adds spurious victims / C2s would
     still score "correct" and the confidently-wrong gate would never fire.
+
+    `beyond` lists values the key doesn't mention but the case file records as evidenced findings
+    (see `beyond_key` in expected.yaml). Producing one is neither right nor wrong: it is left out of
+    the scoring and reported as `beyond_key` in the detail.
+
+    `recall_only` is for lists that aren't accusations (the files a host downloaded): every value the
+    key lists must be produced, and extras are fine.
     """
     exp = [e for e in (expected if isinstance(expected, list) else [expected]) if e is not None]
     if not exp:
@@ -188,16 +202,81 @@ def classify(expected, candidates, normalizer=norm_text):
         if c is not None and normalizer(c) is not None:
             produced.setdefault(normalizer(c), c)
 
-    spurious = [raw for n, raw in produced.items() if n not in exp_norm]
+    beyond_norm = {normalizer(b) for b in beyond if b is not None}
+    extra = [raw for n, raw in produced.items() if n in beyond_norm and n not in exp_norm]
+    produced = {n: raw for n, raw in produced.items() if n not in beyond_norm or n in exp_norm}
+
+    spurious = [] if recall_only else [raw for n, raw in produced.items() if n not in exp_norm]
     missing = [e for e in exp if normalizer(e) not in produced]
 
+    def detail(d):
+        if not extra:
+            return d
+        d = d if isinstance(d, dict) else ({} if d is None else {"value": d})
+        return {**d, "beyond_key": extra}
+
     if spurious:
-        return WRONG, {"spurious": spurious, "missing": missing}
+        return WRONG, detail({"spurious": spurious, "missing": missing})
     if not produced:
-        return MISSED, None
+        return MISSED, detail(None)
     if missing:
-        return MISSED, {"missing": missing}
-    return CORRECT, exp[0] if len(exp) == 1 else exp
+        return MISSED, detail({"missing": missing})
+    return CORRECT, detail(exp[0] if len(exp) == 1 else exp)
+
+
+def pair(client, server):
+    """One host acting on another, as "client -> server"."""
+    return f"{client} -> {server}" if client and server else None
+
+
+def score_lateral(expected, by_q):
+    """Lateral movement: the (client, server) pairs a lateral-movement answer names (#1266).
+
+    A key that lists `lateral_movement: []` asserts there is none -- a discovery capture, say -- so any
+    answer is confidently wrong there; a key without the field doesn't score it.
+    """
+    if "lateral_movement" not in expected:
+        return NA, None
+    produced = [pair(a.get("attributes", {}).get("client"), a.get("attributes", {}).get("server"))
+                for a in by_q.get("lateral-movement", [])]
+    want = [pair(e.get("client"), e.get("server")) for e in (expected.get("lateral_movement") or [])]
+    if not want:
+        produced = [p for p in produced if p]
+        return (WRONG, {"spurious": produced}) if produced else (CORRECT, "none")
+    return classify(want, produced)
+
+
+def score_kerberos(expected, by_q):
+    """Kerberos attacks (#1267): "technique client -> kdc" for each answer, as lateral movement scores
+    its pairs. `kerberos_attack: []` says there is none; a key without the field doesn't score it."""
+    if "kerberos_attack" not in expected:
+        return NA, None
+    produced = []
+    for a in by_q.get("kerberos-attack", []):
+        at = a.get("attributes", {})
+        p = pair(at.get("client"), at.get("kdc"))
+        if p:
+            produced.append(f"{at.get('technique')} {p}")
+    want = [f"{e.get('technique')} {pair(e.get('client'), e.get('kdc'))}"
+            for e in (expected.get("kerberos_attack") or [])]
+    if not want:
+        return (WRONG, {"spurious": produced}) if produced else (CORRECT, "none")
+    return classify(want, produced)
+
+
+def beyond_key(expected, field):
+    """Evidenced findings the key doesn't mention, for one scored field (`beyond_key` in the case).
+
+    Each entry needs a `value` and written `evidence` from a source other than TracePcap itself (an
+    IDS rule's own text, an observed connection, a vendor report); an entry without evidence is
+    rejected, so this can't quietly become a way to mark TracePcap's own output as right.
+    """
+    out = []
+    for e in (expected.get("beyond_key", {}) or {}).get(field, []) or []:
+        if not e.get("value") or not str(e.get("evidence", "")).strip():
+            raise ValueError(f"beyond_key.{field}: every entry needs a value and evidence, got {e!r}")
+        out.append(e["value"])
+    return out
 
 
 def answers_by_question(answers):
@@ -222,6 +301,15 @@ def score_case(expected, answers, knowledge):
     m = expected.get("malware", {}) or {}
     c2_ips = [c.get("ip") for c in (expected.get("c2", []) or []) if c.get("ip")]
     victim_ip = v.get("ip")
+    # When the activity began: the first contact with the server the key names, from the C2 or
+    # remote-access answer about that server (ISO-8601 UTC, to the second).
+    t = expected.get("timeline", {}) or {}
+    starts = [a.get("attributes", {}).get("firstSeen")
+              for a in by_q.get("c2", []) + by_q.get("remote-access", [])
+              if t.get("ip") and t.get("ip") in (a.get("attributes", {}).get("address"),
+                                                  a.get("attributes", {}).get("external"))]
+    file_hashes = [f.get("sha256") for f in (expected.get("files", []) or []) if f.get("sha256")]
+    downloads = [a.get("attributes", {}).get("sha256") for a in by_q.get("downloads", [])]
 
     victim_hosts = [a.get("attributes", {}).get("host") for a in by_q.get("victim", [])]
     # The account is scored against the VICTIM's sign-in, not any host's: another machine having
@@ -245,7 +333,11 @@ def score_case(expected, answers, knowledge):
         ("user.account", *classify(u.get("account"), user_accts)),
         ("user.real_name", *classify(u.get("real_name"), real_name_cands)),
         ("malware.family", *classify(m.get("family"), malwares)),
-        ("c2.ip", *classify(c2_ips or None, c2_addrs)),
+        ("c2.ip", *classify(c2_ips or None, c2_addrs, beyond=beyond_key(expected, "c2.ip"))),
+        ("timeline.start", *classify(t.get("start"), starts)),
+        ("files.sha256", *classify(file_hashes or None, downloads, recall_only=True)),
+        ("lateral_movement", *score_lateral(expected, by_q)),
+        ("kerberos_attack", *score_kerberos(expected, by_q)),
     ]
     return [{"field": f, "status": s, "detail": d} for (f, s, d) in fields]
 
@@ -337,8 +429,13 @@ def fmt_detail(d):
         parts = []
         if d.get("spurious"):
             parts.append("spurious: " + ", ".join(map(str, d["spurious"])))
+        if d.get("value") is not None:
+            v = d["value"]
+            parts.append(", ".join(map(str, v)) if isinstance(v, list) else str(v))
         if d.get("missing"):
             parts.append("missing: " + ", ".join(map(str, d["missing"])))
+        if d.get("beyond_key"):
+            parts.append("also, beyond the key (evidenced): " + ", ".join(map(str, d["beyond_key"])))
         return "; ".join(parts)
     return ", ".join(map(str, d)) if isinstance(d, list) else str(d)
 

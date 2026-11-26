@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
@@ -11,7 +12,7 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import { formatBytes } from '@/utils/formatters';
-import { actionOf, EXPIRING_WITHIN_MS, expiresAt, notesOf, statusOf } from './fileStatus';
+import { EXPIRING_WITHIN_MS, expiresAt, notesOf, statusOf } from './fileStatus';
 import {
   captureKeepService,
   EXTEND_DAYS,
@@ -20,6 +21,7 @@ import {
 } from '@/features/captureKeep/captureKeepService';
 import './FileList.css';
 import '@/features/captureKeep/captureKeep.css';
+import { SYSTEM_ACTOR, uploaderWords } from '@utils/actorWords';
 
 // Exported so contractConformance.test-d.ts can check it against the backend's
 // FileMetadataDto. It is a deliberate subset — this list renders only these fields.
@@ -489,6 +491,13 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         )}
                         {' · '}
                         {ago(uploaded, now)}
+                        <span
+                          data-testid="capture-uploader"
+                          className={file.uploadedBy && file.uploadedBy !== SYSTEM_ACTOR ? undefined : 'text-muted'}
+                        >
+                          {' · '}
+                          {uploaderWords(file.uploadedBy)}
+                        </span>
                       </div>
                       {notes.length > 0 && (
                         <div className="file-notes">
@@ -520,7 +529,8 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                       )}
                     </td>
                     <td className="text-end text-nowrap">
-                      {status.key === 'expiring' ? (
+                      {/* The capture's name opens it; a button here only when there's something else to do. */}
+                      {status.key === 'expiring' && keep.allowed && (
                         <Button
                           variant="outline-warning"
                           size="sm"
@@ -528,13 +538,6 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         >
                           Keep 7 days longer
                         </Button>
-                      ) : (
-                        <Link
-                          to={`/analysis/${file.fileId}`}
-                          className="btn btn-outline-secondary btn-sm captures-open"
-                        >
-                          {actionOf(status.key)}
-                        </Link>
                       )}
                       <Dropdown align="end" className="d-inline-block ms-2">
                         <Dropdown.Toggle
@@ -710,51 +713,54 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={showMerge} onHide={() => !merging && setShowMerge(false)} centered>
-        <Modal.Header closeButton={!merging}>
-          <Modal.Title>Merge {selectedCount} captures into one</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {mergeError && (
-            <Alert variant="danger" className="py-2">
-              {mergeError}
-            </Alert>
-          )}
-          <p className="small text-muted">
-            The packets of all of them go into one new capture, which is then analysed. The
-            originals stay as they are. To look at them side by side instead, use Compare.
-          </p>
-          <Form.Label htmlFor="merge-name">Name</Form.Label>
-          <div className="input-group input-group-sm">
-            <Form.Control
-              id="merge-name"
-              value={mergeName}
-              onChange={e => setMergeName(e.target.value)}
+      <SideDrawer
+        show={showMerge}
+        onHide={() => !merging && setShowMerge(false)}
+        closable={!merging}
+        title={<>Merge {selectedCount} captures into one</>}
+        titleId="merge-captures-title"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline-secondary"
+              onClick={() => setShowMerge(false)}
               disabled={merging}
-            />
-            <span className="input-group-text">.pcap</span>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            type="button"
-            variant="outline-secondary"
-            onClick={() => setShowMerge(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={doMerge}
+              disabled={merging || !mergeName.trim()}
+            >
+              {merging && <Spinner animation="border" size="sm" className="me-2" />}
+              Merge and analyse
+            </Button>
+          </>
+        }
+      >
+        {mergeError && (
+          <Alert variant="danger" className="py-2">
+            {mergeError}
+          </Alert>
+        )}
+        <p className="small text-muted">
+          The packets of all of them go into one new capture, which is then analysed. The
+          originals stay as they are. To look at them side by side instead, use Compare.
+        </p>
+        <Form.Label htmlFor="merge-name">Name</Form.Label>
+        <div className="input-group input-group-sm">
+          <Form.Control
+            id="merge-name"
+            value={mergeName}
+            onChange={e => setMergeName(e.target.value)}
             disabled={merging}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={doMerge}
-            disabled={merging || !mergeName.trim()}
-          >
-            {merging && <Spinner animation="border" size="sm" className="me-2" />}
-            Merge and analyse
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          />
+          <span className="input-group-text">.pcap</span>
+        </div>
+      </SideDrawer>
     </section>
   );
 };

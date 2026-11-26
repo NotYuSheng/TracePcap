@@ -37,7 +37,7 @@ Open ``.env`` in your editor and configure at minimum:
    LLM_API_KEY=
    LLM_MODEL=Qwen2.5-14B-Coder-Instruct
    LLM_TEMPERATURE=0.7
-   LLM_MAX_TOKENS=2000
+   # LLM_MAX_TOKENS=0   # 0 = size each reply to the model's context (the default)
 
 See :doc:`../configuration/environment-variables` for a full reference.
 

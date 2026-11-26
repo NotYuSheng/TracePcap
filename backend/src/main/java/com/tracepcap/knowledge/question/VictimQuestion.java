@@ -7,6 +7,7 @@ import com.tracepcap.knowledge.spi.EntityType;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import com.tracepcap.knowledge.spi.Category;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -32,6 +33,11 @@ public class VictimQuestion implements StandardQuestion {
   }
 
   @Override
+  public Set<Category> categories() {
+    return Set.of(Category.VICTIM);
+  }
+
+  @Override
   public List<Answer> answer(CaseKnowledge board) {
     Set<EntityRef> c2s = new LinkedHashSet<>();
     for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
@@ -42,10 +48,12 @@ public class VictimQuestion implements StandardQuestion {
     // victim host -> the C2s it was seen contacting (deduped: several communicates-with edges — one
     // per alerted conversation plus the aggregated traffic edge — can name the same C2)
     Map<EntityRef, Set<String>> victims = new LinkedHashMap<>();
+    Map<EntityRef, Set<EntityRef>> contacted = new LinkedHashMap<>();
     for (Relationship comm : board.relationshipsWithPredicate("communicates-with")) {
       if (comm.from().type() == EntityType.HOST && c2s.contains(comm.to())) {
         victims.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>())
             .add("contacted C2 " + comm.to().key());
+        contacted.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>()).add(comm.to());
       }
     }
 
@@ -59,8 +67,29 @@ public class VictimQuestion implements StandardQuestion {
           host.key()
               + " — contacted a known malware C2"
               + (user != null ? " (signed in as " + user + ")" : "");
+      List<com.tracepcap.knowledge.spi.Step> steps = new ArrayList<>();
+      Set<EntityRef> itsC2s = contacted.getOrDefault(host, Set.of());
+      for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
+        if (!itsC2s.contains(c2of.from())) continue;
+        String fam = EntityRef.UNIDENTIFIED_MALWARE.equals(c2of.to().key()) ? "unidentified malware" : c2of.to().key();
+        String found = c2of.from().key() + " is a command-and-control server for " + fam
+            + " (the command & control answer shows how).";
+        if (steps.stream().noneMatch(s -> s.found().equals(found))) {
+          steps.add(com.tracepcap.knowledge.spi.Step.of(found, null, Grade.INFERRED));
+        }
+      }
+      for (EntityRef c2 : itsC2s) {
+        steps.add(new com.tracepcap.knowledge.spi.Step(host.key() + " talked to " + c2.key() + ".",
+            Derivations.RULE_VICTIM, Grade.INFERRED, Derivations.conversationsBetween(board, host, c2)));
+      }
+      if (user != null) {
+        Grade signIn = board.relationshipsFrom(host, "signed-in-as").get(0).grade();
+        steps.add(com.tracepcap.knowledge.spi.Step.of(host.key() + " was signed in as " + user
+            + " (the signed-in user answer shows how).", null, signIn));
+      }
       answers.add(
-          new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), new ArrayList<>(basis), attrs));
+          new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), new ArrayList<>(basis), attrs)
+              .withDerivation(steps));
     });
     return answers;
   }

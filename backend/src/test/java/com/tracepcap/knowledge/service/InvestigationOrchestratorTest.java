@@ -133,6 +133,18 @@ class InvestigationOrchestratorTest {
   }
 
   @Test
+  void aGoalKeepsItsAnswersAttributes() {
+    // The panel renders goals from the report: dropping attributes hid the C2 chip and link (#1264).
+    Answer c2 = new Answer("c2", "93.152.209.36 — C2 for NetSupport RAT", Grade.INFERRED,
+        List.of(EntityRef.external("93.152.209.36")), List.of(),
+        java.util.Map.of("address", "93.152.209.36", "conclusion", "install-chain"));
+    InvestigationReport report = service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), List.of(c2));
+    assertThat(outcome(report, Goal.C2).attributes())
+        .containsEntry("address", "93.152.209.36")
+        .containsEntry("conclusion", "install-chain");
+  }
+
+  @Test
   void nonGoalAnswers_areCarriedAsAdditional_notDropped() {
     // A data-transfer answer isn't one of the four goals, but the panel renders from the report, so
     // it must still be there.
@@ -192,5 +204,44 @@ class InvestigationOrchestratorTest {
     InvestigationReport report = service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), none);
     assertThat(report.openGoals()).containsExactly(Goal.values());
     assertThat(report.coverage()).isEmpty();
+  }
+
+  @Test
+  void aBeaconWhoseServerIsntAC2_isConsidered_andOneTheClassifierMatchedIsnt() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(FILE);
+    com.tracepcap.knowledge.spi.EntityRef host = com.tracepcap.knowledge.spi.EntityRef.host("10.0.0.5");
+    com.tracepcap.knowledge.spi.EntityRef quiet = com.tracepcap.knowledge.spi.EntityRef.external("203.0.113.9");
+    com.tracepcap.knowledge.spi.EntityRef c2 = com.tracepcap.knowledge.spi.EntityRef.external("141.98.10.79");
+    for (com.tracepcap.knowledge.spi.EntityRef ext : List.of(quiet, c2)) {
+      b.addFinding(new com.tracepcap.knowledge.spi.Finding("suspected-beacon", "10.0.0.5 → " + ext.key() + ":443 — a beacon shape",
+          com.tracepcap.knowledge.spi.Severity.MEDIUM, com.tracepcap.knowledge.spi.Grade.INFERRED, "beacon",
+          List.of(host, ext), List.of("conv-" + ext.key()), java.util.Map.of()));
+    }
+    b.addRelationship(com.tracepcap.knowledge.spi.Relationship.of(c2, "c2-of",
+        com.tracepcap.knowledge.spi.EntityRef.malware("STRRAT"), com.tracepcap.knowledge.spi.Grade.INFERRED, "stream-classifier"));
+
+    InvestigationReport r = investigate(b.build());
+    assertThat(r.considered()).singleElement().satisfies(c -> {
+      assertThat(c.question()).isEqualTo("c2");
+      assertThat(c.candidate()).isEqualTo("203.0.113.9");
+      assertThat(c.reason()).contains("no rule named it");
+      assertThat(c.conversations()).containsExactly("conv-203.0.113.9");
+    });
+  }
+
+  @Test
+  void aRuledOutCandidate_isNoCoverage_andIsListedOncePerServer() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(FILE);
+    com.tracepcap.knowledge.spi.EntityRef host = com.tracepcap.knowledge.spi.EntityRef.host("10.0.0.5");
+    com.tracepcap.knowledge.spi.EntityRef ext = com.tracepcap.knowledge.spi.EntityRef.external("203.0.113.9");
+    b.addFinding(new com.tracepcap.knowledge.spi.Considered("c2", "203.0.113.9", "rule", "on Spamhaus DROP, but …", List.of())
+        .toFinding("corroboration", List.of(ext, host)));
+    b.addFinding(new com.tracepcap.knowledge.spi.Finding("suspected-beacon", "a beacon shape",
+        com.tracepcap.knowledge.spi.Severity.MEDIUM, com.tracepcap.knowledge.spi.Grade.INFERRED, "beacon",
+        List.of(host, ext), List.of("c1"), java.util.Map.of()));
+
+    InvestigationReport r = investigate(b.build());
+    assertThat(r.coverage()).doesNotContain("corroboration");
+    assertThat(r.considered()).singleElement().satisfies(c -> assertThat(c.reason()).startsWith("on Spamhaus DROP"));
   }
 }

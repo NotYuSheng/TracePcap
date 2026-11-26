@@ -377,6 +377,28 @@ public interface ConversationRepository
   List<Object[]> findFanOutCandidatesByFileId(@Param("fileId") UUID fileId);
 
   /**
+   * Conversations per pair of hosts and which side opened them, for the capture's vantage point.
+   * Columns: [src_ip, dst_ip, conversations, opened_by_src, opened_by_dst]
+   */
+  @Query(
+      value =
+          "SELECT src_ip, dst_ip, COUNT(*),"
+              + " COUNT(*) FILTER (WHERE initiator_ip = src_ip),"
+              + " COUNT(*) FILTER (WHERE initiator_ip = dst_ip)"
+              + " FROM conversations WHERE file_id = :fileId GROUP BY src_ip, dst_ip",
+      nativeQuery = true)
+  List<Object[]> findHostPairsByFileId(@Param("fileId") UUID fileId);
+
+  /** Distinct ports {@code ip} answered on, in conversations another host opened to it. */
+  @Query(
+      value =
+          "SELECT COUNT(DISTINCT CASE WHEN dst_ip = :ip THEN dst_port ELSE src_port END)"
+              + " FROM conversations WHERE file_id = :fileId AND initiator_ip IS NOT NULL"
+              + " AND initiator_ip <> :ip AND (src_ip = :ip OR dst_ip = :ip)",
+      nativeQuery = true)
+  long countDistinctAnsweredPorts(@Param("fileId") UUID fileId, @Param("ip") String ip);
+
+  /**
    * Returns top senders by total bytes for volume anomaly detection. Columns: [src_ip, total_bytes,
    * flow_count]
    */
@@ -557,6 +579,16 @@ public interface ConversationRepository
       // Category multi-value
       if (params.getCategories() != null && !params.getCategories().isEmpty()) {
         predicates.add(root.get("category").in(params.getCategories()));
+      }
+
+      // Connection outcome (#1233); UNKNOWN selects the conversations without one.
+      if (params.getOutcomes() != null && !params.getOutcomes().isEmpty()) {
+        List<String> known =
+            params.getOutcomes().stream().filter(o -> !"UNKNOWN".equals(o)).toList();
+        List<Predicate> any = new java.util.ArrayList<>();
+        if (!known.isEmpty()) any.add(root.get("connectionOutcome").in(known));
+        if (params.getOutcomes().contains("UNKNOWN")) any.add(cb.isNull(root.get("connectionOutcome")));
+        predicates.add(cb.or(any.toArray(new Predicate[0])));
       }
 
       // Has flow risks, custom signature, or Suricata IDS alert matches
@@ -763,6 +795,14 @@ public interface ConversationRepository
       nativeQuery = true)
   List<Object[]> countByCategory(@Param("fileId") UUID fileId);
 
+  /** Conversations per connection outcome (#1233); those without one are counted as UNKNOWN. */
+  @Query(
+      value =
+          "SELECT coalesce(connection_outcome, 'UNKNOWN'), count(*) FROM conversations"
+              + " WHERE file_id = :fileId GROUP BY 1",
+      nativeQuery = true)
+  List<Object[]> countByConnectionOutcome(@Param("fileId") UUID fileId);
+
   @Query(
       value =
           "SELECT r, count(DISTINCT c.id) FROM conversations c, unnest(c.flow_risks) r"
@@ -811,4 +851,37 @@ public interface ConversationRepository
               + " AND conversation_id IS NOT NULL GROUP BY detected_file_type",
       nativeQuery = true)
   List<Object[]> countByFileType(@Param("fileId") UUID fileId);
+
+  /** nDPI app name, captures it's in, conversations; original captures only (#protocol reference). */
+  @Query(
+      value =
+          "SELECT c.app_name, count(DISTINCT c.file_id), count(*) FROM conversations c"
+              + " JOIN files f ON f.id = c.file_id"
+              + " WHERE c.app_name IS NOT NULL AND btrim(c.app_name) <> '' AND f.is_version = false"
+              + " GROUP BY c.app_name",
+      nativeQuery = true)
+  List<Object[]> appUsage();
+
+  /** The original captures an nDPI app name appears in: id, name, conversations; most first. */
+  @Query(
+      value =
+          "SELECT f.id, f.file_name, count(*) FROM conversations c JOIN files f ON f.id = c.file_id"
+              + " WHERE c.app_name = :app AND f.is_version = false"
+              + " GROUP BY f.id, f.file_name ORDER BY count(*) DESC, f.file_name LIMIT :lim",
+      nativeQuery = true)
+  List<Object[]> appCaptures(@Param("app") String app, @Param("lim") int limit);
+
+  /** TCP conversations in a capture (#1268). */
+  @Query(
+      value = "SELECT count(*) FROM conversations WHERE file_id = :fileId AND transport = 'TCP'",
+      nativeQuery = true)
+  long countTcp(@Param("fileId") UUID fileId);
+
+  /** TCP conversations whose handshake isn't in the capture: no connection outcome (#1233, #1268). */
+  @Query(
+      value =
+          "SELECT count(*) FROM conversations WHERE file_id = :fileId AND transport = 'TCP'"
+              + " AND connection_outcome IS NULL",
+      nativeQuery = true)
+  long countTcpWithoutHandshake(@Param("fileId") UUID fileId);
 }

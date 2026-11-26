@@ -60,6 +60,7 @@ public class ConversationQueryService {
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
   private final StorageService storageService;
+  private final com.tracepcap.analysis.spi.IdsAlertLookup idsAlertLookup;
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
       java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
@@ -508,6 +509,9 @@ public class ConversationQueryService {
         .initiatorIp(conv.flow().initiatorIp())
         .srcMac(conv.flow().srcMac())
         .dstMac(conv.flow().dstMac())
+        .connectionOutcome(conv.flow().connectionOutcome())
+        .bytesSrcToDst(conv.flow().bytesSrcToDst())
+        .bytesDstToSrc(conv.flow().bytesDstToSrc())
         .initiatorPort(conv.flow().initiatorPort())
         .protocol(conv.flow().protocol())
         .appName(conv.findings().appName())
@@ -516,6 +520,9 @@ public class ConversationQueryService {
         .hostname(conv.tls().hostname())
         .ja3Client(conv.tls().ja3Client())
         .ja3Server(conv.tls().ja3Server())
+        .ja4Client(conv.tls().ja4Client())
+        .tlsVersion(conv.tls().tlsVersion())
+        .tlsCertificate(com.tracepcap.analysis.dto.TlsCertificateDto.from(conv.tls().cert(), conv.tls().hostname()))
         .tlsIssuer(conv.tls().tlsIssuer())
         .tlsSubject(conv.tls().tlsSubject())
         .tlsNotBefore(conv.tls().tlsNotBefore())
@@ -586,7 +593,7 @@ public class ConversationQueryService {
     if (conversation.flow().dstIp() != null) detailIps.add(conversation.flow().dstIp());
     Map<String, GeoIpService.GeoResult> geoMap = geoIpService.lookupExternal(detailIps);
 
-    return ConversationDetailResponse.builder()
+    ConversationDetailResponse detail = ConversationDetailResponse.builder()
         .conversationId(conversation.id())
         .srcIp(conversation.flow().srcIp())
         .srcPort(conversation.flow().srcPort())
@@ -595,6 +602,9 @@ public class ConversationQueryService {
         .initiatorIp(conversation.flow().initiatorIp())
         .srcMac(conversation.flow().srcMac())
         .dstMac(conversation.flow().dstMac())
+        .connectionOutcome(conversation.flow().connectionOutcome())
+        .bytesSrcToDst(conversation.flow().bytesSrcToDst())
+        .bytesDstToSrc(conversation.flow().bytesDstToSrc())
         .initiatorPort(conversation.flow().initiatorPort())
         .protocol(conversation.flow().protocol())
         .appName(conversation.findings().appName())
@@ -603,6 +613,9 @@ public class ConversationQueryService {
         .hostname(conversation.tls().hostname())
         .ja3Client(conversation.tls().ja3Client())
         .ja3Server(conversation.tls().ja3Server())
+        .ja4Client(conversation.tls().ja4Client())
+        .tlsVersion(conversation.tls().tlsVersion())
+        .tlsCertificate(com.tracepcap.analysis.dto.TlsCertificateDto.from(conversation.tls().cert(), conversation.tls().hostname()))
         .tlsIssuer(conversation.tls().tlsIssuer())
         .tlsSubject(conversation.tls().tlsSubject())
         .tlsNotBefore(conversation.tls().tlsNotBefore())
@@ -610,6 +623,40 @@ public class ConversationQueryService {
         .flowRisks(conversation.findings().flowRisks())
         .customSignatures(conversation.findings().customSignatures())
         .suricataAlerts(conversation.findings().suricataAlerts())
+        .anomalies(
+            idsAlertLookup.anomaliesFor(conversation.id()).stream()
+                .map(a -> ConversationDetailResponse.Anomaly.builder()
+                    .time(a.time())
+                    .srcIp(a.srcIp())
+                    .type(a.type())
+                    .layer(a.layer())
+                    .appProto(a.appProto())
+                    .event(a.event())
+                    .build())
+                .toList())
+        .idsAlerts(
+            idsAlertLookup.forConversation(conversation.id()).stream()
+                .map(a -> ConversationDetailResponse.IdsAlert.builder()
+                    .time(a.time())
+                    .srcIp(a.srcIp())
+                    .srcPort(a.srcPort())
+                    .dstIp(a.dstIp())
+                    .dstPort(a.dstPort())
+                    .sid(a.sid())
+                    .rev(a.rev())
+                    .signature(a.signature())
+                    .category(a.category())
+                    .severity(a.severity())
+                    .signatureSeverity(a.signatureSeverity())
+                    .confidence(a.confidence())
+                    .attackTarget(a.attackTarget())
+                    .httpMethod(a.httpMethod())
+                    .httpHost(a.httpHost())
+                    .httpUrl(a.httpUrl())
+                    .httpUserAgent(a.httpUserAgent())
+                    .httpStatus(a.httpStatus())
+                    .build())
+                .toList())
         .httpUserAgents(conversation.findings().httpUserAgents())
         .packetCount(conversation.flow().packetCount())
         .totalBytes(conversation.flow().totalBytes())
@@ -620,6 +667,12 @@ public class ConversationQueryService {
         .dstGeo(toGeoInfo(geoMap.get(conversation.flow().dstIp())))
         .packets(packetResponses)
         .build();
+    // How many fired (#1284): never fewer than the records shown, whatever the count row says.
+    int shown = detail.getIdsAlerts() == null ? 0 : detail.getIdsAlerts().size();
+    detail.setIdsAlertCount(idsAlertLookup.countFor(conversation.id())
+        .map(c -> Math.max(c.total(), shown))
+        .orElse(shown > 0 ? shown : null));
+    return detail;
   }
 
   private PacketResponse toPacketResponse(PacketFacts p) {

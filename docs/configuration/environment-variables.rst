@@ -141,6 +141,15 @@ documented in its own section below with the surrounding detail.
        Adds ~50 s of fixed rule-loading overhead to each capture it processes,
        on top of packet scanning that scales with size. The fixed floor makes it the
        biggest throughput lever, and proportionally heaviest on small captures.
+   * - ``SURICATA_RULES_DIR``
+     - ``./suricata-rules``
+     - Host folder mounted into the backend for a newer Suricata ruleset
+       (ET's ``emerging.rules.tar.gz`` or ``.rules`` files). Checked every
+       minute, test-loaded, and used only if it loads. See
+       :doc:`../features/ids-threat-detection`.
+   * - ``SURICATA_RULESET_STALE_DAYS``
+     - ``30``
+     - A Suricata ruleset older than this is flagged as stale next to its alerts.
    * - ``FILE_RETENTION_ENABLED``
      - ``true``
      - Master switch for automatic deletion. ``false`` keeps captures
@@ -480,17 +489,22 @@ LLM
      - Sampling temperature (0.0–2.0). Lower values produce more deterministic
        output; higher values more creative output.
    * - ``LLM_MAX_TOKENS``
-     - ``8000``
-     - Maximum number of tokens the LLM may generate per response. Controls
-       response length only — not the context window. Increase if stories are
-       cut off; decrease to save compute. Recommended 4000–8000.
+     - ``0``
+     - The most tokens one reply may use. ``0`` sizes every reply to what the
+       model's context has left after the prompt, so a reasoning model has room
+       to think and a small model isn't asked for more than it holds. Set a
+       number only to cap replies (a paid API, a shared GPU); reasoning models
+       need 24000 or more. If a capped reply is cut off, the error says to
+       raise it.
    * - ``LLM_CONTEXT_LENGTH``
      - *(auto)*
-     - The context window size (in tokens) configured on your LLM server. Used
-       to detect prompt-too-large errors early. If unset, auto-detected from
-       the ``/v1/models`` endpoint; if that fails, the configured
-       ``LLM_MAX_TOKENS`` value remains in effect. Example: ``32768`` for a 32k
-       model.
+     - The context window size (in tokens) configured on your LLM server. Sizes
+       each reply and catches prompts too large to send. If unset, it's read
+       from the server's ``/v1/models`` list (LM Studio, vLLM, llama.cpp), or
+       from the limit the server names when asked for an impossible reply
+       (vLLM, GPUStack, SGLang). If neither works, the reply's length is left
+       to the server. Set it only to overrule the server. Example: ``32768``
+       for a 32k model.
    * - ``LLM_TIMEOUT``
      - ``300``
      - HTTP timeout in seconds for LLM API requests. Local models can be slow —

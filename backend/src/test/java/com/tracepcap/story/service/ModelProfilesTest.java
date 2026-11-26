@@ -35,7 +35,7 @@ class ModelProfilesTest {
   }
 
   private final LlmConnectionTester tester =
-      new LlmConnectionTester(mock(LlmSettings.class), mock(PolicyEditGate.class), new ObjectMapper());
+      new LlmConnectionTester(mock(LlmSettings.class), mock(PolicyEditGate.class), new ObjectMapper(), new com.tracepcap.config.LlmConfig());
 
   @Test
   void aReplyFromAnotherModelIsAWarning() {

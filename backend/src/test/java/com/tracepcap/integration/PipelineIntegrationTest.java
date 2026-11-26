@@ -1218,7 +1218,8 @@ class PipelineIntegrationTest {
             "/api/v1/roles/analyst", HttpMethod.PATCH, json("{\"permissions\":[\"SEE_CAPTURES\"]}"), JsonNode.class);
     assertThat(change.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
-    // An admin could raise it (simulated here); then the same analyst save is refused, unaudited.
+    // An admin could raise it (simulated here); then the same analyst save is refused, and the
+    // refused attempt is audited too, marked denied.
     adminOnly("NETWORK_SETTINGS");
     ResponseEntity<JsonNode> refused =
         rest.exchange(
@@ -1228,12 +1229,9 @@ class PipelineIntegrationTest {
             JsonNode.class);
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     assertThat(refused.getBody().get("message").asText()).contains("only admins");
-    assertThat(
-            rest.getForEntity("/api/v1/audit-log?search=" + id, JsonNode.class)
-                .getBody()
-                .get("total")
-                .asLong())
-        .isEqualTo(1);
+    JsonNode after = rest.getForEntity("/api/v1/audit-log?search=" + id, JsonNode.class).getBody();
+    assertThat(after.get("total").asLong()).isEqualTo(2);
+    assertThat(after.get("data").get(0).get("action").asText()).isEqualTo("network.settings.set.denied");
 
     resetRoles();
     rest.exchange("/api/v1/monitor/networks/" + id, HttpMethod.DELETE, null, Void.class);

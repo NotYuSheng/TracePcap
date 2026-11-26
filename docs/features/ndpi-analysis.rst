@@ -28,9 +28,12 @@ What nDPI Provides
        ``[Risk: ** Name1 **** Name2 **]`` block and normalized to
        ``lowercase_underscore`` form (e.g. ``clear_text_credentials``,
        ``known_protocol_on_non_standard_port``, ``self_signed_certificate``).
-   * - JA3C fingerprint
-     - Client TLS fingerprint (MD5 hash of TLS ClientHello parameters).
-       Extracted from the ``[JA3C: <hash>]`` field.
+   * - JA4 fingerprint
+     - Client TLS fingerprint in the JA4 format (e.g.
+       ``t13d1516h2_8daaf6152771_02713d6af862``). Extracted from the
+       ``[JA4: ...]`` field. nDPI 6 reports JA4 in place of the older JA3C, so
+       the **client JA3** now comes from Suricata's TLS records instead (see
+       :doc:`ids-threat-detection`).
    * - JA3S fingerprint
      - Server TLS fingerprint (MD5 hash of TLS ServerHello parameters).
        Extracted from the ``[JA3S: <hash>]`` field.

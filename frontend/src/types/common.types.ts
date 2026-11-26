@@ -70,6 +70,14 @@ export interface Conversation {
   hostname?: string;
   ja3Client?: string;
   ja3Server?: string;
+  /** JA4 client fingerprint, from nDPI (#599). */
+  ja4Client?: string;
+  /** Negotiated TLS version, e.g. "TLS 1.2", from Suricata (#599). */
+  tlsVersion?: string;
+  /** The server certificate's detail and checks (#1235); absent when the certificate wasn't seen. */
+  tlsCertificate?: TlsCertificate | null;
+  /** How the TCP connection went (#1233): ANSWERED, NO_ANSWER, REJECTED; absent when unknown. */
+  connectionOutcome?: string | null;
   tlsIssuer?: string;
   tlsSubject?: string;
   tlsNotBefore?: number;
@@ -83,6 +91,18 @@ export interface Conversation {
   endTime: number;
   packetCount: number;
   totalBytes: number;
+  /** Bytes from srcIp to dstIp and back (#1260); absent for conversations analysed before then. */
+  bytesSrcToDst?: number | null;
+  bytesDstToSrc?: number | null;
+  /** Each Suricata alert as it fired (#1265), oldest first; absent for captures analysed before. */
+  idsAlerts?: IdsAlert[];
+  /**
+   * How many alerts fired (#1284). More than idsAlerts holds when the records stopped at their cap
+   * (100 each way on a connection, 20,000 per capture): those are the first. Absent for older captures.
+   */
+  idsAlertCount?: number | null;
+  /** Suricata's protocol anomalies (#1268), oldest first; absent for captures analysed before. */
+  anomalies?: ProtocolAnomaly[];
   packets: Packet[];
   direction: 'bidirectional' | 'unidirectional';
   srcGeo?: ConversationGeoInfo;
@@ -448,18 +468,51 @@ export type DeviceType =
   | 'UNKNOWN'
   | string; // custom values from detection-rule classification hints (#926)
 
+/** One Suricata protocol anomaly (#1268): malformed or one-sided traffic, not an attack signature. */
+export interface ProtocolAnomaly {
+  /** Epoch ms. */
+  time?: number;
+  srcIp?: string;
+  type?: string;
+  layer?: string;
+  appProto?: string;
+  event: string;
+}
+
+/** One Suricata alert as logged (#1265). `srcIp` sent the packet that fired it. */
+export interface IdsAlert {
+  /** Epoch ms. */
+  time?: number;
+  srcIp?: string;
+  dstIp?: string;
+  sid: number;
+  signature: string;
+  category?: string;
+  severity?: number;
+  /** The rule's own rating: Critical, Major, Minor, Informational. */
+  signatureSeverity?: string;
+  /** The rule's own confidence: High, Medium, Low. */
+  confidence?: string;
+  httpMethod?: string;
+  httpHost?: string;
+  httpUrl?: string;
+  httpStatus?: number;
+}
+
 export interface HostClassification {
   ip: string;
   mac?: string;
   manufacturer?: string;
   /** Passively-discovered hostname for the host (DHCP/mDNS/NBNS/reverse DNS). */
   hostname?: string;
-  /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
+  /** How `hostname` was discovered: reverse_dns | mdns | nbns | ntlm | dhcp | manual. */
   hostnameSource?: HostnameSource;
   /** Windows sign-in username observed from this host (Kerberos AS-REQ / LDAP); person-level (#809). */
   loggedInUser?: string;
-  /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
+  /** How `loggedInUser` was discovered: kerberos_as_req or ntlm_auth (signed in) | ldap_dn (weaker). */
   loggedInUserSource?: string;
+  /** The person behind `loggedInUser` ("Gabriel McDowell"), from a SAMR reply or an LDAP person DN. */
+  loggedInUserRealName?: string;
   /**
    * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
    * 1. With more, show "N accounts" and the host's login timeline rather than picking one.
@@ -535,7 +588,7 @@ export interface HostIdentityEvidence {
 }
 
 /** How a host's name was discovered from passive traffic. */
-export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'dhcp' | 'manual';
+export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'ntlm' | 'dhcp' | 'manual';
 
 // Filter Generator Types
 export interface FilterGenerationRequest {
@@ -582,6 +635,19 @@ export interface Answer {
   subjects: AnswerEntityRef[];
   basis: string[];
   attributes: Record<string, unknown>;
+  /** How the answer was reached, step by step (#1293). Older servers send none. */
+  derivation?: DerivationStep[];
+}
+
+/**
+ * One step in how an answer was reached (#1293): what was found, the rule that took it to the next
+ * claim (null for context), how directly it's known, and the conversations it rests on.
+ */
+export interface DerivationStep {
+  found: string;
+  rule: string | null;
+  grade: 'MEASURED' | 'REPORTED' | 'INFERRED' | string;
+  conversations: string[];
 }
 
 /** One standing goal's outcome in the autonomous investigation (#819). */
@@ -593,6 +659,10 @@ export interface GoalOutcome {
   confidence: number;
   basis: string[];
   subjects: AnswerEntityRef[];
+  /** The answer's structured detail (a C2's address, how it was concluded); absent from older backends. */
+  attributes?: Record<string, unknown>;
+  /** How the answer was reached (#1293); absent from older backends. */
+  derivation?: DerivationStep[];
 }
 
 /**
@@ -606,4 +676,148 @@ export interface InvestigationReport {
   additional: Answer[];
   unknowns: string[];
   coverage: string[];
+  /** Candidates the checks tested and ruled out, with why (#1294); absent from older backends. */
+  considered?: Considered[];
+  /** Every investigation-framework category's status on this capture; absent from older backends. */
+  categories?: CategoryStatus[];
+  /** Where the capture was taken, how complete it is, the time it spans; absent from older backends. */
+  context?: CaptureContext | null;
+  /** Hosts read against the honeypot signatures; absent from older backends. */
+  honeypots?: Honeypots | null;
+}
+
+/** One thing that points at a honeypot: a signature matched, a behaviour, or analyst evidence. */
+export interface HoneypotSignal {
+  source: 'signature' | 'behaviour' | 'analyst';
+  /** The signature's id, or the behaviour's name (fan-in, many-services, os-mismatch). */
+  id: string;
+  /** The honeypot a signature names; null for behaviour. */
+  honeypot: string | null;
+  /** STRONG, MEDIUM or WEAK; null for analyst evidence. */
+  strength: string | null;
+  points: number;
+  text: string;
+}
+
+/**
+ * One host's honeypot role: inferred from two or more signals, and overridable. Overrides and
+ * evidence go to the adjudication endpoints for the report's `question` and the host's address.
+ */
+export interface HoneypotHost {
+  host: string;
+  /** "Honeypot", "Not a honeypot", an analyst's own, or null: its signals don't settle it. */
+  label: string | null;
+  /** Which honeypot the signatures name, e.g. "Dionaea". */
+  honeypot: string | null;
+  /** "198.51.100.45 is a Dionaea honeypot"; null when undetermined. */
+  described: string | null;
+  basis: 'MACHINE' | 'HUMAN';
+  confidence: number;
+  contested: boolean;
+  candidates: VantageCandidate[];
+  signals: HoneypotSignal[];
+  /** Why: the signals, the override's rationale, or why they fall short. */
+  reason: string | null;
+  overriddenBy: string | null;
+}
+
+export interface Honeypots {
+  /** Every host with a signal, analyst evidence or an override; honeypots first. */
+  hosts: HoneypotHost[];
+  /** Hosts with one signature match and nothing else (a stock banner real servers send too), counted. */
+  singleSignal: number;
+  /** Servers whose banners and certificates were read against the signatures. */
+  serversChecked: number;
+  signaturesVersion: string | null;
+  question: string;
+  options: string[];
+}
+
+/** One vantage point the vote considered, and why. */
+export interface VantageCandidate {
+  label: string;
+  score: number;
+  reasons: string[];
+}
+
+/**
+ * Where a capture was taken: inferred from its address mix, and overridable. Overrides and analyst
+ * evidence go to the generic adjudication endpoints for `question` / `entityKey`.
+ */
+export interface VantagePoint {
+  /** lan, uplink, client, server, sensor, "other" (an analyst's own label), or null: undetermined. */
+  key: string | null;
+  label: string | null;
+  /** The one host the capture is centred on, when it is. */
+  host: string | null;
+  basis: 'MACHINE' | 'HUMAN';
+  confidence: number;
+  contested: boolean;
+  candidates: VantageCandidate[];
+  /** Why: the inference, the override's rationale, or why it can't tell. */
+  reason: string | null;
+  overriddenBy: string | null;
+  question: string;
+  entityKey: string;
+  /** The labels an analyst can pick from. */
+  options: string[];
+}
+
+export interface CaptureContext {
+  vantage: VantagePoint;
+  completeness: {
+    label: string;
+    /** complete, partial (traffic missing or uninspected) or notes. */
+    level: 'complete' | 'partial' | 'notes';
+    notes: { kind: string; level: string; text: string }[];
+  };
+  timeSpan: { start: string | null; end: string | null; durationMs: number | null; label: string | null };
+}
+
+/** A protocol in this capture worth a look for a category: what it shows, and its conversations. */
+export interface CategoryLead {
+  label: string;
+  shows: string;
+  /** Conversations URL query, e.g. "l7Protocols=KERBEROS". */
+  query: string;
+}
+
+/**
+ * One investigation-framework category on one capture (docs/architecture/investigation-framework.rst).
+ * NOT_OBSERVABLE: the capture can't show it, and `reason` says why. `unchecked`: no check covers it
+ * yet, so it is OPEN when the capture could show it.
+ */
+export interface CategoryStatus {
+  key: string;
+  axis: 'CONTEXT' | 'ENTITY' | 'ACTIVITY';
+  label: string;
+  /** The ATT&CK tactic id for an activity ("TA0011"). */
+  attackId: string | null;
+  status: 'ANSWERED' | 'RULED_OUT' | 'OPEN' | 'NOT_OBSERVABLE';
+  unchecked: boolean;
+  reason: string | null;
+  leads: CategoryLead[];
+}
+
+/** A candidate a check tested and ruled out (#1294): what it was, the rule, and why it fell short. */
+export interface Considered {
+  question: string;
+  candidate: string;
+  rule: string | null;
+  reason: string;
+  conversations: string[];
+}
+
+/** Mirrors TlsCertificateDto (#1235): the checks are worked out by the backend. */
+export interface TlsCertificate {
+  sans: string[];
+  keyType?: string | null;
+  keyBits?: number | null;
+  signatureAlgorithm?: string | null;
+  selfSigned: boolean;
+  chainLength: number;
+  weakKey: boolean;
+  weakSignature: boolean;
+  /** Null when there's no server name to check or no SANs. */
+  coversServerName?: boolean | null;
 }

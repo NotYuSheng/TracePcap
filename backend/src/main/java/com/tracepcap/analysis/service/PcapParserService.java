@@ -131,7 +131,9 @@ public class PcapParserService {
             "-e",
             "tcp.flags.syn",
             "-e",
-            "tcp.flags.ack");
+            "tcp.flags.ack",
+            "-e",
+            "tcp.flags.reset");
     pb.redirectErrorStream(false);
 
     // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
@@ -198,8 +200,8 @@ public class PcapParserService {
           //
           // Tail layout, from the end: tcp.payload, udp.payload, ip.ttl, eth.src,
           // arp.src.proto_ipv4, arp.dst.proto_ipv4, eth.dst, arp.src.hw_mac, frame.number,
-          // tcp.flags.syn, tcp.flags.ack.
-          final int TAIL = 11; // structured fields emitted after _ws.col.Info
+          // tcp.flags.syn, tcp.flags.ack, tcp.flags.reset.
+          final int TAIL = 12; // structured fields emitted after _ws.col.Info
           final int n = f.length;
           // 11 head fields + Info (>=1 column) + TAIL fields. A shorter row is malformed/truncated;
           // treat its post-Info fields as absent rather than risk reading a head field as a tail one.
@@ -224,27 +226,27 @@ public class PcapParserService {
             info = f[11];
           }
 
-          String tcpPayloadField = aligned ? f[n - 11] : "";
-          String udpPayloadField = aligned ? f[n - 10] : "";
+          String tcpPayloadField = aligned ? f[n - 12] : "";
+          String udpPayloadField = aligned ? f[n - 11] : "";
 
           // First-seen TTL for the source IP — best-effort, may be absent.
           Integer ttl = null;
-          if (aligned && !f[n - 9].isEmpty()) {
+          if (aligned && !f[n - 10].isEmpty()) {
             try {
-              ttl = Integer.parseInt(firstValue(f[n - 9]));
+              ttl = Integer.parseInt(firstValue(f[n - 10]));
             } catch (NumberFormatException ignored) {
             }
           }
-          String srcMac = aligned && !f[n - 8].isEmpty() ? firstValue(f[n - 8]).toLowerCase() : null;
+          String srcMac = aligned && !f[n - 9].isEmpty() ? firstValue(f[n - 9]).toLowerCase() : null;
 
           // Layer-2 address fallback for non-IP protocols (ARP, STP, LLDP, CDP, etc.).
           // For ARP: use the embedded protocol (IP) addresses from the ARP payload.
           // For other pure L2 frames: use Ethernet MAC addresses as node identifiers.
-          String arpSrcIp = aligned && !f[n - 7].isEmpty() ? firstValue(f[n - 7]) : null;
-          String arpDstIp = aligned && !f[n - 6].isEmpty() ? firstValue(f[n - 6]) : null;
-          String dstMac = aligned && !f[n - 5].isEmpty() ? firstValue(f[n - 5]).toLowerCase() : null;
+          String arpSrcIp = aligned && !f[n - 8].isEmpty() ? firstValue(f[n - 8]) : null;
+          String arpDstIp = aligned && !f[n - 7].isEmpty() ? firstValue(f[n - 7]) : null;
+          String dstMac = aligned && !f[n - 6].isEmpty() ? firstValue(f[n - 6]).toLowerCase() : null;
           // ARP sender hardware address — the "I own this IP at this MAC" claim.
-          String arpSrcMac = aligned && !f[n - 4].isEmpty() ? firstValue(f[n - 4]).toLowerCase() : null;
+          String arpSrcMac = aligned && !f[n - 5].isEmpty() ? firstValue(f[n - 5]).toLowerCase() : null;
           // Belt-and-suspenders: these embedded IPs can become a node id and persist to a
           // varchar(45) column (e.g. ip_mac_observations.ip), so cap them like srcIp/dstIp above.
           if (arpSrcIp != null && arpSrcIp.length() > 45) arpSrcIp = arpSrcIp.substring(0, 45);
@@ -320,7 +322,12 @@ public class PcapParserService {
             final String fProtocol = protocol;
             final LocalDateTime fTs = timestamp;
 
-            String convKey = createConversationKey(srcIp, srcPort, dstIp, dstPort, protocol);
+            // Keyed on the transport, not Wireshark's per-packet label: one TCP connection carries
+            // "TCP" (handshake), "TLSv1.2" (records) and more, and keying on the label split it into
+            // a row per label (45-53% of rows on real captures were such pieces, a regression from
+            // the move to tshark in #120). The row shows the most specific label it saw instead.
+            String transport = transportOf(tcpSport, udpSport, protocol);
+            String convKey = createConversationKey(srcIp, srcPort, dstIp, dstPort, transport);
             // A client with no address yet (a DHCP request from 0.0.0.0) is told apart only by its
             // MAC. Without it in the key, every such client merged into one conversation credited
             // to whichever MAC came first, so the map drew one "0.0.0.0" device for all of them.
@@ -344,6 +351,7 @@ public class PcapParserService {
                       c.setDstIp(fDstIp);
                       c.setDstPort(fDstPort);
                       c.setProtocol(fProtocol);
+                      c.setTransport(transport);
                       c.setStartTime(fTs);
                       c.setEndTime(fTs);
                       c.setPacketCount(0L);
@@ -360,7 +368,16 @@ public class PcapParserService {
                       return c;
                     });
             conv.setPacketCount(conv.getPacketCount() + 1);
+            // "TCP" on the opening SYN, "TLSv1.2" once the handshake starts: show the specific one.
+            if (isBareTransport(conv.getProtocol()) && !isBareTransport(fProtocol)) conv.setProtocol(fProtocol);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
+            // Which way the bytes went: a download and an upload of the same size are different
+            // findings ("sent 6 MB" was written for a 6 MB file the host received).
+            if (fSrcIp.equals(conv.getSrcIp()) && java.util.Objects.equals(fSrcPort, conv.getSrcPort())) {
+              conv.setBytesSrcToDst(conv.getBytesSrcToDst() + packetSize);
+            } else {
+              conv.setBytesDstToSrc(conv.getBytesDstToSrc() + packetSize);
+            }
             // Each side's MAC (#462): the first eth.src seen from it. A local host's own MAC, or for
             // traffic from outside the site's router MAC, which says which network it was on.
             if (srcMac != null) {
@@ -379,13 +396,15 @@ public class PcapParserService {
             // SYN without ACK — the two trailing fields, read from the end for the same reason
             // frame.number is (an Info-column '|' must not shift them). Guarded on length so a row
             // that somehow lacks the flag columns skips this rather than indexing out of bounds.
-            if (conv.getInitiatorIp() == null
-                && f.length >= 3
-                && "1".equals(f[f.length - 2])
-                && !"1".equals(f[f.length - 1])) {
+            boolean syn = f.length >= 4 && "1".equals(f[f.length - 3]);
+            boolean ack = f.length >= 4 && "1".equals(f[f.length - 2]);
+            boolean rst = f.length >= 4 && "1".equals(f[f.length - 1]);
+            if (conv.getInitiatorIp() == null && syn && !ack) {
               conv.setInitiatorIp(fSrcIp);
               conv.setInitiatorPort(fSrcPort);
             }
+            // How the connection went (#1233), from the handshake. Only TCP has one.
+            if (!tcpSport.isEmpty()) conv.observeTcp(fSrcIp, fSrcPort, syn, ack, rst);
 
             // Extract payload hex from tcp.payload / udp.payload (both read tail-relative above, for
             // the same reason as the other post-Info fields — a '|' in Info must not shift them).
@@ -402,7 +421,7 @@ public class PcapParserService {
             // shift every fixed index, and appending syn/ack already moved frame.number off the last
             // slot once — reading from the tail is what keeps that from silently corrupting data.
             long frameNumber = packetNumber;
-            String rawFrame = f.length >= 3 ? f[f.length - 3] : null;
+            String rawFrame = f.length >= 4 ? f[f.length - 4] : null;
             if (rawFrame != null && !rawFrame.isEmpty()) {
               try {
                 frameNumber = Long.parseLong(rawFrame.trim());
@@ -604,6 +623,18 @@ public class PcapParserService {
     return "0.0.0.0".equals(ip) || "::".equals(ip);
   }
 
+  /** The conversation's transport: TCP or UDP when it has ports, else the packet's own label. */
+  static String transportOf(String tcpSport, String udpSport, String label) {
+    if (tcpSport != null && !tcpSport.isEmpty()) return "TCP";
+    if (udpSport != null && !udpSport.isEmpty()) return "UDP";
+    return label;
+  }
+
+  /** A label that names only the transport, which a more specific one should replace. */
+  static boolean isBareTransport(String label) {
+    return label == null || "TCP".equals(label) || "UDP".equals(label);
+  }
+
   private String createConversationKey(
       String srcIp, Integer srcPort, String dstIp, Integer dstPort, String protocol) {
     String ip1, ip2;
@@ -722,12 +753,31 @@ public class PcapParserService {
     private String initiatorIp;
 
     private Integer initiatorPort;
+    /** The row's display label: the most specific one its packets showed ("TLSV1.2"). */
     private String protocol;
+    /**
+     * TCP or UDP (or the label for portless traffic): what the conversation is keyed on, and what
+     * other tools' flow records (nDPI, tshark, Suricata) are matched by. Never the display label,
+     * which changes as a connection goes from its "TCP" SYN to "TLSV1.2" records.
+     */
+    private String transport;
     private String appName;
     private String tsharkProtocol;
     private List<String> flowRisks = new ArrayList<>();
     private List<String> customSignatures = new ArrayList<>();
     private List<String> suricataAlerts = new ArrayList<>();
+    /** Each alert behind {@code suricataAlerts} in full (#1265), persisted to ids_alerts. */
+    private List<SuricataService.AlertEvent> idsAlertEvents = new ArrayList<>();
+    /** How many alerts Suricata logged on this conversation (#1284); idsAlertEvents may be fewer. */
+    private int idsAlertTotal;
+    /** The flow idsAlertTotal counts, either way round: conversations sharing it are counted once. */
+    private String idsAlertFlow;
+    /** Suricata's protocol anomalies on this conversation (#1268), persisted to suricata_anomalies. */
+    private List<SuricataService.Anomaly> suricataAnomalies = new ArrayList<>();
+    /** What one host did to another over SMB and RPC (#1266), persisted to remote_operations. */
+    private List<SmbRpcRecords.Operation> remoteOperations = new ArrayList<>();
+    /** The tickets and errors a KDC returned on this conversation (#1267), to kerberos_exchanges. */
+    private List<KerberosRecords.Exchange> kerberosExchanges = new ArrayList<>();
     private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;
@@ -736,12 +786,19 @@ public class PcapParserService {
     private String dstMac;
     private String ja3Client;
     private String ja3Server;
+    private String ja4Client;
+    private String tlsVersion;
     private String tlsIssuer;
     private String tlsSubject;
     private LocalDateTime tlsNotBefore;
     private LocalDateTime tlsNotAfter;
+    /** The server certificate's detail (#1235), from Suricata's logged DER; null when not seen. */
+    private com.tracepcap.analysis.spi.ConversationLookup.CertFacts tlsCert;
     private Long packetCount;
     private Long totalBytes;
+    /** Bytes sent by {@link #srcIp} (to dstIp), and by dstIp (to srcIp). */
+    private long bytesSrcToDst;
+    private long bytesDstToSrc;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 
@@ -754,6 +811,24 @@ public class PcapParserService {
      * back from the database by this id instead.
      */
     private UUID entityId;
+
+    /** The handshake as seen so far (#1233); TCP conversations only. */
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
+    private TcpHandshake handshake;
+
+    /** Feeds one TCP packet's flags to the handshake. */
+    public void observeTcp(String srcIp, Integer srcPort, boolean syn, boolean ack, boolean rst) {
+      if (handshake == null) handshake = new TcpHandshake();
+      handshake.observe(srcIp, srcPort, syn, ack, rst);
+    }
+
+    /** How the connection went, or null when unknown (not TCP, or the SYN wasn't captured). */
+    public TcpHandshake.Outcome getConnectionOutcome() {
+      return handshake == null ? null : handshake.outcome();
+    }
   }
 
   // ---------------------------------------------------------------------------

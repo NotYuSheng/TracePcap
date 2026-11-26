@@ -38,7 +38,10 @@ public class WindowsLogonLookupAdapter implements WindowsLogonLookup {
       if (ip == null || when == null) return null;
       List<com.tracepcap.analysis.entity.WindowsLogonEntity> logons = byIp.get(ip);
       if (logons == null) return null;
+      // Kerberos and NTLM (#1234) sign-ins decide; LDAP lookups only when there are none.
       java.util.Map<String, java.time.LocalDateTime> kerberos = firstLogins(logons, when, "kerberos_as_req");
+      firstLogins(logons, when, WindowsIdentityResolverService.SOURCE_NTLM_AUTH)
+          .forEach((user, at) -> kerberos.merge(user, at, (x, y) -> x.isBefore(y) ? x : y));
       java.util.Map<String, java.time.LocalDateTime> accounts =
           !kerberos.isEmpty() || ldapIgnored.contains(ip)
               ? kerberos

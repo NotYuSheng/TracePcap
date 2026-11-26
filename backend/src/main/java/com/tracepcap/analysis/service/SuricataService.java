@@ -42,6 +42,14 @@ import org.springframework.stereotype.Service;
  * stored in the conversation's {@code suricataAlerts} list, mirroring how {@link NdpiService}
  * populates {@code flowRisks}.
  *
+ * <p>The same eve.json carries a {@code tls} record per TLS session (#599). Those fill the TLS facts
+ * nDPI didn't provide: above all the client JA3, which nDPI 6 no longer reports (it reports JA4
+ * instead), plus SNI and certificate fields where nDPI missed them, and the negotiated version,
+ * which nothing else records. They only ever fill gaps; a value nDPI set is never replaced. The
+ * {@code http}, {@code dns} and HTTP {@code fileinfo} records are deliberately not read: tshark
+ * already extracts those (web server log, DNS query log, file extraction). The {@code smb}, {@code
+ * dcerpc} and SMB {@code fileinfo} records are, by {@link SmbRpcRecords} (#1266).
+ *
  * <p>Gracefully degrades: if the {@code suricata} binary or ruleset is missing or Suricata fails,
  * {@code suricataAlerts} stays empty and analysis continues normally.
  */
@@ -59,6 +67,10 @@ public class SuricataService implements Extractor {
 
   /** Warm engine (#569). Falls back to the per-file subprocess below when unavailable. */
   private final SuricataEngine engine;
+
+  /** Which ruleset to load (#600). Absent in unit tests, where the packaged default applies. */
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private SuricataRuleset ruleset;
 
   public SuricataService(SuricataEngine engine) {
     this.engine = engine;
@@ -92,21 +104,196 @@ public class SuricataService implements Extractor {
 
   @Override
   public Outcome extract(ExtractionTarget target) {
-    enrich(target.capture(), target.conversations());
+    if (target.conversations().isEmpty()) return Outcome.completed("suricata ran");
+    Eve eve = runSuricata(target.capture());
+    apply(eve, target.conversations());
+    saveStats(target, eve);
     return Outcome.completed("suricata ran");
   }
 
   /** The engine run (the slow part) needs only the file, so it happens before the pipeline's transaction (#409). */
   @Override
   public Prepared prepare(ExtractionTarget target) {
-    Map<String, Set<String>> alertMap = runSuricata(target.capture());
+    Eve eve = runSuricata(target.capture());
     return conversations -> {
-      applyAlerts(alertMap, conversations);
+      apply(eve, conversations);
+      saveStats(target, eve);
       return Outcome.completed("suricata ran");
     };
   }
 
+  /** What one Suricata run produced: alerts and TLS records, each keyed by flow (both directions). */
+  record Eve(
+      Map<String, Set<String>> alerts,
+      Map<String, TlsRecord> tls,
+      Map<String, List<AlertEvent>> alertEvents,
+      java.util.concurrent.atomic.AtomicInteger alertEventCount,
+      Map<String, List<Anomaly>> anomalies,
+      java.util.concurrent.atomic.AtomicInteger anomalyCount,
+      java.util.concurrent.atomic.AtomicReference<CaptureStats> stats,
+      Map<String, List<SmbRpcRecords.Op>> remoteOps,
+      java.util.concurrent.atomic.AtomicInteger remoteOpCount,
+      Map<String, String> smbTrees,
+      Map<String, List<KerberosRecords.Reply>> kerberos,
+      java.util.concurrent.atomic.AtomicInteger kerberosCount,
+      Map<String, JsonNode> kerberosRequests,
+      Map<String, Integer> alertTotals) {
+    static Eve empty() {
+      return new Eve(new HashMap<>(), new HashMap<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(),
+          new java.util.concurrent.atomic.AtomicReference<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(), new HashMap<>(),
+          new java.util.concurrent.atomic.AtomicInteger(), new HashMap<>(), new HashMap<>());
+    }
+  }
+
+  /**
+   * One eve.json {@code anomaly} record (#1268): traffic a protocol parser found malformed or
+   * one-sided, e.g. {@code applayer / proto_detect / APPLAYER_DETECT_PROTOCOL_ONLY_ONE_DIRECTION}.
+   */
+  public record Anomaly(
+      java.time.LocalDateTime time, String srcIp, String dstIp, String type, String layer,
+      String appProto, String event) {}
+
+  /**
+   * Suricata's counters for one run (#1268), from its {@code stats} record. Per capture in both
+   * per-file and socket mode (measured: the same capture twice through one engine gave the same
+   * counts).
+   */
+  public record CaptureStats(
+      Long packets, Long invalidPackets, Long tcpSessions, Long reassemblyGaps,
+      Long streamDepthReached, Long memcapDrops) {}
+
+  /** At most this many anomaly records are kept per capture. */
+  static final int MAX_ANOMALIES = 5_000;
+
+  /** Saves a run's counters; optional so tests can build the service without persistence. */
+  private IdsAlertWriter statsSink;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  void setStatsSink(IdsAlertWriter statsSink) {
+    this.statsSink = statsSink;
+  }
+
+  private void saveStats(ExtractionTarget target, Eve eve) {
+    CaptureStats s = eve.stats().get();
+    if (s == null || statsSink == null || target.file() == null || target.file().getId() == null) return;
+    try {
+      statsSink.saveStats(com.tracepcap.analysis.entity.CaptureStatsEntity.builder()
+          .fileId(target.file().getId())
+          .packets(s.packets())
+          .invalidPackets(s.invalidPackets())
+          .tcpSessions(s.tcpSessions())
+          .reassemblyGaps(s.reassemblyGaps())
+          .streamDepthReached(s.streamDepthReached())
+          .memcapDrops(s.memcapDrops())
+          .build());
+    } catch (Exception e) {
+      log.warn("Saving Suricata's capture counters failed: {}", e.getMessage());
+    }
+  }
+
+  /**
+   * At most this many alert records are kept per capture (#1265). A scan or a noisy rule can fire
+   * hundreds of thousands of times; the deduplicated message lists are unaffected by the cap, and
+   * every flow's true count is kept beside the records (#1284).
+   */
+  static final int MAX_ALERT_EVENTS = 20_000;
+
+  /**
+   * At most this many alert records are kept per flow, each direction its own (#1284), so one noisy connection can't use up
+   * the capture's budget and leave the conversations after it with none.
+   */
+  static final int MAX_ALERT_EVENTS_PER_FLOW = 100;
+
+  /**
+   * One eve.json {@code alert} record in full (#1265): when it fired, the packet's direction, the
+   * rule's metadata, and the HTTP request it fired on. Every field but sid and signature may be null.
+   */
+  public record AlertEvent(
+      java.time.LocalDateTime time,
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort,
+      long sid,
+      Integer gid,
+      Integer rev,
+      String signature,
+      String category,
+      Integer severity,
+      Map<String, List<String>> metadata,
+      String httpMethod,
+      String httpHost,
+      String httpUrl,
+      String httpUserAgent,
+      Integer httpStatus) {
+
+    /** The first value of one metadata key ("signature_severity" → "Major"), or null. */
+    public String meta(String key) {
+      List<String> v = metadata == null ? null : metadata.get(key);
+      return v == null || v.isEmpty() ? null : v.get(0);
+    }
+  }
+
+  /** The TLS facts from one eve.json {@code tls} record (#599). Every field may be null. */
+  record TlsRecord(
+      String sni,
+      String subject,
+      String issuer,
+      java.time.LocalDateTime notBefore,
+      java.time.LocalDateTime notAfter,
+      String version,
+      String ja3,
+      String ja3s,
+      com.tracepcap.analysis.spi.ConversationLookup.CertFacts cert) {
+
+    /** Without the parsed certificate (#1235). */
+    TlsRecord(
+        String sni, String subject, String issuer, java.time.LocalDateTime notBefore,
+        java.time.LocalDateTime notAfter, String version, String ja3, String ja3s) {
+      this(sni, subject, issuer, notBefore, notAfter, version, ja3, ja3s, null);
+    }
+  }
+
   private static final String SURICATA_BINARY = "suricata";
+
+  /**
+   * Turns JA3/JA3S hashing on (#1235). The image enables the {@code tls} custom field list so the
+   * certificate and chain are logged, and with a custom list Suricata only computes JA3 when
+   * something asks for it, which would silently drop the client JA3 that #599 reads.
+   */
+  static final String JA3_ON = "app-layer.protocols.tls.ja3-fingerprints=yes";
+
+  /**
+   * Inspects TCP streams that were already open when the capture began (#1266). Suricata's default
+   * ignores a stream without its handshake: no protocol parsing and no alerts. A live sensor sees
+   * every handshake, but a capture is a slice: on PCAP-ATTACK's PsExec and smbexec samples (no SYN)
+   * this is the difference between nothing and "ET INFO PsExec service created".
+   */
+  static final String MIDSTREAM_ON = "stream.midstream=true";
+
+  /**
+   * Doesn't drop packets for a bad TCP/IP checksum (as {@code -k none} does), the settings Suricata
+   * itself uses for pcap reading and stream reassembly. A capture taken on the sending host has the
+   * checksums its network card would have filled in (offload), and Suricata's default, "auto", only
+   * notices that statistically: on a short capture, too late. Until then it leaves those packets
+   * out of stream and protocol inspection, so PCAP-ATTACK's SpoolSample capture produced no alerts
+   * and no SMB records in the warm engine, against 6 and 22 with this. The capture is a record of
+   * what was sent; it isn't the network's job to check it here.
+   */
+  static final String NO_CHECKSUM_DROP_PCAP = "pcap-file.checksum-checks=no";
+  static final String NO_CHECKSUM_DROP_STREAM = "stream.checksum-validation=no";
+
+  /**
+   * The analysis settings both ways of running Suricata share, the warm engine and the per-file
+   * fallback, as {@code --set} pairs. One list so the two can't drift: a capture would otherwise get
+   * different alerts depending on which path happened to run it.
+   */
+  static final List<String> SHARED_SETTINGS = List.of(
+      "--set", JA3_ON, "--set", MIDSTREAM_ON,
+      "--set", NO_CHECKSUM_DROP_PCAP, "--set", NO_CHECKSUM_DROP_STREAM);
 
   /** Suricata writes its JSON event log here, relative to the {@code -l} output directory. */
   private static final String EVE_JSON = "eve.json";
@@ -124,23 +311,75 @@ public class SuricataService implements Extractor {
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
-    applyAlerts(runSuricata(pcapFile), conversations);
+    apply(runSuricata(pcapFile), conversations);
   }
 
-  /** Resolves engine alerts onto conversations by 5-tuple. Shared by {@link #enrich} and {@link #prepare}. */
-  private void applyAlerts(
-      Map<String, Set<String>> alertMap, List<PcapParserService.ConversationInfo> conversations) {
-    if (alertMap.isEmpty() || conversations.isEmpty()) return;
-
+  /** Resolves alerts and TLS records onto conversations by 5-tuple. Shared by {@link #enrich} and {@link #prepare}. */
+  void apply(Eve eve, List<PcapParserService.ConversationInfo> conversations) {
+    if (conversations.isEmpty()) return;
+    int filled = 0;
+    // One flow key can match several conversations (DHCP clients split by MAC): each SMB/RPC
+    // operation goes to the first, so none is stored and counted twice.
+    Set<SmbRpcRecords.Op> opsGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    Set<KerberosRecords.Reply> kerberosGiven = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     for (PcapParserService.ConversationInfo conv : conversations) {
-      Set<String> alerts = resolve(alertMap, conv);
+      Set<String> alerts = both(eve.alerts(), conv, LinkedHashSet::new);
       if (alerts != null && !alerts.isEmpty()) {
         conv.setSuricataAlerts(new ArrayList<>(alerts));
       }
+      List<Anomaly> anomalies = both(eve.anomalies(), conv, ArrayList::new);
+      if (!anomalies.isEmpty()) conv.setSuricataAnomalies(anomalies);
+      List<KerberosRecords.Reply> krb = both(eve.kerberos(), conv, ArrayList::new);
+      krb.removeIf(r -> !kerberosGiven.add(r));
+      if (!krb.isEmpty()) {
+        conv.setKerberosExchanges(KerberosRecords.group(
+            krb, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort()));
+      }
+      List<SmbRpcRecords.Op> ops = both(eve.remoteOps(), conv, ArrayList::new);
+      ops.removeIf(o -> !opsGiven.add(o));
+      if (!ops.isEmpty()) {
+        conv.setRemoteOperations(SmbRpcRecords.group(
+            ops, conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(),
+            conv.getInitiatorIp()));
+      }
+      // Every conversation on the flow gets its count; saving gives it to the one its records go to.
+      conv.setIdsAlertTotal(totalOf(eve.alertTotals(), conv));
+      conv.setIdsAlertFlow(flowOf(conv));
+      List<AlertEvent> events = both(eve.alertEvents(), conv, ArrayList::new);
+      if (!events.isEmpty()) {
+        events.sort(Comparator.comparing(AlertEvent::time, Comparator.nullsLast(Comparator.naturalOrder())));
+        conv.setIdsAlertEvents(events);
+      }
+      TlsRecord tls = resolve(eve.tls(), conv);
+      if (tls != null && fillTls(conv, tls)) filled++;
     }
-
     long enriched = conversations.stream().filter(c -> !c.getSuricataAlerts().isEmpty()).count();
-    log.info("Suricata flagged {}/{} conversations with IDS alerts", enriched, conversations.size());
+    log.info(
+        "Suricata flagged {}/{} conversations with IDS alerts; TLS records filled facts on {}",
+        enriched, conversations.size(), filled);
+  }
+
+  /**
+   * Fills the conversation's TLS facts Suricata knows and nDPI didn't provide. Never replaces a
+   * value: nDPI's stays when both have one. Returns whether anything was filled.
+   */
+  static boolean fillTls(PcapParserService.ConversationInfo conv, TlsRecord t) {
+    boolean any = false;
+    if (conv.getJa3Client() == null && t.ja3() != null) { conv.setJa3Client(t.ja3()); any = true; }
+    if (conv.getJa3Server() == null && t.ja3s() != null) { conv.setJa3Server(t.ja3s()); any = true; }
+    if (isBlank(conv.getHostname()) && t.sni() != null) { conv.setHostname(t.sni()); any = true; }
+    if (conv.getTlsSubject() == null && t.subject() != null) { conv.setTlsSubject(t.subject()); any = true; }
+    if (conv.getTlsIssuer() == null && t.issuer() != null) { conv.setTlsIssuer(t.issuer()); any = true; }
+    if (conv.getTlsNotBefore() == null && t.notBefore() != null) { conv.setTlsNotBefore(t.notBefore()); any = true; }
+    if (conv.getTlsNotAfter() == null && t.notAfter() != null) { conv.setTlsNotAfter(t.notAfter()); any = true; }
+    if (conv.getTlsVersion() == null && t.version() != null) { conv.setTlsVersion(t.version()); any = true; }
+    // The certificate's own detail (#1235): only Suricata has it, so it's set whenever present.
+    if (conv.getTlsCert() == null && t.cert() != null) { conv.setTlsCert(t.cert()); any = true; }
+    return any;
+  }
+
+  private static boolean isBlank(String s) {
+    return s == null || s.isBlank();
   }
 
   // ---------------------------------------------------------------------------
@@ -151,8 +390,8 @@ public class SuricataService implements Extractor {
    * Runs {@code suricata -r <file> -l <tmp>} and returns a map of flow key → set of alert strings.
    * The output directory is created per-run and deleted afterwards.
    */
-  private Map<String, Set<String>> runSuricata(File pcapFile) {
-    Map<String, Set<String>> result = new HashMap<>();
+  private Eve runSuricata(File pcapFile) {
+    Eve result = Eve.empty();
     Path outDir = null;
 
     try {
@@ -169,21 +408,25 @@ public class SuricataService implements Extractor {
         // Warm output lives in its own subdirectory so an abandoned warm run cannot interleave
         // with the cold fallback below.
         parseEveJson(SuricataEngine.warmDir(outDir).resolve(EVE_JSON), result);
-        log.debug("Suricata (warm) produced alerts for {} distinct flows", result.size());
+        log.debug("Suricata (warm) produced alerts for {} flow keys, TLS records for {}", result.alerts().size(), result.tls().size());
         return result;
       }
 
-      ProcessBuilder pb =
-          new ProcessBuilder(
-              SURICATA_BINARY,
-              "-r",
-              pcapFile.getAbsolutePath(),
-              "-l",
-              outDir.toAbsolutePath().toString(),
-              "--runmode",
-              "single",
-              "--set",
-              "unix-command.enabled=no");
+      List<String> command =
+          new ArrayList<>(
+              List.of(
+                  SURICATA_BINARY,
+                  "-r",
+                  pcapFile.getAbsolutePath(),
+                  "-l",
+                  outDir.toAbsolutePath().toString(),
+                  "--runmode",
+                  "single",
+                  "--set",
+                  "unix-command.enabled=no"));
+      command.addAll(SHARED_SETTINGS);
+      if (ruleset != null) command.addAll(ruleset.suricataArgs());
+      ProcessBuilder pb = new ProcessBuilder(command);
 
       Process process = pb.start();
       try {
@@ -201,8 +444,9 @@ public class SuricataService implements Extractor {
           return result;
         }
 
+        engine.recordLoad(outDir.resolve("suricata.log"), "per-file run");
         parseEveJson(outDir.resolve(EVE_JSON), result);
-        log.debug("Suricata produced alerts for {} distinct flows", result.size());
+        log.debug("Suricata produced alerts for {} flow keys, TLS records for {}", result.alerts().size(), result.tls().size());
       } finally {
         // Never leak the subprocess if waitFor was interrupted or parsing threw.
         if (process.isAlive()) process.destroyForcibly();
@@ -231,7 +475,7 @@ public class SuricataService implements Extractor {
    * result map keyed by 5-tuple flow key (indexed in both directions for direction-independent
    * lookup).
    */
-  private void parseEveJson(Path eveJson, Map<String, Set<String>> result) {
+  private void parseEveJson(Path eveJson, Eve result) {
     if (!Files.isReadable(eveJson)) {
       log.warn("Suricata eve.json not found at {} — no alerts parsed", eveJson);
       return;
@@ -244,12 +488,48 @@ public class SuricataService implements Extractor {
     }
   }
 
-  /** Parse a single eve.json line; only {@code event_type == "alert"} objects contribute. */
-  private void parseEveLine(String line, Map<String, Set<String>> result) {
+  /** Parse a single eve.json line; {@code alert} and {@code tls} objects contribute. */
+  void parseEveLine(String line, Eve result) {
     if (line == null || line.isBlank()) return;
+    // Cheap pre-check: most lines are flow records, which we don't read.
+    if (!line.contains("\"event_type\":\"alert\"") && !line.contains("\"event_type\":\"tls\"")
+        && !line.contains("\"event_type\":\"anomaly\"") && !line.contains("\"event_type\":\"stats\"")
+        && !SmbRpcRecords.mayBe(line) && !KerberosRecords.mayBe(line)) return;
     try {
       JsonNode root = objectMapper.readTree(line);
-      if (!"alert".equals(root.path("event_type").asText())) return;
+      String type = root.path("event_type").asText();
+      if ("krb5".equals(type)) {
+        String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);
+        if (srcIp == null || dstIp == null) return;
+        String key = flowKey(srcIp, root.has("src_port") ? root.get("src_port").asInt() : null,
+            dstIp, root.has("dest_port") ? root.get("dest_port").asInt() : null,
+            root.path("proto").asText(null));
+        KerberosRecords.read(root, key, result.kerberos(), result.kerberosCount(), result.kerberosRequests());
+        return;
+      }
+      if ("smb".equals(type) || "dcerpc".equals(type)
+          || ("fileinfo".equals(type) && "smb".equals(root.path("app_proto").asText()))) {
+        String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);
+        if (srcIp == null || dstIp == null) return;
+        String key = flowKey(srcIp, root.has("src_port") ? root.get("src_port").asInt() : null,
+            dstIp, root.has("dest_port") ? root.get("dest_port").asInt() : null,
+            root.path("proto").asText(null));
+        SmbRpcRecords.read(root, type, key, result.remoteOps(), result.remoteOpCount(), result.smbTrees());
+        return;
+      }
+      if ("tls".equals(type)) {
+        parseTls(root, result.tls());
+        return;
+      }
+      if ("anomaly".equals(type)) {
+        parseAnomaly(root, result);
+        return;
+      }
+      if ("stats".equals(type)) {
+        result.stats().set(parseStats(root.path("stats")));
+        return;
+      }
+      if (!"alert".equals(type)) return;
 
       JsonNode alert = root.path("alert");
       if (alert.isMissingNode()) return;
@@ -268,9 +548,161 @@ public class SuricataService implements Extractor {
       String proto = root.path("proto").asText(null);
 
       String key = flowKey(srcIp, srcPort, dstIp, dstPort, proto);
-      result.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
+      result.alerts().computeIfAbsent(key, k -> new LinkedHashSet<>()).add(formatted);
+      // Every alert is counted; only the first of each flow's, and of the capture's, are kept (#1284).
+      int seenOnFlow = result.alertTotals().merge(key, 1, Integer::sum);
+      // A running count: summing every flow's list on each line made a noisy capture quadratic.
+      if (seenOnFlow <= MAX_ALERT_EVENTS_PER_FLOW
+          && result.alertEventCount().getAndIncrement() < MAX_ALERT_EVENTS) {
+        result.alertEvents().computeIfAbsent(key, k -> new ArrayList<>())
+            .add(alertEvent(root, alert, signature, sid, severity, srcIp, srcPort, dstIp, dstPort));
+      }
     } catch (Exception e) {
       log.debug("Skipping unparseable eve.json line: {}", e.getMessage());
+    }
+  }
+
+  private static AlertEvent alertEvent(
+      JsonNode root, JsonNode alert, String signature, long sid, int severity, String srcIp,
+      Integer srcPort, String dstIp, Integer dstPort) {
+    Map<String, List<String>> metadata = new java.util.LinkedHashMap<>();
+    alert.path("metadata").fields().forEachRemaining(e -> {
+      List<String> values = new ArrayList<>();
+      if (e.getValue().isArray()) e.getValue().forEach(v -> values.add(v.asText()));
+      else values.add(e.getValue().asText());
+      metadata.put(e.getKey(), values);
+    });
+    JsonNode http = root.path("http");
+    return new AlertEvent(
+        eveTime(root.path("timestamp").asText(null)),
+        srcIp, srcPort, dstIp, dstPort, sid,
+        alert.has("gid") ? alert.get("gid").asInt() : null,
+        alert.has("rev") ? alert.get("rev").asInt() : null,
+        signature,
+        text(alert, "category", 255),
+        severity == 0 ? null : severity,
+        metadata,
+        text(http, "http_method", 32),
+        text(http, "hostname", 512),
+        text(http, "url", 4096),
+        text(http, "http_user_agent", 2048),
+        http.has("status") ? http.get("status").asInt() : null);
+  }
+
+  private static void parseAnomaly(JsonNode root, Eve result) {
+    JsonNode a = root.path("anomaly");
+    String event = a.path("event").asText("").trim();
+    String srcIp = root.path("src_ip").asText(null);
+    String dstIp = root.path("dest_ip").asText(null);
+    // Decoder anomalies on a lone packet have no flow to hang on: only flow-level ones are kept.
+    if (event.isEmpty() || srcIp == null || dstIp == null) return;
+    if (result.anomalyCount().getAndIncrement() >= MAX_ANOMALIES) return; // a running count, as for alerts
+    Integer srcPort = root.has("src_port") ? root.get("src_port").asInt() : null;
+    Integer dstPort = root.has("dest_port") ? root.get("dest_port").asInt() : null;
+    String key = flowKey(srcIp, srcPort, dstIp, dstPort, root.path("proto").asText(null));
+    String app = text(a, "app_proto", 64);
+    if (app == null) app = text(root, "app_proto", 64);
+    result.anomalies().computeIfAbsent(key, k -> new ArrayList<>()).add(new Anomaly(
+        eveTime(root.path("timestamp").asText(null)), srcIp, dstIp, text(a, "type", 64),
+        text(a, "layer", 64), app, event.length() > 255 ? event.substring(0, 255) : event));
+  }
+
+  /** The counters that say how complete the capture and the inspection were. */
+  static CaptureStats parseStats(JsonNode s) {
+    JsonNode tcp = s.path("tcp"), dec = s.path("decoder");
+    long memcap = num(tcp, "ssn_memcap_drop") + num(tcp, "segment_memcap_drop")
+        + num(s.path("flow"), "memcap");
+    return new CaptureStats(
+        dec.has("pkts") ? dec.get("pkts").asLong() : null,
+        dec.has("invalid") ? dec.get("invalid").asLong() : null,
+        tcp.has("sessions") ? tcp.get("sessions").asLong() : null,
+        tcp.has("reassembly_gap") ? tcp.get("reassembly_gap").asLong() : null,
+        tcp.has("stream_depth_reached") ? tcp.get("stream_depth_reached").asLong() : null,
+        memcap);
+  }
+
+  private static long num(JsonNode n, String f) {
+    return n.path(f).asLong(0);
+  }
+
+  private static final java.time.format.DateTimeFormatter EVE_TIME =
+      java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ");
+
+  /**
+   * Eve's {@code timestamp} ("2024-11-26T05:08:49.123456+0000") as the local time the conversations'
+   * own times use (the JVM zone, as {@code PcapParserService} converts packet times); null if absent.
+   */
+  static java.time.LocalDateTime eveTime(String ts) {
+    if (ts == null || ts.isBlank()) return null;
+    try {
+      return java.time.LocalDateTime.ofInstant(
+          java.time.OffsetDateTime.parse(ts, EVE_TIME).toInstant(), java.time.ZoneId.systemDefault());
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * One {@code tls} record. Suricata 6 writes, under {@code tls}: {@code sni}, {@code subject},
+   * {@code issuerdn}, {@code notbefore}/{@code notafter} (ISO local), {@code version} (e.g. "TLS 1.2")
+   * and {@code ja3}/{@code ja3s} objects with a {@code hash}. A session can log more than one record;
+   * the first value seen for a field is kept.
+   */
+  private void parseTls(JsonNode root, Map<String, TlsRecord> out) {
+    JsonNode tls = root.path("tls");
+    String srcIp = root.path("src_ip").asText(null);
+    String dstIp = root.path("dest_ip").asText(null);
+    if (tls.isMissingNode() || srcIp == null || dstIp == null) return;
+    Integer srcPort = root.has("src_port") ? root.get("src_port").asInt() : null;
+    Integer dstPort = root.has("dest_port") ? root.get("dest_port").asInt() : null;
+    TlsRecord parsed =
+        new TlsRecord(
+            text(tls, "sni", ConversationEntity.HOSTNAME_MAX_LENGTH),
+            text(tls, "subject", Integer.MAX_VALUE),
+            text(tls, "issuerdn", Integer.MAX_VALUE),
+            date(tls, "notbefore"),
+            date(tls, "notafter"),
+            text(tls, "version", ConversationEntity.TLS_VERSION_MAX_LENGTH),
+            hash(tls.path("ja3")),
+            hash(tls.path("ja3s")),
+            TlsCertificateParser.parse(
+                tls.path("certificate").asText(null),
+                tls.path("chain").isArray() ? tls.path("chain").size() : 1));
+    out.merge(flowKey(srcIp, srcPort, dstIp, dstPort, null), parsed, SuricataService::firstSeen);
+  }
+
+  private static TlsRecord firstSeen(TlsRecord a, TlsRecord b) {
+    return new TlsRecord(
+        a.sni() != null ? a.sni() : b.sni(),
+        a.subject() != null ? a.subject() : b.subject(),
+        a.issuer() != null ? a.issuer() : b.issuer(),
+        a.notBefore() != null ? a.notBefore() : b.notBefore(),
+        a.notAfter() != null ? a.notAfter() : b.notAfter(),
+        a.version() != null ? a.version() : b.version(),
+        a.ja3() != null ? a.ja3() : b.ja3(),
+        a.ja3s() != null ? a.ja3s() : b.ja3s(),
+        a.cert() != null ? a.cert() : b.cert());
+  }
+
+  private static String text(JsonNode node, String field, int max) {
+    String v = node.path(field).asText("").trim();
+    if (v.isEmpty()) return null;
+    return v.length() > max ? v.substring(0, max) : v;
+  }
+
+  /** A JA3/JA3S object's 32-hex hash, or null. */
+  private static String hash(JsonNode ja3) {
+    String h = ja3.path("hash").asText("").trim().toLowerCase();
+    return h.matches("[0-9a-f]{" + ConversationEntity.JA3_HASH_LENGTH + "}") ? h : null;
+  }
+
+  private static java.time.LocalDateTime date(JsonNode node, String field) {
+    String v = node.path(field).asText("").trim();
+    if (v.isEmpty()) return null;
+    try {
+      return java.time.LocalDateTime.parse(v);
+    } catch (java.time.format.DateTimeParseException e) {
+      return null;
     }
   }
 
@@ -300,17 +732,50 @@ public class SuricataService implements Extractor {
         : s;
   }
 
-  /** Lookup alerts trying both directions (src→dst and dst→src). */
-  private Set<String> resolve(
-      Map<String, Set<String>> alertMap, PcapParserService.ConversationInfo conv) {
+  /**
+   * A conversation's alerts from both directions. Suricata keys an alert by the packet that fired
+   * it, so a rule on the server's reply ("Remote Admin Response") sits under the reverse key; taking
+   * one direction only, as {@link #resolve} does, dropped those whenever the client side fired too.
+   */
+  static <E, C extends java.util.Collection<E>> C both(
+      Map<String, ? extends java.util.Collection<E>> map,
+      PcapParserService.ConversationInfo conv,
+      java.util.function.Supplier<C> into) {
+    C out = into.get();
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    if (map.get(forward) != null) out.addAll(map.get(forward));
+    if (!reverse.equals(forward) && map.get(reverse) != null) out.addAll(map.get(reverse));
+    return out;
+  }
+
+  /** The alerts Suricata logged on this conversation's flow, both directions. */
+  static int totalOf(Map<String, Integer> totals, PcapParserService.ConversationInfo conv) {
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    return totals.getOrDefault(forward, 0) + (reverse.equals(forward) ? 0 : totals.getOrDefault(reverse, 0));
+  }
+
+  /** The conversation's flow, the same whichever way round it is written. */
+  static String flowOf(PcapParserService.ConversationInfo conv) {
+    String t = transportOf(conv);
+    String forward = flowKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort(), t);
+    String reverse = flowKey(conv.getDstIp(), conv.getDstPort(), conv.getSrcIp(), conv.getSrcPort(), t);
+    return forward.compareTo(reverse) <= 0 ? forward : reverse;
+  }
+
+  /** Looks up a flow's entry trying both directions (src→dst and dst→src). */
+  private static <T> T resolve(Map<String, T> alertMap, PcapParserService.ConversationInfo conv) {
     String key1 =
         flowKey(
             conv.getSrcIp(),
             conv.getSrcPort(),
             conv.getDstIp(),
             conv.getDstPort(),
-            conv.getProtocol());
-    Set<String> alerts = alertMap.get(key1);
+            transportOf(conv));
+    T alerts = alertMap.get(key1);
     if (alerts == null) {
       String key2 =
           flowKey(
@@ -318,7 +783,7 @@ public class SuricataService implements Extractor {
               conv.getDstPort(),
               conv.getSrcIp(),
               conv.getSrcPort(),
-              conv.getProtocol());
+              transportOf(conv));
       alerts = alertMap.get(key2);
     }
     return alerts;
@@ -329,7 +794,7 @@ public class SuricataService implements Extractor {
    * Suricata's {@code proto} field ("TCP"/"UDP") and pcap4j's {@code protocol} string may differ in
    * casing/naming; IP+port pairs are unique enough to map an alert to its conversation.
    */
-  private String flowKey(String ip, Integer port, String ip2, Integer port2, String proto) {
+  private static String flowKey(String ip, Integer port, String ip2, Integer port2, String proto) {
     return ip + ":" + port + "->" + ip2 + ":" + port2;
   }
 
@@ -363,5 +828,10 @@ public class SuricataService implements Extractor {
   private boolean isNotFoundError(Exception e) {
     String msg = e.getMessage();
     return msg != null && (msg.contains("No such file") || msg.contains("error=2"));
+  }
+
+  /** The transport a flow record is matched by (TCP/UDP); the display label for older rows. */
+  private static String transportOf(PcapParserService.ConversationInfo conv) {
+    return conv.getTransport() != null ? conv.getTransport() : conv.getProtocol();
   }
 }

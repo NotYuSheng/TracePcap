@@ -1,9 +1,12 @@
 import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { Fragment, useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { SuricataRulesetNote } from '@components/common/SuricataRulesetNote';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity } from '@/types';
+import type { Conversation, ConversationGeoInfo, HostClassification, HostIdentity, IdsAlert, TlsCertificate } from '@/types';
+import { alertsFiredNote, groupIdsAlerts } from './idsAlertGroups';
+import { anomalyWords, groupAnomalies } from './anomalyWords';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
@@ -24,6 +27,7 @@ import { HostDetailModal } from '@components/common/EntityDetailModal';
 import { isPrivateIp } from '@/utils/ipClassification';
 import type { DeviceType } from '@/types';
 import './ConversationDetail.css';
+import { CONNECTION_OUTCOME_WORDS } from '@/features/conversation/connectionOutcome';
 
 interface ConversationDetailProps {
   conversation: Conversation;
@@ -234,6 +238,141 @@ function HostFlowCard({
 }
 
 /** A collapsible group of conversation metadata rows — replaces the flat dt/dd wall. */
+/**
+ * The server certificate's own detail (#1235). The verdicts (weak key, weak signature, name not
+ * covered) come from the backend; this only words them.
+ */
+function TlsCertificateRows({ cert }: { cert: TlsCertificate }) {
+  const MAX_SHOWN = 6;
+  return (
+    <>
+      {cert.keyType && (
+        <>
+          <dt>Key</dt>
+          <dd data-testid="tls-cert-key">
+            <small>
+              {cert.keyType}
+              {cert.keyBits ? ` ${cert.keyBits}-bit` : ''}
+            </small>
+            {cert.weakKey && <Badge bg="danger" className="ms-1">Weak key</Badge>}
+          </dd>
+        </>
+      )}
+      {cert.signatureAlgorithm && (
+        <>
+          <dt>Signature</dt>
+          <dd>
+            <small>{cert.signatureAlgorithm}</small>
+            {cert.weakSignature && <Badge bg="danger" className="ms-1">SHA-1/MD5</Badge>}
+          </dd>
+        </>
+      )}
+      <dt>Signed by</dt>
+      <dd data-testid="tls-cert-signer">
+        {cert.selfSigned ? (
+          <Badge bg="warning" text="dark">Self-signed</Badge>
+        ) : (
+          <small>
+            A CA ({cert.chainLength} certificate{cert.chainLength === 1 ? '' : 's'} sent)
+          </small>
+        )}
+      </dd>
+      {cert.sans.length > 0 && (
+        <>
+          <dt>Names</dt>
+          <dd data-testid="tls-cert-sans">
+            <small className="text-break">
+              {cert.sans.slice(0, MAX_SHOWN).join(', ')}
+              {cert.sans.length > MAX_SHOWN && ` +${cert.sans.length - MAX_SHOWN} more`}
+            </small>
+            {cert.coversServerName === false && (
+              <Badge bg="danger" className="ms-1">Doesn't cover the server name</Badge>
+            )}
+          </dd>
+        </>
+      )}
+    </>
+  );
+}
+
+/** The rule's own rating, as a chip colour; unknown ratings read as neutral. */
+const SIGNATURE_SEVERITY_BG: Record<string, string> = {
+  Critical: '#b02a37',
+  Major: '#b35900',
+  Minor: '#0a58ca',
+  Informational: '#6c757d',
+};
+
+/** A small rating chip, matching the grade chips of the Investigation Summary. */
+function RatingChip({ bg, children }: { bg?: string; children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+        borderRadius: 3,
+        padding: '1px 6px',
+        ...(bg
+          ? { color: '#fff', background: bg }
+          : { color: 'var(--bs-secondary-color, #6c757d)', border: '1px solid var(--bs-border-color, #dee2e6)' }),
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Each Suricata alert on the conversation as it fired (#1265): when, which side sent the packet,
+ * the rule's own rating and confidence, and the HTTP request it fired on.
+ */
+function IdsAlertRows({ alerts, clientIp }: { alerts: IdsAlert[]; clientIp: string }) {
+  const groups = groupIdsAlerts(alerts);
+  return (
+    <ul className="list-unstyled mb-0 d-flex flex-column gap-2" data-testid="ids-alerts">
+      {groups.map((g, i) => {
+        const a = g.first;
+        const fromServer = a.srcIp != null && a.srcIp !== clientIp;
+        return (
+          <li key={i} className="border-bottom pb-2">
+            <div className="d-flex align-items-start gap-2 flex-wrap">
+              <small className="fw-semibold text-break flex-grow-1" style={{ minWidth: 0 }}>{a.signature}</small>
+              {a.signatureSeverity && (
+                <RatingChip bg={SIGNATURE_SEVERITY_BG[a.signatureSeverity] ?? '#6c757d'}>{a.signatureSeverity}</RatingChip>
+              )}
+              {a.confidence && <RatingChip>{a.confidence} confidence</RatingChip>}
+            </div>
+            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+              {a.category && <span>{a.category} · </span>}
+              <span>{fromServer ? 'on the server\'s reply' : 'on the client\'s request'}</span>
+              <span> · sid {a.sid}</span>
+              {g.from != null && (
+                <span>
+                  {' · '}
+                  {g.count > 1
+                    ? `${g.count}× from ${formatTimestamp(g.from)} to ${formatTimestamp(g.to!)}`
+                    : formatTimestamp(g.from)}
+                </span>
+              )}
+              {g.from == null && g.count > 1 && <span> · {g.count}×</span>}
+            </div>
+            {a.httpUrl && (
+              <div style={{ fontSize: '0.75rem', overflowWrap: 'anywhere' }} data-testid="ids-alert-request">
+                <code>
+                  {a.httpMethod ? `${a.httpMethod} ` : ''}
+                  {a.httpUrl}
+                </code>
+                {a.httpStatus != null && <span className="text-muted"> → {a.httpStatus}</span>}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function MetaGroup({
   title,
   note,
@@ -446,6 +585,7 @@ export const ConversationDetail = ({
               {conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now() && (
                 <span className="cd-chip" style={{ backgroundColor: '#dc2626', color: '#fff' }}>Expired certificate</span>
               )}
+              {(conversation.suricataAlerts?.length ?? 0) > 0 && <SuricataRulesetNote className="w-100 mt-1" />}
             </div>
           )}
 
@@ -455,9 +595,64 @@ export const ConversationDetail = ({
               <dl className="cd-kv">
                 <dt>Packets</dt><dd>{conversation.packetCount.toLocaleString()}</dd>
                 <dt>Bytes</dt><dd>{formatBytes(conversation.totalBytes)}</dd>
+                {conversation.bytesSrcToDst != null && conversation.bytesDstToSrc != null && (
+                  <>
+                    {/* Which way the bytes went (#1260): a big download and an upload look
+                        the same as a total, and only one of them is possible exfiltration. */}
+                    <dt>Sent</dt>
+                    <dd data-testid="bytes-src-to-dst">
+                      {formatBytes(conversation.bytesSrcToDst)} <small className="text-muted">by {source.ip}</small>
+                    </dd>
+                    <dt>Received</dt>
+                    <dd data-testid="bytes-dst-to-src">
+                      {formatBytes(conversation.bytesDstToSrc)} <small className="text-muted">from {destination.ip}</small>
+                    </dd>
+                  </>
+                )}
                 <dt>Start</dt><dd>{formatTimestamp(conversation.startTime)}</dd>
+                {conversation.connectionOutcome && (
+                  <>
+                    <dt>Connection</dt>
+                    <dd data-testid="connection-outcome">
+                      {CONNECTION_OUTCOME_WORDS[conversation.connectionOutcome] ?? conversation.connectionOutcome}
+                    </dd>
+                  </>
+                )}
               </dl>
             </MetaGroup>
+
+            {((conversation.idsAlerts?.length ?? 0) > 0 || (conversation.idsAlertCount ?? 0) > 0) && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <MetaGroup
+                  title="IDS alerts"
+                  note={alertsFiredNote(conversation.idsAlerts?.length ?? 0, conversation.idsAlertCount)}
+                  defaultOpen
+                >
+                  <IdsAlertRows
+                    alerts={conversation.idsAlerts ?? []}
+                    clientIp={conversation.initiatorIp ?? source.ip}
+                  />
+                </MetaGroup>
+              </div>
+            )}
+
+            {(conversation.anomalies?.length ?? 0) > 0 && (
+              <MetaGroup title="Protocol anomalies" note="malformed or one-sided traffic, not attacks">
+                <ul className="list-unstyled mb-0 d-flex flex-column gap-1" data-testid="protocol-anomalies">
+                  {groupAnomalies(conversation.anomalies!).map((g, i) => (
+                    <li key={i} style={{ fontSize: '0.8rem' }}>
+                      {anomalyWords(g.first.event)}
+                      <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+                        {' '}
+                        {[g.first.appProto, g.first.event, g.count > 1 ? `${g.count}×` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </MetaGroup>
+            )}
 
             {(conversation.srcGeo?.countryCode || conversation.dstGeo?.countryCode ||
               isPrivateIp(source.ip) || isPrivateIp(destination.ip)) && (
@@ -484,15 +679,27 @@ export const ConversationDetail = ({
               </MetaGroup>
             )}
 
-            {(conversation.ja3Client || conversation.ja3Server || conversation.tlsIssuer ||
+            {(conversation.ja3Client || conversation.ja3Server || conversation.ja4Client ||
+              conversation.tlsVersion || conversation.tlsIssuer ||
               conversation.tlsSubject || conversation.tlsNotBefore != null ||
-              conversation.tlsNotAfter != null) && (
+              conversation.tlsNotAfter != null || conversation.tlsCertificate) && (
               <MetaGroup
-                title="TLS Certificate"
+                title="TLS"
                 defaultOpen
                 note={conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now() ? 'expired' : undefined}
               >
                 <dl className="cd-kv">
+                  {conversation.tlsVersion && (
+                    <>
+                      <dt>Version</dt>
+                      <dd>
+                        <small>{conversation.tlsVersion}</small>
+                        {/^(SSL|TLS 1\.[01]$)/.test(conversation.tlsVersion) && (
+                          <Badge bg="warning" text="dark" className="ms-1">Legacy</Badge>
+                        )}
+                      </dd>
+                    </>
+                  )}
                   {conversation.tlsIssuer && (<><dt>Issuer</dt><dd><small>{conversation.tlsIssuer}</small></dd></>)}
                   {conversation.tlsSubject && (<><dt>Subject</dt><dd><small>{conversation.tlsSubject}</small></dd></>)}
                   {conversation.tlsNotBefore != null && (<><dt>Valid from</dt><dd><small>{formatTimestamp(conversation.tlsNotBefore)}</small></dd></>)}
@@ -507,8 +714,12 @@ export const ConversationDetail = ({
                       </dd>
                     </>
                   )}
+                  {conversation.tlsCertificate && (
+                    <TlsCertificateRows cert={conversation.tlsCertificate} />
+                  )}
                   {conversation.ja3Client && (<><dt>JA3</dt><dd><code className="small">{conversation.ja3Client}</code></dd></>)}
                   {conversation.ja3Server && (<><dt>JA3S</dt><dd><code className="small">{conversation.ja3Server}</code></dd></>)}
+                  {conversation.ja4Client && (<><dt>JA4</dt><dd><code className="small">{conversation.ja4Client}</code></dd></>)}
                 </dl>
               </MetaGroup>
             )}

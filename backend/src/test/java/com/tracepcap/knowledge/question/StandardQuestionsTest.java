@@ -52,7 +52,9 @@ class StandardQuestionsTest {
     assertThat(a).singleElement().satisfies(ans -> {
       assertThat(ans.attributes())
           .containsEntry("address", "141.98.10.79")
-          .containsEntry("malware", List.of("STRRAT")); // always a list, single family included
+          .containsEntry("malware", List.of("STRRAT")) // always a list, single family included
+          .containsEntry("conclusion", "rule") // a malware rule named it: no corroboration chip
+          .doesNotContainKey("conclusionReason");
       assertThat(ans.subjects()).contains(EntityRef.external("141.98.10.79"), EntityRef.malware("STRRAT"));
     });
   }
@@ -202,5 +204,65 @@ class StandardQuestionsTest {
     assertThat(new MalwareQuestion().answer(empty)).isEmpty();
     assertThat(new SignedInUserQuestion().answer(empty)).isEmpty();
     assertThat(new DataTransferQuestion().answer(empty)).isEmpty();
+  }
+
+  // ── Direction (a download is not exfiltration) ──────────────────────────────
+
+  private CaseKnowledge directionalBoard(long sent, long received) {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef host = EntityRef.host("10.11.10.147");
+    EntityRef ext = EntityRef.external("96.62.224.200");
+    b.addEntity(ext, java.util.Map.of("org", "Some Hosting", "country", "DE"));
+    b.addRelationship(new Relationship(host, "communicates-with", ext, Grade.MEASURED, "traffic",
+        java.util.Map.of("bytes", sent + received, "sentBytes", sent, "receivedBytes", received)));
+    return b.build();
+  }
+
+  @Test
+  void dataTransfer_aLargeDownload_isNotFlagged() {
+    // 2026-11-10: the host received a 6 MB file (5555.mp4); it used to read "sent 6.3 MB".
+    assertThat(new DataTransferQuestion().answer(directionalBoard(200_000L, 6_100_000L))).isEmpty();
+  }
+
+  @Test
+  void dataTransfer_aLargeUpload_isFlagged_asSent() {
+    assertThat(new DataTransferQuestion().answer(directionalBoard(7_000_000L, 300_000L)))
+        .singleElement()
+        .satisfies(ans -> assertThat(ans.headline()).contains("10.11.10.147 sent 7.0 MB"));
+  }
+
+  @Test
+  void dataTransfer_withoutDirection_saysExchanged() {
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "UAB Host Baltic")))
+        .singleElement()
+        .satisfies(ans -> assertThat(ans.headline()).contains("exchanged 8.0 MB with "));
+  }
+
+  @Test
+  void c2_saysHowACorroboratedServerWasConcluded() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("45.1.2.3");
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE),
+        Grade.INFERRED, "corroboration",
+        java.util.Map.of("corroboration", "suspected-c2", "reason", "ET DROP listed; 4 rounds")));
+    assertThat(new C2Question().answer(b.build())).singleElement().satisfies(ans ->
+        assertThat(ans.attributes())
+            .containsEntry("conclusion", "suspected-c2")
+            .containsEntry("conclusionReason", "ET DROP listed; 4 rounds"));
+  }
+
+  @Test
+  void c2_theChipNamesTheStrongestConclusion_asTheHeadlineDoes() {
+    // Suspected first, then an install chain: not worded "suspected", so not chipped "Suspected".
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("45.1.2.3");
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware(EntityRef.UNIDENTIFIED_MALWARE),
+        Grade.INFERRED, "corroboration", java.util.Map.of("corroboration", "suspected-c2", "reason", "listed")));
+    b.addRelationship(new Relationship(c2, "c2-of", EntityRef.malware("NetSupport RAT"),
+        Grade.INFERRED, "corroboration", java.util.Map.of("corroboration", "install-chain", "reason", "chain")));
+    assertThat(new C2Question().answer(b.build())).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).doesNotContain("suspected");
+      assertThat(ans.attributes()).containsEntry("conclusion", "install-chain");
+    });
   }
 }
