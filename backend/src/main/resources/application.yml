@@ -174,7 +174,8 @@ llm:
     api-key: ${LLM_API_KEY:your-api-key-here}
     model: ${LLM_MODEL:gpt-4}
     temperature: ${LLM_TEMPERATURE:0.7}
-    max-tokens: ${LLM_MAX_TOKENS:2000}
+    # 0 = size each reply to what the context has left after the prompt; a number caps it.
+    max-tokens: ${LLM_MAX_TOKENS:0}
     # Empty default (not #{null}): @ConfigurationProperties binding does not evaluate SpEL, so an
     # unset LLM_CONTEXT_LENGTH must resolve to "" (which binds to a null Integer = auto-detect),
     # not the literal "#{null}". Compose already passes an empty value; this keeps it working when

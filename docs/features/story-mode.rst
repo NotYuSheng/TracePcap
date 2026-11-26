@@ -132,11 +132,15 @@ investigation steps, but the narrative prompt itself is not rebuilt).
 Output-truncation handling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If the model's *response* hits its output-token cap and is cut off (a
-``finish_reason`` of ``length``), generation fails deliberately with a clear
-``OUTPUT_TRUNCATED`` error — "the response exceeded the output token budget and
-was cut off; raise ``LLM_MAX_TOKENS`` or reduce the amount to narrate" — rather
-than letting the truncated JSON surface later as a cryptic parse error. This is
+Each reply's budget is what the model's context has left after the prompt
+(under ``LLM_MAX_TOKENS`` when that is set). The prompt's size is a deliberate
+overestimate, so when a reply is cut off (a ``finish_reason`` of ``length``) and
+the server's own count of the prompt leaves clearly more room, it is asked once
+more with that. A server that refuses the budget and names its limit is asked
+again within it. If the reply is still cut off, generation fails deliberately
+with a clear ``OUTPUT_TRUNCATED`` error, saying whether the cap or the context
+ran out and what to change, rather than letting the truncated JSON surface
+later as a cryptic parse error. This is
 distinct from the *prompt*-too-large case above, which is caught before the call.
 
 Known analysis limitations (embedded in every prompt)
