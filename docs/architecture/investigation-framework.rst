@@ -141,10 +141,13 @@ Not observable    The capture can't show it: the category never shows in traffic
 Each category carries how much of it a capture can show (*wire*, *partly*, *rarely*, *never*), and
 each check declares the traffic it reads. The status follows from those two and the capture:
 
-1. A check concluded something: **Answered**. Its candidates were all rejected: **Ruled out**.
+1. A check concluded something: **Answered**. Every check covering it tested candidates and rejected
+   them all: **Ruled out**. One check ruling out its candidate (a TeamViewer peer) leaves a category
+   its other checks also cover (Command and Control) open.
 2. Otherwise, a *never* category, or a *rarely* one: **Not observable**.
-3. Otherwise, if the category's checks read traffic and none of it is in the capture: **Not
-   observable**.
+3. Otherwise, if the category's checks read traffic, none of it is in the capture, and no other
+   traffic worth a look for it is either: **Not observable**. NTLM with no Kerberos keeps Credential
+   Access open, with NTLM to look at.
 4. Otherwise: **Open** (with *no check yet* when no check covers it).
 
 Coverage today

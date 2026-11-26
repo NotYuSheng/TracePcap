@@ -69,14 +69,26 @@ describe('WorthALookCard (#1292)', () => {
 });
 
 describe('worthALookGroups', () => {
-  it('merges categories pointing at the same traffic, keeping the most settled status', () => {
+  it('merges categories pointing at the same traffic with the same status', () => {
+    const groups = worthALookGroups([
+      cat({ key: 'c2-server', label: 'C2 server', axis: 'ENTITY', status: 'OPEN', leads: C2_LEADS }),
+      cat({ key: 'command-and-control', label: 'Command and Control', status: 'OPEN', leads: C2_LEADS }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe('C2 server · Command and Control');
+    expect(groups[0].status).toBe('OPEN');
+  });
+
+  it('keeps an open category apart from an answered one on the same traffic', () => {
+    // Command and Control answered by a remote-access tool mustn't mark an open C2 server answered.
     const groups = worthALookGroups([
       cat({ key: 'c2-server', label: 'C2 server', axis: 'ENTITY', status: 'OPEN', leads: C2_LEADS }),
       cat({ key: 'command-and-control', label: 'Command and Control', status: 'ANSWERED', leads: C2_LEADS }),
     ]);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('C2 server · Command and Control');
-    expect(groups[0].status).toBe('ANSWERED');
+    expect(groups.map(g => [g.label, g.status])).toEqual([
+      ['C2 server', 'OPEN'],
+      ['Command and Control', 'ANSWERED'],
+    ]);
   });
 
   it('leaves out capture context', () => {

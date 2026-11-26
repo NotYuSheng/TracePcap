@@ -6,14 +6,6 @@ import type { CategoryLead, CategoryStatus } from '@/types';
 
 type Status = CategoryStatus['status'];
 
-/** How settled a status is: answered first, what the capture can't show last. */
-export const STATUS_RANK: Record<Status, number> = {
-  ANSWERED: 0,
-  RULED_OUT: 1,
-  OPEN: 2,
-  NOT_OBSERVABLE: 3,
-};
-
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export interface WorthALookGroup {
@@ -24,21 +16,21 @@ export interface WorthALookGroup {
 }
 
 /**
- * The categories worth a look in this capture, merging ones that point at the same traffic (a C2
- * server and Command and Control both point at DNS, TLS and HTTP) so a protocol isn't listed twice.
- * The merged status is the most settled one: answered, then ruled out, then open.
+ * The categories worth a look in this capture, merging ones that point at the same traffic and have
+ * the same status (a C2 server and Command and Control, both open, both pointing at DNS, TLS and
+ * HTTP) so a protocol isn't listed twice. Categories whose statuses differ stay apart: an answered
+ * Command and Control (a remote-access tool) mustn't make an open C2 server read as answered.
  */
 export function worthALookGroups(categories: CategoryStatus[]): WorthALookGroup[] {
   const groups = new Map<string, WorthALookGroup>();
   for (const c of categories) {
     if (c.axis === 'CONTEXT' || c.leads.length === 0) continue;
-    const sig = c.leads.map(l => l.query).join('|');
+    const sig = `${c.status}|${c.leads.map(l => l.query).join('|')}`;
     const g = groups.get(sig);
     if (!g) {
       groups.set(sig, { key: c.key, label: c.label, status: c.status, leads: c.leads });
     } else {
       g.label = `${g.label} · ${c.label}`;
-      if (STATUS_RANK[c.status] < STATUS_RANK[g.status]) g.status = c.status;
     }
   }
   return [...groups.values()];

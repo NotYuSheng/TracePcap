@@ -50,8 +50,8 @@ What Needs a Look (right)
   with **How we got here**, and **Considered and ruled out** (see :doc:`story-mode`).
 - **Worth a look**: the protocols in this capture, grouped by the investigation category they help
   answer (see :doc:`../architecture/investigation-framework`), each with what it shows there and a
-  link to its conversations. Categories that point at the same traffic share one group (a C2 server
-  and Command and Control both point at DNS, TLS and HTTP). Kerberos and LDAP for *who
+  link to its conversations. Categories that point at the same traffic and have the same status
+  share one group (a C2 server and Command and Control, both open, both point at DNS, TLS and HTTP). Kerberos and LDAP for *who
   is signed in*, DHCP and NetBIOS for *which machine it is*, DNS, TLS and HTTP for *command and
   control*, SMB, DCE-RPC and RDP for *lateral movement*, Kerberos and NTLM for *account attacks*,
   mail and FTP for *data leaving*, remote-control tools for *remote access*. A question the

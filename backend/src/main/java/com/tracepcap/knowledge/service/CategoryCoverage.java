@@ -83,13 +83,17 @@ public class CategoryCoverage {
       List<Lead> leads = present.leads(CategoryLeads.of(c));
       if (e.questions().stream().anyMatch(answered::contains)) {
         out.add(new CategoryStatus(c, Status.ANSWERED, false, null, leads));
-      } else if (e.questions().stream().anyMatch(ruledOut::contains)) {
+      } else if (!e.questions().isEmpty() && ruledOut.containsAll(e.questions())) {
+        // Every check that covers it tested candidates and rejected them. One check ruling out its
+        // candidate (a TeamViewer peer) says nothing about the others (no C2 was looked into).
         out.add(new CategoryStatus(c, Status.RULED_OUT, false, null, leads));
       } else if (c.visibility() == Category.Visibility.NEVER
           || c.visibility() == Category.Visibility.RARELY) {
         out.add(new CategoryStatus(c, Status.NOT_OBSERVABLE, e.unchecked(), c.unseenReason(), List.of()));
-      } else if (!e.unchecked() && !e.readsAnyTraffic()
+      } else if (!e.unchecked() && !e.readsAnyTraffic() && leads.isEmpty()
           && e.evidence().stream().noneMatch(q -> present.has(q.source()))) {
+        // Not when a lead is present: NTLM speaks to Credential Access even though its only check
+        // reads Kerberos, so the category stays open with NTLM to look at.
         out.add(new CategoryStatus(c, Status.NOT_OBSERVABLE, false, missing(e), List.of()));
       } else {
         out.add(new CategoryStatus(c, Status.OPEN, e.unchecked(),

@@ -87,6 +87,10 @@ export function StorySummary({ fileId, goals, additional, categories, loading }:
     );
   }
 
+  // Nothing to say: no categories reported (the investigation failed, or an older backend) and no
+  // answers. Render nothing rather than an empty box.
+  if (!categories?.length && answers.length === 0) return null;
+
   const cats = categories ?? [];
   const counted = cats.filter(c => c.axis !== 'CONTEXT');
   const counts = Object.fromEntries(ORDER.map(s => [s, counted.filter(c => c.status === s).length])) as Record<Status, number>;

@@ -114,6 +114,11 @@ describe('StorySummary', () => {
     expect(await screen.findByText('10.0.0.5 talked to a known C2.')).toBeInTheDocument();
   });
 
+  it('renders nothing when there are neither categories nor answers', () => {
+    const { container } = renderIt({ categories: null });
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('still shows the answers from a backend that reports no categories', () => {
     renderIt({ categories: null, goals: [goal('C2', '203.0.113.9 is a C2')] });
     expect(screen.queryByTestId('story-summary-sentence')).not.toBeInTheDocument();

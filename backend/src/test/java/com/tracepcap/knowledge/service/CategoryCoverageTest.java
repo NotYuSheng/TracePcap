@@ -55,6 +55,23 @@ class CategoryCoverageTest {
   }
 
   @Test
+  void oneCheckRulingOutItsCandidateLeavesTheOthersOpen() {
+    // Remote access rejected a TeamViewer peer; the c2 and malware checks concluded nothing.
+    var m = run(Set.of(), Set.of("remote-access"), Set.of("DNS"), Set.of());
+    assertThat(m.get(Category.COMMAND_AND_CONTROL).status()).isEqualTo(Status.OPEN);
+    assertThat(m.get(Category.REMOTE_ACCESS_SERVER).status()).isEqualTo(Status.RULED_OUT);
+  }
+
+  @Test
+  void aLeadInTheCaptureKeepsACategoryOpenThoughItsCheckHasNoTraffic() {
+    // NTLM but no Kerberos: the Kerberos check can't run, but NTLM is still worth a look.
+    CategoryStatus cred = run(Set.of(), Set.of(), Set.of("NTLMSSP"), Set.of())
+        .get(Category.CREDENTIAL_ACCESS);
+    assertThat(cred.status()).isEqualTo(Status.OPEN);
+    assertThat(cred.leads()).extracting(CategoryCoverage.Lead::label).containsExactly("NTLM");
+  }
+
+  @Test
   void neverAndRarelyAreNotObservableWithTheirReason() {
     var m = run(Set.of(), Set.of(), Set.of("SMB2"), Set.of());
     assertThat(m.get(Category.ADVERSARY).status()).isEqualTo(Status.NOT_OBSERVABLE);
