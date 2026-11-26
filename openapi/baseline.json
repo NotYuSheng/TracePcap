@@ -5729,13 +5729,27 @@
       "SetValueRequest": {
         "properties": {
           "value": {
-            "maxLength": 64,
+            "maxLength": 255,
             "minLength": 0,
             "type": "string"
           }
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "SetValuesRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "values"
         ],
         "type": "object"
       },
@@ -15150,6 +15164,39 @@
         "summary": "Every deploy-time setting with its effective value (read-only)",
         "tags": [
           "System Settings"
+        ]
+      },
+      "patch": {
+        "description": "For settings that only work as a set, such as the LLM's URL, key and model: if one is refused, none is changed. Each needs its own permission and is audited on its own.",
+        "operationId": "setAll",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetValuesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemSettingDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Override several editable settings together, all or none",
+        "tags": [
+          "Policy Settings"
         ]
       }
     },

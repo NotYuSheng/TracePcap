@@ -98,4 +98,20 @@ class PolicySettingsServiceTest {
     verify(audit, never()).record(anyString(), anyString(), anyString(), any(), any());
     verify(permissions).require(eq(PermissionAction.ANALYSIS_POLICY));
   }
+
+  @Test
+  void severalAreSetTogetherInOneTransaction_soARefusalChangesNone() throws Exception {
+    when(policy.value(EditablePolicy.LLM_API_BASE_URL)).thenReturn("http://old/v1");
+    when(policy.deployValue(EditablePolicy.LLM_API_BASE_URL)).thenReturn("http://old/v1");
+    when(actor.username()).thenReturn("alice");
+    var values = new java.util.LinkedHashMap<String, String>();
+    values.put("LLM_API_BASE_URL", "http://new/v1");
+    values.put("LLM_TEMPERATURE", "9");
+
+    assertThatThrownBy(() -> service.setAll(values)).hasMessageContaining("0");
+    // The URL was written in the same transaction, which the refusal rolls back.
+    assertThat(PolicySettingsService.class.getMethod("setAll", Map.class)
+            .isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class))
+        .isTrue();
+  }
 }

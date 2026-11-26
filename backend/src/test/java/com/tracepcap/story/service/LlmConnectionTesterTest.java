@@ -60,7 +60,7 @@ class LlmConnectionTesterTest {
       @Override public boolean canEdit(EditablePolicy.Kind kind) { return allowed; }
       @Override public String reason(EditablePolicy.Kind kind) { return "Only admins can change the LLM connection."; }
     };
-    return new LlmConnectionTester(settings, gate, new ObjectMapper());
+    return new LlmConnectionTester(settings, gate, new ObjectMapper(), new com.tracepcap.config.LlmConfig());
   }
 
   private static String statuses(LlmTestResult r) {
@@ -163,5 +163,21 @@ class LlmConnectionTesterTest {
     var unknown = LlmConnectionTester.capacityStep(null, false, null, 0, 0, 300);
     assertThat(unknown.getStatus()).isEqualTo("OK");
     assertThat(unknown.getDetail()).contains("LLM_CONTEXT_LENGTH");
+  }
+
+  @Test
+  void aReplyTooShortToTimeGivesNoSpeed() {
+    // "OK" in 400 ms says nothing about how fast it writes a story.
+    var shortReply = LlmConnectionTester.capacityStep(131_072, false, 2, 400, 0, 300);
+    assertThat(shortReply.getStatus()).isEqualTo("OK");
+    assertThat(shortReply.getDetail()).doesNotContain("tokens a second");
+  }
+
+  @Test
+  void anUnknownContextSaysWhatRepliesGet() {
+    assertThat(LlmConnectionTester.capacityStep(null, false, null, 0, 6000, 300).getDetail())
+        .contains("6,000 tokens (LLM_MAX_TOKENS)");
+    assertThat(LlmConnectionTester.capacityStep(null, false, null, 0, 0, 300).getDetail())
+        .contains("8,192 tokens, then the rest");
   }
 }

@@ -40,6 +40,10 @@ public class LlmConnectionTester {
   static final int REPLY_TIMEOUT_CAP_MS = 120_000;
   /** Enough for a reasoning model to show that it reasons, still a quick reply. */
   static final int REPLY_TOKENS = 24;
+  /** Asks for more than {@link #REPLY_TOKENS}, so every model writes the whole reply and its speed shows. */
+  static final String SPEED_PROMPT = "Count from 1 to 40, separated by spaces.";
+  /** A reply shorter than this says too little about speed (an "OK", a cold load): no estimate. */
+  static final int MIN_SPEED_TOKENS = REPLY_TOKENS / 2;
 
   /** A Story on a busy capture sends 10,000–20,000 tokens; under this it may be refused. */
   static final int STORY_MIN_CONTEXT = 16_384;
@@ -54,6 +58,7 @@ public class LlmConnectionTester {
   private final LlmSettings settings;
   private final PolicyEditGate editGate;
   private final ObjectMapper objectMapper;
+  private final com.tracepcap.config.LlmConfig llmConfig;
 
   public LlmTestResult test(LlmTestRequest request) {
     // Testing what's in effect points nowhere new, so anyone may. Testing other values sends
@@ -155,7 +160,7 @@ public class LlmConnectionTester {
     try {
       Map<String, Object> body = Map.of(
           "model", model,
-          "messages", List.of(Map.of("role", "user", "content", "Reply with OK.")),
+          "messages", List.of(Map.of("role", "user", "content", SPEED_PROMPT)),
           "max_tokens", REPLY_TOKENS,
           "temperature", 0);
       HttpHeaders h = headers(apiKey);
@@ -180,7 +185,9 @@ public class LlmConnectionTester {
     }
     // 5. Whether it can carry a story: its context, the cap, its speed. Warnings only.
     if (reply != null) {
-      Integer context = LlmClient.contextLengthOf(entry);
+      // A configured LLM_CONTEXT_LENGTH is what replies are sized to, so it's what counts here.
+      Integer context = llmConfig.getApi() == null ? null : llmConfig.getApi().getContextLength();
+      if (context == null) context = LlmClient.contextLengthOf(entry);
       if (context == null && entry != null && LlmClient.namesItsLimit(entry.path("owned_by").asText(null))) {
         context = LlmClient.probe(template(LIST_TIMEOUT_MS), baseUrl, apiKey, model).contextLength();
       }
@@ -266,8 +273,9 @@ public class LlmConnectionTester {
     List<String> warnings = new ArrayList<>();
     List<String> notes = new ArrayList<>();
     if (context == null) {
-      notes.add("The server doesn't say how large its context is; replies get 8192 tokens, then the rest if cut off."
-          + " Set LLM_CONTEXT_LENGTH to size them.");
+      notes.add("The server doesn't say how large its context is; replies get "
+          + (ceiling > 0 ? n(ceiling) + " tokens (LLM_MAX_TOKENS)" : n(LlmClient.FALLBACK_REPLY_TOKENS) + " tokens, then the rest if cut off")
+          + ". Set LLM_CONTEXT_LENGTH to size them to it.");
     } else if (reasoning && context < REASONING_MIN_CONTEXT) {
       warnings.add("Its context holds " + n(context) + " tokens. A reasoning model thinks before it writes, so a story"
           + " needs " + n(REASONING_MIN_CONTEXT) + " or more: on a busy capture it may be cut off or refused.");
@@ -282,7 +290,7 @@ public class LlmConnectionTester {
       warnings.add("LLM_MAX_TOKENS caps replies at " + n(ceiling) + "; " + (reasoning ? "a reasoning model's" : "a")
           + " story needs " + n(minCap) + " or more. Set it to 0 to size replies to the context.");
     }
-    if (completionTokens != null && completionTokens > 0 && replyMs > 0) {
+    if (completionTokens != null && completionTokens >= MIN_SPEED_TOKENS && replyMs > 0) {
       // A 24-token reply includes the prompt's processing, so this is a floor on its speed.
       double perSecond = completionTokens * 1000.0 / replyMs;
       int storyTokens = reasoning ? STORY_REPLY_TOKENS * 3 : STORY_REPLY_TOKENS;

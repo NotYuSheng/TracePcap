@@ -2950,7 +2950,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Override several editable settings together, all or none
+         * @description For settings that only work as a set, such as the LLM's URL, key and model: if one is refused, none is changed. Each needs its own permission and is audited on its own.
+         */
+        patch: operations["setAll"];
         trace?: never;
     };
     "/api/v1/system/settings/{key}": {
@@ -5177,6 +5181,11 @@ export interface components {
         };
         SetValueRequest: {
             value: string;
+        };
+        SetValuesRequest: {
+            values: {
+                [key: string]: string;
+            };
         };
         SkippedFile: {
             /** Format: uuid */
@@ -10338,6 +10347,30 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"][];
+                };
+            };
+        };
+    };
+    setAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetValuesRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

@@ -61,13 +61,13 @@ export interface LlmTestResult {
 }
 
 export const settingsService = {
+  /** The server's models for these values (blank = current), to pick one before saving. */
+  listLlmModels: async (candidate: { baseUrl?: string; apiKey?: string } = {}): Promise<LlmModelList> =>
+    (await apiClient.post<LlmModelList>(API_ENDPOINTS.LLM_MODELS, candidate)).data,
   /**
    * Tests the LLM connection step by step. Blank fields use the current settings, so `{}` tests
    * what's in effect and e.g. `{ model }` tests a change before saving it.
    */
-  /** The server's models for these values (blank = current), to pick one before saving. */
-  listLlmModels: async (candidate: { baseUrl?: string; apiKey?: string } = {}): Promise<LlmModelList> =>
-    (await apiClient.post<LlmModelList>(API_ENDPOINTS.LLM_MODELS, candidate)).data,
   testLlm: async (candidate: { baseUrl?: string; apiKey?: string; model?: string } = {}): Promise<LlmTestResult> =>
     (await apiClient.post<LlmTestResult>(API_ENDPOINTS.LLM_TEST, candidate)).data,
   getSystemSettings: async (): Promise<SystemSetting[]> =>
@@ -75,6 +75,9 @@ export const settingsService = {
   /** Overrides an editable policy setting (audited). Setting the deployment's value resets it. */
   setSystemSetting: async (key: string, value: string): Promise<SystemSetting> =>
     (await apiClient.put<SystemSetting>(API_ENDPOINTS.SYSTEM_SETTING(key), { value })).data,
+  /** Overrides several together, all or none (each audited): for settings that only work as a set. */
+  setSystemSettings: async (values: Record<string, string>): Promise<SystemSetting[]> =>
+    (await apiClient.patch<SystemSetting[]>(API_ENDPOINTS.SYSTEM_SETTINGS, { values })).data,
   /** Removes an override, so the deployment's value applies again (audited). */
   resetSystemSetting: async (key: string): Promise<void> => {
     await apiClient.delete(API_ENDPOINTS.SYSTEM_SETTING(key));

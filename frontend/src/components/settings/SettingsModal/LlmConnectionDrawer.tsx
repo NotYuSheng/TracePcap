@@ -10,6 +10,8 @@ import { contextLabel } from './llmConnection';
 /** Wait this long after typing before asking the server for its models. */
 const LIST_DELAY_MS = 600;
 const OTHER = '__other__';
+/** The saved model, when the server doesn't offer it. */
+const UNLISTED = '__unlisted__';
 
 function apiMessage(err: unknown): string | null {
   return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? null;
@@ -53,11 +55,13 @@ export function LlmConnectionDrawer({
 
   // Ask the server at the typed URL (with the typed key) for its models, once typing pauses.
   useEffect(() => {
+    const id = ++asked.current;
     if (!baseUrl.trim()) {
+      // Also drops the answer to a request still on its way for the old URL.
       setList(null);
+      setListing(false);
       return;
     }
-    const id = ++asked.current;
     const timer = setTimeout(() => {
       setListing(true);
       settingsService
@@ -77,26 +81,38 @@ export function LlmConnectionDrawer({
   const picking = models.length > 0 && !typing;
   const offered = models.some(m => m.id === model);
 
-  const changes: [string, string][] = [];
-  if (urlSetting?.editable && urlChanged) changes.push(['LLM_API_BASE_URL', baseUrl.trim()]);
-  if (keySetting?.editable && apiKey.trim()) changes.push(['LLM_API_KEY', apiKey.trim()]);
+  const changes: Record<string, string> = {};
+  if (urlSetting?.editable && urlChanged && baseUrl.trim()) changes.LLM_API_BASE_URL = baseUrl.trim();
+  if (keySetting?.editable && apiKey.trim()) changes.LLM_API_KEY = apiKey.trim();
   if (modelSetting?.editable && model.trim() && model.trim() !== (modelSetting?.value ?? ''))
-    changes.push(['LLM_MODEL', model.trim()]);
+    changes.LLM_MODEL = model.trim();
+  const changed = Object.keys(changes).length > 0;
+  // A URL and a model are needed for any call; a blank one is never saved.
+  const incomplete = !baseUrl.trim() || !model.trim();
+  // Changed in the app, and so resettable to the deployment's values.
+  const overridden = [urlSetting, keySetting, modelSetting].filter(
+    (s): s is SystemSetting => !!s?.editable && !!s.overridden
+  );
 
-  const save = async () => {
+  const run = async (action: () => Promise<unknown>) => {
     setSaving(true);
     setError(null);
     try {
-      for (const [key, value] of changes) await settingsService.setSystemSetting(key, value);
+      await action();
       onSaved();
       onHide();
     } catch (err) {
-      onSaved();
       setError(apiMessage(err) ?? "Couldn't save the change. Please try again.");
     } finally {
       setSaving(false);
     }
   };
+  // All together or none, so the connection is never left half changed.
+  const save = () => run(() => settingsService.setSystemSettings(changes));
+  const reset = () =>
+    run(async () => {
+      for (const s of overridden) await settingsService.resetSystemSetting(s.key);
+    });
 
   const locked = (s?: SystemSetting) =>
     s && !s.editable ? <Form.Text muted>{s.lockedReason ?? "You can't change this here."}</Form.Text> : null;
@@ -109,6 +125,11 @@ export function LlmConnectionDrawer({
       titleId="llm-connection-title"
       footer={
         <>
+          {overridden.length > 0 && (
+            <Button type="button" variant="link" className="me-auto" disabled={saving} onClick={reset}>
+              Reset to the deployment's values
+            </Button>
+          )}
           <Button type="button" variant="outline-secondary" onClick={onHide} disabled={saving}>
             Cancel
           </Button>
@@ -116,7 +137,7 @@ export function LlmConnectionDrawer({
             type="submit"
             form="llm-connection-form"
             variant="primary"
-            disabled={saving || changes.length === 0}
+            disabled={saving || !changed || incomplete}
           >
             {saving ? (
               <>
@@ -134,7 +155,7 @@ export function LlmConnectionDrawer({
         id="llm-connection-form"
         onSubmit={e => {
           e.preventDefault();
-          if (changes.length) save();
+          if (changed && !incomplete) save();
         }}
       >
         {error && (
@@ -177,18 +198,24 @@ export function LlmConnectionDrawer({
           {picking ? (
             <Form.Select
               id="llm-model"
-              value={offered ? model : OTHER}
-              onChange={e => (e.target.value === OTHER ? setTyping(true) : setModel(e.target.value))}
+              value={offered ? model : UNLISTED}
+              onChange={e =>
+                e.target.value === OTHER
+                  ? setTyping(true)
+                  : e.target.value !== UNLISTED && setModel(e.target.value)
+              }
               disabled={saving || !modelSetting?.editable}
             >
-              {!offered && <option value={OTHER}>{model ? `${model} (not on this server)` : 'Pick a model'}</option>}
+              {!offered && (
+                <option value={UNLISTED}>{model ? `${model} (not on this server)` : 'Pick a model'}</option>
+              )}
               {models.map(m => (
                 <option key={m.id} value={m.id}>
                   {m.id}
                   {m.contextLength ? ` · ${contextLabel(m.contextLength)}` : ''}
                 </option>
               ))}
-              {offered && <option value={OTHER}>Type another name…</option>}
+              <option value={OTHER}>Type another name…</option>
             </Form.Select>
           ) : (
             <Form.Control
