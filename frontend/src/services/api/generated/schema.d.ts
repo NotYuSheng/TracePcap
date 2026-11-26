@@ -1328,7 +1328,7 @@ export interface paths {
         };
         /**
          * Autonomous investigation report for a file
-         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look.
+         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look; where the capture was taken; and which hosts read as honeypots.
          */
         get: operations["getInvestigation"];
         put?: never;
@@ -4161,6 +4161,39 @@ export interface components {
             role?: string;
             text?: string;
         };
+        HoneypotHostResponse: {
+            basis?: string;
+            candidates?: components["schemas"]["VantageCandidateResponse"][];
+            /** Format: int32 */
+            confidence?: number;
+            contested?: boolean;
+            described?: string;
+            honeypot?: string;
+            host?: string;
+            label?: string;
+            overriddenBy?: string;
+            reason?: string;
+            signals?: components["schemas"]["HoneypotSignalResponse"][];
+        };
+        HoneypotSignalResponse: {
+            honeypot?: string;
+            id?: string;
+            /** Format: int32 */
+            points?: number;
+            source?: string;
+            strength?: string;
+            text?: string;
+        };
+        HoneypotsResponse: {
+            hosts?: components["schemas"]["HoneypotHostResponse"][];
+            options?: string[];
+            question?: string;
+            /** Format: int32 */
+            serversChecked?: number;
+            signaturesVersion?: string;
+            /** Format: int32 */
+            singleSignal?: number;
+        };
         HostClassificationResponse: {
             addressKind?: string;
             /** Format: int32 */
@@ -4370,6 +4403,7 @@ export interface components {
             context?: components["schemas"]["CaptureContextResponse"];
             coverage?: string[];
             goals?: components["schemas"]["GoalOutcomeDto"][];
+            honeypots?: components["schemas"]["HoneypotsResponse"];
             unknowns?: string[];
         };
         InvestigationStep: {

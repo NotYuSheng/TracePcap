@@ -1,0 +1,105 @@
+{
+  "about": "Stock honeypot fingerprints a capture can show (docs/architecture/investigation-framework.rst, Honeypots). One match is never enough: a real server can send the same banner. strength: strong = only a honeypot sends it; medium = rare on a real server; weak = a real product's own default too. kind: ssh-banner, ssh-hassh, ftp-banner, http-server, smb-os, smb-server-name, mysql-version (from service_banners) and tls-cert (subject or issuer). match: equals or contains, case-sensitive.",
+  "version": "2026-11-26",
+  "signatures": [
+    {
+      "id": "cowrie-ssh-banner",
+      "honeypot": "Cowrie",
+      "kind": "ssh-banner",
+      "match": "equals",
+      "value": "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3",
+      "strength": "weak",
+      "why": "Cowrie's default SSH version string (cowrie/cowrie, 2026); a real Debian 12 server sends it too"
+    },
+    {
+      "id": "cowrie-ssh-banner-2016",
+      "honeypot": "Cowrie",
+      "kind": "ssh-banner",
+      "match": "equals",
+      "value": "SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2",
+      "strength": "weak",
+      "why": "Cowrie's default SSH version string before 2.x; a real Debian 7 server sent it too"
+    },
+    {
+      "id": "kippo-ssh-banner",
+      "honeypot": "Kippo",
+      "kind": "ssh-banner",
+      "match": "equals",
+      "value": "SSH-2.0-OpenSSH_5.1p1 Debian-5",
+      "strength": "weak",
+      "why": "Kippo's default SSH version string; a real Debian 5 server sent it too"
+    },
+    {
+      "id": "cowrie-ssh-hassh",
+      "honeypot": "Cowrie",
+      "kind": "ssh-hassh",
+      "match": "equals",
+      "value": "6fa2f18e2061da02d6c8a9009674fa4e",
+      "strength": "medium",
+      "why": "the HASSH of Cowrie's SSH key exchange (Twisted Conch, cowrie/cowrie 2026), which no OpenSSH release offers"
+    },
+    {
+      "id": "dionaea-tls-cert",
+      "honeypot": "Dionaea",
+      "kind": "tls-cert",
+      "match": "contains",
+      "value": "dionaea.carnivore.it",
+      "strength": "strong",
+      "why": "Dionaea's self-signed default certificate (O=dionaea.carnivore.it, CN=Nepenthes Development Team)"
+    },
+    {
+      "id": "dionaea-smb-server-name",
+      "honeypot": "Dionaea",
+      "kind": "smb-server-name",
+      "match": "equals",
+      "value": "HOMEUSER-3AF6FE",
+      "strength": "strong",
+      "why": "Dionaea's default SMB server name (dionaea/smb/extras.py)"
+    },
+    {
+      "id": "dionaea-smb-os",
+      "honeypot": "Dionaea",
+      "kind": "smb-os",
+      "match": "equals",
+      "value": "Windows 5.1 / Windows 2000 LAN Manager",
+      "strength": "weak",
+      "why": "Dionaea's default SMB native OS and LAN manager (dionaea/smb/extras.py); a real Windows XP sends the same"
+    },
+    {
+      "id": "dionaea-ftp-banner",
+      "honeypot": "Dionaea",
+      "kind": "ftp-banner",
+      "match": "equals",
+      "value": "DiskStation FTP server ready.",
+      "strength": "weak",
+      "why": "Dionaea's default FTP greeting (dionaea/ftp.py); a real Synology DiskStation sends it too"
+    },
+    {
+      "id": "dionaea-mysql-version",
+      "honeypot": "Dionaea",
+      "kind": "mysql-version",
+      "match": "equals",
+      "value": "5.7.16",
+      "strength": "weak",
+      "why": "Dionaea's default MySQL version (dionaea/mysql/var.py); a real MySQL 5.7.16 may send it too"
+    },
+    {
+      "id": "glastopf-http-server",
+      "honeypot": "Glastopf",
+      "kind": "http-server",
+      "match": "equals",
+      "value": "BaseHTTP/0.3 Python/2.5.1",
+      "strength": "medium",
+      "why": "Glastopf's HTTP Server header (Vetterl and Clayton, 2018); a Python 2.5 web server from 2006 is rare"
+    },
+    {
+      "id": "amun-http-server",
+      "honeypot": "Amun",
+      "kind": "http-server",
+      "match": "equals",
+      "value": "Apache/1.3.29",
+      "strength": "weak",
+      "why": "Amun's HTTP Server header (Vetterl and Clayton, 2018); a real Apache 1.3.29 sends it too"
+    }
+  ]
+}

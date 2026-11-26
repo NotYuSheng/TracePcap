@@ -51,10 +51,60 @@ public class CategoryCoverage {
   private final ConversationLookup conversations;
 
   public List<CategoryStatus> coverage(
-      UUID fileId, InvestigationReport report, CaptureContextService.CaptureContext context) {
+      UUID fileId, InvestigationReport report, CaptureContextService.CaptureContext context,
+      HoneypotRoleService.HoneypotReport honeypots) {
     ConversationLookup.FacetCounts facets = conversations.facetCounts(fileId);
-    return withContext(compute(catalogue.entries(), answeredQuestions(report),
-        ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context);
+    return withHoneypots(withContext(compute(catalogue.entries(), answeredQuestions(report),
+        ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context),
+        honeypots);
+  }
+
+  /**
+   * The Honeypot category from the honeypot role: answered when a host reads as one, open when a
+   * host matched a signature but not enough to tell, and ruled out when every server's banners and
+   * certificates were read and none matched.
+   */
+  static List<CategoryStatus> withHoneypots(
+      List<CategoryStatus> statuses, HoneypotRoleService.HoneypotReport report) {
+    if (report == null) return statuses;
+    List<CategoryStatus> out = new ArrayList<>();
+    for (CategoryStatus s : statuses) {
+      out.add(s.category() == Category.HONEYPOT ? honeypot(report, s.leads()) : s);
+    }
+    return out;
+  }
+
+  private static CategoryStatus honeypot(HoneypotRoleService.HoneypotReport r, List<Lead> leads) {
+    Category c = Category.HONEYPOT;
+    List<HoneypotRoleService.HostRole> found = r.honeypots();
+    if (!found.isEmpty()) {
+      return new CategoryStatus(c, Status.ANSWERED, false, String.join("; ", found.stream()
+          .map(h -> h.described() + ("HUMAN".equals(h.basis()) ? " (set by an analyst)" : " (inferred)"))
+          .toList()), leads);
+    }
+    var undecided = r.hosts().stream().filter(h -> h.label() == null).toList();
+    if (!undecided.isEmpty()) {
+      var h = undecided.get(0);
+      return new CategoryStatus(c, Status.OPEN, false, h.host() + " points at "
+          + (h.honeypot() == null ? "a honeypot" : h.honeypot()) + ", but " + h.reason(), leads);
+    }
+    if (!r.hosts().isEmpty()) {
+      return new CategoryStatus(c, Status.RULED_OUT, false, String.join("; ",
+          r.hosts().stream().map(h -> h.described() + " (set by an analyst)").toList()), leads);
+    }
+    String checked = " (" + r.serversChecked() + (r.serversChecked() == 1 ? " server" : " servers")
+        + " checked)";
+    if (r.singleSignal() > 0) {
+      return new CategoryStatus(c, Status.RULED_OUT, false, "no server showed enough: "
+          + r.singleSignal() + " sent" + " only a stock honeypot"
+          + " banner, which real servers send too" + checked, leads);
+    }
+    if (r.serversChecked() > 0) {
+      return new CategoryStatus(c, Status.RULED_OUT, false,
+          "no server matched a honeypot signature" + checked, leads);
+    }
+    return new CategoryStatus(c, Status.OPEN, false,
+        "no server banners or certificates in this capture to check", leads);
   }
 
   /**

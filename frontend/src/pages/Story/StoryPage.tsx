@@ -6,7 +6,7 @@ import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import type { Answer, CaptureContext, CategoryStatus, GoalOutcome, TimelineDataPoint } from '@/types';
+import type { Answer, CaptureContext, CategoryStatus, GoalOutcome, Honeypots, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { storyService } from '@/features/story/services/storyService';
@@ -67,7 +67,9 @@ export const StoryPage = () => {
   const [additional, setAdditional] = useState<Answer[]>([]);
   const [categories, setCategories] = useState<CategoryStatus[] | null>(null);
   const [captureContext, setCaptureContext] = useState<CaptureContext | null>(null);
-  // Bumped when an analyst overrides or adds evidence to the capture context, to re-read it.
+  const [honeypots, setHoneypots] = useState<Honeypots | null>(null);
+  // Bumped when an analyst overrides or adds evidence to the capture context or a host's honeypot
+  // role, to re-read it.
   const [investigationRev, setInvestigationRev] = useState(0);
   const loadedFileId = useRef<string | null>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
@@ -122,6 +124,7 @@ export const StoryPage = () => {
         setAdditional(r.additional);
         setCategories(r.categories ?? null);
         setCaptureContext(r.context ?? null);
+        setHoneypots(r.honeypots ?? null);
       })
       .catch(() => {
         // A failed re-read keeps what was shown; only a new capture starts from nothing.
@@ -130,6 +133,7 @@ export const StoryPage = () => {
         setAdditional([]);
         setCategories(null);
         setCaptureContext(null);
+        setHoneypots(null);
       })
       .finally(() => { if (alive) setGoalsLoaded(true); });
     return () => { alive = false; };
@@ -186,6 +190,7 @@ export const StoryPage = () => {
       additional={additional}
       categories={categories}
       context={captureContext}
+      honeypots={honeypots}
       onContextChanged={() => setInvestigationRev(r => r + 1)}
       loading={!goalsLoaded}
     />

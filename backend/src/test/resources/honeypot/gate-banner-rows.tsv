@@ -1,0 +1,337 @@
+198.51.100.22		2222	55700	True	True	64										
+198.51.100.22		2222	55710	True	True	64										
+198.51.100.22		2222	51924	True	True	64										
+198.51.100.22		2222	51934	True	True	64										
+198.51.100.45		21	56682	True	True	64										
+198.51.100.22		2222	39510	True	True	64										
+198.51.100.101		39510	2222	False	True	64		SSH-2.0-Go								
+198.51.100.22		2222	39510	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2222	39520	True	True	64										
+198.51.100.101		39520	2222	False	True	64		SSH-2.0-OpenSSH_10.3								
+198.51.100.22		2222	39520	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2223	54426	True	True	64										
+198.51.100.45		21	56682	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		21	43084	True	True	64										
+198.51.100.45		21	43084	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	59310	True	True	64										
+198.51.100.45		80	59310	False	True	64						nginx				
+198.51.100.45		443	53818	True	True	64										
+198.51.100.45		445	57507	True	True	64										
+198.51.100.45		445	52164	True	True	64										
+198.51.100.45		445	52164	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.101		52164	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	52172	True	True	64										
+198.51.100.45		445	52164	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		445	46352	True	True	64										
+198.51.100.101		46352	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	46362	True	True	64										
+198.51.100.45		445	46352	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.101		46352	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	46352	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		1433	59728	True	True	64										
+198.51.100.45		1433	35298	True	True	64										
+198.51.100.45		1433	35304	True	True	64										
+198.51.100.45		80	49710	True	True	64										
+198.51.100.45		21	43012	True	True	64										
+198.51.100.45		1723	60632	True	True	64										
+198.51.100.45		3306	44438	True	True	64										
+198.51.100.45		445	46374	True	True	64										
+198.51.100.45		135	48220	True	True	64										
+198.51.100.45		443	48292	True	True	64										
+198.51.100.45		5060	49538	True	True	64										
+198.51.100.45		27017	42732	True	True	64										
+198.51.100.45		11211	40820	True	True	64										
+198.51.100.45		1433	35320	True	True	64										
+198.51.100.45		1883	45878	True	True	64										
+198.51.100.45		42	44560	True	True	64										
+198.51.100.45		21	37583	True	True	64										
+198.51.100.45		3306	37583	True	True	64										
+198.51.100.45		80	37583	True	True	64										
+198.51.100.45		445	37583	True	True	64										
+198.51.100.45		1433	37583	True	True	64										
+198.51.100.45		21	43016	True	True	64										
+198.51.100.45		80	49712	True	True	64										
+198.51.100.45		445	46380	True	True	64										
+198.51.100.45		1433	35322	True	True	64										
+198.51.100.45		3306	44454	True	True	64										
+198.51.100.45		3306	44454	False	True	64										5.7.16
+198.51.100.45		21	43016	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		445	46380	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.45		80	49712	False	True	64						nginx				
+198.51.100.45		1433	56284	True	True	64										
+198.51.100.22		2222	47658	True	True	64										
+198.51.100.102		47658	2222	False	True	64		SSH-2.0-Go								
+198.51.100.22		2222	47658	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2222	47668	True	True	64										
+198.51.100.102		47668	2222	False	True	64		SSH-2.0-OpenSSH_10.3								
+198.51.100.22		2222	47668	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2223	36662	True	True	64										
+198.51.100.45		21	40118	True	True	64										
+198.51.100.45		21	40118	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	35626	True	True	64										
+198.51.100.45		80	35626	False	True	64						nginx				
+198.51.100.45		443	36600	True	True	64										
+198.51.100.45		445	47515	True	True	64										
+198.51.100.45		445	51614	True	True	64										
+198.51.100.45		445	51614	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.102		51614	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	51626	True	True	64										
+198.51.100.45		445	51614	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		445	51634	True	True	64										
+198.51.100.102		51634	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	51638	True	True	64										
+198.51.100.45		445	51634	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.102		51634	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	51634	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		1433	53679	True	True	64										
+198.51.100.45		1433	46296	True	True	64										
+198.51.100.45		1433	46310	True	True	64										
+198.51.100.45		21	40126	True	True	64										
+198.51.100.45		135	51502	True	True	64										
+198.51.100.45		443	36604	True	True	64										
+198.51.100.45		80	35630	True	True	64										
+198.51.100.45		445	51642	True	True	64										
+198.51.100.45		3306	58244	True	True	64										
+198.51.100.45		1723	50712	True	True	64										
+198.51.100.45		1883	44876	True	True	64										
+198.51.100.45		42	44308	True	True	64										
+198.51.100.45		21	40126	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		11211	43446	True	True	64										
+198.51.100.45		1433	46324	True	True	64										
+198.51.100.45		5060	45414	True	True	64										
+198.51.100.45		27017	49756	True	True	64										
+198.51.100.45		80	39469	True	True	64										
+198.51.100.45		445	39469	True	True	64										
+198.51.100.45		21	39469	True	True	64										
+198.51.100.45		3306	39469	True	True	64										
+198.51.100.45		1433	39469	True	True	64										
+198.51.100.45		21	40128	True	True	64										
+198.51.100.45		80	35646	True	True	64										
+198.51.100.45		445	51644	True	True	64										
+198.51.100.45		1433	46334	True	True	64										
+198.51.100.45		3306	58252	True	True	64										
+198.51.100.45		21	40128	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		3306	58252	False	True	64										5.7.16
+198.51.100.45		80	35646	False	True	64						nginx				
+198.51.100.45		445	51644	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.45		1433	46510	True	True	64										
+198.51.100.22		2222	55296	True	True	64										
+198.51.100.103		55296	2222	False	True	64		SSH-2.0-Go								
+198.51.100.22		2222	55296	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2222	55298	True	True	64										
+198.51.100.103		55298	2222	False	True	64		SSH-2.0-OpenSSH_10.3								
+198.51.100.22		2222	55298	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2223	57502	True	True	64										
+198.51.100.45		21	35678	True	True	64										
+198.51.100.45		21	35678	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	53660	True	True	64										
+198.51.100.45		80	53660	False	True	64						nginx				
+198.51.100.45		443	39970	True	True	64										
+198.51.100.45		445	34922	True	True	64										
+198.51.100.45		445	36132	True	True	64										
+198.51.100.45		445	36132	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.103		36132	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	36134	True	True	64										
+198.51.100.45		445	36132	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		445	36144	True	True	64										
+198.51.100.103		36144	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	36156	True	True	64										
+198.51.100.45		445	36144	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.103		36144	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	36144	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		1433	63518	True	True	64										
+198.51.100.45		1433	34672	True	True	64										
+198.51.100.45		1433	34674	True	True	64										
+198.51.100.45		3306	34598	True	True	64										
+198.51.100.45		135	38598	True	True	64										
+198.51.100.45		445	36162	True	True	64										
+198.51.100.45		80	53664	True	True	64										
+198.51.100.45		21	35686	True	True	64										
+198.51.100.45		443	39980	True	True	64										
+198.51.100.45		1723	39094	True	True	64										
+198.51.100.45		11211	48802	True	True	64										
+198.51.100.45		42	38494	True	True	64										
+198.51.100.45		1433	34688	True	True	64										
+198.51.100.45		1883	55464	True	True	64										
+198.51.100.45		5060	35166	True	True	64										
+198.51.100.45		27017	41360	True	True	64										
+198.51.100.45		80	56087	True	True	64										
+198.51.100.45		3306	56087	True	True	64										
+198.51.100.45		445	56087	True	True	64										
+198.51.100.45		21	56087	True	True	64										
+198.51.100.45		1433	56087	True	True	64										
+198.51.100.45		21	35702	True	True	64										
+198.51.100.45		80	53670	True	True	64										
+198.51.100.45		445	36176	True	True	64										
+198.51.100.45		1433	34690	True	True	64										
+198.51.100.45		3306	34610	True	True	64										
+198.51.100.45		3306	34610	False	True	64										5.7.16
+198.51.100.45		21	35702	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	53670	False	True	64						nginx				
+198.51.100.45		445	36176	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.45		1433	41896	True	True	64										
+198.51.100.22		2222	47434	True	True	64										
+198.51.100.104		47434	2222	False	True	64		SSH-2.0-Go								
+198.51.100.22		2222	47434	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2222	52332	True	True	64										
+198.51.100.104		52332	2222	False	True	64		SSH-2.0-OpenSSH_10.3								
+198.51.100.22		2222	52332	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2223	41828	True	True	64										
+198.51.100.45		21	50238	True	True	64										
+198.51.100.45		21	50238	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	43296	True	True	64										
+198.51.100.45		80	43296	False	True	64						nginx				
+198.51.100.45		443	52222	True	True	64										
+198.51.100.45		445	38698	True	True	64										
+198.51.100.45		445	45176	True	True	64										
+198.51.100.45		445	45176	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.104		45176	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	45186	True	True	64										
+198.51.100.45		445	45176	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		445	45198	True	True	64										
+198.51.100.104		45198	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	45210	True	True	64										
+198.51.100.45		445	45198	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.104		45198	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	45198	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		1433	52559	True	True	64										
+198.51.100.45		1433	35162	True	True	64										
+198.51.100.45		1433	35174	True	True	64										
+198.51.100.45		21	50250	True	True	64										
+198.51.100.45		80	43298	True	True	64										
+198.51.100.45		3306	57880	True	True	64										
+198.51.100.45		445	45216	True	True	64										
+198.51.100.45		1723	60978	True	True	64										
+198.51.100.45		135	47886	True	True	64										
+198.51.100.45		443	52236	True	True	64										
+198.51.100.45		11211	48950	True	True	64										
+198.51.100.45		5060	52508	True	True	64										
+198.51.100.45		42	40608	True	True	64										
+198.51.100.45		1433	35184	True	True	64										
+198.51.100.45		1883	46352	True	True	64										
+198.51.100.45		27017	40422	True	True	64										
+198.51.100.45		21	47083	True	True	64										
+198.51.100.45		445	47083	True	True	64										
+198.51.100.45		3306	47083	True	True	64										
+198.51.100.45		80	47083	True	True	64										
+198.51.100.45		1433	47083	True	True	64										
+198.51.100.45		21	50256	True	True	64										
+198.51.100.45		80	43308	True	True	64										
+198.51.100.45		445	45226	True	True	64										
+198.51.100.45		1433	35186	True	True	64										
+198.51.100.45		3306	57890	True	True	64										
+198.51.100.45		21	50256	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		3306	57890	False	True	64										5.7.16
+198.51.100.45		445	45226	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.45		80	43308	False	True	64						nginx				
+198.51.100.45		1433	40194	True	True	64										
+198.51.100.22		2222	39342	True	True	64										
+198.51.100.105		39342	2222	False	True	64		SSH-2.0-Go								
+198.51.100.22		2222	39342	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2222	47072	True	True	64										
+198.51.100.105		47072	2222	False	True	64		SSH-2.0-OpenSSH_10.3								
+198.51.100.22		2222	47072	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2223	54328	True	True	64										
+198.51.100.45		21	42222	True	True	64										
+198.51.100.45		21	42222	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	55460	True	True	64										
+198.51.100.45		80	55460	False	True	64						nginx				
+198.51.100.45		443	60094	True	True	64										
+198.51.100.45		445	51725	True	True	64										
+198.51.100.45		445	37580	True	True	64										
+198.51.100.45		445	37580	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.105		37580	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	37596	True	True	64										
+198.51.100.45		445	37580	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		445	37608	True	True	64										
+198.51.100.105		37608	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	37620	True	True	64										
+198.51.100.45		445	37608	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.105		37608	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	37608	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		1433	37950	True	True	64										
+198.51.100.45		1433	34310	True	True	64										
+198.51.100.45		1433	34318	True	True	64										
+198.51.100.45		135	42550	True	True	64										
+198.51.100.45		443	60104	True	True	64										
+198.51.100.45		80	55466	True	True	64										
+198.51.100.45		3306	50692	True	True	64										
+198.51.100.45		445	37628	True	True	64										
+198.51.100.45		21	42226	True	True	64										
+198.51.100.45		1723	59394	True	True	64										
+198.51.100.45		5060	34738	True	True	64										
+198.51.100.45		27017	56260	True	True	64										
+198.51.100.45		11211	51372	True	True	64										
+198.51.100.45		42	57980	True	True	64										
+198.51.100.45		1433	34334	True	True	64										
+198.51.100.45		1883	36534	True	True	64										
+198.51.100.45		21	44610	True	True	64										
+198.51.100.45		445	44610	True	True	64										
+198.51.100.45		3306	44610	True	True	64										
+198.51.100.45		80	44610	True	True	64										
+198.51.100.45		1433	44610	True	True	64										
+198.51.100.45		21	42238	True	True	64										
+198.51.100.45		80	55482	True	True	64										
+198.51.100.45		445	37632	True	True	64										
+198.51.100.45		1433	34336	True	True	64										
+198.51.100.45		3306	50696	True	True	64										
+198.51.100.45		21	42238	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		3306	50696	False	True	64										5.7.16
+198.51.100.45		80	55482	False	True	64						nginx				
+198.51.100.45		445	37632	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.45		1433	43606	True	True	64										
+198.51.100.22		2222	44750	True	True	64										
+198.51.100.106		44750	2222	False	True	64		SSH-2.0-Go								
+198.51.100.22		2222	44750	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2222	44752	True	True	64										
+198.51.100.106		44752	2222	False	True	64		SSH-2.0-OpenSSH_10.3								
+198.51.100.22		2222	44752	False	True	64		SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3	6fa2f18e2061da02d6c8a9009674fa4e							
+198.51.100.22		2223	53328	True	True	64										
+198.51.100.45		21	35420	True	True	64										
+198.51.100.45		21	35420	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		80	58952	True	True	64										
+198.51.100.45		80	58952	False	True	64						nginx				
+198.51.100.45		443	36360	True	True	64										
+198.51.100.45		445	53145	True	True	64										
+198.51.100.45		445	38360	True	True	64										
+198.51.100.45		445	38360	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.106		38360	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	38366	True	True	64										
+198.51.100.45		445	38360	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		445	38372	True	True	64										
+198.51.100.106		38372	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	38376	True	True	64										
+198.51.100.45		445	38372	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.106		38372	445	False	True	64							Nmap	Native Lanman		
+198.51.100.45		445	38372	False	True	64							Windows 5.1	Windows 2000 LAN Manager		
+198.51.100.45		1433	44709	True	True	64										
+198.51.100.45		1433	43462	True	True	64										
+198.51.100.45		1433	43468	True	True	64										
+198.51.100.45		3306	47976	True	True	64										
+198.51.100.45		445	38390	True	True	64										
+198.51.100.45		21	54570	True	True	64										
+198.51.100.45		80	58966	True	True	64										
+198.51.100.45		1723	57054	True	True	64										
+198.51.100.45		443	36368	True	True	64										
+198.51.100.45		135	47206	True	True	64										
+198.51.100.45		1883	46372	True	True	64										
+198.51.100.45		27017	35594	True	True	64										
+198.51.100.45		1433	43480	True	True	64										
+198.51.100.45		42	47672	True	True	64										
+198.51.100.45		11211	45052	True	True	64										
+198.51.100.45		5060	40306	True	True	64										
+198.51.100.45		80	39928	True	True	64										
+198.51.100.45		3306	39928	True	True	64										
+198.51.100.45		445	39928	True	True	64										
+198.51.100.45		21	39928	True	True	64										
+198.51.100.45		1433	39928	True	True	64										
+198.51.100.45		21	54586	True	True	64										
+198.51.100.45		80	58968	True	True	64										
+198.51.100.45		445	38394	True	True	64										
+198.51.100.45		1433	43492	True	True	64										
+198.51.100.45		3306	47984	True	True	64										
+198.51.100.45		21	54586	False	True	64				220	DiskStation FTP server ready.					
+198.51.100.45		3306	47984	False	True	64										5.7.16
+198.51.100.45		445	38394	False	True	64									HOMEUSER-3AF6FE	
+198.51.100.45		80	58968	False	True	64						nginx				
+198.51.100.45		1433	45638	True	True	64										

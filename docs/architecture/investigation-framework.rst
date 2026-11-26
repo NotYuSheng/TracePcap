@@ -3,11 +3,12 @@ Investigation Framework
 
 .. note::
 
-   **Status: in progress.** The categories, their catalogue (phase 1), each category's status per
-   capture (phase 2) and the capture context (phase 3) are built: ``GET
-   /api/v1/investigation-categories`` serves the catalogue, the investigation report carries every
-   category's status and the capture's context, and the Overview and Story show them. Honeypot
-   detection is not built yet. See `Delivery plan`_.
+   **Status: built.** All four phases are in: the categories and their catalogue (phase 1), each
+   category's status per capture (phase 2), the capture context (phase 3) and the honeypot role
+   (phase 4). ``GET /api/v1/investigation-categories`` serves the catalogue; the investigation
+   report carries every category's status, the capture's context and the hosts that read as
+   honeypots; the Overview and Story show them. The uncovered tactics are next. See `Delivery
+   plan`_.
 
 TracePcap should judge every capture against **one fixed set of categories**, and say for each one
 whether it was *answered*, *ruled out*, still *open*, or *not observable* in this capture. The
@@ -190,9 +191,9 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      - Yes
      - Hosts sweeping ports or addresses
    * - Honeypot
-     - none
+     - the honeypot role
      - Yes
-     - See `Honeypots`_
+     - Built: see `Honeypots`_
    * - Adversary
      - none
      - No
@@ -397,6 +398,64 @@ A honeypot conclusion is graded ``INFERRED`` and needs **at least two independen
 default banner alone could be a real, old server. That matches the multi-stage rule the research
 uses to avoid false positives.
 
+What's built
+~~~~~~~~~~~~
+
+**Extract.** ``ServiceBannerExtractor`` runs one tshark pass and records what each server said about
+itself (table ``service_banners``): its SSH banner and HASSH, FTP greeting, HTTP ``Server`` header,
+SMB native OS and server name, MySQL version, and the initial TTL of its SYN-ACKs (32, 64, 128 or
+255, rounded up from the one seen). Only the server side counts: the address and port that sent the
+SYN-ACK, or the lower port when the capture began mid-connection. Ports 2222 and 2223 are decoded as
+SSH and Telnet, since Cowrie is often exposed there and tshark 3.6 only knows SSH on 22. TLS
+certificates come from the conversations' own TLS fields.
+
+**Signatures.** ``backend/src/main/resources/honeypot/signatures.json`` lists each fingerprint with
+the honeypot it names, the field it matches (``equals`` or ``contains``), a strength and why. Every
+value in it was checked against the honeypot's own image or source, or comes from the cited research:
+
+=============================  ==========  ===================================================================
+Signature                      Strength    Why
+=============================  ==========  ===================================================================
+Dionaea TLS certificate        strong      ``O=dionaea.carnivore.it, CN=Nepenthes Development Team``: only Dionaea
+Dionaea SMB server name        strong      ``HOMEUSER-3AF6FE`` (``dionaea/smb/extras.py``)
+Cowrie HASSH                   medium      Cowrie's key exchange (Twisted Conch); no OpenSSH release offers it
+Glastopf HTTP ``Server``       medium      ``BaseHTTP/0.3 Python/2.5.1``
+Cowrie, Kippo SSH banners      weak        ``OpenSSH_9.2p1 Debian-2+deb12u3`` and older: real Debian sends them
+Dionaea FTP, MySQL, SMB OS     weak        "DiskStation FTP server ready.", 5.7.16, Windows 5.1: real products' too
+Amun HTTP ``Server``           weak        ``Apache/1.3.29``
+=============================  ==========  ===================================================================
+
+**Behaviour.** Read only for hosts a signature or an analyst already points at, the strongest 50
+first: *fan-in* (5 or more hosts opened conversations to it, and it opened at most 10% of its own;
+weak), *many services* (it answered on 5 or more ports; medium), and *OS mismatch* (its SMB says
+Windows but its packets start at TTL 64; weak, since Samba on Linux does this too).
+
+**The vote.** Strong signals are worth 45 points, medium 30, weak 15. A host reads as a honeypot
+when it has **two or more signals, at least one a signature, worth 60 points together**. The
+honeypot named is the one its signatures' points favour. Below that, a host with two or more
+signals is listed with why it falls short ("its signals add up to 30 points of the 60 a honeypot
+needs"); a host with one signature match and nothing else is only counted, since an internet scan
+can meet hundreds of servers still sending an old honeypot's banner.
+
+**Override and evidence.** Each host's role is an adjudicated question (``honeypot``, entity key
+the host's address) at the generic adjudication endpoints. An override (*Honeypot*, *Not a
+honeypot*, or a label of your own) wins outright and keeps the signals for reference; evidence adds
+its weight to *Honeypot* or *Not a honeypot*, and counts as a signal, so an analyst's word plus one
+signature can settle a host.
+
+**Where it shows.** The Honeypot category is *Answered* when a host reads as one, *Open* when a host
+has two or more signals but not enough, and *Ruled out* when every server's banners and
+certificates were checked and none showed enough ("no server matched a honeypot signature (7
+servers checked)"). Story's summary names each honeypot under the capture context, and *Why ·
+change* opens its signals, the vote, an override and evidence.
+
+**The gate capture.** No public pcap of a modern Cowrie or Dionaea exists: honeypot datasets
+publish the honeypots' logs (MURHCAD, sweetie-data), not packets. ``scripts/honeypot-capture.sh``
+makes one anyone can rebuild: the official ``cowrie/cowrie`` and ``dinotools/dionaea`` images,
+pinned by digest, on an internal Docker network in the documentation range, probed by six attacker
+containers (SSH and Telnet logins, an FTP login, HTTP and TLS, SMB, MS-SQL, a port sweep and a
+version scan). The only change from the honeypots' defaults is turning on Cowrie's Telnet.
+
 How a honeypot changes other answers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -466,9 +525,17 @@ Four phases, each its own PR into ``dev``:
    mix and answers completeness and time span, and Story's summary opens with them (see `Capture
    context`_). The vantage point can be overridden and given evidence. Gate: Scan of the Month 28
    day 1, a public honeynet capture, reads as a sensor.
-4. **Honeypot role.** Signature file, contributor, adjudicated role graded ``INFERRED`` from two or
-   more signals. Gate: a true positive on a Cowrie or Dionaea capture, and no false positive on the
-   walkthrough captures.
+4. **Honeypot role** *(done)*. ``ServiceBannerExtractor`` records what servers say about
+   themselves, ``HoneypotRoleService`` reads them against the bundled signature file with the
+   hosts' behaviour, and each host's role is graded ``INFERRED`` from two or more signals, with an
+   override and evidence (see `What's built`_). Gate: on the scripted capture, Dionaea reads as
+   Dionaea (95: both strong signatures, three weak, fan-in, 14 ports, OS mismatch) and Cowrie as
+   Cowrie (60: HASSH, banner, fan-in). No false positive: no signature matched on the nine
+   malware-traffic-analysis.net exercises in ``eval/pcaps`` or the Ultimate PCAP. PANDAcap's 64
+   sessions (Zenodo 3759652, a high-interaction SSH honeypot: a real Ubuntu with genuine OpenSSH)
+   are ruled out, as they should be, since nothing it sends is a honeypot's; the only matches there
+   are single old Cowrie and Kippo banners on servers its compromised VM scanned, which are counted,
+   not concluded.
 
 After that, each uncovered category (Reconnaissance, Defense Evasion, Discovery, Collection,
 Impact) is one PR.
@@ -478,14 +545,18 @@ Open questions
 
 - Tag with ATT&CK tactic ids only, or technique ids too (``T1021.002`` for SMB admin shares)?
   Techniques are more precise but need upkeep each ATT&CK release.
-- Which honeypot captures can we test phase 4 with? The Honeynet Project's Scan of the Month
-  captures (2002) predate Cowrie and Dionaea, so a capture of a modern one is still needed: our own
-  in a lab, or a public one.
+- Should a honeypot change the other answers it touches (see `How a honeypot changes other
+  answers`_)? Phase 4 names the honeypot; the victim, downloads and scanner answers don't read it
+  yet.
+- High-interaction honeypots (PANDAcap, a real system) can't be told from a real server by what
+  they send. Their tell is behaviour over time, such as every login accepted, which needs
+  cleartext Telnet or FTP logins to count.
 - Should *Not observable* say what evidence would have answered it everywhere, as Lateral Movement
   does from the uplink?
 
 Decided: anything inferred gets an override and analyst evidence, as host roles have. The vantage
-point has both.
+point and the honeypot role have both. Test captures for phase 4: no public pcap exists, so the gate
+uses a scripted capture of the official images (``scripts/honeypot-capture.sh``).
 
 References
 ----------

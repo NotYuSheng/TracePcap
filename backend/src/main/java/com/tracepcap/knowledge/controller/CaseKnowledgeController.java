@@ -33,6 +33,7 @@ public class CaseKnowledgeController {
   private final InvestigationOrchestrator investigationOrchestrator;
   private final CategoryCoverage categoryCoverage;
   private final CaptureContextService captureContext;
+  private final com.tracepcap.knowledge.service.HoneypotRoleService honeypotRoles;
 
   @GetMapping("/{fileId}/knowledge")
   @Operation(summary = "Assembled knowledge board (entities, relationships, findings) for a file")
@@ -54,11 +55,13 @@ public class CaseKnowledgeController {
           "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence,"
               + " the goals still unknown, and the techniques that contributed (#819). Also every"
               + " investigation category's status on this capture: answered, ruled out, open or"
-              + " not observable, with why and the traffic worth a look.")
+              + " not observable, with why and the traffic worth a look; where the capture was taken;"
+              + " and which hosts read as honeypots.")
   public ResponseEntity<InvestigationReportResponse> getInvestigation(@PathVariable UUID fileId) {
     var report = investigationOrchestrator.investigate(fileId);
     var context = captureContext.forFile(fileId);
+    var honeypots = honeypotRoles.forFile(fileId);
     return ResponseEntity.ok(InvestigationReportResponse.from(
-        report, categoryCoverage.coverage(fileId, report, context), context));
+        report, categoryCoverage.coverage(fileId, report, context, honeypots), context, honeypots));
   }
 }
