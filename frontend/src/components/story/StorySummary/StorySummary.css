@@ -5,6 +5,17 @@
   padding: 16px 20px 8px;
 }
 
+.story-summary-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--tp-border, #dfe1e6);
+  font-size: 0.875rem;
+}
+
 .story-summary-scope {
   font-size: 0.75rem;
   color: var(--tp-text-muted, #525a68);

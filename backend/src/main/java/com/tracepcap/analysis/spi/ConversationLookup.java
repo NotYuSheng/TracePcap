@@ -491,6 +491,23 @@ public interface ConversationLookup {
    */
   List<HostFanOut> fanOutCandidates(UUID fileId);
 
+  /**
+   * Conversations between one pair of hosts, and which side opened them: the address mix a
+   * capture's vantage point is read from (docs/architecture/investigation-framework.rst, "Capture
+   * context"). {@code a} and {@code b} are as stored (srcIp, dstIp); the rest, where the opener
+   * isn't known (UDP, ICMP, a connection already open when the capture began), is neither.
+   */
+  record HostPair(String a, String b, long conversations, long openedByA, long openedByB) {}
+
+  /** Every pair of hosts with a conversation, aggregated in the database. */
+  List<HostPair> hostPairs(UUID fileId);
+
+  /**
+   * The distinct ports {@code ip} answered on: the responder's port of each conversation another
+   * host opened to it. Many ports from many openers is a sensor's shape; a server answers a few.
+   */
+  long distinctAnsweredPorts(UUID fileId, String ip);
+
   /** One host's outbound volume. */
   record HostVolume(String srcIp, long totalBytes, long flowCount) {}
 

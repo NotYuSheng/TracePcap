@@ -6,7 +6,7 @@ import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import type { Answer, CategoryStatus, GoalOutcome, TimelineDataPoint } from '@/types';
+import type { Answer, CaptureContext, CategoryStatus, GoalOutcome, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { storyService } from '@/features/story/services/storyService';
@@ -66,6 +66,10 @@ export const StoryPage = () => {
   const [goals, setGoals] = useState<GoalOutcome[]>([]);
   const [additional, setAdditional] = useState<Answer[]>([]);
   const [categories, setCategories] = useState<CategoryStatus[] | null>(null);
+  const [captureContext, setCaptureContext] = useState<CaptureContext | null>(null);
+  // Bumped when an analyst overrides or adds evidence to the capture context, to re-read it.
+  const [investigationRev, setInvestigationRev] = useState(0);
+  const loadedFileId = useRef<string | null>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [showRegenerate, setShowRegenerate] = useState(false);
   const ai = usePermission('ASK_AI');
@@ -105,14 +109,23 @@ export const StoryPage = () => {
   // following a lead (a beacon classified as a C2 with no IDS rule) shows on its card too.
   useEffect(() => {
     let alive = true;
-    setGoalsLoaded(false);
+    // Only a new capture shows the loading state: re-reading after an override keeps the summary
+    // (and the modal the analyst is in) on screen.
+    if (loadedFileId.current !== fileId) setGoalsLoaded(false);
+    loadedFileId.current = fileId;
     storyService
       .getInvestigationReport(fileId)
-      .then(r => { if (alive) { setGoals(r.goals); setAdditional(r.additional); setCategories(r.categories ?? null); } })
-      .catch(() => { if (alive) { setGoals([]); setAdditional([]); setCategories(null); } })
+      .then(r => {
+        if (!alive) return;
+        setGoals(r.goals);
+        setAdditional(r.additional);
+        setCategories(r.categories ?? null);
+        setCaptureContext(r.context ?? null);
+      })
+      .catch(() => { if (alive) { setGoals([]); setAdditional([]); setCategories(null); setCaptureContext(null); } })
       .finally(() => { if (alive) setGoalsLoaded(true); });
     return () => { alive = false; };
-  }, [fileId]);
+  }, [fileId, investigationRev]);
 
   useEffect(() => {
     const fetchTimeline = async () => {
@@ -164,6 +177,8 @@ export const StoryPage = () => {
       goals={goals}
       additional={additional}
       categories={categories}
+      context={captureContext}
+      onContextChanged={() => setInvestigationRev(r => r + 1)}
       loading={!goalsLoaded}
     />
   );

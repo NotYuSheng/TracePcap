@@ -260,6 +260,18 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public List<HostPair> hostPairs(UUID fileId) {
+    return repository.findHostPairsByFileId(fileId).stream()
+        .map(r -> new HostPair((String) r[0], (String) r[1], asLong(r[2]), asLong(r[3]), asLong(r[4])))
+        .toList();
+  }
+
+  @Override
+  public long distinctAnsweredPorts(UUID fileId, String ip) {
+    return repository.countDistinctAnsweredPorts(fileId, ip);
+  }
+
+  @Override
   public List<HostVolume> topSenders(UUID fileId) {
     return repository.findTopSendersByFileId(fileId).stream()
         .map(r -> new HostVolume((String) r[0], asLong(r[1]), asLong(r[2])))

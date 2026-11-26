@@ -131,4 +131,45 @@ class CategoryCoverageTest {
     var m = run(Set.of(), Set.of(), Set.of("DNS"), Set.of());
     assertThat(m.get(Category.LATERAL_MOVEMENT).leads()).isEmpty();
   }
+
+  private static CaptureContextService.CaptureContext context(String vantageKey, String label) {
+    var v = new CaptureContextService.VantagePoint(vantageKey, label, null,
+        "MACHINE", 70, false, List.of(), vantageKey == null ? "too few to tell" : "why", null);
+    return new CaptureContextService.CaptureContext(v,
+        new CaptureContextService.Completeness("Complete", "complete", List.of()),
+        new CaptureContextService.TimeSpan(null, null, 60_000L, "1 min, from to"));
+  }
+
+  private static Map<Category, CategoryStatus> withContext(
+      CaptureContextService.CaptureContext ctx, Set<String> apps) {
+    return CategoryCoverage.withContext(
+            CategoryCoverage.compute(ENTRIES, Set.of(), Set.of(), Set.of(), apps), ctx)
+        .stream().collect(Collectors.toMap(CategoryStatus::category, s -> s));
+  }
+
+  @Test
+  void theCaptureContextAnswersItsThreeCategories() {
+    var m = withContext(context("sensor", "On a honeypot or sensor"), Set.of());
+    assertThat(m.get(Category.VANTAGE_POINT).status()).isEqualTo(Status.ANSWERED);
+    assertThat(m.get(Category.VANTAGE_POINT).reason()).isEqualTo("On a honeypot or sensor (inferred)");
+    assertThat(m.get(Category.COMPLETENESS).reason()).isEqualTo("Complete");
+    assertThat(m.get(Category.TIME_SPAN).reason()).isEqualTo("1 min, from to");
+  }
+
+  @Test
+  void anUndeterminedVantageStaysOpenWithWhy() {
+    var m = withContext(context(null, null), Set.of());
+    assertThat(m.get(Category.VANTAGE_POINT).status()).isEqualTo(Status.OPEN);
+    assertThat(m.get(Category.VANTAGE_POINT).reason()).isEqualTo("too few to tell");
+  }
+
+  @Test
+  void fromTheUplinkLateralMovementCantBeSeenUnlessThereIsTrafficForIt() {
+    var m = withContext(context("uplink", "On the internet uplink"), Set.of());
+    assertThat(m.get(Category.LATERAL_MOVEMENT).status()).isEqualTo(Status.NOT_OBSERVABLE);
+    assertThat(m.get(Category.LATERAL_MOVEMENT).reason()).contains("a capture inside the LAN would show it");
+    // SMB crossing the uplink is still worth a look.
+    var withSmb = withContext(context("uplink", "On the internet uplink"), Set.of("SMBv23"));
+    assertThat(withSmb.get(Category.LATERAL_MOVEMENT).status()).isEqualTo(Status.OPEN);
+  }
 }

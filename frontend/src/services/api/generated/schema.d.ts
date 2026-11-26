@@ -3290,6 +3290,11 @@ export interface components {
             protocol?: string;
             srcIp?: string;
         };
+        CaptureContextResponse: {
+            completeness?: components["schemas"]["CompletenessResponse"];
+            timeSpan?: components["schemas"]["TimeSpanResponse"];
+            vantage?: components["schemas"]["VantageResponse"];
+        };
         CaptureMark: {
             baseline?: boolean;
             /** Format: date-time */
@@ -3490,6 +3495,11 @@ export interface components {
             forceDirectedImage?: string;
             hierarchicalImage?: string;
             nodeLimitNote?: string;
+        };
+        CompletenessResponse: {
+            label?: string;
+            level?: string;
+            notes?: components["schemas"]["QualityNoteResponse"][];
         };
         CompositionHistoryEntry: {
             deviceTypes?: string[];
@@ -4357,6 +4367,7 @@ export interface components {
             additional?: components["schemas"]["AnswerResponse"][];
             categories?: components["schemas"]["CategoryStatusResponse"][];
             considered?: components["schemas"]["ConsideredResponse"][];
+            context?: components["schemas"]["CaptureContextResponse"];
             coverage?: string[];
             goals?: components["schemas"]["GoalOutcomeDto"][];
             unknowns?: string[];
@@ -4890,6 +4901,11 @@ export interface components {
             /** Format: int64 */
             conversations?: number;
         };
+        QualityNoteResponse: {
+            kind?: string;
+            level?: string;
+            text?: string;
+        };
         ReanalyseRequest: {
             enableFileExtraction?: boolean;
             enableNdpi?: boolean;
@@ -5298,6 +5314,15 @@ export interface components {
             type?: string;
             value?: string;
         };
+        TimeSpanResponse: {
+            /** Format: int64 */
+            durationMs?: number;
+            /** Format: date-time */
+            end?: string;
+            label?: string;
+            /** Format: date-time */
+            start?: string;
+        };
         TimelineDataDto: {
             /** Format: int64 */
             bytes?: number;
@@ -5468,6 +5493,27 @@ export interface components {
             id: string;
             name: string;
             parentId: string;
+        };
+        VantageCandidateResponse: {
+            label?: string;
+            reasons?: string[];
+            /** Format: int32 */
+            score?: number;
+        };
+        VantageResponse: {
+            basis?: string;
+            candidates?: components["schemas"]["VantageCandidateResponse"][];
+            /** Format: int32 */
+            confidence?: number;
+            contested?: boolean;
+            entityKey?: string;
+            host?: string;
+            key?: string;
+            label?: string;
+            options?: string[];
+            overriddenBy?: string;
+            question?: string;
+            reason?: string;
         };
         WebServerDetailResponse: {
             api?: boolean;

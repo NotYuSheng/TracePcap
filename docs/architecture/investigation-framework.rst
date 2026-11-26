@@ -3,10 +3,11 @@ Investigation Framework
 
 .. note::
 
-   **Status: in progress.** The categories, their catalogue (phase 1) and each category's status per
-   capture (phase 2) are built: ``GET /api/v1/investigation-categories`` serves the catalogue, the
-   investigation report carries every category's status, and the Overview and Story show them.
-   Capture context and honeypot detection are not built yet. See `Delivery plan`_.
+   **Status: in progress.** The categories, their catalogue (phase 1), each category's status per
+   capture (phase 2) and the capture context (phase 3) are built: ``GET
+   /api/v1/investigation-categories`` serves the catalogue, the investigation report carries every
+   category's status and the capture's context, and the Overview and Story show them. Honeypot
+   detection is not built yet. See `Delivery plan`_.
 
 TracePcap should judge every capture against **one fixed set of categories**, and say for each one
 whether it was *answered*, *ruled out*, still *open*, or *not observable* in this capture. The
@@ -261,17 +262,75 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      -
      -
    * - Completeness
-     - none (the IDS completeness note, #1274, shows it today)
+     - ``CaptureContextService``, from the capture-quality notes (#1268)
      - Yes
-     - Phase 3
+     - Complete, complete with notes, or partial
    * - Vantage point
-     - none
+     - ``CaptureContextService``, from the address mix
      - Yes
-     - Internal, uplink, or honeypot sensor
+     - Inside the LAN, uplink, one host, exposed server, or sensor; analyst can override
    * - Time span
-     - none
+     - ``CaptureContextService``, from the capture summary
      - Yes
-     - Phase 3
+     - Duration, first and last packet
+
+Capture context
+---------------
+
+``CaptureContextService`` answers the three context categories for every capture, with no LLM, and
+the investigation report carries them as ``context``. Story opens with them in one line:
+*On a honeypot or sensor (192.168.100.28) · inferred · complete · 24 h*.
+
+**Vantage point** is a vote over the address mix, which comes from two database aggregates: the
+conversations per pair of hosts, with which side opened them, and the ports the busiest host answered
+on. Internal means a private address or one of the operator's private ranges.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 50 10
+
+   * - Vantage
+     - Shape
+     - Score
+   * - On a honeypot or sensor
+     - One host in at least 80% of conversations. Others opened most of them, at least 5 hosts on at
+       least 5 of its ports.
+     - 75
+   * - On an exposed server
+     - The same, but fewer openers or ports.
+     - 65
+   * - On one host
+     - One host in at least 80% of conversations, and it opened most of them. A host that also takes
+       a sensor's probes keeps *sensor* as runner-up (50): a compromised honeypot attacking out.
+     - 70
+   * - Inside the LAN
+     - At least 2 internal hosts, and at least 20% of conversations between them.
+     - 70
+   * - On the internet uplink
+     - At least 2 internal hosts, under 20% between them, and at least 60% between an internal and
+       an external host.
+     - 65
+
+Under 10 conversations, or a mix none of these fit, leaves it undetermined, and the reason says why
+(for a capture with no internal addresses, to add the operator's private ranges). The top two within
+15 points is *contested*.
+
+It is the ``vantage-point`` question about entity ``capture`` at the generic adjudication endpoints
+(:doc:`adjudication-explainability`). Analyst evidence adds its weight to a candidate, and an
+override replaces the vote. Story's *Why · change* opens the vote, its reasons, the override and the
+evidence. A vantage of the uplink makes Lateral Movement *not observable* when the capture has no
+traffic for it, since traffic between internal hosts doesn't cross an uplink.
+
+**Completeness** is the capture-quality notes as a verdict: *partial* when traffic is missing or
+uninspected (gaps, the IDS out of memory or unable to read it), *complete, with notes* for the rest.
+Sessions longer than the IDS's inspection depth are listed but don't qualify it: they say how far
+Suricata read, not what the capture holds.
+
+Checked against real captures: day 1 of the Honeynet Project's Scan of the Month 28 reads as a sensor,
+with 18 outside hosts opening 44 conversations on 18 ports. Day 3, the same honeypot compromised and
+flooding out, reads as one host, with sensor as runner-up. The 2010 forensic challenge 1 attack trace
+(5 conversations) is undetermined. The four malware-traffic-analysis.net captures read as one host's
+traffic, and a merged capture of many networks reads as inside the LAN.
 
 Honeypots
 ---------
@@ -399,8 +458,10 @@ Four phases, each its own PR into ``dev``:
    report (``categories``). *Worth a look* reads them, and Story takes the summary-first layout
    above (items 1 to 4; the tactic-tagged timeline waits on the narrative). Gate: on the four
    malware-traffic-analysis.net walkthrough captures, every status is right by hand check.
-3. **Capture context.** Infer the vantage point (internal, uplink, sensor) from address mix and
-   direction, and frame the summary by it. Gate: a public honeypot capture reads as a sensor log.
+3. **Capture context** *(done)*. ``CaptureContextService`` infers the vantage point from the address
+   mix and answers completeness and time span, and Story's summary opens with them (see `Capture
+   context`_). The vantage point can be overridden and given evidence. Gate: Scan of the Month 28
+   day 1, a public honeynet capture, reads as a sensor.
 4. **Honeypot role.** Signature file, contributor, adjudicated role graded ``INFERRED`` from two or
    more signals. Gate: a true positive on a Cowrie or Dionaea capture, and no false positive on the
    walkthrough captures.
@@ -413,11 +474,14 @@ Open questions
 
 - Tag with ATT&CK tactic ids only, or technique ids too (``T1021.002`` for SMB admin shares)?
   Techniques are more precise but need upkeep each ATT&CK release.
-- Which honeypot captures can we test with? Our own Cowrie and Dionaea in a lab, or public sensor
-  captures.
-- Should *Not observable* say what evidence would have answered it ("capture inside the LAN to see
-  lateral movement")?
-- Does the vantage point need a user override, as host roles have?
+- Which honeypot captures can we test phase 4 with? The Honeynet Project's Scan of the Month
+  captures (2002) predate Cowrie and Dionaea, so a capture of a modern one is still needed: our own
+  in a lab, or a public one.
+- Should *Not observable* say what evidence would have answered it everywhere, as Lateral Movement
+  does from the uplink?
+
+Decided: anything inferred gets an override and analyst evidence, as host roles have. The vantage
+point has both.
 
 References
 ----------

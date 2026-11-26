@@ -50,10 +50,46 @@ public class CategoryCoverage {
   private final CategoryCatalogue catalogue;
   private final ConversationLookup conversations;
 
-  public List<CategoryStatus> coverage(UUID fileId, InvestigationReport report) {
+  public List<CategoryStatus> coverage(
+      UUID fileId, InvestigationReport report, CaptureContextService.CaptureContext context) {
     ConversationLookup.FacetCounts facets = conversations.facetCounts(fileId);
-    return compute(catalogue.entries(), answeredQuestions(report), ruledOutQuestions(report),
-        facets.l7Protocols().keySet(), facets.apps().keySet());
+    return withContext(compute(catalogue.entries(), answeredQuestions(report),
+        ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context);
+  }
+
+  /**
+   * The capture-context categories answered from the capture's context, and the vantage point
+   * framing what it hides: traffic between internal hosts doesn't cross an internet uplink.
+   */
+  static List<CategoryStatus> withContext(
+      List<CategoryStatus> statuses, CaptureContextService.CaptureContext context) {
+    if (context == null) return statuses;
+    CaptureContextService.VantagePoint v = context.vantage();
+    boolean uplink = v != null && CaptureContextService.Vantage.UPLINK.key().equals(v.key());
+    List<CategoryStatus> out = new ArrayList<>();
+    for (CategoryStatus s : statuses) {
+      Category c = s.category();
+      if (c == Category.VANTAGE_POINT && v != null) {
+        out.add(v.determined()
+            ? new CategoryStatus(c, Status.ANSWERED, false,
+                v.described() + ("HUMAN".equals(v.basis()) ? " (set by an analyst)" : " (inferred)"),
+                List.of())
+            : new CategoryStatus(c, Status.OPEN, false, v.reason(), List.of()));
+      } else if (c == Category.COMPLETENESS && context.completeness() != null) {
+        out.add(new CategoryStatus(c, Status.ANSWERED, false, context.completeness().label(), List.of()));
+      } else if (c == Category.TIME_SPAN && context.timeSpan() != null
+          && context.timeSpan().label() != null) {
+        out.add(new CategoryStatus(c, Status.ANSWERED, false, context.timeSpan().label(), List.of()));
+      } else if (c == Category.LATERAL_MOVEMENT && uplink && s.leads().isEmpty()
+          && (s.status() == Status.OPEN || s.status() == Status.NOT_OBSERVABLE)) {
+        out.add(new CategoryStatus(c, Status.NOT_OBSERVABLE, false,
+            "taken on the internet uplink, which traffic between internal hosts doesn't cross:"
+                + " a capture inside the LAN would show it", List.of()));
+      } else {
+        out.add(s);
+      }
+    }
+    return out;
   }
 
   /** The question keys with an answer: every goal answered, and every other answer. */

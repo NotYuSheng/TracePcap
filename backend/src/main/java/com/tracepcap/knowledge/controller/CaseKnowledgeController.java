@@ -3,6 +3,7 @@ package com.tracepcap.knowledge.controller;
 import com.tracepcap.knowledge.dto.AnswerResponse;
 import com.tracepcap.knowledge.dto.CaseKnowledgeResponse;
 import com.tracepcap.knowledge.dto.InvestigationReportResponse;
+import com.tracepcap.knowledge.service.CaptureContextService;
 import com.tracepcap.knowledge.service.CaseKnowledgeService;
 import com.tracepcap.knowledge.service.CategoryCoverage;
 import com.tracepcap.knowledge.service.InvestigationOrchestrator;
@@ -31,6 +32,7 @@ public class CaseKnowledgeController {
   private final StandardQuestionService standardQuestionService;
   private final InvestigationOrchestrator investigationOrchestrator;
   private final CategoryCoverage categoryCoverage;
+  private final CaptureContextService captureContext;
 
   @GetMapping("/{fileId}/knowledge")
   @Operation(summary = "Assembled knowledge board (entities, relationships, findings) for a file")
@@ -55,7 +57,8 @@ public class CaseKnowledgeController {
               + " not observable, with why and the traffic worth a look.")
   public ResponseEntity<InvestigationReportResponse> getInvestigation(@PathVariable UUID fileId) {
     var report = investigationOrchestrator.investigate(fileId);
-    return ResponseEntity.ok(
-        InvestigationReportResponse.from(report, categoryCoverage.coverage(fileId, report)));
+    var context = captureContext.forFile(fileId);
+    return ResponseEntity.ok(InvestigationReportResponse.from(
+        report, categoryCoverage.coverage(fileId, report, context), context));
   }
 }
