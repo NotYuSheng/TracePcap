@@ -719,14 +719,30 @@ export const ExtractedFilesPage = () => {
         )}
       </SideDrawer>
 
-      <Modal show={previewFile !== null} onHide={() => setPreviewFile(null)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="bi bi-play-circle me-2"></i>
-            Preview — {previewFile?.filename ?? '(unnamed)'}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="text-center">
+      <SideDrawer
+        show={previewFile !== null}
+        onHide={() => setPreviewFile(null)}
+        title={<><i className="bi bi-play-circle me-2"></i>
+                  Preview — {previewFile?.filename ?? '(unnamed)'}</>}
+        titleId="file-preview-title"
+        wide
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPreviewFile(null)}>
+              Close
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => { setPreviewFile(null); handleDownloadRequest(previewFile!); }}
+              disabled={!exportPackets.allowed}
+            >
+              <i className="bi bi-download me-1"></i>
+              Download
+            </Button>
+          </>
+        }
+      >
+        <div className="text-center">
           {previewFile && (() => {
             const mode = nativePreviewMode(previewFile.mimeType);
             const url = getPreviewUrl(fileId, previewFile.id);
@@ -760,21 +776,8 @@ export const ExtractedFilesPage = () => {
             Content rendered from a packet capture. Do not interact with active content on a
             production system.
           </Alert>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setPreviewFile(null)}>
-            Close
-          </Button>
-          <Button
-            variant="outline-primary"
-            onClick={() => { setPreviewFile(null); handleDownloadRequest(previewFile!); }}
-            disabled={!exportPackets.allowed}
-          >
-            <i className="bi bi-download me-1"></i>
-            Download
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        </div>
+      </SideDrawer>
 
       {/* Safety disclaimer modal */}
       <Modal show={pendingDownload !== null} onHide={() => setPendingDownload(null)}>

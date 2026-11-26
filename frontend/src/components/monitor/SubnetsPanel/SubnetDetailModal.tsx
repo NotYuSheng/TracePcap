@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useMemo, useState } from 'react';
-import { Badge, Button, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { SubnetSnapshotHistory } from '@components/monitor/SubnetsPanel/SubnetSnapshotHistory';
@@ -51,101 +52,100 @@ export function SubnetDetailModal({ subnet, networkId, snapshots, overlap, onClo
   }, [snapshots, subnet.cidr, subnet.label]);
 
   return (
-    <Modal show onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton>
-        <Modal.Title className="h6 mb-0">
-          <i className="bi bi-diagram-2 me-2" />
-          <span className="font-monospace">{subnet.cidr}</span>
-          {subnet.source === 'AUTO'
-            ? <Badge bg="info" text="dark" className="ms-2" style={{ fontSize: '0.6rem' }}>Detected</Badge>
-            : <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.6rem' }}>Manual</Badge>}
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        {/* ── Overlap warning (possible two networks sharing this CIDR) ──── */}
-        {overlap && (
-          <Alert variant="danger" className="p-2 mb-3 small">
-            <div className="d-flex align-items-start gap-2">
-              <i className="bi bi-diagram-3-fill mt-1 flex-shrink-0" />
-              <div>
-                <strong>Possible overlapping networks.</strong> In snapshot{' '}
-                <strong>{overlap.snapshotOrder + 1}</strong> ({overlap.snapshotFileName}),{' '}
-                <code className="font-monospace">{overlap.conflictingIp}</code> is claimed by{' '}
-                <strong>{overlap.macs.length}</strong> different MACs — which usually means two
-                separate L2 networks are reusing this range. Labels and composition for this subnet
-                may be blending both.
-                <ul className="mb-0 mt-1 ps-3 font-monospace">
-                  {overlap.macs.map(m => <li key={m}>{m}</li>)}
-                </ul>
-              </div>
+    <SideDrawer
+      show
+      onHide={onClose}
+      title={<><i className="bi bi-diagram-2 me-2" />
+              <span className="font-monospace">{subnet.cidr}</span>
+              {subnet.source === 'AUTO'
+                ? <Badge bg="info" text="dark" className="ms-2" style={{ fontSize: '0.6rem' }}>Detected</Badge>
+                : <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.6rem' }}>Manual</Badge>}</>}
+      titleId="subnet-detail-title"
+      wide
+    >
+      {/* ── Overlap warning (possible two networks sharing this CIDR) ──── */}
+      {overlap && (
+        <Alert variant="danger" className="p-2 mb-3 small">
+          <div className="d-flex align-items-start gap-2">
+            <i className="bi bi-diagram-3-fill mt-1 flex-shrink-0" />
+            <div>
+              <strong>Possible overlapping networks.</strong> In snapshot{' '}
+              <strong>{overlap.snapshotOrder + 1}</strong> ({overlap.snapshotFileName}),{' '}
+              <code className="font-monospace">{overlap.conflictingIp}</code> is claimed by{' '}
+              <strong>{overlap.macs.length}</strong> different MACs — which usually means two
+              separate L2 networks are reusing this range. Labels and composition for this subnet
+              may be blending both.
+              <ul className="mb-0 mt-1 ps-3 font-monospace">
+                {overlap.macs.map(m => <li key={m}>{m}</li>)}
+              </ul>
             </div>
-          </Alert>
-        )}
+          </div>
+        </Alert>
+      )}
 
-        {/* ── Present-day label (read-only) ─────────────────────────────── */}
-        <div className="mb-2">
-          <h6 className="border-bottom pb-1 mb-2">
-            Label <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· present-day (latest snapshot)</span>
-          </h6>
-          {staleSince && (
-            <Alert variant="warning" className="p-2 mb-2 small">
-              <div className="d-flex align-items-start gap-2">
-                <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
-                <div>
-                  <strong>This label may be stale.</strong> The subnet's composition has drifted since
-                  it was labelled.
-                  {staleFields.length > 0 && (
-                    <ul className="mb-0 mt-1 ps-3">
-                      {staleFields.slice(0, 6).map((f, i) => <li key={i}>{f}</li>)}
-                    </ul>
-                  )}
-                </div>
-              </div>
-              <div className="mt-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  className="py-0"
-                  style={{ fontSize: '0.75rem' }}
-                  onClick={dismiss}
-                  disabled={dismissing}
-                  title="Mark the label as still correct and reset the composition baseline"
-                >
-                  {dismissing
-                    ? <><Spinner size="sm" className="me-1" />Dismissing…</>
-                    : <><i className="bi bi-check-lg me-1" />Dismiss — label is still correct</>}
-                </Button>
-              </div>
-            </Alert>
-          )}
-          {presentDayLabel ? (
-            <div className="p-2 rounded small bg-light">
-              <div className="fw-semibold">
-                {presentDayLabel}
-                {staleSince && (
-                  <Badge bg="warning" text="dark" className="ms-2" style={{ fontSize: '0.6rem' }}>
-                    <i className="bi bi-exclamation-triangle me-1" />Stale
-                  </Badge>
+      {/* ── Present-day label (read-only) ─────────────────────────────── */}
+      <div className="mb-2">
+        <h6 className="border-bottom pb-1 mb-2">
+          Label <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· present-day (latest snapshot)</span>
+        </h6>
+        {staleSince && (
+          <Alert variant="warning" className="p-2 mb-2 small">
+            <div className="d-flex align-items-start gap-2">
+              <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
+              <div>
+                <strong>This label may be stale.</strong> The subnet's composition has drifted since
+                it was labelled.
+                {staleFields.length > 0 && (
+                  <ul className="mb-0 mt-1 ps-3">
+                    {staleFields.slice(0, 6).map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
                 )}
               </div>
             </div>
-          ) : (
-            <p className="text-muted small fst-italic mb-0">
-              No label assigned. Set one per snapshot in the history below.
-            </p>
-          )}
-        </div>
-
-        {/* ── Per-snapshot history (where labels are set) ───────────────── */}
-        {canScan && subnet.id !== null && (
-          <SubnetSnapshotHistory
-            subnetId={subnet.id}
-            cidr={subnet.cidr}
-            networkId={networkId}
-            snapshots={snapshots}
-          />
+            <div className="mt-2">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="py-0"
+                style={{ fontSize: '0.75rem' }}
+                onClick={dismiss}
+                disabled={dismissing}
+                title="Mark the label as still correct and reset the composition baseline"
+              >
+                {dismissing
+                  ? <><Spinner size="sm" className="me-1" />Dismissing…</>
+                  : <><i className="bi bi-check-lg me-1" />Dismiss — label is still correct</>}
+              </Button>
+            </div>
+          </Alert>
         )}
-      </Modal.Body>
-    </Modal>
+        {presentDayLabel ? (
+          <div className="p-2 rounded small bg-light">
+            <div className="fw-semibold">
+              {presentDayLabel}
+              {staleSince && (
+                <Badge bg="warning" text="dark" className="ms-2" style={{ fontSize: '0.6rem' }}>
+                  <i className="bi bi-exclamation-triangle me-1" />Stale
+                </Badge>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-muted small fst-italic mb-0">
+            No label assigned. Set one per snapshot in the history below.
+          </p>
+        )}
+      </div>
+
+      {/* ── Per-snapshot history (where labels are set) ───────────────── */}
+      {canScan && subnet.id !== null && (
+        <SubnetSnapshotHistory
+          subnetId={subnet.id}
+          cidr={subnet.cidr}
+          networkId={networkId}
+          snapshots={snapshots}
+        />
+      )}
+    </SideDrawer>
   );
 }

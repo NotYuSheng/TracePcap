@@ -1,6 +1,6 @@
 import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { Link } from 'react-router-dom';
 import { Alert } from '@components/common/Alert';
 import { Pagination } from '@/components/common/Pagination';
@@ -148,221 +148,220 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
 
   return (
     <>
-    <Modal show={show} onHide={selected ? () => setSelected(null) : onHide} size="xl" scrollable>
-      <Modal.Header closeButton>
-        <Modal.Title as="h5" className="d-flex align-items-center gap-2">
-          {selected ? (
-            <>
-              <button type="button" className="btn btn-link p-0" onClick={() => setSelected(null)}>
-                <i className="bi bi-arrow-left me-1" aria-hidden="true" />
-                Devices
-              </button>
-              <span>{selected.name ?? selected.mac}</span>
-            </>
-          ) : (
-            <>
-              Devices
-              <button
-                type="button"
-                aria-label="How devices are recognised"
-                aria-expanded={helpOpen}
-                className="btn btn-link p-0 text-muted"
-                style={{ fontSize: '0.9rem', lineHeight: 1 }}
-                onClick={() => setHelpOpen(o => !o)}
-              >
-                <i className="bi bi-info-circle" aria-hidden="true" />
-              </button>
-            </>
+    <SideDrawer
+      show={show}
+      onHide={selected ? () => setSelected(null) : onHide}
+      title={<>{selected ? (
+                <>
+                  <button type="button" className="btn btn-link p-0" onClick={() => setSelected(null)}>
+                    <i className="bi bi-arrow-left me-1" aria-hidden="true" />
+                    Devices
+                  </button>
+                  <span>{selected.name ?? selected.mac}</span>
+                </>
+              ) : (
+                <>
+                  Devices
+                  <button
+                    type="button"
+                    aria-label="How devices are recognised"
+                    aria-expanded={helpOpen}
+                    className="btn btn-link p-0 text-muted"
+                    style={{ fontSize: '0.9rem', lineHeight: 1 }}
+                    onClick={() => setHelpOpen(o => !o)}
+                  >
+                    <i className="bi bi-info-circle" aria-hidden="true" />
+                  </button>
+                </>
+              )}</>}
+      titleId="network-devices-title"
+      wide
+    >
+      {selected ? (
+        <>
+          {actionError && <Alert variant="danger" className="small py-2">{actionError}</Alert>}
+          <DeviceDetail device={selected} snapshots={snapshots} onNavigate={onHide} onUndo={undo} />
+        </>
+      ) : (
+        <>
+          <p className="text-muted small mb-2">
+            {networkName} · {snapshots.length} snapshot{snapshots.length === 1 ? '' : 's'} · one row per
+            device, wherever it was on the network
+          </p>
+          {helpOpen && (
+            <Alert variant="info" className="small py-2" data-testid="devices-help">
+              A device is recognised by its <strong>MAC</strong>, so a laptop that moved from one address
+              to another is one row, and two devices that shared an address are two. Hosts outside the
+              local network have no MAC of their own (their frames carry the router's) and aren't listed.{' '}
+              <strong>Irregular</strong> devices have a MAC that may not identify one machine: a virtual
+              machine or container MAC, or one MAC answering as two machines at once.{' '}
+              <strong>Private</strong> MACs are made up by the device (phones do this per network) and
+              can change, so the same phone may appear under more than one.
+            </Alert>
           )}
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        {selected ? (
-          <>
-            {actionError && <Alert variant="danger" className="small py-2">{actionError}</Alert>}
-            <DeviceDetail device={selected} snapshots={snapshots} onNavigate={onHide} onUndo={undo} />
-          </>
-        ) : (
-          <>
-            <p className="text-muted small mb-2">
-              {networkName} · {snapshots.length} snapshot{snapshots.length === 1 ? '' : 's'} · one row per
-              device, wherever it was on the network
-            </p>
-            {helpOpen && (
-              <Alert variant="info" className="small py-2" data-testid="devices-help">
-                A device is recognised by its <strong>MAC</strong>, so a laptop that moved from one address
-                to another is one row, and two devices that shared an address are two. Hosts outside the
-                local network have no MAC of their own (their frames carry the router's) and aren't listed.{' '}
-                <strong>Irregular</strong> devices have a MAC that may not identify one machine: a virtual
-                machine or container MAC, or one MAC answering as two machines at once.{' '}
-                <strong>Private</strong> MACs are made up by the device (phones do this per network) and
-                can change, so the same phone may appear under more than one.
-              </Alert>
-            )}
 
-            <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-              <Form.Label htmlFor="devices-search" className="visually-hidden">
-                Search devices
-              </Form.Label>
-              <Form.Control
-                id="devices-search"
-                type="search"
-                size="sm"
-                placeholder="Search name, MAC, address, vendor or label"
-                value={q}
-                onChange={e => setQ(e.target.value)}
-                style={{ flex: '1 1 280px', maxWidth: 420 }}
-              />
-              <div role="group" aria-label="Show" className="d-flex gap-1">
-                {chips.map(c => (
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <Form.Label htmlFor="devices-search" className="visually-hidden">
+              Search devices
+            </Form.Label>
+            <Form.Control
+              id="devices-search"
+              type="search"
+              size="sm"
+              placeholder="Search name, MAC, address, vendor or label"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              style={{ flex: '1 1 280px', maxWidth: 420 }}
+            />
+            <div role="group" aria-label="Show" className="d-flex gap-1">
+              {chips.map(c => (
+                <Button
+                  key={c.key}
+                  type="button"
+                  size="sm"
+                  variant={filter === c.key ? 'primary' : 'outline-secondary'}
+                  aria-pressed={filter === c.key}
+                  onClick={() => {
+                    setFilter(c.key);
+                    setPage(1);
+                  }}
+                >
+                  {c.label}
+                  {c.count != null && <> <span>{c.count}</span></>}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {error && <Alert variant="danger" className="small py-2">{error}</Alert>}
+
+          {filter === 'all' && !query && suggestions.slice(0, 3).map(sg => (
+            <Alert key={sg.macA + sg.macB} variant="warning" className="small py-2" data-testid="device-suggestion">
+              <div className="d-flex flex-wrap gap-2 align-items-start justify-content-between">
+                <div style={{ flex: '1 1 420px', minWidth: 0 }}>
+                  <strong>
+                    2 private MACs look like one device{sg.nameB ? `: ${sg.nameB}` : ''}
+                  </strong>
+                  <div>
+                    <span className="font-monospace">{sg.macA}</span> in {range({ firstSnapshot: sg.firstSnapshotA, lastSnapshot: sg.lastSnapshotA })},
+                    then <span className="font-monospace">{sg.macB}</span> in {range({ firstSnapshot: sg.firstSnapshotB, lastSnapshot: sg.lastSnapshotB })}.
+                  </div>
+                  <ul className="list-unstyled mb-0 mt-1">
+                    {sg.evidence.map(e => (
+                      <li key={e.what} className="d-flex gap-2 align-items-start">
+                        <span className={`badge ${STRENGTH_BADGE[e.strength] ?? ''}`} style={{ minWidth: 58 }}>{e.strength}</span>
+                        <span><strong>{e.what}.</strong> {e.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="d-flex gap-2 flex-shrink-0">
                   <Button
-                    key={c.key}
                     type="button"
                     size="sm"
-                    variant={filter === c.key ? 'primary' : 'outline-secondary'}
-                    aria-pressed={filter === c.key}
-                    onClick={() => {
-                      setFilter(c.key);
-                      setPage(1);
-                    }}
+                    variant="primary"
+                    onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'same' })}
                   >
-                    {c.label}
-                    {c.count != null && <> <span>{c.count}</span></>}
+                    Same device
                   </Button>
-                ))}
-              </div>
-            </div>
-
-            {error && <Alert variant="danger" className="small py-2">{error}</Alert>}
-
-            {filter === 'all' && !query && suggestions.slice(0, 3).map(sg => (
-              <Alert key={sg.macA + sg.macB} variant="warning" className="small py-2" data-testid="device-suggestion">
-                <div className="d-flex flex-wrap gap-2 align-items-start justify-content-between">
-                  <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-                    <strong>
-                      2 private MACs look like one device{sg.nameB ? `: ${sg.nameB}` : ''}
-                    </strong>
-                    <div>
-                      <span className="font-monospace">{sg.macA}</span> in {range({ firstSnapshot: sg.firstSnapshotA, lastSnapshot: sg.lastSnapshotA })},
-                      then <span className="font-monospace">{sg.macB}</span> in {range({ firstSnapshot: sg.firstSnapshotB, lastSnapshot: sg.lastSnapshotB })}.
-                    </div>
-                    <ul className="list-unstyled mb-0 mt-1">
-                      {sg.evidence.map(e => (
-                        <li key={e.what} className="d-flex gap-2 align-items-start">
-                          <span className={`badge ${STRENGTH_BADGE[e.strength] ?? ''}`} style={{ minWidth: 58 }}>{e.strength}</span>
-                          <span><strong>{e.what}.</strong> {e.detail}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="d-flex gap-2 flex-shrink-0">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="primary"
-                      onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'same' })}
-                    >
-                      Same device
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline-secondary"
-                      onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'not_same' })}
-                    >
-                      Not the same
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-secondary"
+                    onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'not_same' })}
+                  >
+                    Not the same
+                  </Button>
                 </div>
-              </Alert>
-            ))}
-            {filter === 'all' && !query && suggestions.length > 3 && (
-              <p className="small text-muted">And {suggestions.length - 3} more possible matches.</p>
-            )}
-
-            {!error && !loading && rows.length === 0 && (
-              <p className="text-muted small" data-testid="devices-empty">
-                {query || filter !== 'all'
-                  ? 'No devices match.'
-                  : 'No devices yet: add a snapshot with local traffic to see its devices.'}
-              </p>
-            )}
-
-            {rows.length > 0 && (
-              <div className="table-responsive">
-                <table className="table table-sm align-top small mb-2">
-                  <thead>
-                    <tr className="text-muted">
-                      <th scope="col">Device</th>
-                      <th scope="col">MAC</th>
-                      <th scope="col">Addresses it used</th>
-                      <th scope="col">Seen in</th>
-                      <th scope="col">Label</th>
-                      <th scope="col">Irregularities</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map(d => (
-                      <tr key={d.mac} data-testid="device-row">
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-link p-0 fw-semibold text-start"
-                            onClick={() => setSelected(d)}
-                          >
-                            {d.name ?? d.mac}
-                          </button>
-                          {d.deviceType && (
-                            <div className="text-muted">{deviceTypeLabel(d.deviceType as DeviceType)}</div>
-                          )}
-                        </td>
-                        <td>
-                          {d.macs.map(m => (
-                            <div key={m} className="font-monospace">{m}</div>
-                          ))}
-                          {d.vendor && <div className="text-muted">{d.vendor}</div>}
-                          {MAC_KIND_BADGE[d.macKind] && (
-                            <span className={`badge ${MAC_KIND_BADGE[d.macKind]!.cls}`}>
-                              {MAC_KIND_BADGE[d.macKind]!.text}
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {d.addresses.map(a => (
-                            <div key={a.ip}>
-                              <span className="font-monospace">{a.ip}</span>{' '}
-                              <span className="text-muted">{range(a)}</span>
-                            </div>
-                          ))}
-                        </td>
-                        <td>
-                          <SeenStrip device={d} snapshots={snapshots} />
-                        </td>
-                        <td>{d.label ? <span className="badge bg-primary-subtle text-primary-emphasis">{d.label}</span> : <span className="text-muted">—</span>}</td>
-                        <td style={{ maxWidth: 300 }}>
-                          <Flags device={d} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
-            )}
+            </Alert>
+          ))}
+          {filter === 'all' && !query && suggestions.length > 3 && (
+            <p className="small text-muted">And {suggestions.length - 3} more possible matches.</p>
+          )}
 
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalItems={total}
-                pageSize={PAGE_SIZE}
-                onPageChange={setPage}
-                showPageSizeSelector={false}
-              />
-            )}
-          </>
-        )}
-      </Modal.Body>
-    </Modal>
+          {!error && !loading && rows.length === 0 && (
+            <p className="text-muted small" data-testid="devices-empty">
+              {query || filter !== 'all'
+                ? 'No devices match.'
+                : 'No devices yet: add a snapshot with local traffic to see its devices.'}
+            </p>
+          )}
+
+          {rows.length > 0 && (
+            <div className="table-responsive">
+              <table className="table table-sm align-top small mb-2">
+                <thead>
+                  <tr className="text-muted">
+                    <th scope="col">Device</th>
+                    <th scope="col">MAC</th>
+                    <th scope="col">Addresses it used</th>
+                    <th scope="col">Seen in</th>
+                    <th scope="col">Label</th>
+                    <th scope="col">Irregularities</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(d => (
+                    <tr key={d.mac} data-testid="device-row">
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 fw-semibold text-start"
+                          onClick={() => setSelected(d)}
+                        >
+                          {d.name ?? d.mac}
+                        </button>
+                        {d.deviceType && (
+                          <div className="text-muted">{deviceTypeLabel(d.deviceType as DeviceType)}</div>
+                        )}
+                      </td>
+                      <td>
+                        {d.macs.map(m => (
+                          <div key={m} className="font-monospace">{m}</div>
+                        ))}
+                        {d.vendor && <div className="text-muted">{d.vendor}</div>}
+                        {MAC_KIND_BADGE[d.macKind] && (
+                          <span className={`badge ${MAC_KIND_BADGE[d.macKind]!.cls}`}>
+                            {MAC_KIND_BADGE[d.macKind]!.text}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {d.addresses.map(a => (
+                          <div key={a.ip}>
+                            <span className="font-monospace">{a.ip}</span>{' '}
+                            <span className="text-muted">{range(a)}</span>
+                          </div>
+                        ))}
+                      </td>
+                      <td>
+                        <SeenStrip device={d} snapshots={snapshots} />
+                      </td>
+                      <td>{d.label ? <span className="badge bg-primary-subtle text-primary-emphasis">{d.label}</span> : <span className="text-muted">—</span>}</td>
+                      <td style={{ maxWidth: 300 }}>
+                        <Flags device={d} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              showPageSizeSelector={false}
+            />
+          )}
+        </>
+      )}
+    </SideDrawer>
     <DecisionModal pending={pending} onHide={() => setPending(null)} onSubmit={decide} />
     </>
   );

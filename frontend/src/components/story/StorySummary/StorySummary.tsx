@@ -1,6 +1,7 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Modal } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
 import type { Answer, CaptureContext, CategoryStatus, GoalOutcome, Honeypots } from '@/types';
 import { plural, summarySentence, worthALookNext } from '@/features/insights/categoryStatus';
 import { GOAL_QUESTION } from '@/features/story/services/storyService';
@@ -230,41 +231,42 @@ export function StorySummary({
         </Fold>
       )}
 
-      <Modal show={showAll} onHide={() => setShowAll(false)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Every category on this capture</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {(['CONTEXT', 'ENTITY', 'ACTIVITY'] as const).map(axis => {
-            const rows = cats.filter(c => c.axis === axis);
-            if (rows.length === 0) return null;
-            return (
-              <table key={axis} className="table table-sm story-summary-grid">
-                <caption>{AXIS_LABEL[axis]}</caption>
-                <colgroup>
-                  <col style={{ width: '38%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col />
-                </colgroup>
-                <tbody>
-                  {rows.map(c => (
-                    <tr key={c.key}>
-                      <th scope="row">
-                        {c.label}
-                        {c.attackId && <span className="story-summary-meta"> {c.attackId}</span>}
-                      </th>
-                      <td><span className={`story-summary-tag tag-${c.status}`}>{STATUS_LABEL[c.status]}</span></td>
-                      <td className="story-summary-meta">
-                        {c.reason ?? (c.leads.length > 0 ? c.leads.map(l => l.label).join(', ') : '')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            );
-          })}
-        </Modal.Body>
-      </Modal>
+      <SideDrawer
+        show={showAll}
+        onHide={() => setShowAll(false)}
+        title="Every category on this capture"
+        titleId="every-category-title"
+        wide
+      >
+        {(['CONTEXT', 'ENTITY', 'ACTIVITY'] as const).map(axis => {
+          const rows = cats.filter(c => c.axis === axis);
+          if (rows.length === 0) return null;
+          return (
+            <table key={axis} className="table table-sm story-summary-grid">
+              <caption>{AXIS_LABEL[axis]}</caption>
+              <colgroup>
+                <col style={{ width: '38%' }} />
+                <col style={{ width: '18%' }} />
+                <col />
+              </colgroup>
+              <tbody>
+                {rows.map(c => (
+                  <tr key={c.key}>
+                    <th scope="row">
+                      {c.label}
+                      {c.attackId && <span className="story-summary-meta"> {c.attackId}</span>}
+                    </th>
+                    <td><span className={`story-summary-tag tag-${c.status}`}>{STATUS_LABEL[c.status]}</span></td>
+                    <td className="story-summary-meta">
+                      {c.reason ?? (c.leads.length > 0 ? c.leads.map(l => l.label).join(', ') : '')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          );
+        })}
+      </SideDrawer>
     </section>
   );
 }
