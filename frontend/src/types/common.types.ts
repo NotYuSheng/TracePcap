@@ -682,6 +682,55 @@ export interface InvestigationReport {
   categories?: CategoryStatus[];
   /** Where the capture was taken, how complete it is, the time it spans; absent from older backends. */
   context?: CaptureContext | null;
+  /** Hosts read against the honeypot signatures; absent from older backends. */
+  honeypots?: Honeypots | null;
+}
+
+/** One thing that points at a honeypot: a signature matched, a behaviour, or analyst evidence. */
+export interface HoneypotSignal {
+  source: 'signature' | 'behaviour' | 'analyst';
+  /** The signature's id, or the behaviour's name (fan-in, many-services, os-mismatch). */
+  id: string;
+  /** The honeypot a signature names; null for behaviour. */
+  honeypot: string | null;
+  /** STRONG, MEDIUM or WEAK; null for analyst evidence. */
+  strength: string | null;
+  points: number;
+  text: string;
+}
+
+/**
+ * One host's honeypot role: inferred from two or more signals, and overridable. Overrides and
+ * evidence go to the adjudication endpoints for the report's `question` and the host's address.
+ */
+export interface HoneypotHost {
+  host: string;
+  /** "Honeypot", "Not a honeypot", an analyst's own, or null: its signals don't settle it. */
+  label: string | null;
+  /** Which honeypot the signatures name, e.g. "Dionaea". */
+  honeypot: string | null;
+  /** "198.51.100.45 is a Dionaea honeypot"; null when undetermined. */
+  described: string | null;
+  basis: 'MACHINE' | 'HUMAN';
+  confidence: number;
+  contested: boolean;
+  candidates: VantageCandidate[];
+  signals: HoneypotSignal[];
+  /** Why: the signals, the override's rationale, or why they fall short. */
+  reason: string | null;
+  overriddenBy: string | null;
+}
+
+export interface Honeypots {
+  /** Every host with a signal, analyst evidence or an override; honeypots first. */
+  hosts: HoneypotHost[];
+  /** Hosts with one signature match and nothing else (a stock banner real servers send too), counted. */
+  singleSignal: number;
+  /** Servers whose banners and certificates were read against the signatures. */
+  serversChecked: number;
+  signaturesVersion: string | null;
+  question: string;
+  options: string[];
 }
 
 /** One vantage point the vote considered, and why. */

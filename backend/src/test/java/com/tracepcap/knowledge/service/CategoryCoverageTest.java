@@ -185,4 +185,79 @@ class CategoryCoverageTest {
     // Not the uplink's reason: with no SMB it is phase 2's "no SMB or DCE-RPC" (and with SMB, open).
     assertThat(m.get(Category.LATERAL_MOVEMENT).reason()).doesNotContain("uplink");
   }
+
+  // ── The honeypot role ──────────────────────────────────────────────────────────────────────
+
+  private static HoneypotRoleService.HostRole host(String ip, String label, String honeypot,
+      String basis, String reason) {
+    return new HoneypotRoleService.HostRole(ip, label, honeypot, basis, 80, false, List.of(),
+        List.of(), reason, null);
+  }
+
+  private static CategoryStatus honeypot(HoneypotRoleService.HoneypotReport r) {
+    return CategoryCoverage.withHoneypots(
+            CategoryCoverage.compute(ENTRIES, Set.of(), Set.of(), Set.of(), Set.of()), r, null)
+        .stream().filter(s -> s.category() == Category.HONEYPOT).findFirst().orElseThrow();
+  }
+
+  @Test
+  void onASensorNoSignatureLeavesItOpenNotRuledOut() {
+    var ctx = context("sensor", "On a honeypot or sensor");
+    var s = CategoryCoverage.withHoneypots(
+            CategoryCoverage.compute(ENTRIES, Set.of(), Set.of(), Set.of(), Set.of()),
+            new HoneypotRoleService.HoneypotReport(List.of(), 0, 3, "v"), ctx)
+        .stream().filter(x -> x.category() == Category.HONEYPOT).findFirst().orElseThrow();
+    assertThat(s.status()).isEqualTo(Status.OPEN);
+    assertThat(s.reason()).startsWith("the capture reads as taken on a honeypot or sensor")
+        .contains("high-interaction honeypot");
+  }
+
+  @Test
+  void aHostReadAsAHoneypotAnswersTheCategory() {
+    var s = honeypot(new HoneypotRoleService.HoneypotReport(List.of(
+        host("198.51.100.45", "Honeypot", "Dionaea", "MACHINE", "x")), 0, 2, "v"));
+    assertThat(s.status()).isEqualTo(Status.ANSWERED);
+    assertThat(s.unchecked()).isFalse();
+    assertThat(s.reason()).isEqualTo("198.51.100.45 is a Dionaea honeypot (inferred)");
+  }
+
+  @Test
+  void aSignatureWithoutEnoughElseLeavesItOpenWithWhy() {
+    var s = honeypot(new HoneypotRoleService.HoneypotReport(List.of(
+        host("203.0.113.5", null, "Cowrie", "MACHINE", "its signals add up to 30 points of the 60 a"
+            + " honeypot needs")), 0, 3, "v"));
+    assertThat(s.status()).isEqualTo(Status.OPEN);
+    assertThat(s.reason()).isEqualTo("203.0.113.5 points at Cowrie, but its signals add up to 30"
+        + " points of the 60 a honeypot needs");
+  }
+
+  @Test
+  void serversCheckedWithNoMatchRuleItOut() {
+    var s = honeypot(new HoneypotRoleService.HoneypotReport(List.of(), 0, 4, "v"));
+    assertThat(s.status()).isEqualTo(Status.RULED_OUT);
+    assertThat(s.reason()).isEqualTo("no server matched a honeypot signature (4 servers checked)");
+  }
+
+  @Test
+  void anAnalystSayingNotAHoneypotRulesItOut() {
+    var s = honeypot(new HoneypotRoleService.HoneypotReport(List.of(
+        host("198.51.100.22", "Not a honeypot", null, "HUMAN", "bastion")), 0, 1, "v"));
+    assertThat(s.status()).isEqualTo(Status.RULED_OUT);
+    assertThat(s.reason()).isEqualTo("198.51.100.22 is not a honeypot (set by an analyst)");
+  }
+
+  @Test
+  void serversWithOnlyAStockBannerAreCountedAndRuledOut() {
+    var s = honeypot(new HoneypotRoleService.HoneypotReport(List.of(), 12, 1476, "v"));
+    assertThat(s.status()).isEqualTo(Status.RULED_OUT);
+    assertThat(s.reason()).isEqualTo("no server showed enough: 12 sent only a stock honeypot banner,"
+        + " which real servers send too (1476 servers checked)");
+  }
+
+  @Test
+  void noBannersAtAllLeaveItOpen() {
+    var s = honeypot(new HoneypotRoleService.HoneypotReport(List.of(), 0, 0, "v"));
+    assertThat(s.status()).isEqualTo(Status.OPEN);
+    assertThat(s.reason()).contains("no server banners or certificates");
+  }
 }

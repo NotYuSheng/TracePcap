@@ -2,9 +2,10 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import type { CaptureContext, CategoryStatus, GoalOutcome } from '@/types';
+import type { CaptureContext, CategoryStatus, GoalOutcome, HoneypotHost, Honeypots } from '@/types';
 import { adjudicationService } from '@/features/insights/services/adjudicationService';
 import { contextParts } from '@/features/insights/captureContext';
+import { honeypotGrade, honeypotLines, honeypotText } from '@/features/insights/honeypots';
 
 vi.mock('@/features/insights/services/adjudicationService', () => ({
   adjudicationService: {
@@ -205,5 +206,93 @@ describe('StorySummary capture context', () => {
   it('shows no context line from a backend that has none', () => {
     renderIt();
     expect(screen.queryByTestId('story-summary-context')).not.toBeInTheDocument();
+  });
+});
+
+const DIONAEA: HoneypotHost = {
+  host: '198.51.100.45',
+  label: 'Honeypot',
+  honeypot: 'Dionaea',
+  described: '198.51.100.45 is a Dionaea honeypot',
+  basis: 'MACHINE',
+  confidence: 95,
+  contested: false,
+  candidates: [{ label: 'Honeypot', score: 100, reasons: ['TLS certificate: Dionaea\'s self-signed default certificate'] }],
+  signals: [
+    { source: 'signature', id: 'dionaea-tls-cert', honeypot: 'Dionaea', strength: 'STRONG', points: 45,
+      text: 'TLS certificate "O=dionaea.carnivore.it" on port 443: Dionaea\'s self-signed default certificate' },
+    { source: 'behaviour', id: 'fan-in', honeypot: null, strength: 'WEAK', points: 15,
+      text: '6 hosts opened 120 conversations to it; it opened none' },
+  ],
+  reason: 'TLS certificate',
+  overriddenBy: null,
+};
+
+const UNSETTLED: HoneypotHost = {
+  ...DIONAEA,
+  host: '203.0.113.5',
+  label: null,
+  honeypot: 'Cowrie',
+  described: null,
+  confidence: 30,
+  reason: 'its signals add up to 30 points of the 60 a honeypot needs',
+};
+
+const HONEYPOTS: Honeypots = {
+  hosts: [
+    DIONAEA, UNSETTLED,
+    { ...DIONAEA, host: '10.0.0.9', label: 'Not a honeypot', basis: 'HUMAN', described: '10.0.0.9 is not a honeypot' },
+    { ...DIONAEA, host: '10.0.0.10', label: 'Not a honeypot', basis: 'MACHINE', described: '10.0.0.10 is not a honeypot' },
+  ],
+  singleSignal: 0,
+  serversChecked: 5,
+  signaturesVersion: '2026-11-26',
+  question: 'honeypot',
+  options: ['Honeypot', 'Not a honeypot'],
+};
+
+describe('honeypot lines', () => {
+  it('reads each host as one line, keeping an analyst\'s "not a honeypot" so it can be changed', () => {
+    expect(honeypotLines(HONEYPOTS.hosts).map(h => h.host)).toEqual(['198.51.100.45', '203.0.113.5', '10.0.0.9']);
+    expect(honeypotText(DIONAEA)).toBe('198.51.100.45 is a Dionaea honeypot');
+    expect(honeypotGrade(DIONAEA)).toBe('inferred, 95%');
+    expect(honeypotText(UNSETTLED)).toBe('203.0.113.5 may be a Cowrie honeypot');
+    expect(honeypotGrade(UNSETTLED)).toBe('its signals add up to 30 points of the 60 a honeypot needs');
+    expect(honeypotGrade({ ...DIONAEA, basis: 'HUMAN' })).toBe('set by an analyst');
+  });
+});
+
+describe('StorySummary honeypots', () => {
+  it('names each honeypot under the capture context', () => {
+    renderIt({ honeypots: HONEYPOTS });
+    expect(screen.getByTestId('story-honeypot-198.51.100.45')).toHaveTextContent(
+      '198.51.100.45 is a Dionaea honeypot · inferred, 95%'
+    );
+    expect(screen.getByTestId('story-honeypot-203.0.113.5')).toHaveTextContent('may be a Cowrie honeypot');
+    expect(screen.getByTestId('story-honeypot-10.0.0.9')).toHaveTextContent('10.0.0.9 is not a honeypot · set by an analyst');
+  });
+
+  it('opens a host\'s signals, and lets an analyst say it is not a honeypot', async () => {
+    const onContextChanged = vi.fn();
+    renderIt({ honeypots: { ...HONEYPOTS, hosts: [DIONAEA] }, onContextChanged });
+    await userEvent.click(screen.getByRole('button', { name: 'Why · change' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Is 198.51.100.45 a honeypot?')).toBeInTheDocument();
+    expect(within(dialog).getByTestId('honeypot-signals')).toHaveTextContent('Signature, strong');
+    expect(within(dialog).getByTestId('honeypot-signals')).toHaveTextContent('Behaviour, weak');
+    await userEvent.click(within(dialog).getByRole('button', { name: /I disagree/ }));
+    await userEvent.selectOptions(within(dialog).getAllByRole('combobox')[0], 'Not a honeypot');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Save/ }));
+    expect(adjudicationService.setOverride).toHaveBeenCalledWith(
+      'f1', 'honeypot', '198.51.100.45', 'Not a honeypot', undefined
+    );
+    expect(onContextChanged).toHaveBeenCalled();
+  });
+
+  it('shows the reason a category was ruled out', async () => {
+    renderIt({ categories: [...CATS, cat('honeypot', 'RULED_OUT', { axis: 'ENTITY',
+      reason: 'no server matched a honeypot signature (4 servers checked)' })] });
+    await userEvent.click(screen.getByRole('button', { name: /Ruled out/ }));
+    expect(screen.getByText(/no server matched a honeypot signature/)).toBeInTheDocument();
   });
 });

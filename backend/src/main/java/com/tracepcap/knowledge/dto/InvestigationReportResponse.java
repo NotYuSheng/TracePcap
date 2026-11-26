@@ -2,6 +2,7 @@ package com.tracepcap.knowledge.dto;
 
 import com.tracepcap.knowledge.dto.CaseKnowledgeResponse.EntityRefDto;
 import com.tracepcap.knowledge.service.CaptureContextService;
+import com.tracepcap.knowledge.service.HoneypotRoleService;
 import com.tracepcap.knowledge.spi.Goal;
 import com.tracepcap.knowledge.spi.InvestigationReport;
 import java.util.List;
@@ -17,7 +18,68 @@ public record InvestigationReportResponse(
     List<CategoryStatusResponse> categories,
     // What the capture can show: where it was taken, how complete it is, the time it spans. Null
     // when not computed.
-    CaptureContextResponse context) {
+    CaptureContextResponse context,
+    // Hosts read against the honeypot signatures: every one with a signal, analyst evidence or an
+    // override, honeypots first. Null when not computed.
+    HoneypotsResponse honeypots) {
+
+  /** The honeypot role, host by host. */
+  public record HoneypotsResponse(
+      List<HoneypotHostResponse> hosts,
+      // Hosts with one signature match and nothing else, counted rather than listed.
+      int singleSignal,
+      int serversChecked,
+      String signaturesVersion,
+      String question,
+      List<String> options) {
+
+    public static HoneypotsResponse from(HoneypotRoleService.HoneypotReport r) {
+      if (r == null) return null;
+      return new HoneypotsResponse(
+          r.hosts().stream().map(HoneypotHostResponse::from).toList(), r.singleSignal(),
+          r.serversChecked(),
+          r.signaturesVersion(), HoneypotRoleService.QUESTION,
+          List.of(HoneypotRoleService.HONEYPOT, HoneypotRoleService.NOT_HONEYPOT));
+    }
+  }
+
+  /**
+   * One host's honeypot role: an inferred vote an analyst can override or add evidence to, at the
+   * adjudication endpoints for the report's {@code question} and the host's address.
+   *
+   * @param label Honeypot, Not a honeypot, an analyst's own, or null: its signals don't settle it
+   * @param honeypot which honeypot the signatures name, e.g. Dionaea
+   * @param basis MACHINE (inferred) or HUMAN (overridden, or settled by analyst evidence alone)
+   */
+  public record HoneypotHostResponse(
+      String host,
+      String label,
+      String honeypot,
+      String described,
+      String basis,
+      int confidence,
+      boolean contested,
+      List<VantageCandidateResponse> candidates,
+      List<HoneypotSignalResponse> signals,
+      String reason,
+      String overriddenBy) {
+
+    static HoneypotHostResponse from(HoneypotRoleService.HostRole h) {
+      return new HoneypotHostResponse(h.host(), h.label(), h.honeypot(), h.described(), h.basis(),
+          h.confidence(), h.contested(),
+          h.candidates().stream()
+              .map(k -> new VantageCandidateResponse(k.label(), k.score(), k.reasons())).toList(),
+          h.signals().stream()
+              .map(x -> new HoneypotSignalResponse(x.source(), x.id(), x.honeypot(), x.strength(),
+                  x.points(), x.text()))
+              .toList(),
+          h.reason(), h.overriddenBy());
+    }
+  }
+
+  /** One signal: a signature matched, a behaviour, or analyst evidence ({@code source}). */
+  public record HoneypotSignalResponse(
+      String source, String id, String honeypot, String strength, int points, String text) {}
 
   /** Where the capture was taken, how complete it is, and the time it spans. */
   public record CaptureContextResponse(
@@ -102,13 +164,14 @@ public record InvestigationReportResponse(
 
 
   public static InvestigationReportResponse from(InvestigationReport report) {
-    return from(report, List.of(), null);
+    return from(report, List.of(), null, null);
   }
 
   public static InvestigationReportResponse from(
       InvestigationReport report,
       List<com.tracepcap.knowledge.service.CategoryCoverage.CategoryStatus> categories,
-      CaptureContextService.CaptureContext context) {
+      CaptureContextService.CaptureContext context,
+      HoneypotRoleService.HoneypotReport honeypots) {
     return new InvestigationReportResponse(
         report.outcomes().stream().map(GoalOutcomeDto::from).toList(),
         report.additional().stream().map(AnswerResponse::from).toList(),
@@ -118,7 +181,8 @@ public record InvestigationReportResponse(
             .map(c -> new ConsideredResponse(c.question(), c.candidate(), c.rule(), c.reason(), c.conversations()))
             .toList(),
         categories.stream().map(CategoryStatusResponse::from).toList(),
-        CaptureContextResponse.from(context));
+        CaptureContextResponse.from(context),
+        HoneypotsResponse.from(honeypots));
   }
 
   public record GoalOutcomeDto(

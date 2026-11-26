@@ -2872,6 +2872,106 @@
         },
         "type": "object"
       },
+      "HoneypotHostResponse": {
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/VantageCandidateResponse"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contested": {
+            "type": "boolean"
+          },
+          "described": {
+            "type": "string"
+          },
+          "honeypot": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "overriddenBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/HoneypotSignalResponse"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HoneypotSignalResponse": {
+        "properties": {
+          "honeypot": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "points": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HoneypotsResponse": {
+        "properties": {
+          "hosts": {
+            "items": {
+              "$ref": "#/components/schemas/HoneypotHostResponse"
+            },
+            "type": "array"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          },
+          "serversChecked": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "signaturesVersion": {
+            "type": "string"
+          },
+          "singleSignal": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "HostClassificationResponse": {
         "properties": {
           "addressKind": {
@@ -3457,6 +3557,9 @@
               "$ref": "#/components/schemas/GoalOutcomeDto"
             },
             "type": "array"
+          },
+          "honeypots": {
+            "$ref": "#/components/schemas/HoneypotsResponse"
           },
           "unknowns": {
             "items": {
@@ -10855,7 +10958,7 @@
     },
     "/api/v1/files/{fileId}/investigation": {
       "get": {
-        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look.",
+        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look; where the capture was taken; and which hosts read as honeypots.",
         "operationId": "getInvestigation",
         "parameters": [
           {

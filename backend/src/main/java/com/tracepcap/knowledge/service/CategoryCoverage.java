@@ -51,10 +51,75 @@ public class CategoryCoverage {
   private final ConversationLookup conversations;
 
   public List<CategoryStatus> coverage(
-      UUID fileId, InvestigationReport report, CaptureContextService.CaptureContext context) {
+      UUID fileId, InvestigationReport report, CaptureContextService.CaptureContext context,
+      HoneypotRoleService.HoneypotReport honeypots) {
     ConversationLookup.FacetCounts facets = conversations.facetCounts(fileId);
-    return withContext(compute(catalogue.entries(), answeredQuestions(report),
-        ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context);
+    return withHoneypots(withContext(compute(catalogue.entries(), answeredQuestions(report),
+        ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context),
+        honeypots, context);
+  }
+
+  /**
+   * The Honeypot category from the honeypot role: answered when a host reads as one, open when a
+   * host matched a signature but not enough to tell, and ruled out when every server's banners and
+   * certificates were read and none matched.
+   */
+  static List<CategoryStatus> withHoneypots(
+      List<CategoryStatus> statuses, HoneypotRoleService.HoneypotReport report,
+      CaptureContextService.CaptureContext context) {
+    if (report == null) return statuses;
+    CaptureContextService.VantagePoint v = context == null ? null : context.vantage();
+    boolean sensor = v != null && CaptureContextService.Vantage.SENSOR.key().equals(v.key());
+    List<CategoryStatus> out = new ArrayList<>();
+    for (CategoryStatus s : statuses) {
+      out.add(s.category() == Category.HONEYPOT
+          ? honeypot(report, s.leads(), sensor ? v.described() : null) : s);
+    }
+    return out;
+  }
+
+  /**
+   * @param sensor the vantage point, when the capture reads as taken on a honeypot or sensor: then
+   *     no signature match leaves the category open, not ruled out, since the context says otherwise
+   */
+  private static CategoryStatus honeypot(
+      HoneypotRoleService.HoneypotReport r, List<Lead> leads, String sensor) {
+    Category c = Category.HONEYPOT;
+    List<HoneypotRoleService.HostRole> found = r.honeypots();
+    if (!found.isEmpty()) {
+      return new CategoryStatus(c, Status.ANSWERED, false, String.join("; ", found.stream()
+          .map(h -> h.described() + ("HUMAN".equals(h.basis()) ? " (set by an analyst)" : " (inferred)"))
+          .toList()), leads);
+    }
+    var undecided = r.hosts().stream().filter(h -> h.label() == null).toList();
+    if (!undecided.isEmpty()) {
+      var h = undecided.get(0);
+      return new CategoryStatus(c, Status.OPEN, false, h.host() + " points at "
+          + (h.honeypot() == null ? "a honeypot" : h.honeypot()) + ", but " + h.reason(), leads);
+    }
+    if (!r.hosts().isEmpty()) {
+      // Only analysts' "not a honeypot" verdicts are left.
+      return new CategoryStatus(c, Status.RULED_OUT, false, String.join("; ",
+          r.hosts().stream().map(h -> h.described() + " (set by an analyst)").toList()), leads);
+    }
+    if (sensor != null) {
+      return new CategoryStatus(c, Status.OPEN, false, "the capture reads as taken " + lower(sensor)
+          + ", but nothing it sent matches a honeypot signature: a high-interaction honeypot or a"
+          + " bare sensor sends nothing a signature knows", leads);
+    }
+    String checked = " (" + r.serversChecked() + (r.serversChecked() == 1 ? " server" : " servers")
+        + " checked)";
+    if (r.singleSignal() > 0) {
+      return new CategoryStatus(c, Status.RULED_OUT, false, "no server showed enough: "
+          + r.singleSignal() + " sent" + " only a stock honeypot"
+          + " banner, which real servers send too" + checked, leads);
+    }
+    if (r.serversChecked() > 0) {
+      return new CategoryStatus(c, Status.RULED_OUT, false,
+          "no server matched a honeypot signature" + checked, leads);
+    }
+    return new CategoryStatus(c, Status.OPEN, false,
+        "no server banners or certificates in this capture to check", leads);
   }
 
   /**
@@ -92,6 +157,10 @@ public class CategoryCoverage {
       }
     }
     return out;
+  }
+
+  private static String lower(String s) {
+    return s.isEmpty() ? s : Character.toLowerCase(s.charAt(0)) + s.substring(1);
   }
 
   /** The question keys with an answer: every goal answered, and every other answer. */

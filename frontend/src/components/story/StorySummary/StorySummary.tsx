@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Modal } from '@govtechsg/sgds-react';
-import type { Answer, CaptureContext, CategoryStatus, GoalOutcome } from '@/types';
+import type { Answer, CaptureContext, CategoryStatus, GoalOutcome, Honeypots } from '@/types';
 import { plural, summarySentence, worthALookNext } from '@/features/insights/categoryStatus';
 import { GOAL_QUESTION } from '@/features/story/services/storyService';
 import { QUESTION_META } from '@/features/story/questionMeta';
 import { HowWeGotHere } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import { CaptureContextLine } from './CaptureContextLine';
+import { HoneypotLine } from './HoneypotLine';
 import './StorySummary.css';
 
 type Status = CategoryStatus['status'];
@@ -45,8 +46,10 @@ interface StorySummaryProps {
   categories: CategoryStatus[] | null;
   /** Where the capture was taken, how complete it is, the time it spans; null from older backends. */
   context?: CaptureContext | null;
-  /** Called after an analyst overrides or adds evidence to the context, to re-read it. */
+  /** Called after an analyst overrides or adds evidence to the context or a host's role, to re-read it. */
   onContextChanged?: () => void;
+  /** Hosts read against the honeypot signatures; null from older backends. */
+  honeypots?: Honeypots | null;
   loading: boolean;
 }
 
@@ -56,7 +59,8 @@ interface StorySummaryProps {
  * categories worth a look next, and the ruled-out and not-observable ones folded away with why.
  */
 export function StorySummary({
-  fileId, goals, additional, categories, context = null, onContextChanged = () => {}, loading,
+  fileId, goals, additional, categories, context = null, onContextChanged = () => {}, honeypots = null,
+  loading,
 }: StorySummaryProps) {
   const [showMoreOpen, setShowMoreOpen] = useState(false);
   const [showRuledOut, setShowRuledOut] = useState(false);
@@ -109,6 +113,7 @@ export function StorySummary({
   return (
     <section className="story-summary" aria-label="Where the investigation stands" data-testid="story-summary">
       {context && <CaptureContextLine fileId={fileId} context={context} onChanged={onContextChanged} />}
+      {honeypots && <HoneypotLine fileId={fileId} honeypots={honeypots} onChanged={onContextChanged} />}
       {categories && counted.length > 0 && (
         <>
           <div className="story-summary-scope">{plural(counted.length, 'category', 'categories')} checked</div>
@@ -201,7 +206,7 @@ export function StorySummary({
         >
           {ruledOut.map(c => (
             <div key={c.key}>
-              <b>{c.label}</b> · its candidates were tested and ruled out
+              <b>{c.label}</b> · {c.reason ?? 'its candidates were tested and ruled out'}
             </div>
           ))}
         </Fold>

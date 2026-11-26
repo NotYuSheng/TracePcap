@@ -162,6 +162,10 @@ questions and answers beside it:
   ("On a honeypot or sensor (192.168.100.28) · inferred · complete · 24 h").
   Where it was taken is inferred from who talks to whom, so *Why · change* opens
   the reasons, and lets you set it yourself or add evidence toward one answer.
+  A host that reads as a honeypot gets a line of its own ("198.51.100.45 is a
+  Dionaea honeypot · inferred, 95%"), and its *Why · change* lists the signals:
+  the signatures it matched (a stock banner or certificate) and how it behaves.
+  You can mark it *Not a honeypot*, or add evidence either way.
   Then one sentence and one bar count the investigation's categories by status:
   "Nothing is concluded yet. 17 are still open and 4 can't be seen in this
   capture." Under it:
