@@ -37,6 +37,24 @@ public record EvidenceSource(
   public static final EvidenceSource SMB =
       of("SMB", List.of("SMB", "SMB2"), List.of("SMBv1", "SMBv23"));
   public static final EvidenceSource DCERPC = of("DCE-RPC", List.of("DCERPC"), List.of("DCERPC"));
+  public static final EvidenceSource RDP = of("RDP", List.of("RDP"), List.of("RDP"));
+  public static final EvidenceSource DNS = of("DNS", List.of("DNS"), List.of("DNS"));
+  public static final EvidenceSource TLS =
+      new EvidenceSource("TLS", List.of("TLS"), List.of("TLS"), null, true);
+  public static final EvidenceSource FTP =
+      of("FTP", List.of("FTP", "FTP-DATA"), List.of("FTP_CONTROL", "FTP_DATA"));
+  public static final EvidenceSource MAIL =
+      of("Mail", List.of("SMTP", "IMAP", "POP"),
+          List.of("SMTP", "SMTPS", "IMAP", "IMAPS", "POP3", "POPS"));
+  public static final EvidenceSource DHCP =
+      of("DHCP", List.of("DHCP", "BOOTP"), List.of("DHCP"));
+  public static final EvidenceSource NETBIOS =
+      of("NetBIOS", List.of("NBNS", "BROWSER", "NBSS"), List.of("NetBIOS"));
+  public static final EvidenceSource LOCAL_NAMES =
+      of("LLMNR / mDNS", List.of("LLMNR", "MDNS"), List.of("LLMNR", "MDNS"));
+  public static final EvidenceSource REMOTE_CONTROL =
+      of("Remote-control tools", List.of("VNC"),
+          List.of("TeamViewer", "AnyDesk", "VNC", "Radmin", "NoMachine", "Splashtop", "ScreenConnect"));
   public static final EvidenceSource HTTP =
       new EvidenceSource("HTTP", List.of("HTTP"), List.of("HTTP"), null, true);
 

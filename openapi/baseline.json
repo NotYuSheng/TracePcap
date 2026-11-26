@@ -550,6 +550,20 @@
         },
         "type": "object"
       },
+      "CategoryLeadResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "shows": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CategoryStat": {
         "properties": {
           "bytes": {
@@ -566,6 +580,38 @@
           "percentage": {
             "format": "double",
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CategoryStatusResponse": {
+        "properties": {
+          "attackId": {
+            "type": "string"
+          },
+          "axis": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "leads": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryLeadResponse"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "unchecked": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -3351,6 +3397,12 @@
           "additional": {
             "items": {
               "$ref": "#/components/schemas/AnswerResponse"
+            },
+            "type": "array"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryStatusResponse"
             },
             "type": "array"
           },
@@ -10669,7 +10721,7 @@
     },
     "/api/v1/files/{fileId}/investigation": {
       "get": {
-        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).",
+        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look.",
         "operationId": "getInvestigation",
         "parameters": [
           {

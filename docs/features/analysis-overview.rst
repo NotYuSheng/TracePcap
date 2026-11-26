@@ -48,15 +48,17 @@ What Needs a Look (right)
   traffic.
 - **Investigation Summary**, when the investigation has answers or ruled out candidates: each answer
   with **How we got here**, and **Considered and ruled out** (see :doc:`story-mode`).
-- **Worth a look**: the protocols in this capture, grouped by the investigation question they help
-  answer, each with what it shows there and a link to its conversations. Kerberos and LDAP for *who
+- **Worth a look**: the protocols in this capture, grouped by the investigation category they help
+  answer (see :doc:`../architecture/investigation-framework`), each with what it shows there and a
+  link to its conversations. Categories that point at the same traffic and have the same status
+  share one group (a C2 server and Command and Control, both open, both point at DNS, TLS and HTTP). Kerberos and LDAP for *who
   is signed in*, DHCP and NetBIOS for *which machine it is*, DNS, TLS and HTTP for *command and
   control*, SMB, DCE-RPC and RDP for *lateral movement*, Kerberos and NTLM for *account attacks*,
   mail and FTP for *data leaving*, remote-control tools for *remote access*. A question the
   Investigation Summary answered is marked **Answered**; one whose candidates were tested and ruled out
-  is **Ruled out**; one nothing concluded is **Open**, so its protocols are where to look. No status
-  shows until the investigation has loaded. Questions with none of their protocols in the capture are
-  left out; every application counts, not only the top ones the Overview lists.
+  is **Ruled out**; one nothing concluded is **Open**, so its protocols are where to look. Nothing
+  shows until the investigation has loaded. Categories with none of their protocols in the capture
+  are left out; every application counts, not only the top ones the Overview lists.
 - **Applications detected** (from nDPI) and **Dissected protocols** (from
   tshark). Click a badge for its details.
 

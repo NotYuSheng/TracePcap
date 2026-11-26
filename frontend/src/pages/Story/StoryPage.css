@@ -255,3 +255,7 @@
   background: rgb(155 125 255 / 18%);
   color: #c9b8ff;
 }
+
+.story-start > .story-summary {
+  margin-bottom: 16px;
+}

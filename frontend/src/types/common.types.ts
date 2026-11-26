@@ -678,6 +678,33 @@ export interface InvestigationReport {
   coverage: string[];
   /** Candidates the checks tested and ruled out, with why (#1294); absent from older backends. */
   considered?: Considered[];
+  /** Every investigation-framework category's status on this capture; absent from older backends. */
+  categories?: CategoryStatus[];
+}
+
+/** A protocol in this capture worth a look for a category: what it shows, and its conversations. */
+export interface CategoryLead {
+  label: string;
+  shows: string;
+  /** Conversations URL query, e.g. "l7Protocols=KERBEROS". */
+  query: string;
+}
+
+/**
+ * One investigation-framework category on one capture (docs/architecture/investigation-framework.rst).
+ * NOT_OBSERVABLE: the capture can't show it, and `reason` says why. `unchecked`: no check covers it
+ * yet, so it is OPEN when the capture could show it.
+ */
+export interface CategoryStatus {
+  key: string;
+  axis: 'CONTEXT' | 'ENTITY' | 'ACTIVITY';
+  label: string;
+  /** The ATT&CK tactic id for an activity ("TA0011"). */
+  attackId: string | null;
+  status: 'ANSWERED' | 'RULED_OUT' | 'OPEN' | 'NOT_OBSERVABLE';
+  unchecked: boolean;
+  reason: string | null;
+  leads: CategoryLead[];
 }
 
 /** A candidate a check tested and ruled out (#1294): what it was, the rule, and why it fell short. */

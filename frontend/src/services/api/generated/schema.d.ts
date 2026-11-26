@@ -1328,7 +1328,7 @@ export interface paths {
         };
         /**
          * Autonomous investigation report for a file
-         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).
+         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819). Also every investigation category's status on this capture: answered, ruled out, open or not observable, with why and the traffic worth a look.
          */
         get: operations["getInvestigation"];
         put?: never;
@@ -3332,6 +3332,11 @@ export interface components {
             question?: string;
             shows?: string;
         };
+        CategoryLeadResponse: {
+            label?: string;
+            query?: string;
+            shows?: string;
+        };
         CategoryStat: {
             /** Format: int64 */
             bytes?: number;
@@ -3340,6 +3345,16 @@ export interface components {
             count?: number;
             /** Format: double */
             percentage?: number;
+        };
+        CategoryStatusResponse: {
+            attackId?: string;
+            axis?: string;
+            key?: string;
+            label?: string;
+            leads?: components["schemas"]["CategoryLeadResponse"][];
+            reason?: string;
+            status?: string;
+            unchecked?: boolean;
         };
         ChangeEventDto: {
             changeType?: string;
@@ -4340,6 +4355,7 @@ export interface components {
         };
         InvestigationReportResponse: {
             additional?: components["schemas"]["AnswerResponse"][];
+            categories?: components["schemas"]["CategoryStatusResponse"][];
             considered?: components["schemas"]["ConsideredResponse"][];
             coverage?: string[];
             goals?: components["schemas"]["GoalOutcomeDto"][];

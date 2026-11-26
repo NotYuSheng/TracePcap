@@ -3,10 +3,10 @@ Investigation Framework
 
 .. note::
 
-   **Status: in progress.** The categories and their catalogue are built (phase 1): every category,
-   the questions that answer it and the traffic they read are served at
-   ``GET /api/v1/investigation-categories``. The coverage statuses, capture context and honeypot
-   detection are not built yet. See `Delivery plan`_.
+   **Status: in progress.** The categories, their catalogue (phase 1) and each category's status per
+   capture (phase 2) are built: ``GET /api/v1/investigation-categories`` serves the catalogue, the
+   investigation report carries every category's status, and the Overview and Story show them.
+   Capture context and honeypot detection are not built yet. See `Delivery plan`_.
 
 TracePcap should judge every capture against **one fixed set of categories**, and say for each one
 whether it was *answered*, *ruled out*, still *open*, or *not observable* in this capture. The
@@ -141,10 +141,13 @@ Not observable    The capture can't show it: the category never shows in traffic
 Each category carries how much of it a capture can show (*wire*, *partly*, *rarely*, *never*), and
 each check declares the traffic it reads. The status follows from those two and the capture:
 
-1. A check concluded something: **Answered**. Its candidates were all rejected: **Ruled out**.
+1. A check concluded something: **Answered**. Every check covering it tested candidates and rejected
+   them all: **Ruled out**. One check ruling out its candidate (a TeamViewer peer) leaves a category
+   its other checks also cover (Command and Control) open.
 2. Otherwise, a *never* category, or a *rarely* one: **Not observable**.
-3. Otherwise, if the category's checks read traffic and none of it is in the capture: **Not
-   observable**.
+3. Otherwise, if the category's checks read traffic, none of it is in the capture, and no other
+   traffic worth a look for it is either: **Not observable**. NTLM with no Kerberos keeps Credential
+   Access open, with NTLM to look at.
 4. Otherwise: **Open** (with *no check yet* when no check covers it).
 
 Coverage today
@@ -354,8 +357,8 @@ Code changes
      with what it shows for that check (lateral movement: SMB, DCE-RPC, RDP).
 
 2. **A category catalogue** in the backend lists every category, including those with no question
-   yet, and is served through the API. It replaces the question groups the frontend keeps in
-   ``features/insights/protocolInsights.ts``.
+   yet, and is served through the API. It replaced the question groups the frontend kept in
+   ``features/insights/protocolInsights.ts`` (removed in phase 2).
 3. **Coverage per capture** adds the *Not observable* status, computed from each category's
    visibility, its checks' ``requires()`` and the protocols present (see `The four statuses`_).
 4. **The Investigation Summary and Story** frame their answers by the capture context, and Story
@@ -391,8 +394,10 @@ Four phases, each its own PR into ``dev``:
    ``Category`` enum and ``CategoryCatalogue`` in the knowledge layer, and
    ``GET /investigation-categories``. ``CategoryCatalogueTest`` pins the mapping to
    `Coverage today`_.
-2. **Coverage on the Overview and Story.** *Worth a look* shows every category with its four-way
-   status, from the API, and Story takes the summary-first layout above. Gate: on the four
+2. **Coverage on the Overview and Story** *(done)*. ``CategoryCoverage`` computes each category's
+   status on a capture and ``CategoryLeads`` where to look for it. Both come with the investigation
+   report (``categories``). *Worth a look* reads them, and Story takes the summary-first layout
+   above (items 1 to 4; the tactic-tagged timeline waits on the narrative). Gate: on the four
    malware-traffic-analysis.net walkthrough captures, every status is right by hand check.
 3. **Capture context.** Infer the vantage point (internal, uplink, sensor) from address mix and
    direction, and frame the summary by it. Gate: a public honeypot capture reads as a sensor log.
