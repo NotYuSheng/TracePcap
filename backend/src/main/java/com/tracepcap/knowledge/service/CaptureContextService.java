@@ -53,6 +53,9 @@ public class CaptureContextService {
   /** One host in at least this share of conversations: the capture is that host's traffic. */
   static final double FOCAL_SHARE = 0.8;
 
+  /** Fewer peers than this, with a second host as busy: either end of one pair could be the capture's. */
+  static final int TWO_ENDED_PEERS = 3;
+
   /** A sensor is opened to by at least this many hosts, on at least this many of its ports. */
   static final int SENSOR_OPENERS = 5;
 
@@ -141,7 +144,12 @@ public class CaptureContextService {
   /** The time the capture spans; null times when the summary isn't there yet. */
   public record TimeSpan(LocalDateTime start, LocalDateTime end, Long durationMs, String label) {}
 
-  public record CaptureContext(VantagePoint vantage, Completeness completeness, TimeSpan timeSpan) {}
+  /**
+   * @param internalConversations conversations between two internal hosts: from the uplink, none
+   *     means lateral movement can't show; any means some internal traffic is there to look at
+   */
+  public record CaptureContext(
+      VantagePoint vantage, Completeness completeness, TimeSpan timeSpan, long internalConversations) {}
 
   /**
    * The address mix of a capture.
@@ -162,7 +170,31 @@ public class CaptureContextService {
       long focalConversations,
       long focalOpened,
       long focalAnswered,
-      int focalOpeners) {}
+      int focalOpeners,
+      int focalPeers,
+      String runnerUp,
+      long runnerUpConversations) {
+
+    double share(long n) {
+      return conversations == 0 ? 0 : (double) n / conversations;
+    }
+
+    /**
+     * Two hosts each in most conversations, and the busiest talks to hardly anyone else: a capture of
+     * one pair, which could have been taken at either end, so neither is "the" host. A host with
+     * other peers is the end the capture sits on, however much of its traffic goes to one of them (a
+     * compromised sensor flooding one target).
+     */
+    boolean twoEnded() {
+      return share(focalConversations) >= FOCAL_SHARE && share(runnerUpConversations) >= FOCAL_SHARE
+          && focalPeers < TWO_ENDED_PEERS;
+    }
+
+    /** One host dominates, and only one: the capture is that host's traffic. */
+    boolean hostCentred() {
+      return share(focalConversations) >= FOCAL_SHARE && !twoEnded();
+    }
+  }
 
   private final ConversationLookup conversations;
   private final AnalysisSummaryLookup summaries;
@@ -173,14 +205,15 @@ public class CaptureContextService {
 
   public CaptureContext forFile(UUID fileId) {
     Mix mix = mix(conversations.hostPairs(fileId), locality.currentRules()::isLocal);
-    long answeredPorts = mix.focal() == null ? 0 : conversations.distinctAnsweredPorts(fileId, mix.focal());
+    long answeredPorts = mix.hostCentred() ? conversations.distinctAnsweredPorts(fileId, mix.focal()) : 0;
     VantagePoint inferred = decide(infer(mix, answeredPorts), mix,
         evidence.findByQuestionAndFileId(QUESTION, fileId).stream()
             .filter(e -> ENTITY.equals(e.getEntityKey())).toList());
     VantagePoint vantage = overrides.find(QUESTION, fileId, ENTITY)
         .map(o -> overridden(inferred, o.getLabel(), o.getRationale(), o.getActor()))
         .orElse(inferred);
-    return new CaptureContext(vantage, completeness(quality.qualityNotes(fileId)), timeSpan(fileId));
+    return new CaptureContext(vantage, completeness(quality.qualityNotes(fileId)), timeSpan(fileId),
+        mix.internalToInternal());
   }
 
   // ── The address mix ───────────────────────────────────────────────────────────────────────
@@ -200,26 +233,32 @@ public class CaptureContextService {
       if (!p.b().equals(p.a())) perHost.merge(p.b(), p.conversations(), Long::sum);
     }
     // Ties go to the lexically first host, so the same capture always names the same one.
-    String focal = perHost.entrySet().stream()
-        .max(Map.Entry.<String, Long>comparingByValue()
-            .thenComparing(Map.Entry.comparingByKey(Comparator.reverseOrder())))
-        .map(Map.Entry::getKey).orElse(null);
+    List<String> busiest = perHost.entrySet().stream()
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+            .thenComparing(Map.Entry.comparingByKey()))
+        .limit(2).map(Map.Entry::getKey).toList();
+    String focal = busiest.isEmpty() ? null : busiest.get(0);
+    String runnerUp = busiest.size() < 2 ? null : busiest.get(1);
     long opened = 0, answered = 0;
     Set<String> openers = new HashSet<>();
+    Set<String> peers = new HashSet<>();
     for (HostPair p : pairs) {
       if (focal == null) break;
       if (focal.equals(p.a())) {
+        peers.add(p.b());
         opened += p.openedByA();
         answered += p.openedByB();
         if (p.openedByB() > 0) openers.add(p.b());
       } else if (focal.equals(p.b())) {
+        peers.add(p.a());
         opened += p.openedByB();
         answered += p.openedByA();
         if (p.openedByA() > 0) openers.add(p.a());
       }
     }
     return new Mix(total, ii, ie, internal.size(), focal,
-        focal == null ? 0 : perHost.get(focal), opened, answered, openers.size());
+        focal == null ? 0 : perHost.get(focal), opened, answered, openers.size(),
+        peers.size(), runnerUp, runnerUp == null ? 0 : perHost.get(runnerUp));
   }
 
   // ── The vote ──────────────────────────────────────────────────────────────────────────────
@@ -231,7 +270,8 @@ public class CaptureContextService {
   static List<Candidate> infer(Mix m, long answeredPorts) {
     if (m.conversations() < MIN_CONVERSATIONS) return List.of();
     List<Candidate> out = new ArrayList<>();
-    double focalShare = (double) m.focalConversations() / m.conversations();
+    if (m.twoEnded()) return List.of();
+    double focalShare = m.share(m.focalConversations());
     if (focalShare >= FOCAL_SHARE) {
       String centred = m.focal() + " is in " + pct(focalShare) + " of conversations";
       long known = m.focalOpened() + m.focalAnswered();
@@ -288,6 +328,10 @@ public class CaptureContextService {
     if (m.conversations() < MIN_CONVERSATIONS) {
       return "only " + plural(m.conversations(), "conversation") + ", too few to tell where it was taken";
     }
+    if (m.twoEnded()) {
+      return "most of it is between two hosts, " + m.focal() + " and " + m.runnerUp()
+          + ", and it could have been taken at either end";
+    }
     if (m.internalHosts() < 2) {
       return "no one host dominates and under 2 hosts are internal: if these addresses are yours,"
           + " add them as private ranges";
@@ -315,9 +359,16 @@ public class CaptureContextService {
     Candidate top = ranked.get(0);
     boolean contested = ranked.size() > 1 && top.score() - ranked.get(1).score() < CONTESTED_MARGIN;
     Vantage v = Vantage.ofLabel(top.label());
-    boolean centred = v == Vantage.CLIENT || v == Vantage.SERVER || v == Vantage.SENSOR;
+    boolean centred = (v == Vantage.CLIENT || v == Vantage.SERVER || v == Vantage.SENSOR)
+        && m.hostCentred();
+    // Where the address mix settled nothing, the answer is the analyst's evidence alone: theirs, not
+    // an inference.
+    String basis = machine.isEmpty() ? "HUMAN" : "MACHINE";
+    String reason = machine.isEmpty()
+        ? undetermined(m) + "; set from " + String.join("; ", top.reasons())
+        : String.join("; ", top.reasons());
     return new VantagePoint(v == null ? "other" : v.key(), top.label(), centred ? m.focal() : null,
-        "MACHINE", top.score(), contested, ranked, String.join("; ", top.reasons()), null);
+        basis, top.score(), contested, ranked, reason, null);
   }
 
   /** An analyst's answer, which wins outright; the machine's candidates stay for reference. */
@@ -377,7 +428,7 @@ public class CaptureContextService {
     if (start == null || end == null || durationMs == null) return new TimeSpan(start, end, durationMs, null);
     String label = duration(durationMs) + ", " + WHEN.format(start) + " to "
         + (start.toLocalDate().equals(end.toLocalDate()) ? end.toLocalTime().toString().substring(0, 5)
-            : WHEN.format(end)) + " UTC";
+            : WHEN.format(end));
     return new TimeSpan(start, end, durationMs, label);
   }
 

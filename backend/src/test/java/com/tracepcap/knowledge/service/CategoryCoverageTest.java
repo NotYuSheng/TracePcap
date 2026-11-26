@@ -133,11 +133,17 @@ class CategoryCoverageTest {
   }
 
   private static CaptureContextService.CaptureContext context(String vantageKey, String label) {
+    return context(vantageKey, label, 0);
+  }
+
+  private static CaptureContextService.CaptureContext context(
+      String vantageKey, String label, long internalConversations) {
     var v = new CaptureContextService.VantagePoint(vantageKey, label, null,
         "MACHINE", 70, false, List.of(), vantageKey == null ? "too few to tell" : "why", null);
     return new CaptureContextService.CaptureContext(v,
         new CaptureContextService.Completeness("Complete", "complete", List.of()),
-        new CaptureContextService.TimeSpan(null, null, 60_000L, "1 min, from to"));
+        new CaptureContextService.TimeSpan(null, null, 60_000L, "1 min, from to"),
+        internalConversations);
   }
 
   private static Map<Category, CategoryStatus> withContext(
@@ -171,5 +177,12 @@ class CategoryCoverageTest {
     // SMB crossing the uplink is still worth a look.
     var withSmb = withContext(context("uplink", "On the internet uplink"), Set.of("SMBv23"));
     assertThat(withSmb.get(Category.LATERAL_MOVEMENT).status()).isEqualTo(Status.OPEN);
+  }
+
+  @Test
+  void fromTheUplinkInternalTrafficInTheCaptureKeepsLateralMovementOpen() {
+    var m = withContext(context("uplink", "On the internet uplink", 1500), Set.of());
+    // Not the uplink's reason: with no SMB it is phase 2's "no SMB or DCE-RPC" (and with SMB, open).
+    assertThat(m.get(Category.LATERAL_MOVEMENT).reason()).doesNotContain("uplink");
   }
 }

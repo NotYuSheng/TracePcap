@@ -111,7 +111,8 @@ export const StoryPage = () => {
     let alive = true;
     // Only a new capture shows the loading state: re-reading after an override keeps the summary
     // (and the modal the analyst is in) on screen.
-    if (loadedFileId.current !== fileId) setGoalsLoaded(false);
+    const refresh = loadedFileId.current === fileId;
+    if (!refresh) setGoalsLoaded(false);
     loadedFileId.current = fileId;
     storyService
       .getInvestigationReport(fileId)
@@ -122,7 +123,14 @@ export const StoryPage = () => {
         setCategories(r.categories ?? null);
         setCaptureContext(r.context ?? null);
       })
-      .catch(() => { if (alive) { setGoals([]); setAdditional([]); setCategories(null); setCaptureContext(null); } })
+      .catch(() => {
+        // A failed re-read keeps what was shown; only a new capture starts from nothing.
+        if (!alive || refresh) return;
+        setGoals([]);
+        setAdditional([]);
+        setCategories(null);
+        setCaptureContext(null);
+      })
       .finally(() => { if (alive) setGoalsLoaded(true); });
     return () => { alive = false; };
   }, [fileId, investigationRev]);

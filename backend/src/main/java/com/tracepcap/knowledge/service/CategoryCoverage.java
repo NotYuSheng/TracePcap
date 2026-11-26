@@ -59,7 +59,8 @@ public class CategoryCoverage {
 
   /**
    * The capture-context categories answered from the capture's context, and the vantage point
-   * framing what it hides: traffic between internal hosts doesn't cross an internet uplink.
+   * framing what it hides: traffic between internal hosts doesn't cross an internet uplink. Only
+   * when the capture has none: some internal traffic is still there to look at.
    */
   static List<CategoryStatus> withContext(
       List<CategoryStatus> statuses, CaptureContextService.CaptureContext context) {
@@ -81,6 +82,7 @@ public class CategoryCoverage {
           && context.timeSpan().label() != null) {
         out.add(new CategoryStatus(c, Status.ANSWERED, false, context.timeSpan().label(), List.of()));
       } else if (c == Category.LATERAL_MOVEMENT && uplink && s.leads().isEmpty()
+          && context.internalConversations() == 0
           && (s.status() == Status.OPEN || s.status() == Status.NOT_OBSERVABLE)) {
         out.add(new CategoryStatus(c, Status.NOT_OBSERVABLE, false,
             "taken on the internet uplink, which traffic between internal hosts doesn't cross:"

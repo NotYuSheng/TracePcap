@@ -158,7 +158,7 @@ const CONTEXT: CaptureContext = {
     options: ['Inside the LAN', 'On the internet uplink', 'On one host', 'On an exposed server', 'On a honeypot or sensor'],
   },
   completeness: { label: 'Complete: no gaps', level: 'complete', notes: [] },
-  timeSpan: { start: null, end: null, durationMs: 86_000_000, label: '24 h, 2002-11-29 14:26 to 2002-11-30 14:19 UTC' },
+  timeSpan: { start: null, end: null, durationMs: 86_000_000, label: '24 h, 2002-11-29 14:26 to 2002-11-30 14:19' },
 };
 
 describe('contextParts', () => {

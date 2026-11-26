@@ -72,6 +72,25 @@ class CaptureContextServiceTest {
   }
 
   @Test
+  void twoHostsTalkingOnlyToEachOtherCouldBeEitherEnd() {
+    VantagePoint v = vantage(List.of(new HostPair("192.168.1.5", "10.1.1.1", 40, 40, 0)), 1);
+    assertThat(v.determined()).isFalse();
+    assertThat(v.reason()).contains("between two hosts").contains("either end");
+  }
+
+  @Test
+  void evidenceAloneSettlesAnUndeterminedVantageAsTheAnalystsNotAnInference() {
+    ManualEvidenceEntity ev = ManualEvidenceEntity.builder()
+        .label("On one host").weight(1).reason("our laptop").entityKey("capture").build();
+    VantagePoint v = vantage(List.of(new HostPair("98.114.205.102", "192.150.11.111", 5, 4, 1)), 1, ev);
+    assertThat(v.key()).isEqualTo(Vantage.CLIENT.key());
+    assertThat(v.basis()).isEqualTo("HUMAN");
+    // No host dominates a 5-conversation, two-ended capture: none is named.
+    assertThat(v.host()).isNull();
+    assertThat(v.reason()).contains("too few to tell").contains("analyst evidence: our laptop");
+  }
+
+  @Test
   void manyInternalHostsTalkingToEachOtherIsInsideTheLan() {
     List<HostPair> pairs = new ArrayList<>();
     for (int i = 1; i <= 10; i++) {
@@ -160,7 +179,8 @@ class CaptureContextServiceTest {
   void theTimeSpanReadsAsADurationAndItsEnds() {
     var t = CaptureContextService.timeSpan(LocalDateTime.of(2024, 8, 15, 8, 9),
         LocalDateTime.of(2024, 8, 15, 8, 42), 33 * 60_000L);
-    assertThat(t.label()).isEqualTo("33 min, 2024-08-15 08:09 to 08:42 UTC");
+    // In the server's zone, as stored: no "UTC" on it.
+    assertThat(t.label()).isEqualTo("33 min, 2024-08-15 08:09 to 08:42");
     assertThat(CaptureContextService.duration(16_219)).isEqualTo("16 s");
     assertThat(CaptureContextService.duration(85_987_389)).isEqualTo("24 h");
     assertThat(CaptureContextService.duration(6143L * 86_400_000)).isEqualTo("17 years");

@@ -312,14 +312,18 @@ on. Internal means a private address or one of the operator's private ranges.
      - 65
 
 Under 10 conversations, or a mix none of these fit, leaves it undetermined, and the reason says why
-(for a capture with no internal addresses, to add the operator's private ranges). The top two within
-15 points is *contested*.
+(for a capture with no internal addresses, to add the operator's private ranges). So does a capture
+of one pair of hosts, both in most conversations and the busiest with under 3 peers: it could have
+been taken at either end. The top two within 15 points is *contested*.
 
 It is the ``vantage-point`` question about entity ``capture`` at the generic adjudication endpoints
 (:doc:`adjudication-explainability`). Analyst evidence adds its weight to a candidate, and an
-override replaces the vote. Story's *Why · change* opens the vote, its reasons, the override and the
+override replaces the vote. Evidence on a vantage the address mix left undetermined settles it as
+the analyst's answer, not an inference. Story's *Why · change* opens the vote, its reasons, the override and the
 evidence. A vantage of the uplink makes Lateral Movement *not observable* when the capture has no
-traffic for it, since traffic between internal hosts doesn't cross an uplink.
+traffic for it and no conversations between internal hosts, since those don't cross an uplink.
+
+**Time span** is the first and last packet, in the server's time zone like the app's other times.
 
 **Completeness** is the capture-quality notes as a verdict: *partial* when traffic is missing or
 uninspected (gaps, the IDS out of memory or unable to read it), *complete, with notes* for the rest.
