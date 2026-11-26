@@ -2893,6 +2893,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List the LLM server's models
+         * @description The models the server at the given URL offers, with each one's context length when the server says, for picking one before saving. Blank fields use the current settings; a POST because the key travels in the body. Other values than the current ones require the permission to edit the LLM connection.
+         */
+        post: operations["models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/llm/test": {
         parameters: {
             query?: never;
@@ -2930,7 +2950,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Override several editable settings together, all or none
+         * @description For settings that only work as a set, such as the LLM's URL, key and model: if one is refused, none is changed. Each needs its own permission and is audited on its own.
+         */
+        patch: operations["setAll"];
         trace?: never;
     };
     "/api/v1/system/settings/{key}": {
@@ -4486,6 +4510,17 @@ export interface components {
             fileIds: string[];
             mergedFileName?: string;
         };
+        ModelList: {
+            baseUrl?: string;
+            detail?: string;
+            models?: components["schemas"]["ModelOption"][];
+            ok?: boolean;
+        };
+        ModelOption: {
+            /** Format: int32 */
+            contextLength?: number;
+            id?: string;
+        };
         NarrativeSection: {
             content?: string;
             relatedData?: components["schemas"]["RelatedData"];
@@ -5146,6 +5181,11 @@ export interface components {
         };
         SetValueRequest: {
             value: string;
+        };
+        SetValuesRequest: {
+            values: {
+                [key: string]: string;
+            };
         };
         SkippedFile: {
             /** Format: uuid */
@@ -10251,6 +10291,30 @@ export interface operations {
             };
         };
     };
+    models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LlmTestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ModelList"];
+                };
+            };
+        };
+    };
     test: {
         parameters: {
             query?: never;
@@ -10283,6 +10347,30 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"][];
+                };
+            };
+        };
+    };
+    setAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetValuesRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

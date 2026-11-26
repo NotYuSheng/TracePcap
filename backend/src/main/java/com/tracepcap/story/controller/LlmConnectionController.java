@@ -31,4 +31,16 @@ public class LlmConnectionController {
   public LlmTestResult test(@RequestBody(required = false) LlmTestRequest request) {
     return tester.test(request);
   }
+
+  @PostMapping("/models")
+  @Operation(
+      summary = "List the LLM server's models",
+      description =
+          "The models the server at the given URL offers, with each one's context length when the"
+              + " server says, for picking one before saving. Blank fields use the current settings;"
+              + " a POST because the key travels in the body. Other values than the current ones"
+              + " require the permission to edit the LLM connection.")
+  public LlmConnectionTester.ModelList models(@RequestBody(required = false) LlmTestRequest request) {
+    return tester.listModels(request);
+  }
 }

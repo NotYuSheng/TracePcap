@@ -4,7 +4,6 @@ import { Alert } from '@components/common/Alert';
 import { SideDrawer } from '@components/common/SideDrawer';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { settingsService, type SystemSetting } from '@/features/settings';
-import { LlmTestPanel } from './LlmTestPanel';
 
 interface EditSystemSettingModalProps {
   setting: SystemSetting | null;
@@ -52,15 +51,6 @@ export function EditSystemSettingModal({ setting, onHide, onSaved }: EditSystemS
 
   const inputId = `edit-setting-${setting.key}`;
   const unchanged = !setting.secret && value.trim() === (setting.value ?? '');
-  // The LLM connection's own fields can be tested with the typed value before saving it.
-  const candidate =
-    setting.key === 'LLM_API_BASE_URL'
-      ? { baseUrl: value }
-      : setting.key === 'LLM_API_KEY'
-        ? { apiKey: value }
-        : setting.key === 'LLM_MODEL'
-          ? { model: value }
-          : null;
 
   return (
     <SideDrawer
@@ -166,11 +156,6 @@ export function EditSystemSettingModal({ setting, onHide, onSaved }: EditSystemS
             {setting.takesEffect && <> Takes effect: {setting.takesEffect}</>}
           </Form.Text>
         </Form.Group>
-        {candidate && value.trim() !== '' && (
-          <div className="mb-3">
-            <LlmTestPanel candidate={candidate} label="Test this value" />
-          </div>
-        )}
         <p className="small mb-0">
           Applies to everyone using this install, and is recorded in the audit log
           {setting.secret ? ' (that it changed, not the key)' : ''}.

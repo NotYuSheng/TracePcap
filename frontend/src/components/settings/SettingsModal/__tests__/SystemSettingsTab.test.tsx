@@ -128,4 +128,134 @@ describe('SystemSettingsTab', () => {
       expect(screen.queryByRole('button', { name: 'Change…' })).not.toBeInTheDocument()
     })
   })
+
+  describe('the LLM connection, in one form', () => {
+    const llm = (key: string, label: string, value: string | null, extra = {}) => ({
+      key, label, group: 'LLM', value, defaultValue: null, secret: false, set: value !== null,
+      editable: true, inAppEditable: true, deployValue: value, overridden: false, lockedReason: null,
+      description: label, ...extra,
+    })
+    const llmRows = [
+      llm('LLM_API_BASE_URL', 'LLM API base URL', 'http://old:1234/v1'),
+      llm('LLM_API_KEY', 'LLM API key', null, { secret: true, set: true }),
+      llm('LLM_MODEL', 'LLM model', 'qwen'),
+    ]
+
+    it('lists the models at the typed URL, picks one, and saves only what changed', async () => {
+      const listed: unknown[] = []
+      let saved: unknown = null
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json(llmRows)),
+        http.post('*/system/llm/models', async ({ request }) => {
+          const body = (await request.json()) as { baseUrl?: string }
+          listed.push(body)
+          return HttpResponse.json(
+            body.baseUrl === 'http://new/v1'
+              ? { ok: true, baseUrl: 'http://new/v1', models: [{ id: 'glm-5', contextLength: 262144 }, { id: 'llama' }] }
+              : { ok: true, baseUrl: 'http://old:1234/v1', models: [{ id: 'qwen', contextLength: 32768 }] }
+          )
+        }),
+        http.patch('*/system/settings', async ({ request }) => {
+          saved = await request.json()
+          return HttpResponse.json([])
+        })
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /Change connection/ }))
+
+      const url = screen.getByLabelText('Server URL')
+      await userEvent.clear(url)
+      await userEvent.type(url, 'http://new/v1')
+      const select = (await screen.findByRole('option', { name: 'glm-5 · 256k context' }, { timeout: 3000 }))
+        .closest('select') as HTMLSelectElement
+      // The saved model isn't on the new server, and says so.
+      expect(screen.getByRole('option', { name: 'qwen (not on this server)' })).toBeInTheDocument()
+      await userEvent.selectOptions(select, 'glm-5')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(listed.at(-1)).toEqual({ baseUrl: 'http://new/v1' })
+      // Together, all or none.
+      expect(saved).toEqual({ values: { LLM_API_BASE_URL: 'http://new/v1', LLM_MODEL: 'glm-5' } })
+    })
+
+    it("lets a model the server doesn't list be typed", async () => {
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json(llmRows)),
+        http.post('*/system/llm/models', () =>
+          HttpResponse.json({ ok: true, baseUrl: 'http://old:1234/v1', models: [{ id: 'glm-5' }] })
+        )
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /Change connection/ }))
+      const option = await screen.findByRole('option', { name: 'qwen (not on this server)' }, { timeout: 3000 })
+      await userEvent.selectOptions(option.closest('select') as HTMLSelectElement, 'Type another name…')
+
+      const typed = screen.getByLabelText('Model')
+      expect(typed.tagName).toBe('INPUT')
+      expect(typed).toHaveValue('qwen')
+    })
+
+    it('never saves a blank URL', async () => {
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json(llmRows)),
+        http.post('*/system/llm/models', () => HttpResponse.json({ ok: true, baseUrl: '', models: [] }))
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /Change connection/ }))
+      await userEvent.clear(screen.getByLabelText('Server URL'))
+      await userEvent.type(screen.getByLabelText('Model'), '-2')
+
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    })
+
+    it("resets what was changed in the app to the deployment's values", async () => {
+      const reset: string[] = []
+      server.use(
+        http.get('*/system/settings', () =>
+          HttpResponse.json([
+            { ...llmRows[0], overridden: true }, llmRows[1], { ...llmRows[2], overridden: true },
+          ])
+        ),
+        http.post('*/system/llm/models', () => HttpResponse.json({ ok: true, baseUrl: '', models: [] })),
+        http.delete('*/system/settings/:key', ({ params }) => {
+          reset.push(params.key as string)
+          return new HttpResponse(null, { status: 204 })
+        })
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /Change connection/ }))
+      await userEvent.click(screen.getByRole('button', { name: "Reset to the deployment's values" }))
+
+      await screen.findByRole('button', { name: /Change connection/ })
+      expect(reset).toEqual(['LLM_API_BASE_URL', 'LLM_MODEL'])
+    })
+
+    it("lets the model be typed when the server doesn't list its models", async () => {
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json(llmRows)),
+        http.post('*/system/llm/models', () =>
+          HttpResponse.json({ ok: true, baseUrl: 'http://old:1234/v1', models: [], detail: "The server doesn't list its models: type the model's name." })
+        )
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /Change connection/ }))
+
+      expect(await screen.findByText(/doesn't list its models/, {}, { timeout: 3000 })).toBeInTheDocument()
+      expect(screen.getByLabelText('Model')).toHaveValue('qwen')
+      expect(screen.getByLabelText('Model').tagName).toBe('INPUT')
+    })
+
+    it("opens from a connection setting's own Change button too", async () => {
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json(llmRows)),
+        http.post('*/system/llm/models', () => HttpResponse.json({ ok: false, baseUrl: '', models: [], detail: 'The server refused the key (401).' }))
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /LLM model/ }))
+      await userEvent.click(screen.getByRole('button', { name: 'Change…' }))
+
+      expect(screen.getByText('LLM connection')).toBeInTheDocument()
+      expect(await screen.findByText('The server refused the key (401).', {}, { timeout: 3000 })).toBeInTheDocument()
+    })
+  })
 })

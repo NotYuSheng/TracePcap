@@ -3819,6 +3819,38 @@
         ],
         "type": "object"
       },
+      "ModelList": {
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOption"
+            },
+            "type": "array"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ModelOption": {
+        "properties": {
+          "contextLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NarrativeSection": {
         "properties": {
           "content": {
@@ -5697,13 +5729,27 @@
       "SetValueRequest": {
         "properties": {
           "value": {
-            "maxLength": 64,
+            "maxLength": 255,
             "minLength": 0,
             "type": "string"
           }
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "SetValuesRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "values"
         ],
         "type": "object"
       },
@@ -15034,6 +15080,37 @@
         ]
       }
     },
+    "/api/v1/system/llm/models": {
+      "post": {
+        "description": "The models the server at the given URL offers, with each one's context length when the server says, for picking one before saving. Blank fields use the current settings; a POST because the key travels in the body. Other values than the current ones require the permission to edit the LLM connection.",
+        "operationId": "models",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List the LLM server's models",
+        "tags": [
+          "LLM Connection"
+        ]
+      }
+    },
     "/api/v1/system/llm/test": {
       "post": {
         "description": "Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Testing other values than the current ones requires the permission to edit the LLM connection.",
@@ -15087,6 +15164,39 @@
         "summary": "Every deploy-time setting with its effective value (read-only)",
         "tags": [
           "System Settings"
+        ]
+      },
+      "patch": {
+        "description": "For settings that only work as a set, such as the LLM's URL, key and model: if one is refused, none is changed. Each needs its own permission and is audited on its own.",
+        "operationId": "setAll",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetValuesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemSettingDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Override several editable settings together, all or none",
+        "tags": [
+          "Policy Settings"
         ]
       }
     },
