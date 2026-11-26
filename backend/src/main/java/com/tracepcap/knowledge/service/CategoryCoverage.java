@@ -56,7 +56,7 @@ public class CategoryCoverage {
     ConversationLookup.FacetCounts facets = conversations.facetCounts(fileId);
     return withHoneypots(withContext(compute(catalogue.entries(), answeredQuestions(report),
         ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context),
-        honeypots);
+        honeypots, context);
   }
 
   /**
@@ -65,16 +65,25 @@ public class CategoryCoverage {
    * certificates were read and none matched.
    */
   static List<CategoryStatus> withHoneypots(
-      List<CategoryStatus> statuses, HoneypotRoleService.HoneypotReport report) {
+      List<CategoryStatus> statuses, HoneypotRoleService.HoneypotReport report,
+      CaptureContextService.CaptureContext context) {
     if (report == null) return statuses;
+    CaptureContextService.VantagePoint v = context == null ? null : context.vantage();
+    boolean sensor = v != null && CaptureContextService.Vantage.SENSOR.key().equals(v.key());
     List<CategoryStatus> out = new ArrayList<>();
     for (CategoryStatus s : statuses) {
-      out.add(s.category() == Category.HONEYPOT ? honeypot(report, s.leads()) : s);
+      out.add(s.category() == Category.HONEYPOT
+          ? honeypot(report, s.leads(), sensor ? v.described() : null) : s);
     }
     return out;
   }
 
-  private static CategoryStatus honeypot(HoneypotRoleService.HoneypotReport r, List<Lead> leads) {
+  /**
+   * @param sensor the vantage point, when the capture reads as taken on a honeypot or sensor: then
+   *     no signature match leaves the category open, not ruled out, since the context says otherwise
+   */
+  private static CategoryStatus honeypot(
+      HoneypotRoleService.HoneypotReport r, List<Lead> leads, String sensor) {
     Category c = Category.HONEYPOT;
     List<HoneypotRoleService.HostRole> found = r.honeypots();
     if (!found.isEmpty()) {
@@ -89,8 +98,14 @@ public class CategoryCoverage {
           + (h.honeypot() == null ? "a honeypot" : h.honeypot()) + ", but " + h.reason(), leads);
     }
     if (!r.hosts().isEmpty()) {
+      // Only analysts' "not a honeypot" verdicts are left.
       return new CategoryStatus(c, Status.RULED_OUT, false, String.join("; ",
           r.hosts().stream().map(h -> h.described() + " (set by an analyst)").toList()), leads);
+    }
+    if (sensor != null) {
+      return new CategoryStatus(c, Status.OPEN, false, "the capture reads as taken " + lower(sensor)
+          + ", but nothing it sent matches a honeypot signature: a high-interaction honeypot or a"
+          + " bare sensor sends nothing a signature knows", leads);
     }
     String checked = " (" + r.serversChecked() + (r.serversChecked() == 1 ? " server" : " servers")
         + " checked)";
@@ -142,6 +157,10 @@ public class CategoryCoverage {
       }
     }
     return out;
+  }
+
+  private static String lower(String s) {
+    return s.isEmpty() ? s : Character.toLowerCase(s.charAt(0)) + s.substring(1);
   }
 
   /** The question keys with an answer: every goal answered, and every other answer. */

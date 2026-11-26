@@ -405,7 +405,10 @@ What's built
 itself (table ``service_banners``): its SSH banner and HASSH, FTP greeting, HTTP ``Server`` header,
 SMB native OS and server name, MySQL version, and the initial TTL of its SYN-ACKs (32, 64, 128 or
 255, rounded up from the one seen). Only the server side counts: the address and port that sent the
-SYN-ACK, or the lower port when the capture began mid-connection. Ports 2222 and 2223 are decoded as
+SYN-ACK. When the capture began mid-connection, fields only a server sends (HASSH, FTP greeting,
+HTTP ``Server``, SMB server name, MySQL version) count unless the sender is known to be the client,
+and the SSH version string and SMB native OS, which both sides send, are taken from the lower
+port. Ports 2222 and 2223 are decoded as
 SSH and Telnet, since Cowrie is often exposed there and tshark 3.6 only knows SSH on 22. TLS
 certificates come from the conversations' own TLS fields.
 
@@ -441,12 +444,17 @@ can meet hundreds of servers still sending an old honeypot's banner.
 the host's address) at the generic adjudication endpoints. An override (*Honeypot*, *Not a
 honeypot*, or a label of your own) wins outright and keeps the signals for reference; evidence adds
 its weight to *Honeypot* or *Not a honeypot*, and counts as a signal, so an analyst's word plus one
-signature can settle a host.
+signature can settle a host. Evidence worth 60 points settles a host on its own: the two-signal rule
+guards against a real server's stock banner, and an analyst's word isn't one. An override on any
+address, signals or not, answers it.
 
 **Where it shows.** The Honeypot category is *Answered* when a host reads as one, *Open* when a host
 has two or more signals but not enough, and *Ruled out* when every server's banners and
 certificates were checked and none showed enough ("no server matched a honeypot signature (7
-servers checked)"). Story's summary names each honeypot under the capture context, and *Why ·
+servers checked)"). Only servers that sent a banner or certificate count as checked; with none, it
+stays *Open*. When the capture context reads the capture as taken on a honeypot or sensor, no
+signature match leaves it *Open* too: a high-interaction honeypot or a bare sensor sends nothing a
+signature knows. Story's summary names each honeypot under the capture context, and *Why ·
 change* opens its signals, the vote, an override and evidence.
 
 **The gate capture.** No public pcap of a modern Cowrie or Dionaea exists: honeypot datasets

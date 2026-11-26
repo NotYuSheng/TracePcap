@@ -239,7 +239,11 @@ const UNSETTLED: HoneypotHost = {
 };
 
 const HONEYPOTS: Honeypots = {
-  hosts: [DIONAEA, UNSETTLED, { ...DIONAEA, host: '10.0.0.9', label: 'Not a honeypot', basis: 'HUMAN', described: '10.0.0.9 is not a honeypot' }],
+  hosts: [
+    DIONAEA, UNSETTLED,
+    { ...DIONAEA, host: '10.0.0.9', label: 'Not a honeypot', basis: 'HUMAN', described: '10.0.0.9 is not a honeypot' },
+    { ...DIONAEA, host: '10.0.0.10', label: 'Not a honeypot', basis: 'MACHINE', described: '10.0.0.10 is not a honeypot' },
+  ],
   singleSignal: 0,
   serversChecked: 5,
   signaturesVersion: '2026-11-26',
@@ -248,8 +252,8 @@ const HONEYPOTS: Honeypots = {
 };
 
 describe('honeypot lines', () => {
-  it('reads each host as one line, leaving out the ones an analyst said are not', () => {
-    expect(honeypotLines(HONEYPOTS.hosts).map(h => h.host)).toEqual(['198.51.100.45', '203.0.113.5']);
+  it('reads each host as one line, keeping an analyst\'s "not a honeypot" so it can be changed', () => {
+    expect(honeypotLines(HONEYPOTS.hosts).map(h => h.host)).toEqual(['198.51.100.45', '203.0.113.5', '10.0.0.9']);
     expect(honeypotText(DIONAEA)).toBe('198.51.100.45 is a Dionaea honeypot');
     expect(honeypotGrade(DIONAEA)).toBe('inferred, 95%');
     expect(honeypotText(UNSETTLED)).toBe('203.0.113.5 may be a Cowrie honeypot');
@@ -265,7 +269,7 @@ describe('StorySummary honeypots', () => {
       '198.51.100.45 is a Dionaea honeypot · inferred, 95%'
     );
     expect(screen.getByTestId('story-honeypot-203.0.113.5')).toHaveTextContent('may be a Cowrie honeypot');
-    expect(screen.queryByTestId('story-honeypot-10.0.0.9')).not.toBeInTheDocument();
+    expect(screen.getByTestId('story-honeypot-10.0.0.9')).toHaveTextContent('10.0.0.9 is not a honeypot · set by an analyst');
   });
 
   it('opens a host\'s signals, and lets an analyst say it is not a honeypot', async () => {

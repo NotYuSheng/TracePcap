@@ -72,12 +72,14 @@ class ServiceBannerExtractorTest {
     row[2] = "22";
     row[3] = "51515";
     row[8] = "SSH-2.0-OpenSSH_8.9";
+    row[17] = "10.0.0.9";
     tally.accept(row);
     String[] client = row.clone();
     client[0] = "10.0.0.9";
     client[2] = "51515";
     client[3] = "22";
     client[8] = "SSH-2.0-PuTTY";
+    client[17] = "10.0.0.5";
     tally.accept(client);
     assertThat(tally.banners()).extracting(Banner::value).containsExactly("SSH-2.0-OpenSSH_8.9");
   }
@@ -88,5 +90,31 @@ class ServiceBannerExtractorTest {
     assertThat(ServiceBannerExtractor.initialTtl(64)).isEqualTo(64);
     assertThat(ServiceBannerExtractor.initialTtl(113)).isEqualTo(128);
     assertThat(ServiceBannerExtractor.initialTtl(240)).isEqualTo(255);
+  }
+
+  @Test
+  void aServerOnAHighPortIsKnownByWhatOnlyAServerSends() {
+    ServiceBannerExtractor.Tally tally = new ServiceBannerExtractor.Tally();
+    String[] blank = new String[ServiceBannerExtractor.FIELDS.length];
+    java.util.Arrays.fill(blank, "");
+    // 10.0.0.5 serves on 2222 (its SYN-ACK was seen)...
+    String[] synAck = blank.clone();
+    synAck[0] = "10.0.0.5"; synAck[2] = "2222"; synAck[3] = "40000"; synAck[4] = "1"; synAck[5] = "1";
+    synAck[6] = "64"; synAck[17] = "10.0.0.9";
+    tally.accept(synAck);
+    // ...and, on a connection open before the capture, is the client, from port 2000, of
+    // 10.0.0.7's SSH on 2222. Only a server sends a HASSH-server, so 10.0.0.7's counts.
+    String[] server = blank.clone();
+    server[0] = "10.0.0.7"; server[2] = "2222"; server[3] = "2000";
+    server[9] = "6fa2f18e2061da02d6c8a9009674fa4e"; server[17] = "10.0.0.5";
+    tally.accept(server);
+    // A host known to be the client on that connection (its peer's SYN-ACK was seen) never counts.
+    String[] client = blank.clone();
+    client[0] = "10.0.0.9"; client[2] = "40000"; client[3] = "2222";
+    client[12] = "nginx"; client[17] = "10.0.0.5";
+    tally.accept(client);
+    assertThat(tally.banners()).filteredOn(b -> !b.kind().equals("ttl"))
+        .extracting(Banner::ip, Banner::kind)
+        .containsExactly(org.assertj.core.groups.Tuple.tuple("10.0.0.7", "ssh-hassh"));
   }
 }

@@ -6,11 +6,11 @@ export function isHoneypot(h: HoneypotHost): boolean {
 }
 
 /**
- * The hosts worth a line in the summary: every honeypot, and every host a signature points at
- * that its signals don't settle. A host an analyst marked "Not a honeypot" needs no line.
+ * The hosts worth a line in the summary: every honeypot, every host its signals don't settle, and
+ * every host an analyst answered, "Not a honeypot" too, so their answer stays reachable to change.
  */
 export function honeypotLines(hosts: HoneypotHost[]): HoneypotHost[] {
-  return hosts.filter(h => isHoneypot(h) || h.label === null);
+  return hosts.filter(h => isHoneypot(h) || h.label === null || h.basis === 'HUMAN');
 }
 
 /** "198.51.100.45 is a Dionaea honeypot" or "198.51.100.22 may be a Cowrie honeypot". */

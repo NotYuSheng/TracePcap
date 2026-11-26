@@ -27,7 +27,7 @@ export function HoneypotLine({ fileId, honeypots, onChanged }: Props) {
     <>
       {lines.map(h => (
         <div key={h.host} className="story-summary-context" data-testid={`story-honeypot-${h.host}`}>
-          <i className={`bi ${isHoneypot(h) ? 'bi-bug' : 'bi-question-circle'}`} aria-hidden="true" />
+          <i className={`bi ${isHoneypot(h) ? 'bi-bug' : h.label ? 'bi-check-circle' : 'bi-question-circle'}`} aria-hidden="true" />
           <span>
             <b>{honeypotText(h)}</b>
             <span className="story-summary-meta"> · {honeypotGrade(h)}</span>

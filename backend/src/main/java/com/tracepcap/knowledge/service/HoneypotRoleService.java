@@ -176,14 +176,21 @@ public class HoneypotRoleService {
     Map<String, List<ManualEvidenceEntity>> analyst = new HashMap<>();
     evidence.findByQuestionAndFileId(QUESTION, fileId)
         .forEach(e -> analyst.computeIfAbsent(e.getEntityKey(), k -> new ArrayList<>()).add(e));
+    // One query for every override: an override on a host with no signal still answers it.
+    Map<String, HumanOverrideEntity> overridden = new HashMap<>();
+    overrides.findAll(QUESTION, fileId).forEach(o -> overridden.put(o.getEntityKey(), o));
     Set<String> hosts = new TreeSet<>(signals.keySet());
     hosts.addAll(analyst.keySet());
-    if (hosts.isEmpty()) return new HoneypotReport(List.of(), 0, observed.size(), file.version());
+    hosts.addAll(overridden.keySet());
+    // Only servers that sent something to compare: a SYN-ACK's TTL alone checks nothing.
+    int checked = (int) observed.values().stream()
+        .filter(seen -> seen.stream().anyMatch(o -> !"ttl".equals(o[0]))).count();
+    if (hosts.isEmpty()) return new HoneypotReport(List.of(), 0, checked, file.version());
 
     // Behaviour reads only the hosts already in question, a signature or an analyst's word, and
     // the strongest of them first.
     List<String> examined = hosts.stream()
-        .sorted(Comparator.comparing((String h) -> !analyst.containsKey(h))
+        .sorted(Comparator.comparing((String h) -> !analyst.containsKey(h) && !overridden.containsKey(h))
             .thenComparing(h -> -signals.getOrDefault(h, List.of()).stream().mapToInt(Signal::points).sum())
             .thenComparing(h -> h))
         .toList();
@@ -198,7 +205,7 @@ public class HoneypotRoleService {
             observed.getOrDefault(host, List.of())));
       }
       HostRole inferred = decide(host, all, analyst.getOrDefault(host, List.of()));
-      Optional<HumanOverrideEntity> o = overrides.find(QUESTION, fileId, host);
+      Optional<HumanOverrideEntity> o = Optional.ofNullable(overridden.get(host));
       if (o.isEmpty() && !analyst.containsKey(host) && inferred.label() == null && all.size() < 2) {
         single++;
         continue;
@@ -208,7 +215,7 @@ public class HoneypotRoleService {
     }
     out.sort(Comparator.comparing((HostRole r) -> !r.isHoneypot())
         .thenComparing(r -> -r.confidence()).thenComparing(HostRole::host));
-    return new HoneypotReport(List.copyOf(out), single, observed.size(), file.version());
+    return new HoneypotReport(List.copyOf(out), single, checked, file.version());
   }
 
   // ── What each server said ─────────────────────────────────────────────────────────────────
@@ -317,25 +324,29 @@ public class HoneypotRoleService {
     List<String> againstReasons = new ArrayList<>();
     List<Signal> all = new ArrayList<>(signals);
     String ownLabel = null;
+    int analystPoints = 0;
     for (ManualEvidenceEntity e : analyst) {
-      String label = e.getLabel() == null ? HONEYPOT : e.getLabel().trim();
+      String label = canonical(e.getLabel());
       String text = "analyst evidence: " + e.getReason();
-      if (NOT_HONEYPOT.equalsIgnoreCase(label) || "not".equalsIgnoreCase(label)) {
+      if (NOT_HONEYPOT.equals(label)) {
         against += e.getWeight();
         againstReasons.add(text);
       } else {
         forIt += e.getWeight();
+        analystPoints += e.getWeight();
         reasons.add(text);
-        if (!HONEYPOT.equalsIgnoreCase(label)) ownLabel = label;
+        if (!HONEYPOT.equals(label)) ownLabel = label;
         all.add(new Signal("analyst", "evidence", null, null, e.getWeight(), text));
       }
     }
     forIt = Math.min(100, forIt);
     against = Math.min(100, against);
     boolean analystFor = all.size() > signals.size();
-    // Two signals, one a signature (or an analyst's word), and enough points between them.
-    boolean concluded = all.size() >= 2 && (signature || analystFor) && forIt >= CONCLUDE
-        && forIt > against;
+    // Two signals, one a signature (or an analyst's word), and enough points between them. The
+    // two-signal rule guards against a real server's stock banner; an analyst's own evidence is
+    // their word, not a banner, so enough of it settles the host alone.
+    boolean concluded = forIt > against && forIt >= CONCLUDE
+        && ((all.size() >= 2 && (signature || analystFor)) || Math.min(100, analystPoints) >= CONCLUDE);
 
     List<Candidate> candidates = new ArrayList<>();
     if (forIt > 0) candidates.add(new Candidate(HONEYPOT, forIt, List.copyOf(reasons)));
@@ -349,8 +360,8 @@ public class HoneypotRoleService {
           String.join("; ", againstReasons), null);
     }
     if (!concluded) {
-      return new HostRole(host, null, honeypot, "MACHINE", forIt, contested, candidates, all,
-          notEnough(all, signature, forIt), null);
+      return new HostRole(host, null, honeypot, signals.isEmpty() ? "HUMAN" : "MACHINE", forIt,
+          contested, candidates, all, notEnough(all, signature, forIt), null);
     }
     String basis = signals.isEmpty() ? "HUMAN" : "MACHINE";
     return new HostRole(host, ownLabel != null && signals.isEmpty() ? ownLabel : HONEYPOT, honeypot,
@@ -359,6 +370,9 @@ public class HoneypotRoleService {
 
   /** Why a host's signals fall short. */
   static String notEnough(List<Signal> signals, boolean signature, int points) {
+    if (signals.stream().allMatch(s -> "analyst".equals(s.source()))) {
+      return "only analyst evidence, worth " + points + " points of the " + CONCLUDE + " it needs";
+    }
     if (signals.size() < 2) {
       return "one signal only, and a real server can show it too: a honeypot needs two";
     }
@@ -377,12 +391,26 @@ public class HoneypotRoleService {
 
   /** An analyst's answer, which wins outright; the machine's candidates and signals stay. */
   static HostRole overridden(HostRole inferred, String label, String rationale, String actor) {
-    String l = label == null ? HONEYPOT : label.trim();
-    String shown = HONEYPOT.equalsIgnoreCase(l) ? HONEYPOT
-        : NOT_HONEYPOT.equalsIgnoreCase(l) ? NOT_HONEYPOT : l;
+    String shown = canonical(label);
     String reason = rationale == null || rationale.isBlank() ? "set by an analyst" : rationale.trim();
     return new HostRole(inferred.host(), shown, NOT_HONEYPOT.equals(shown) ? null : inferred.honeypot(),
         "HUMAN", 100, false, inferred.candidates(), inferred.signals(), reason, actor);
+  }
+
+  /** Words that mean "not a honeypot", however an analyst typed them. */
+  private static final Set<String> NOT_WORDS =
+      Set.of("not a honeypot", "not honeypot", "not", "no", "false", "real", "real server");
+
+  /**
+   * An analyst's label in the vote's terms: {@link #HONEYPOT}, {@link #NOT_HONEYPOT}, or their own
+   * words, which name what it is (a "T-Pot sensor") and so count as a honeypot.
+   */
+  static String canonical(String label) {
+    if (label == null || label.isBlank()) return HONEYPOT;
+    String l = label.trim();
+    if (NOT_WORDS.contains(l.toLowerCase(java.util.Locale.ROOT))) return NOT_HONEYPOT;
+    if (HONEYPOT.equalsIgnoreCase(l) || "yes".equalsIgnoreCase(l)) return HONEYPOT;
+    return l;
   }
 
   // ── The signature file ────────────────────────────────────────────────────────────────────

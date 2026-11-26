@@ -196,8 +196,20 @@ class CategoryCoverageTest {
 
   private static CategoryStatus honeypot(HoneypotRoleService.HoneypotReport r) {
     return CategoryCoverage.withHoneypots(
-            CategoryCoverage.compute(ENTRIES, Set.of(), Set.of(), Set.of(), Set.of()), r)
+            CategoryCoverage.compute(ENTRIES, Set.of(), Set.of(), Set.of(), Set.of()), r, null)
         .stream().filter(s -> s.category() == Category.HONEYPOT).findFirst().orElseThrow();
+  }
+
+  @Test
+  void onASensorNoSignatureLeavesItOpenNotRuledOut() {
+    var ctx = context("sensor", "On a honeypot or sensor");
+    var s = CategoryCoverage.withHoneypots(
+            CategoryCoverage.compute(ENTRIES, Set.of(), Set.of(), Set.of(), Set.of()),
+            new HoneypotRoleService.HoneypotReport(List.of(), 0, 3, "v"), ctx)
+        .stream().filter(x -> x.category() == Category.HONEYPOT).findFirst().orElseThrow();
+    assertThat(s.status()).isEqualTo(Status.OPEN);
+    assertThat(s.reason()).startsWith("the capture reads as taken on a honeypot or sensor")
+        .contains("high-interaction honeypot");
   }
 
   @Test

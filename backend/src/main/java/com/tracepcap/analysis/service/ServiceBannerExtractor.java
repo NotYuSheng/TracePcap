@@ -52,7 +52,8 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
   static final String[] FIELDS = {
     "ip.src", "ipv6.src", "tcp.srcport", "tcp.dstport", "tcp.flags.syn", "tcp.flags.ack", "ip.ttl",
     "ipv6.hlim", "ssh.protocol", "ssh.kex.hasshserver", "ftp.response.code", "ftp.response.arg",
-    "http.server", "smb.native_os", "smb.native_lanman", "smb.server", "mysql.version"
+    "http.server", "smb.native_os", "smb.native_lanman", "smb.server", "mysql.version", "ip.dst",
+    "ipv6.dst"
   };
 
   private final ServiceBannerRepository repository;
@@ -117,7 +118,7 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
     private final Map<String, int[]> counts = new LinkedHashMap<>();
     private final Map<String, Integer> ttl = new LinkedHashMap<>();
 
-    void accept(String[] f) {
+    synchronized void accept(String[] f) {
       if (f.length < FIELDS.length) return;
       String ip = first(f[0]) != null ? first(f[0]) : first(f[1]);
       Integer port = integer(f[2]), peerPort = integer(f[3]);
@@ -130,20 +131,29 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
         if (observed != null) ttl.merge(at, initialTtl(observed), Math::max);
         return;
       }
-      // The server side only: it sent the SYN-ACK, or (no handshake seen) it has the lower port.
-      boolean server = servers.contains(at)
-          || (!servers.contains(ip + "|" + peerPort) && peerPort != null && port < peerPort);
-      if (!server) return;
-      add(ip, port, "ssh-banner", f[8]);
+      // Which side sent it. Known from the handshake when it was captured: the side that sent the
+      // SYN-ACK serves, the other is the client. The peer's own address with its port, not ours: a
+      // host can serve on one connection and be the client on another.
+      String peer = first(f[17]) != null ? first(f[17]) : first(f[18]);
+      boolean peerServes = peer != null && peerPort != null && servers.contains(peer + "|" + peerPort);
+      boolean knownServer = servers.contains(at);
+      boolean knownClient = peerServes && !knownServer;
+      if (knownClient) return;
+      // Fields only a server sends count whenever the sender isn't known to be the client: a
+      // server on a high port can talk to a client on a lower one.
       add(ip, port, "ssh-hassh", f[9]);
       if ("220".equals(first(f[10]))) add(ip, port, "ftp-banner", f[11]);
       add(ip, port, "http-server", f[12]);
+      add(ip, port, "smb-server-name", f[15]);
+      add(ip, port, "mysql-version", f[16]);
+      // Both sides send an SSH version string and an SMB native OS: without a handshake, the lower
+      // port is taken as the server's.
+      if (!knownServer && (peerPort == null || port >= peerPort)) return;
+      add(ip, port, "ssh-banner", f[8]);
       String os = first(f[13]), lanman = first(f[14]);
       if (os != null || lanman != null) {
         add(ip, port, "smb-os", (os == null ? "" : os) + " / " + (lanman == null ? "" : lanman));
       }
-      add(ip, port, "smb-server-name", f[15]);
-      add(ip, port, "mysql-version", f[16]);
     }
 
     private void add(String ip, int port, String kind, String raw) {
@@ -156,7 +166,7 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
       else if (counts.size() < MAX_ROWS) counts.put(key, new int[] {1});
     }
 
-    List<Banner> banners() {
+    synchronized List<Banner> banners() {
       List<Banner> out = new ArrayList<>();
       counts.forEach((key, n) -> {
         String[] k = key.split("\\|", 4);
@@ -210,22 +220,39 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
       cmd.add(field);
     }
     Process process = null;
+    java.util.concurrent.ExecutorService reader = null;
     try {
       process = new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-      try (BufferedReader r = new BufferedReader(
-          new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = r.readLine()) != null) {
-          if (!line.isEmpty()) tally.accept(line.split("\t", -1));
+      final Process proc = process;
+      // Rows are read on their own thread, so the timeout below bounds the pass: read on this one,
+      // a stalled tshark would hold the analysis until it exits.
+      reader = java.util.concurrent.Executors.newSingleThreadExecutor();
+      java.util.concurrent.Future<?> rows = reader.submit(() -> {
+        try (BufferedReader r = new BufferedReader(
+            new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+          String line;
+          while ((line = r.readLine()) != null) {
+            if (!line.isEmpty()) tally.accept(line.split("\t", -1));
+          }
         }
+        return null;
+      });
+      if (!process.waitFor(2, TimeUnit.MINUTES)) {
+        log.warn("Service banner pass timed out; keeping what it read");
+        process.destroyForcibly();
       }
-      if (!process.waitFor(2, TimeUnit.MINUTES)) log.warn("Service banner pass timed out; partial");
+      try {
+        rows.get(30, TimeUnit.SECONDS);
+      } catch (java.util.concurrent.TimeoutException e) {
+        log.warn("Service banner rows not drained; keeping what was read");
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (Exception e) {
       log.warn("Service banner pass failed: {}", e.getMessage());
     } finally {
       if (process != null) process.destroyForcibly();
+      if (reader != null) reader.shutdownNow();
     }
   }
 }

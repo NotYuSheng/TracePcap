@@ -163,6 +163,28 @@ class HoneypotRoleServiceTest {
   }
 
   @Test
+  void oneStrongPieceOfEvidenceSettlesAHostAlone() {
+    HostRole r = role("10.0.0.5", List.of(), List.of(), 0, evidence("Honeypot", 80, "our T-Pot"));
+    assertThat(r.isHoneypot()).isTrue();
+    assertThat(r.basis()).isEqualTo("HUMAN");
+    HostRole weak = role("10.0.0.5", List.of(), List.of(), 0, evidence("Honeypot", 40, "maybe"));
+    assertThat(weak.label()).isNull();
+    assertThat(weak.reason()).isEqualTo("only analyst evidence, worth 40 points of the 60 it needs");
+  }
+
+  @Test
+  void anAnalystsWordsForNoMeanNotAHoneypotWhereverTheyAreTyped() {
+    HostRole inferred = role("198.51.100.22", COWRIE, probed("198.51.100.22", 6, 0), 2);
+    assertThat(HoneypotRoleService.overridden(inferred, "not", null, "ana").isHoneypot()).isFalse();
+    assertThat(HoneypotRoleService.overridden(inferred, "Not a honeypot", null, "ana").label())
+        .isEqualTo(HoneypotRoleService.NOT_HONEYPOT);
+    assertThat(role("10.0.0.5", List.of(), List.of(), 0, evidence("no", 50, "ours")).label())
+        .isEqualTo(HoneypotRoleService.NOT_HONEYPOT);
+    // A label of their own names what it is.
+    assertThat(HoneypotRoleService.overridden(inferred, "T-Pot sensor", null, "ana").isHoneypot()).isTrue();
+  }
+
+  @Test
   void evidenceAgainstOutweighingTheSignalsSaysNotAHoneypot() {
     HostRole r = role("198.51.100.22", COWRIE, probed("198.51.100.22", 6, 0), 2,
         evidence("Not a honeypot", 90, "our own bastion, on a Twisted SSH server"));
@@ -205,11 +227,8 @@ class HoneypotRoleServiceTest {
     when(c.tlsConversations(FILE)).thenReturn(List.of());
     when(c.distinctAnsweredPorts(eq(FILE), anyString())).thenReturn(1L);
     HumanOverrideService o = mock(HumanOverrideService.class);
-    when(o.find(eq(HoneypotRoleService.QUESTION), eq(FILE), anyString())).thenReturn(Optional.empty());
-    if (override != null) {
-      when(o.find(HoneypotRoleService.QUESTION, FILE, override.getEntityKey()))
-          .thenReturn(Optional.of(override));
-    }
+    when(o.findAll(HoneypotRoleService.QUESTION, FILE))
+        .thenReturn(override == null ? List.of() : List.of(override));
     ManualEvidenceRepository e = mock(ManualEvidenceRepository.class);
     when(e.findByQuestionAndFileId(any(), any())).thenReturn(List.of(ev));
     return new HoneypotRoleService(b, c, o, e, new ObjectMapper());
@@ -254,6 +273,22 @@ class HoneypotRoleServiceTest {
         .reason("T-Pot").entityKey("10.0.0.5").build();
     var r = service(List.of(), List.of(), null, ev).forFile(FILE);
     assertThat(r.hosts()).extracting(HostRole::host).containsExactly("10.0.0.5");
+  }
+
+  @Test
+  void anOverrideOnAHostWithNoSignalStillAnswersIt() {
+    HumanOverrideEntity o = mock(HumanOverrideEntity.class);
+    when(o.getEntityKey()).thenReturn("10.0.2.15");
+    when(o.getLabel()).thenReturn("Honeypot");
+    var r = service(List.of(), List.of(), o).forFile(FILE);
+    assertThat(r.honeypots()).extracting(HostRole::host).containsExactly("10.0.2.15");
+  }
+
+  @Test
+  void serversThatSentOnlyASynAckAreNotCountedAsChecked() {
+    var r = service(List.of(new Banner("192.0.2.1", 443, "ttl", "64", 1),
+        new Banner("192.0.2.80", 80, "http-server", "nginx", 4)), List.of(), null).forFile(FILE);
+    assertThat(r.serversChecked()).isEqualTo(1);
   }
 
   @Test
