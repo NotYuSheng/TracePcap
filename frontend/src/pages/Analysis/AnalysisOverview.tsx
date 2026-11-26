@@ -34,7 +34,7 @@ import { getExtractedFiles } from '@features/extractedFiles/services/extractedFi
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import { CaptureQualityNote } from '@components/common/CaptureQualityNote/CaptureQualityNote';
-import type { Answer, Considered } from '@/types';
+import type { Answer, CategoryStatus, Considered } from '@/types';
 
 /** "Where the hosts are" lists this many groups per heading before "Show all". */
 const HOSTS_SHOWN = 6;
@@ -99,10 +99,9 @@ export const AnalysisOverview = () => {
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [considered, setConsidered] = useState<Considered[]>([]);
-  // Whether the investigation came back: until then (or if it failed) no question is called open.
-  const [investigationLoaded, setInvestigationLoaded] = useState(false);
-  // Every application in the capture, when the Overview's own list was cut to its top ones.
-  const [allApps, setAllApps] = useState<string[] | null>(null);
+  // Every category's status: null until the investigation is in (or if it failed), so nothing is
+  // called open before it has been looked at.
+  const [categories, setCategories] = useState<CategoryStatus[] | null>(null);
   const [activity, setActivity] = useState<TimelineDataPoint[]>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const { tops: hostTops } = useHostGroups(fileId, data);
@@ -187,13 +186,13 @@ export const AnalysisOverview = () => {
         setAnswers(s.answers);
         setUnknowns(s.unknowns);
         setConsidered(s.considered);
-        setInvestigationLoaded(true);
+        setCategories(s.categories);
       })
       .catch(() => {
         setAnswers([]);
         setUnknowns([]);
         setConsidered([]);
-        setInvestigationLoaded(false);
+        setCategories(null);
       });
     if (networkContext) {
       conversationService
@@ -208,20 +207,6 @@ export const AnalysisOverview = () => {
   const triggeredRules = networkContext ? networkTriggered : (data.triggeredCustomRules ?? []);
 
   const detectedApps = data.detectedApplications ?? [];
-
-  // Worth a look matches every application (#1292): when the list above was cut to the top ones, a
-  // small Kerberos or AnyDesk flow could fall off and take its question with it.
-  const appsTruncated = !!data.detectedApplicationsTruncated;
-  useEffect(() => {
-    if (!fileId || !appsTruncated) {
-      setAllApps(null);
-      return;
-    }
-    apiClient
-      .get<string[]>(API_ENDPOINTS.DISTINCT_APPS(fileId))
-      .then(r => setAllApps(r.data))
-      .catch(() => setAllApps(null));
-  }, [fileId, appsTruncated]);
 
   // "26m 12s" for a short capture; days, months or years past two days, not "8846328m 29s".
   const durationText = formatDuration(data.timeRange ? data.timeRange[1] - data.timeRange[0] : 0);
@@ -532,13 +517,7 @@ export const AnalysisOverview = () => {
 
           {/* The protocols worth opening, by the question they help answer (#1292). */}
           {fileId && (
-            <WorthALookCard
-              fileId={fileId}
-              l7Protocols={data.detectedL7Protocols ?? []}
-              apps={allApps ?? detectedApps.map(a => a.name)}
-              answeredQuestions={investigationLoaded ? answers.map(a => a.question) : null}
-              ruledOutQuestions={considered.map(c => c.question)}
-            />
+            <WorthALookCard fileId={fileId} categories={categories} />
           )}
 
           {(

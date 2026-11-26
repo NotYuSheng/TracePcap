@@ -11,7 +11,32 @@ public record InvestigationReportResponse(
     List<AnswerResponse> additional,
     List<String> unknowns,
     List<String> coverage,
-    List<ConsideredResponse> considered) {
+    List<ConsideredResponse> considered,
+    // Every framework category's status on this capture, with where to look.
+    List<CategoryStatusResponse> categories) {
+
+  /** One investigation-framework category on this capture. */
+  public record CategoryStatusResponse(
+      String key,
+      String axis,
+      String label,
+      String attackId,
+      String status,
+      boolean unchecked,
+      String reason,
+      List<CategoryLeadResponse> leads) {
+
+    public static CategoryStatusResponse from(
+        com.tracepcap.knowledge.service.CategoryCoverage.CategoryStatus s) {
+      var c = s.category();
+      return new CategoryStatusResponse(c.key(), c.axis().name(), c.label(), c.attackId(),
+          s.status().name(), s.unchecked(), s.reason(),
+          s.leads().stream().map(l -> new CategoryLeadResponse(l.label(), l.shows(), l.query())).toList());
+    }
+  }
+
+  /** A protocol in this capture worth a look for a category: what it shows, and its conversations. */
+  public record CategoryLeadResponse(String label, String shows, String query) {}
 
   /** A candidate a check tested and ruled out (#1294), with why. */
   public record ConsideredResponse(
@@ -19,6 +44,12 @@ public record InvestigationReportResponse(
 
 
   public static InvestigationReportResponse from(InvestigationReport report) {
+    return from(report, List.of());
+  }
+
+  public static InvestigationReportResponse from(
+      InvestigationReport report,
+      List<com.tracepcap.knowledge.service.CategoryCoverage.CategoryStatus> categories) {
     return new InvestigationReportResponse(
         report.outcomes().stream().map(GoalOutcomeDto::from).toList(),
         report.additional().stream().map(AnswerResponse::from).toList(),
@@ -26,7 +57,8 @@ public record InvestigationReportResponse(
         report.coverage(),
         report.considered().stream()
             .map(c -> new ConsideredResponse(c.question(), c.candidate(), c.rule(), c.reason(), c.conversations()))
-            .toList());
+            .toList(),
+        categories.stream().map(CategoryStatusResponse::from).toList());
   }
 
   public record GoalOutcomeDto(

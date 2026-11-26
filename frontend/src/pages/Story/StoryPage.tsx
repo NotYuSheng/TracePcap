@@ -6,7 +6,7 @@ import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import type { Answer, GoalOutcome, TimelineDataPoint } from '@/types';
+import type { Answer, CategoryStatus, GoalOutcome, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { storyService } from '@/features/story/services/storyService';
@@ -17,7 +17,7 @@ import {
 import { StoryProgress } from '@components/story/StoryProgress/StoryProgress';
 import { AiJobStatus } from '@components/common/AiJobStatus/AiJobStatus';
 import { placeInLine } from '@/features/aiJobs/aiJobText';
-import { StoryGoals } from '@components/story/StoryGoals';
+import { StorySummary } from '@components/story/StorySummary';
 import { StoryNarrative } from '@components/story/StoryNarrative';
 import { StoryHowItWorks, StoryPromptSettings } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
@@ -34,7 +34,7 @@ const written = (ms: number) =>
   new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /**
- * Story mode, laid out as an investigation (design B): the four standing questions first, the
+ * Story mode, laid out as an investigation: where it stands first (summary-first, design F), the
  * narrative told as a timeline, Q&A open beside it, and the evidence the story rests on in tabs
  * underneath. Settings live in the Regenerate dialog rather than on the page.
  */
@@ -65,6 +65,7 @@ export const StoryPage = () => {
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [goals, setGoals] = useState<GoalOutcome[]>([]);
   const [additional, setAdditional] = useState<Answer[]>([]);
+  const [categories, setCategories] = useState<CategoryStatus[] | null>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [showRegenerate, setShowRegenerate] = useState(false);
   const ai = usePermission('ASK_AI');
@@ -107,8 +108,8 @@ export const StoryPage = () => {
     setGoalsLoaded(false);
     storyService
       .getInvestigationReport(fileId)
-      .then(r => { if (alive) { setGoals(r.goals); setAdditional(r.additional); } })
-      .catch(() => { if (alive) { setGoals([]); setAdditional([]); } })
+      .then(r => { if (alive) { setGoals(r.goals); setAdditional(r.additional); setCategories(r.categories ?? null); } })
+      .catch(() => { if (alive) { setGoals([]); setAdditional([]); setCategories(null); } })
       .finally(() => { if (alive) setGoalsLoaded(true); });
     return () => { alive = false; };
   }, [fileId]);
@@ -156,6 +157,17 @@ export const StoryPage = () => {
     />
   );
 
+  // Where the investigation stands needs no model, so it shows before a story is written too.
+  const summary = (
+    <StorySummary
+      fileId={fileId}
+      goals={goals}
+      additional={additional}
+      categories={categories}
+      loading={!goalsLoaded}
+    />
+  );
+
   const howItWorks = (
     <Modal show={showHowItWorks} onHide={() => setShowHowItWorks(false)} size="lg" scrollable>
       <Modal.Header closeButton>
@@ -171,6 +183,7 @@ export const StoryPage = () => {
   if (generating && !story && job?.status === 'WAITING') {
     return (
       <div className="story-start">
+        {summary}
         <Card className="story-start-card" data-testid="story-waiting">
           <Card.Body>
             <span className="story-pill story-pill-writing">Queued</span>
@@ -262,6 +275,7 @@ export const StoryPage = () => {
   if (!story && background && background.status !== 'FAILED') {
     return (
       <div className="story-start">
+        {summary}
         <Card className="story-start-card" data-testid="story-background">
           <Card.Body>
             <span className="story-pill story-pill-writing">
@@ -306,6 +320,7 @@ export const StoryPage = () => {
     return (
       <div className={gridClass}>
       <div className="story-start">
+        {summary}
         {background?.status === 'FAILED' && (
           <Alert variant="warning" className="mb-3">
             The story asked for at upload couldn&apos;t be written
@@ -369,7 +384,7 @@ export const StoryPage = () => {
 
       <div className={gridClass}>
         <div className="story-main">
-          <StoryGoals goals={goals} additional={additional} loading={!goalsLoaded} />
+          {summary}
 
           {generating && job && (
             <AiJobStatus

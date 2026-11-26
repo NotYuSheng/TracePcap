@@ -5,6 +5,7 @@ import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrig
 import { Button, Card } from '@govtechsg/sgds-react';
 import type { Answer, Considered } from '@/types';
 import { DerivationModal } from '../DerivationModal/DerivationModal';
+import { QUESTION_META } from '@/features/story/questionMeta';
 
 interface ConfirmedFindingsPanelProps {
   answers: Answer[];
@@ -132,21 +133,8 @@ function answerAddress(a: Answer): string | null {
   return typeof v === 'string' && v ? v : null;
 }
 
-/** Friendly label + icon per standard-question key; unknown keys fall back to the raw key. */
-const QUESTION_META: Record<string, { label: string; icon: string }> = {
-  victim: { label: 'Victim host', icon: 'bi-pc-display' },
-  c2: { label: 'Command & control', icon: 'bi-broadcast-pin' },
-  malware: { label: 'Malware', icon: 'bi-bug' },
-  'signed-in-user': { label: 'Signed-in user', icon: 'bi-person-badge' },
-  'data-transfer': { label: 'Bulk transfer', icon: 'bi-arrow-up-right-circle' },
-  'remote-access': { label: 'Remote-access tool', icon: 'bi-display' },
-  'lateral-movement': { label: 'Lateral movement', icon: 'bi-diagram-2' },
-  'kerberos-attack': { label: 'Kerberos attack', icon: 'bi-key' },
-  downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
-};
-
 /** The answer's "How we got here" button and the walkthrough it opens (#1293). */
-function HowWeGotHere({ answer, label, fileId }: { answer: Answer; label: string; fileId?: string }) {
+export function HowWeGotHere({ answer, label, fileId }: { answer: Answer; label: string; fileId?: string }) {
   const [show, setShow] = useState(false);
   if (!answer.derivation || answer.derivation.length === 0) return null;
   return (

@@ -156,14 +156,22 @@ The Story Page
 The Story tab is laid out as an investigation, read top to bottom, with the
 questions and answers beside it:
 
-- **The four questions** come first, as cards: *Victim* (which host was
-  attacked?), *User* (who was signed in?), *Malware* (what ran on it?) and *C2*
-  (where did it call home?). A card is **Answered** with the headline, its grade,
-  confidence and how many reasons back it; **Not established** when an incident
-  was found but nothing settled that part of it; or **No lead** when nothing in
-  the capture pointed there, which on a benign capture is the expected outcome.
-  Answers that aren't one of the four (a bulk transfer to review, say) are listed
-  under the cards as *Also found*.
+- **Where the investigation stands** comes first, summary first (see
+  :doc:`../architecture/investigation-framework`). One sentence and one bar count
+  the investigation's categories by status: "Nothing is concluded yet. 17 are still
+  open and 4 can't be seen in this capture." Under it:
+
+  - **Answered**: each answer with its grade and confidence.
+  - **Worth a look next**: the open categories, those with traffic in this capture
+    first, each linking to that traffic's conversations. Three show, and the rest
+    open with *and N more open*.
+  - **Ruled out** and **Not observable** fold away, each category with why ("no SMB
+    or DCE-RPC in this capture", "happens on the host, and rarely shows on the
+    wire").
+  - **Show all** opens every category with its status, by axis: capture context,
+    hosts and activities (with each ATT&CK tactic id).
+
+  It needs no LLM, so it shows before a story is written too.
 - **The story** follows: the summary, then *What happened* as a timeline of
   events (suspicious and critical ones marked with an amber or red edge), then
   the rest of the narrative (anomalies, the conclusion) under its own headings.
@@ -190,7 +198,7 @@ Story Mode returns a response containing several components:
 Investigation Summary
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The **Investigation Summary** (the question cards at the top of the Story tab) surfaces the deterministic answers to the
+The **Investigation Summary** (the answers at the top of the Story tab) surfaces the deterministic answers to the
 standard investigation questions — **victim**, **command-and-control**,
 **malware**, and **signed-in user** — from the :doc:`../architecture/knowledge-layer`,
 each labelled with its :ref:`grade <knowledge-grade>` (measured, reported, or

@@ -4,6 +4,7 @@ import com.tracepcap.knowledge.dto.AnswerResponse;
 import com.tracepcap.knowledge.dto.CaseKnowledgeResponse;
 import com.tracepcap.knowledge.dto.InvestigationReportResponse;
 import com.tracepcap.knowledge.service.CaseKnowledgeService;
+import com.tracepcap.knowledge.service.CategoryCoverage;
 import com.tracepcap.knowledge.service.InvestigationOrchestrator;
 import com.tracepcap.knowledge.service.StandardQuestionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +30,7 @@ public class CaseKnowledgeController {
   private final CaseKnowledgeService caseKnowledgeService;
   private final StandardQuestionService standardQuestionService;
   private final InvestigationOrchestrator investigationOrchestrator;
+  private final CategoryCoverage categoryCoverage;
 
   @GetMapping("/{fileId}/knowledge")
   @Operation(summary = "Assembled knowledge board (entities, relationships, findings) for a file")
@@ -48,9 +50,12 @@ public class CaseKnowledgeController {
       summary = "Autonomous investigation report for a file",
       description =
           "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence,"
-              + " the goals still unknown, and the techniques that contributed (#819).")
+              + " the goals still unknown, and the techniques that contributed (#819). Also every"
+              + " investigation category's status on this capture: answered, ruled out, open or"
+              + " not observable, with why and the traffic worth a look.")
   public ResponseEntity<InvestigationReportResponse> getInvestigation(@PathVariable UUID fileId) {
+    var report = investigationOrchestrator.investigate(fileId);
     return ResponseEntity.ok(
-        InvestigationReportResponse.from(investigationOrchestrator.investigate(fileId)));
+        InvestigationReportResponse.from(report, categoryCoverage.coverage(fileId, report)));
   }
 }
