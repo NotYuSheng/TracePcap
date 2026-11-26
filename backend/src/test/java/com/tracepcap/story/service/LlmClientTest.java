@@ -329,25 +329,37 @@ class LlmClientTest {
   }
 
   @Test
-  void withNoCeilingAndNoKnownContextTheReplyLengthIsLeftToTheServer() {
+  void withNoCeilingAndNoKnownContextTheFallbackIsAskedAndThenNoCap() {
     LlmClient auto = withCeiling(0);
     server
         .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(LlmClient.FALLBACK_REPLY_TOKENS))
+        .andRespond(
+            withSuccess("{\"choices\":[{\"finish_reason\":\"length\"}]}", MediaType.APPLICATION_JSON));
+    // Some servers default to a hundred tokens without max_tokens, so the guess came first.
+    server
+        .expect(requestTo(COMPLETIONS_URL))
         .andExpect(jsonPath("$.max_tokens").doesNotExist())
-        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+        .andRespond(withSuccess(messageResponse("whole"), MediaType.APPLICATION_JSON));
 
-    assertThat(auto.generateCompletion("sys", "user")).isEqualTo("hello");
+    assertThat(auto.generateCompletion("sys", "user")).isEqualTo("whole");
     server.verify();
+  }
+
+  /** The request as sent is guessed at, not just the prompts: allow its JSON's few hundred chars. */
+  private static org.hamcrest.Matcher<Integer> roomAfter(int context, int promptChars) {
+    int most = context - promptChars / 2 - LlmClient.TEMPLATE_MARGIN;
+    return org.hamcrest.Matchers.allOf(
+        org.hamcrest.Matchers.lessThan(most), org.hamcrest.Matchers.greaterThan(most - 200));
   }
 
   @Test
   void withNoCeilingTheReplyGetsWhatTheContextLeaves() {
     LlmClient auto = withCeiling(0);
     auto.assumeLimits(32_768, null);
-    // "sys" + "user" is 7 chars: 3 tokens by the high guess, and the template's margin.
     server
         .expect(requestTo(COMPLETIONS_URL))
-        .andExpect(jsonPath("$.max_tokens").value(32_768 - 3 - LlmClient.TEMPLATE_MARGIN))
+        .andExpect(jsonPath("$.max_tokens").value(roomAfter(32_768, 7)))
         .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
 
     auto.generateCompletion("sys", "user");
@@ -379,12 +391,11 @@ class LlmClientTest {
   void aReplyCutOffShortOfTheRealRoomIsAskedAgainWithIt() {
     LlmClient auto = withCeiling(0);
     auto.assumeLimits(10_000, null);
-    String prompt = "x".repeat(7_997); // with "sys": 8000 chars, guessed at 4000 tokens
-    int guessed = 10_000 - 4_000 - LlmClient.TEMPLATE_MARGIN;
+    String prompt = "x".repeat(7_997); // with "sys": 8000 chars, guessed at over 4000 tokens
     int counted = 10_000 - 2_000 - LlmClient.TEMPLATE_MARGIN;
     server
         .expect(requestTo(COMPLETIONS_URL))
-        .andExpect(jsonPath("$.max_tokens").value(guessed))
+        .andExpect(jsonPath("$.max_tokens").value(roomAfter(10_000, 8_000)))
         .andRespond(
             withSuccess(
                 "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"cut\"}}],"
@@ -429,12 +440,59 @@ class LlmClientTest {
                         + " max_model_len=max_total_tokens=262144.\"}}"));
     server
         .expect(requestTo(COMPLETIONS_URL))
-        .andExpect(jsonPath("$.max_tokens").value(262_144 - 3 - LlmClient.TEMPLATE_MARGIN))
+        .andExpect(jsonPath("$.max_tokens").value(roomAfter(262_144, 7)))
         .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
 
     assertThat(high.generateCompletion("sys", "user")).isEqualTo("hello");
     assertThat(high.getModelContextLength()).isEqualTo(262_144);
     server.verify();
+  }
+
+  @Test
+  void anOvershootOfAKnownContextIsAskedAgainFromTheServersPromptCount() {
+    LlmClient auto = withCeiling(0);
+    auto.assumeLimits(32_768, null);
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(
+            withStatus(HttpStatus.BAD_REQUEST)
+                .body(
+                    "{\"error\":\"This model's maximum context length is 32768 tokens. However, you"
+                        + " requested 34300 tokens (2300 in the messages, 32000 in the completion)\"}"));
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(32_768 - 2_300 - LlmClient.TEMPLATE_MARGIN))
+        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+
+    assertThat(auto.generateCompletion("sys", "user")).isEqualTo("hello");
+    server.verify();
+  }
+
+  @Test
+  void aConfiguredContextLengthIsNotReplacedByOneAnErrorNames() {
+    config.getApi().setContextLength(16_384);
+    LlmClient pinned = withCeiling(300_000);
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(roomAfter(16_384, 7)))
+        .andRespond(
+            withStatus(HttpStatus.BAD_REQUEST)
+                .body("{\"error\":\"max_tokens cannot be greater than max_model_len=131072\"}"));
+
+    assertThatThrownBy(() -> pinned.generateCompletion("sys", "user"))
+        .isInstanceOf(ContextLengthExceededException.class);
+    assertThat(pinned.getModelContextLength()).isEqualTo(16_384);
+    server.verify();
+  }
+
+  @Test
+  void onlyServersThatRefuseBeforeGeneratingAreProbed() {
+    assertThat(LlmClient.namesItsLimit("gpustack")).isTrue();
+    assertThat(LlmClient.namesItsLimit("vllm")).isTrue();
+    assertThat(LlmClient.namesItsLimit("sglang")).isTrue();
+    assertThat(LlmClient.namesItsLimit("organization_owner")).isFalse(); // LM Studio
+    assertThat(LlmClient.namesItsLimit("library")).isFalse(); // Ollama
+    assertThat(LlmClient.namesItsLimit(null)).isFalse();
   }
 
   @Test
@@ -451,7 +509,7 @@ class LlmClientTest {
                         + " max_model_len=max_total_tokens=262144.\"}}"));
     LlmClient probing = new LlmClient(config, settingsFrom(config), restTemplate, health);
 
-    assertThat(probing.probeContextLength()).isEqualTo(262_144);
+    assertThat(probing.probeContextLength(null)).isEqualTo(262_144);
     h.verify();
   }
 
@@ -462,6 +520,8 @@ class LlmClientTest {
     assertThat(LlmClient.contextLengthIn("max_model_len=8192")).isEqualTo(8192);
     assertThat(LlmClient.contextLengthIn("This model's maximum context length is 4096 tokens"))
         .isEqualTo(4096);
+    assertThat(LlmClient.contextLengthIn("{\"type\":\"exceed_context_size_error\",\"n_prompt_tokens\":9000,\"n_ctx\":8192}"))
+        .isEqualTo(8192);
     assertThat(LlmClient.contextLengthIn("nothing here")).isZero();
   }
 
