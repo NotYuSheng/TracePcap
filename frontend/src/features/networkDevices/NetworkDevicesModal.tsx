@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Link } from 'react-router-dom';
@@ -398,11 +399,23 @@ function DecisionModal({
     }
   };
   return (
-    <Modal show onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title as="h5">{same ? 'Same device?' : 'Not the same device?'}</Modal.Title>
-      </Modal.Header>
-      <Modal.Body className="small">
+    <SideDrawer
+      show
+      onHide={onHide}
+      title={<>{same ? 'Same device?' : 'Not the same device?'}</>}
+      titleId="same-device-title"
+      footer={
+        <>
+          <Button type="button" variant="outline-secondary" onClick={onHide}>
+            Cancel
+          </Button>
+          <Button type="button" variant="primary" onClick={save} disabled={busy || !reason.trim()}>
+            {same ? 'Link as one device' : 'Mark as different'}
+          </Button>
+        </>
+      }
+    >
+      <div className="small">
         <p>
           <span className="font-monospace">{pending.macA}</span> and{' '}
           <span className="font-monospace">{pending.macB}</span>
@@ -421,16 +434,8 @@ function DecisionModal({
           onChange={e => setReason(e.target.value)}
           placeholder={same ? "e.g. Bob's phone rotated its private address" : 'e.g. two staff with the same phone model'}
         />
-      </Modal.Body>
-      <Modal.Footer>
-        <Button type="button" variant="outline-secondary" onClick={onHide}>
-          Cancel
-        </Button>
-        <Button type="button" variant="primary" onClick={save} disabled={busy || !reason.trim()}>
-          {same ? 'Link as one device' : 'Mark as different'}
-        </Button>
-      </Modal.Footer>
-    </Modal>
+      </div>
+    </SideDrawer>
   );
 }
 

@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
@@ -464,32 +465,35 @@ export const StoryPage = () => {
         {chat}
       </div>
 
-      <Modal show={showRegenerate} onHide={() => setShowRegenerate(false)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Regenerate the story</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted small mb-0">
-            The LLM writes the story again from the current findings. Tell it anything it can't see, or
-            lower the limits if the last attempt ran out of context.
-          </p>
-          {settings}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowRegenerate(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setShowRegenerate(false);
-              handleGenerateStory();
-            }}
-          >
-            Regenerate
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <SideDrawer
+        show={showRegenerate}
+        onHide={() => setShowRegenerate(false)}
+        title="Regenerate the story"
+        titleId="regenerate-story-title"
+        wide
+        footer={
+          <>
+            <Button variant="outline-secondary" onClick={() => setShowRegenerate(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setShowRegenerate(false);
+                handleGenerateStory();
+              }}
+            >
+              Regenerate
+            </Button>
+          </>
+        }
+      >
+        <p className="text-muted small mb-0">
+          The LLM writes the story again from the current findings. Tell it anything it can't see, or
+          lower the limits if the last attempt ran out of context.
+        </p>
+        {settings}
+      </SideDrawer>
       {howItWorks}
     </div>
   );

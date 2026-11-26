@@ -1,6 +1,7 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useRef, useState } from 'react';
-import { Badge, Button, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/services/api/client';
@@ -210,292 +211,293 @@ export const AddSnapshotModal = ({
   };
 
   return (
-    <Modal show={show} onHide={isBusy ? undefined : handleClose} size="lg">
-      <Modal.Header closeButton={!isBusy}>
-        <Modal.Title>Add PCAP Snapshot</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        {uploadPhase === 'idle' || uploadPhase === 'error' ? (
-          <>
-            <div
-              {...getRootProps()}
-              className={`border rounded p-4 text-center mb-3 ${isDragActive ? 'border-primary bg-primary-subtle' : ''}`}
-              style={{ cursor: 'pointer', borderStyle: 'dashed' }}
-            >
-              <input {...getInputProps()} />
-              <i className="bi bi-cloud-upload fs-2 text-primary d-block mb-2"></i>
-              {uploadFiles.length > 0 ? (
-                uploadFiles.length === 1 ? (
-                  <>
-                    <div className="fw-semibold">{uploadFiles[0].name}</div>
-                    <small className="text-muted">
-                      {uploadFiles[0].size >= 1024 * 1024
-                        ? `${(uploadFiles[0].size / 1024 / 1024).toFixed(1)} MB`
-                        : `${(uploadFiles[0].size / 1024).toFixed(1)} KB`} — click to change
-                    </small>
-                  </>
-                ) : (
-                  <>
-                    <div className="fw-semibold">{uploadFiles.length} files selected</div>
-                    <small className="text-muted">{uploadFiles.map(f => f.name).join(', ')}</small>
-                  </>
-                )
-              ) : isDragActive ? (
-                <p className="mb-0 fw-semibold text-primary">Drop here</p>
+    <SideDrawer
+      show={show}
+      onHide={() => !isBusy && handleClose()}
+      title="Add PCAP Snapshot"
+      titleId="add-snapshot-title"
+      wide
+    >
+      {uploadPhase === 'idle' || uploadPhase === 'error' ? (
+        <>
+          <div
+            {...getRootProps()}
+            className={`border rounded p-4 text-center mb-3 ${isDragActive ? 'border-primary bg-primary-subtle' : ''}`}
+            style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+          >
+            <input {...getInputProps()} />
+            <i className="bi bi-cloud-upload fs-2 text-primary d-block mb-2"></i>
+            {uploadFiles.length > 0 ? (
+              uploadFiles.length === 1 ? (
+                <>
+                  <div className="fw-semibold">{uploadFiles[0].name}</div>
+                  <small className="text-muted">
+                    {uploadFiles[0].size >= 1024 * 1024
+                      ? `${(uploadFiles[0].size / 1024 / 1024).toFixed(1)} MB`
+                      : `${(uploadFiles[0].size / 1024).toFixed(1)} KB`} — click to change
+                  </small>
+                </>
               ) : (
                 <>
-                  <p className="mb-1"><strong>Click to browse</strong> or drag &amp; drop</p>
-                  <small className="text-muted">.pcap / .pcapng / .cap</small>
+                  <div className="fw-semibold">{uploadFiles.length} files selected</div>
+                  <small className="text-muted">{uploadFiles.map(f => f.name).join(', ')}</small>
                 </>
-              )}
-            </div>
-
-            {/* Analysis options collapsible */}
-            <div className="border rounded mb-3">
-              <button
-                type="button"
-                className="btn text-body w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
-                onClick={() => setShowAnalysisOptions(v => !v)}
-              >
-                <span className="d-flex align-items-center gap-2">
-                  <i className="bi bi-sliders text-secondary" />
-                  <span className="fw-semibold small">Analysis options</span>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>optional</span>
-                  {enableSuricata && (
-                    <Badge bg="warning" text="dark" style={{ fontSize: '0.65rem' }}>
-                      Suricata on
-                    </Badge>
-                  )}
-                </span>
-                <i className={`bi bi-chevron-${showAnalysisOptions ? 'up' : 'down'} text-muted`} style={{ fontSize: '0.75rem' }} />
-              </button>
-
-              {showAnalysisOptions && (
-                <div className="px-3 pb-3 border-top">
-                  <p className="text-muted mb-2 mt-2" style={{ fontSize: '0.8rem' }}>
-                    Choose which stages to run for this snapshot. Disabling stages reduces processing
-                    time. <strong>Suricata IDS is off by default</strong> — enable it for deeper
-                    threat detection at the cost of extra processing time.
-                  </p>
-
-                  <div className="d-flex flex-column gap-2">
-                    <label className="d-flex align-items-start gap-2" style={{ cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        className="form-check-input mt-1 flex-shrink-0"
-                        checked={enableNdpi}
-                        onChange={e => setEnableNdpi(e.target.checked)}
-                      />
-                      <span>
-                        <span className="fw-semibold small d-block">Protocol &amp; application classification</span>
-                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          Identifies apps, traffic categories, and security risks.
-                        </span>
-                      </span>
-                    </label>
-
-                    <label
-                      className="tp-suricata-option d-flex align-items-start gap-2 p-2 rounded border"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        type="checkbox"
-                        className="form-check-input mt-1 flex-shrink-0"
-                        checked={enableSuricata}
-                        onChange={e => setEnableSuricata(e.target.checked)}
-                      />
-                      <span>
-                        <span className="fw-semibold small d-block">
-                          Suricata IDS threat detection
-                          <span className="badge bg-secondary ms-2" style={{ fontSize: '0.6rem' }}>Optional</span>
-                        </span>
-                        <span className="text-muted d-block" style={{ fontSize: '0.78rem' }}>
-                          Flags known malware, exploits, and suspicious activity as IDS alerts.
-                        </span>
-                        <span className="tp-suricata-warning d-block" style={{ fontSize: '0.78rem' }}>
-                          <i className="bi bi-clock-history me-1" />
-                          Significantly increases processing time.
-                        </span>
-                      </span>
-                    </label>
-
-                    <label className="d-flex align-items-start gap-2" style={{ cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        className="form-check-input mt-1 flex-shrink-0"
-                        checked={enableFileExtraction}
-                        onChange={e => setEnableFileExtraction(e.target.checked)}
-                      />
-                      <span>
-                        <span className="fw-semibold small d-block">Embedded file extraction</span>
-                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          Extracts files transferred over HTTP and raw TCP/UDP streams.
-                        </span>
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Subnet Overrides collapsible */}
-            <div className="border rounded mb-3">
-              <button
-                type="button"
-                className="btn text-body w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
-                onClick={handleToggleSubnets}
-              >
-                <span className="d-flex align-items-center gap-2">
-                  <i className="bi bi-diagram-2 text-secondary" />
-                  <span className="fw-semibold small">Subnet Overrides</span>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>optional</span>
-                  {subnetOverridesActive && (
-                    <Badge bg={subnetOverrides.length > 0 ? 'primary' : 'secondary'} style={{ fontSize: '0.65rem' }}>
-                      {subnetOverrides.length > 0 ? `${subnetOverrides.length} ranges` : 'empty — no subnets'}
-                    </Badge>
-                  )}
-                </span>
-                <i className={`bi bi-chevron-${showSubnets ? 'up' : 'down'} text-muted`} style={{ fontSize: '0.75rem' }} />
-              </button>
-
-              {showSubnets && (
-                <div className="px-3 pb-3 border-top">
-                  {loadingSubnets ? (
-                    <div className="text-center py-3">
-                      <Spinner animation="border" size="sm" className="text-primary" />
-                      <span className="ms-2 text-muted small">Loading global subnets…</span>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-muted mb-2 mt-2" style={{ fontSize: '0.8rem' }}>
-                        Pre-populated from global subnet definitions.
-                        Modify to override internal/external classification for this snapshot only.
-                        <strong className="d-block mt-1">Inherited</strong> ranges came from the global config; you can remove or edit them.
-                      </p>
-
-                      {subnetOverrides.length > 0 ? (
-                        <div className="table-responsive mb-2">
-                          <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.8rem' }}>
-                            <thead className="table-light">
-                              <tr>
-                                <th style={{ width: '38%' }}>CIDR</th>
-                                <th>Label</th>
-                                <th style={{ width: '5rem' }}></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {subnetOverrides.map((o, i) => (
-                                <tr key={i}>
-                                  <td>
-                                    <input
-                                      className="form-control form-control-sm font-monospace"
-                                      value={o.cidr}
-                                      onChange={e => updateOverride(i, 'cidr', e.target.value)}
-                                      style={{ fontSize: '0.78rem' }}
-                                    />
-                                  </td>
-                                  <td>
-                                    <input
-                                      className="form-control form-control-sm"
-                                      value={o.label ?? ''}
-                                      onChange={e => updateOverride(i, 'label', e.target.value || null)}
-                                      placeholder="Optional"
-                                      style={{ fontSize: '0.78rem' }}
-                                    />
-                                  </td>
-                                  <td className="text-center align-middle">
-                                    {o.inherited && (
-                                      <span className="badge bg-secondary me-1" style={{ fontSize: '0.6rem' }}>Inherited</span>
-                                    )}
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-outline-danger p-0"
-                                      style={{ width: 22, height: 22, lineHeight: 1 }}
-                                      onClick={() => removeOverride(i)}
-                                      title="Remove"
-                                    >
-                                      <i className="bi bi-trash" style={{ fontSize: '0.7rem' }} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className="text-muted text-center small py-2 mb-2">
-                          No ranges configured. If left empty, global subnet definitions will be used.
-                        </p>
-                      )}
-
-                      <div className="d-flex gap-2 align-items-center flex-wrap">
-                        <input
-                          className="form-control form-control-sm font-monospace"
-                          placeholder="e.g. 192.168.1.0/24"
-                          value={newCidr}
-                          onChange={e => setNewCidr(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
-                          style={{ maxWidth: 200, fontSize: '0.8rem' }}
-                        />
-                        <input
-                          className="form-control form-control-sm"
-                          placeholder="Label (optional)"
-                          value={newLabel}
-                          onChange={e => setNewLabel(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
-                          style={{ maxWidth: 200, fontSize: '0.8rem' }}
-                        />
-                        <Button size="sm" variant="outline-primary" onClick={addOverride} disabled={!newCidr.trim()}>
-                          <i className="bi bi-plus me-1" />Add CIDR
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {uploadError && <Alert variant="danger" className="py-2">{uploadError}</Alert>}
-            <Button
-              variant="primary"
-              className="w-100"
-              disabled={uploadFiles.length === 0}
-              onClick={handleUploadAndAdd}
-            >
-              <i className="bi bi-upload me-1"></i>
-              {uploadFiles.length > 1
-                ? `Upload ${uploadFiles.length} files & add to network`
-                : 'Upload & add to network'}
-            </Button>
-          </>
-        ) : (
-          <div className="text-center py-4">
-            {uploadPhase === 'done' ? (
-              <div className="text-success fw-semibold fs-5">
-                <i className="bi bi-check-circle-fill me-2"></i>Added!
-              </div>
+              )
+            ) : isDragActive ? (
+              <p className="mb-0 fw-semibold text-primary">Drop here</p>
             ) : (
               <>
-                <Spinner animation="border" className="text-primary mb-3" role="status" />
-                <div className="fw-semibold">
-                  {totalFiles > 1 && `File ${uploadCurrent} of ${totalFiles} — `}
-                  {phaseLabel[uploadPhase]}
-                </div>
-                {uploadPhase === 'uploading' && (
-                  <div className="progress mt-2" style={{ height: 6 }}>
-                    <div className="progress-bar" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                )}
-                {uploadPhase === 'analyzing' && (
-                  <small className="text-muted d-block mt-1">
-                    This may take a minute for large captures.
-                  </small>
-                )}
+                <p className="mb-1"><strong>Click to browse</strong> or drag &amp; drop</p>
+                <small className="text-muted">.pcap / .pcapng / .cap</small>
               </>
             )}
           </div>
-        )}
-      </Modal.Body>
-    </Modal>
+
+          {/* Analysis options collapsible */}
+          <div className="border rounded mb-3">
+            <button
+              type="button"
+              className="btn text-body w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+              onClick={() => setShowAnalysisOptions(v => !v)}
+            >
+              <span className="d-flex align-items-center gap-2">
+                <i className="bi bi-sliders text-secondary" />
+                <span className="fw-semibold small">Analysis options</span>
+                <span className="text-muted" style={{ fontSize: '0.75rem' }}>optional</span>
+                {enableSuricata && (
+                  <Badge bg="warning" text="dark" style={{ fontSize: '0.65rem' }}>
+                    Suricata on
+                  </Badge>
+                )}
+              </span>
+              <i className={`bi bi-chevron-${showAnalysisOptions ? 'up' : 'down'} text-muted`} style={{ fontSize: '0.75rem' }} />
+            </button>
+
+            {showAnalysisOptions && (
+              <div className="px-3 pb-3 border-top">
+                <p className="text-muted mb-2 mt-2" style={{ fontSize: '0.8rem' }}>
+                  Choose which stages to run for this snapshot. Disabling stages reduces processing
+                  time. <strong>Suricata IDS is off by default</strong> — enable it for deeper
+                  threat detection at the cost of extra processing time.
+                </p>
+
+                <div className="d-flex flex-column gap-2">
+                  <label className="d-flex align-items-start gap-2" style={{ cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      className="form-check-input mt-1 flex-shrink-0"
+                      checked={enableNdpi}
+                      onChange={e => setEnableNdpi(e.target.checked)}
+                    />
+                    <span>
+                      <span className="fw-semibold small d-block">Protocol &amp; application classification</span>
+                      <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                        Identifies apps, traffic categories, and security risks.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className="tp-suricata-option d-flex align-items-start gap-2 p-2 rounded border"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <input
+                      type="checkbox"
+                      className="form-check-input mt-1 flex-shrink-0"
+                      checked={enableSuricata}
+                      onChange={e => setEnableSuricata(e.target.checked)}
+                    />
+                    <span>
+                      <span className="fw-semibold small d-block">
+                        Suricata IDS threat detection
+                        <span className="badge bg-secondary ms-2" style={{ fontSize: '0.6rem' }}>Optional</span>
+                      </span>
+                      <span className="text-muted d-block" style={{ fontSize: '0.78rem' }}>
+                        Flags known malware, exploits, and suspicious activity as IDS alerts.
+                      </span>
+                      <span className="tp-suricata-warning d-block" style={{ fontSize: '0.78rem' }}>
+                        <i className="bi bi-clock-history me-1" />
+                        Significantly increases processing time.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="d-flex align-items-start gap-2" style={{ cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      className="form-check-input mt-1 flex-shrink-0"
+                      checked={enableFileExtraction}
+                      onChange={e => setEnableFileExtraction(e.target.checked)}
+                    />
+                    <span>
+                      <span className="fw-semibold small d-block">Embedded file extraction</span>
+                      <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                        Extracts files transferred over HTTP and raw TCP/UDP streams.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Subnet Overrides collapsible */}
+          <div className="border rounded mb-3">
+            <button
+              type="button"
+              className="btn text-body w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+              onClick={handleToggleSubnets}
+            >
+              <span className="d-flex align-items-center gap-2">
+                <i className="bi bi-diagram-2 text-secondary" />
+                <span className="fw-semibold small">Subnet Overrides</span>
+                <span className="text-muted" style={{ fontSize: '0.75rem' }}>optional</span>
+                {subnetOverridesActive && (
+                  <Badge bg={subnetOverrides.length > 0 ? 'primary' : 'secondary'} style={{ fontSize: '0.65rem' }}>
+                    {subnetOverrides.length > 0 ? `${subnetOverrides.length} ranges` : 'empty — no subnets'}
+                  </Badge>
+                )}
+              </span>
+              <i className={`bi bi-chevron-${showSubnets ? 'up' : 'down'} text-muted`} style={{ fontSize: '0.75rem' }} />
+            </button>
+
+            {showSubnets && (
+              <div className="px-3 pb-3 border-top">
+                {loadingSubnets ? (
+                  <div className="text-center py-3">
+                    <Spinner animation="border" size="sm" className="text-primary" />
+                    <span className="ms-2 text-muted small">Loading global subnets…</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-muted mb-2 mt-2" style={{ fontSize: '0.8rem' }}>
+                      Pre-populated from global subnet definitions.
+                      Modify to override internal/external classification for this snapshot only.
+                      <strong className="d-block mt-1">Inherited</strong> ranges came from the global config; you can remove or edit them.
+                    </p>
+
+                    {subnetOverrides.length > 0 ? (
+                      <div className="table-responsive mb-2">
+                        <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.8rem' }}>
+                          <thead className="table-light">
+                            <tr>
+                              <th style={{ width: '38%' }}>CIDR</th>
+                              <th>Label</th>
+                              <th style={{ width: '5rem' }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {subnetOverrides.map((o, i) => (
+                              <tr key={i}>
+                                <td>
+                                  <input
+                                    className="form-control form-control-sm font-monospace"
+                                    value={o.cidr}
+                                    onChange={e => updateOverride(i, 'cidr', e.target.value)}
+                                    style={{ fontSize: '0.78rem' }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-control form-control-sm"
+                                    value={o.label ?? ''}
+                                    onChange={e => updateOverride(i, 'label', e.target.value || null)}
+                                    placeholder="Optional"
+                                    style={{ fontSize: '0.78rem' }}
+                                  />
+                                </td>
+                                <td className="text-center align-middle">
+                                  {o.inherited && (
+                                    <span className="badge bg-secondary me-1" style={{ fontSize: '0.6rem' }}>Inherited</span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-danger p-0"
+                                    style={{ width: 22, height: 22, lineHeight: 1 }}
+                                    onClick={() => removeOverride(i)}
+                                    title="Remove"
+                                  >
+                                    <i className="bi bi-trash" style={{ fontSize: '0.7rem' }} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-muted text-center small py-2 mb-2">
+                        No ranges configured. If left empty, global subnet definitions will be used.
+                      </p>
+                    )}
+
+                    <div className="d-flex gap-2 align-items-center flex-wrap">
+                      <input
+                        className="form-control form-control-sm font-monospace"
+                        placeholder="e.g. 192.168.1.0/24"
+                        value={newCidr}
+                        onChange={e => setNewCidr(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
+                        style={{ maxWidth: 200, fontSize: '0.8rem' }}
+                      />
+                      <input
+                        className="form-control form-control-sm"
+                        placeholder="Label (optional)"
+                        value={newLabel}
+                        onChange={e => setNewLabel(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
+                        style={{ maxWidth: 200, fontSize: '0.8rem' }}
+                      />
+                      <Button size="sm" variant="outline-primary" onClick={addOverride} disabled={!newCidr.trim()}>
+                        <i className="bi bi-plus me-1" />Add CIDR
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {uploadError && <Alert variant="danger" className="py-2">{uploadError}</Alert>}
+          <Button
+            variant="primary"
+            className="w-100"
+            disabled={uploadFiles.length === 0}
+            onClick={handleUploadAndAdd}
+          >
+            <i className="bi bi-upload me-1"></i>
+            {uploadFiles.length > 1
+              ? `Upload ${uploadFiles.length} files & add to network`
+              : 'Upload & add to network'}
+          </Button>
+        </>
+      ) : (
+        <div className="text-center py-4">
+          {uploadPhase === 'done' ? (
+            <div className="text-success fw-semibold fs-5">
+              <i className="bi bi-check-circle-fill me-2"></i>Added!
+            </div>
+          ) : (
+            <>
+              <Spinner animation="border" className="text-primary mb-3" role="status" />
+              <div className="fw-semibold">
+                {totalFiles > 1 && `File ${uploadCurrent} of ${totalFiles} — `}
+                {phaseLabel[uploadPhase]}
+              </div>
+              {uploadPhase === 'uploading' && (
+                <div className="progress mt-2" style={{ height: 6 }}>
+                  <div className="progress-bar" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              )}
+              {uploadPhase === 'analyzing' && (
+                <small className="text-muted d-block mt-1">
+                  This may take a minute for large captures.
+                </small>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </SideDrawer>
   );
 };

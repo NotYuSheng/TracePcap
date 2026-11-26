@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Button, Card, Container, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Card, Container, Form } from '@govtechsg/sgds-react';
 import { PermissionLock } from '@components/common/PermissionLock';
 import { usePermission } from '@/features/me/useMe';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -614,38 +614,40 @@ export const NetworkDetailPage = () => {
         </section>
       </SideDrawer>
 
-      <Modal show={showNotes} onHide={() => setShowNotes(false)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Notes</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="small text-muted">Free-text notes on this network. Insights read them as context.</p>
-          <NetworkAnnotationsPanel
-            annotations={annotations}
-            onAdd={data.handleAddAnnotation}
-            onUpdate={data.handleUpdateAnnotation}
-            onDelete={data.handleDeleteAnnotation}
-          />
-        </Modal.Body>
-      </Modal>
+      <SideDrawer
+        show={showNotes}
+        onHide={() => setShowNotes(false)}
+        title="Notes"
+        titleId="network-notes-title"
+        wide
+      >
+        <p className="small text-muted">Free-text notes on this network. Insights read them as context.</p>
+        <NetworkAnnotationsPanel
+          annotations={annotations}
+          onAdd={data.handleAddAnnotation}
+          onUpdate={data.handleUpdateAnnotation}
+          onDelete={data.handleDeleteAnnotation}
+        />
+      </SideDrawer>
 
-      <Modal show={showEvents} onHide={() => setShowEvents(false)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Outside events</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="small text-muted">
-            Real-world events (maintenance windows, incidents, policy changes) to line up with what
-            changed. Insights take them into account.
-          </p>
-          <ExternalEventsPanel
-            events={externalEvents}
-            onAdd={data.handleAddExternalEvent}
-            onUpdate={data.handleUpdateExternalEvent}
-            onDelete={data.handleDeleteExternalEvent}
-          />
-        </Modal.Body>
-      </Modal>
+      <SideDrawer
+        show={showEvents}
+        onHide={() => setShowEvents(false)}
+        title="Outside events"
+        titleId="network-events-title"
+        wide
+      >
+        <p className="small text-muted">
+          Real-world events (maintenance windows, incidents, policy changes) to line up with what
+          changed. Insights take them into account.
+        </p>
+        <ExternalEventsPanel
+          events={externalEvents}
+          onAdd={data.handleAddExternalEvent}
+          onUpdate={data.handleUpdateExternalEvent}
+          onDelete={data.handleDeleteExternalEvent}
+        />
+      </SideDrawer>
 
 
       <ManagePcapsModal

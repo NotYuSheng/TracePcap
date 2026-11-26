@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { PermissionLock } from '@components/common/PermissionLock';
@@ -517,63 +518,60 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
           </div>
 
           {/* Add-evidence popup — shared by Identity and every per-axis panel (#499). */}
-          <Modal
+          <SideDrawer
             show={addingEvidence}
             onHide={() => !busy && resetEvidenceForm()}
-            centered
+            title={<>{editingEvidenceId != null ? 'Edit' : 'Add'} evidence · {title}</>}
+            titleId="evidence-edit-title"
+            footer={
+              <>
+                <Button variant="outline-secondary" size="sm" onClick={resetEvidenceForm} disabled={busy || locked}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleSaveEvidence} disabled={busy || locked || !evLabel.trim() || !evReason.trim()}>
+                  {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-check-lg me-1" />{editingEvidenceId != null ? 'Save changes' : 'Add evidence'}
+              </>
+            }
+                        </Button>
+                      </>}
           >
-            <Modal.Header closeButton={!busy}>
-              <Modal.Title style={{ fontSize: '1rem' }}>
-                {editingEvidenceId != null ? 'Edit' : 'Add'} evidence · {title}
-              </Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <Form.Label className="small mb-1">Supports which label</Form.Label>
-              <LabelField
-                value={evLabel}
-                onChange={setEvLabel}
-                options={labelOptions}
-                placeholder="e.g. SERVER"
-              />
-              <Form.Label className="small mb-1">Weight: {evWeight}</Form.Label>
-              <input
-                type="range"
-                min={1}
-                max={100}
-                value={evWeight}
-                onChange={e => setEvWeight(Number(e.target.value))}
-                className="form-range mb-1"
-              />
-              <div className="text-muted mb-3" style={{ fontSize: '0.7rem' }}>
-                Scale it against the scores in “Why” above: a weak or secondhand hint is usually
-                under 20, a solid single observation (comparable to one machine signal) is around
-                40–60, and 70+ should mean you are about as sure as the strongest signal already
-                shown.
-              </div>
-              <Form.Label className="small mb-1">Reason (required)</Form.Label>
-              <Form.Control
-                as="textarea"
-                size="sm"
-                rows={3}
-                className="mb-2"
-                placeholder="e.g. confirmed running sshd out-of-band"
-                value={evReason}
-                onChange={e => setEvReason(e.target.value)}
-              />
-              <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                Evidence informs the vote and shows in the trail — it does not override the machine.
-                Use “I disagree” to set the answer directly.
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="outline-secondary" size="sm" onClick={resetEvidenceForm} disabled={busy || locked}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleSaveEvidence} disabled={busy || locked || !evLabel.trim() || !evReason.trim()}>
-                {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-check-lg me-1" />{editingEvidenceId != null ? 'Save changes' : 'Add evidence'}</>}
-              </Button>
-            </Modal.Footer>
-          </Modal>
+            <Form.Label className="small mb-1">Supports which label</Form.Label>
+            <LabelField
+              value={evLabel}
+              onChange={setEvLabel}
+              options={labelOptions}
+              placeholder="e.g. SERVER"
+            />
+            <Form.Label className="small mb-1">Weight: {evWeight}</Form.Label>
+            <input
+              type="range"
+              min={1}
+              max={100}
+              value={evWeight}
+              onChange={e => setEvWeight(Number(e.target.value))}
+              className="form-range mb-1"
+            />
+            <div className="text-muted mb-3" style={{ fontSize: '0.7rem' }}>
+              Scale it against the scores in “Why” above: a weak or secondhand hint is usually
+              under 20, a solid single observation (comparable to one machine signal) is around
+              40–60, and 70+ should mean you are about as sure as the strongest signal already
+              shown.
+            </div>
+            <Form.Label className="small mb-1">Reason (required)</Form.Label>
+            <Form.Control
+              as="textarea"
+              size="sm"
+              rows={3}
+              className="mb-2"
+              placeholder="e.g. confirmed running sshd out-of-band"
+              value={evReason}
+              onChange={e => setEvReason(e.target.value)}
+            />
+            <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+              Evidence informs the vote and shows in the trail — it does not override the machine.
+              Use “I disagree” to set the answer directly.
+            </div>
+          </SideDrawer>
         </>
       )}
     </div>

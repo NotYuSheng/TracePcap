@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
@@ -186,11 +187,35 @@ export function CaptureRulesCard({ fileId, onChanged }: CaptureRulesCardProps) {
         }
       />
 
-      <Modal show={promoting !== null} onHide={() => !busy && setPromoting(null)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Promote to a global rule</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="small">
+      <SideDrawer
+        show={promoting !== null}
+        onHide={() => !busy && setPromoting(null)}
+        title={<>Promote to a global rule</>}
+        titleId="promote-rule-title"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPromoting(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={busy}
+              onClick={async () => {
+                const r = promoting;
+                setPromoting(null);
+                if (r)
+                  await run(
+                    () => detectionRulesService.promote(r.id, keepOriginal),
+                    `${r.name} is now a global rule. Re-apply in Settings › Detection rules to check other captures.`
+                  );
+              }}
+            >
+              Promote
+            </Button>
+          </>
+        }
+      >
+        <div className="small">
           <p>
             Makes a global copy of <strong className="font-monospace">{promoting?.name}</strong>, so
             it flags matching conversations in every capture. Other captures show as out of date
@@ -203,28 +228,8 @@ export function CaptureRulesCard({ fileId, onChanged }: CaptureRulesCardProps) {
             onChange={e => setKeepOriginal(e.target.checked)}
             disabled={busy}
           />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setPromoting(null)} disabled={busy}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={busy}
-            onClick={async () => {
-              const r = promoting;
-              setPromoting(null);
-              if (r)
-                await run(
-                  () => detectionRulesService.promote(r.id, keepOriginal),
-                  `${r.name} is now a global rule. Re-apply in Settings › Detection rules to check other captures.`
-                );
-            }}
-          >
-            Promote
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        </div>
+      </SideDrawer>
 
       <Modal show={deleting !== null} onHide={() => !busy && setDeleting(null)}>
         <Modal.Header closeButton>

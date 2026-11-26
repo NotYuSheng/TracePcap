@@ -1,3 +1,4 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
@@ -72,145 +73,145 @@ export function NetworkRulesModal({
 
   return (
     <>
-      <Modal show={show && !showEditor && deleting === null} onHide={onHide} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Detection rules for {networkName}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="small text-muted">
-            These rules flag conversations in this network's captures, and show when you view them
-            here (snapshots, the Security tab). Each capture that joins the network is checked
-            against them. Rules for every capture are in Settings › Detection rules.
-          </p>
-          {!perm.allowed && (
-            <Alert variant="info" className="py-2 small">
-              <i className="bi bi-lock me-2" aria-hidden="true" />
-              You can view these rules but not change them:{' '}
-              {perm.reason ?? 'only admins can change them.'}
-            </Alert>
-          )}
-          {error && (
-            <Alert variant="danger" className="py-2 small">
-              {error}
-            </Alert>
-          )}
-          <RuleSyncBanner
-            canReapply={globalPerm.allowed}
-            reason={globalPerm.reason}
-            refreshKey={reload}
-          />
-          <div className="d-flex mb-2">
-            <Button
-              size="sm"
-              variant="primary"
-              className="ms-auto"
-              disabled={!perm.allowed}
-              onClick={() => {
-                setEditing(null);
-                setShowEditor(true);
-              }}
-            >
-              <i className="bi bi-plus me-1" aria-hidden="true" />
-              Add rule
+      <SideDrawer
+        show={show && !showEditor && deleting === null}
+        onHide={onHide}
+        title={<>Detection rules for {networkName}</>}
+        titleId="network-rules-title"
+        wide
+        footer={
+          <>
+            <Button variant="secondary" onClick={onHide}>
+              Close
             </Button>
-          </div>
-          {rules && rules.length === 0 && (
-            <p className="small text-muted mb-0">No rules for this network yet.</p>
-          )}
-          {rules && rules.length > 0 && (
-            <ul className="list-unstyled small mb-0">
-              {rules.map(r => (
-                <li key={r.id} className="d-flex align-items-center gap-2 border-top py-2">
-                  <Form.Check
-                    type="switch"
-                    id={`net-rule-on-${r.id}`}
-                    aria-label={`${r.enabled ? 'Disable' : 'Enable'} ${r.name}`}
-                    checked={r.enabled}
-                    disabled={!perm.allowed || busy}
-                    onChange={() =>
-                      run(() =>
-                        detectionRulesService.update(r.id, { ...toInput(r), enabled: !r.enabled })
-                      )
-                    }
-                  />
-                  <span className="me-auto">
-                    <span className="font-monospace fw-semibold">{r.name}</span>{' '}
-                    <span className="text-muted font-monospace">{describeCriteria(r)}</span>
-                    <div className="text-muted">
-                      {r.updatedBy} · v{r.version}
-                    </div>
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline-primary"
-                    aria-label={`${perm.allowed ? 'Edit' : 'View'} ${r.name}`}
-                    onClick={() => {
-                      setEditing(r);
-                      setShowEditor(true);
-                    }}
-                  >
-                    <i
-                      className={`bi ${perm.allowed ? 'bi-pencil' : 'bi-eye'}`}
-                      aria-hidden="true"
-                    />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline-danger"
-                    aria-label={`Delete ${r.name}`}
-                    disabled={!perm.allowed || busy}
-                    onClick={() => setDeleting(r)}
-                  >
-                    <i className="bi bi-trash" aria-hidden="true" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {globalRules.length > 0 && (
-            <section className="mt-4" data-testid="global-rules-here">
-              <h6 className="mb-1">Global rules in this network</h6>
-              <p className="small text-muted mb-1">
-                Switch a global rule off here to hide its matches when this network's captures are
-                viewed in this network. It keeps applying everywhere else.
-              </p>
-              <ul className="list-unstyled small mb-0">
-                {globalRules.map(g => {
-                  const applies = !suppressed.has(g.id);
-                  return (
-                    <li key={g.id} className="d-flex align-items-center gap-2 border-top py-1">
-                      <Form.Check
-                        type="switch"
-                        id={`global-here-${g.id}`}
-                        aria-label={`${g.name} applies in this network`}
-                        checked={applies}
-                        disabled={!perm.allowed || busy}
-                        onChange={() =>
-                          run(() => detectionRulesService.setSuppressed(networkId, g.id, applies))
-                        }
-                      />
-                      <span className={applies ? '' : 'text-muted text-decoration-line-through'}>
-                        <span className="font-monospace">{g.name}</span>{' '}
-                        <span className="text-muted font-monospace">{describeCriteria(g)}</span>
-                      </span>
-                      {!applies && (
-                        <span className="badge bg-secondary-subtle text-secondary-emphasis ms-auto">
-                          off here
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide}>
-            Close
+          </>
+        }
+      >
+        <p className="small text-muted">
+          These rules flag conversations in this network's captures, and show when you view them
+          here (snapshots, the Security tab). Each capture that joins the network is checked against
+          them. Rules for every capture are in Settings › Detection rules.
+        </p>
+        {!perm.allowed && (
+          <Alert variant="info" className="py-2 small">
+            <i className="bi bi-lock me-2" aria-hidden="true" />
+            You can view these rules but not change them:{' '}
+            {perm.reason ?? 'only admins can change them.'}
+          </Alert>
+        )}
+        {error && (
+          <Alert variant="danger" className="py-2 small">
+            {error}
+          </Alert>
+        )}
+        <RuleSyncBanner
+          canReapply={globalPerm.allowed}
+          reason={globalPerm.reason}
+          refreshKey={reload}
+        />
+        <div className="d-flex mb-2">
+          <Button
+            size="sm"
+            variant="primary"
+            className="ms-auto"
+            disabled={!perm.allowed}
+            onClick={() => {
+              setEditing(null);
+              setShowEditor(true);
+            }}
+          >
+            <i className="bi bi-plus me-1" aria-hidden="true" />
+            Add rule
           </Button>
-        </Modal.Footer>
-      </Modal>
+        </div>
+        {rules && rules.length === 0 && (
+          <p className="small text-muted mb-0">No rules for this network yet.</p>
+        )}
+        {rules && rules.length > 0 && (
+          <ul className="list-unstyled small mb-0">
+            {rules.map(r => (
+              <li key={r.id} className="d-flex align-items-center gap-2 border-top py-2">
+                <Form.Check
+                  type="switch"
+                  id={`net-rule-on-${r.id}`}
+                  aria-label={`${r.enabled ? 'Disable' : 'Enable'} ${r.name}`}
+                  checked={r.enabled}
+                  disabled={!perm.allowed || busy}
+                  onChange={() =>
+                    run(() =>
+                      detectionRulesService.update(r.id, { ...toInput(r), enabled: !r.enabled })
+                    )
+                  }
+                />
+                <span className="me-auto">
+                  <span className="font-monospace fw-semibold">{r.name}</span>{' '}
+                  <span className="text-muted font-monospace">{describeCriteria(r)}</span>
+                  <div className="text-muted">
+                    {r.updatedBy} · v{r.version}
+                  </div>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline-primary"
+                  aria-label={`${perm.allowed ? 'Edit' : 'View'} ${r.name}`}
+                  onClick={() => {
+                    setEditing(r);
+                    setShowEditor(true);
+                  }}
+                >
+                  <i className={`bi ${perm.allowed ? 'bi-pencil' : 'bi-eye'}`} aria-hidden="true" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline-danger"
+                  aria-label={`Delete ${r.name}`}
+                  disabled={!perm.allowed || busy}
+                  onClick={() => setDeleting(r)}
+                >
+                  <i className="bi bi-trash" aria-hidden="true" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {globalRules.length > 0 && (
+          <section className="mt-4" data-testid="global-rules-here">
+            <h6 className="mb-1">Global rules in this network</h6>
+            <p className="small text-muted mb-1">
+              Switch a global rule off here to hide its matches when this network's captures are
+              viewed in this network. It keeps applying everywhere else.
+            </p>
+            <ul className="list-unstyled small mb-0">
+              {globalRules.map(g => {
+                const applies = !suppressed.has(g.id);
+                return (
+                  <li key={g.id} className="d-flex align-items-center gap-2 border-top py-1">
+                    <Form.Check
+                      type="switch"
+                      id={`global-here-${g.id}`}
+                      aria-label={`${g.name} applies in this network`}
+                      checked={applies}
+                      disabled={!perm.allowed || busy}
+                      onChange={() =>
+                        run(() => detectionRulesService.setSuppressed(networkId, g.id, applies))
+                      }
+                    />
+                    <span className={applies ? '' : 'text-muted text-decoration-line-through'}>
+                      <span className="font-monospace">{g.name}</span>{' '}
+                      <span className="text-muted font-monospace">{describeCriteria(g)}</span>
+                    </span>
+                    {!applies && (
+                      <span className="badge bg-secondary-subtle text-secondary-emphasis ms-auto">
+                        off here
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+      </SideDrawer>
 
       <RuleEditorModal
         show={show && showEditor}

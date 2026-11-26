@@ -12,6 +12,8 @@ interface SideDrawerProps {
   badge?: number;
   /** Extra class on the dialog, for content-specific styling. */
   className?: string;
+  /** Wider (720px), for forms with tables or several columns. */
+  wide?: boolean;
   /** Where to portal the drawer; pass the fullscreen element so it shows in fullscreen. */
   container?: HTMLElement;
   footer?: ReactNode;
@@ -21,6 +23,8 @@ interface SideDrawerProps {
 /**
  * A full-height sheet on the right edge: an SGDS Modal styled as a drawer, so Escape, the
  * backdrop and the × close it through `onHide` and it joins the modal stack like any Modal.
+ * Every form that adds or edits something opens in one; centred modals are for viewers,
+ * explainers and yes/no confirmations.
  */
 export function SideDrawer({
   show,
@@ -29,6 +33,7 @@ export function SideDrawer({
   titleId,
   badge,
   className,
+  wide,
   container,
   footer,
   children,
@@ -37,7 +42,7 @@ export function SideDrawer({
     <Modal
       show={show}
       onHide={onHide}
-      dialogClassName={`side-drawer${className ? ` ${className}` : ''}`}
+      dialogClassName={`side-drawer${wide ? ' side-drawer-wide' : ''}${className ? ` ${className}` : ''}`}
       contentClassName="side-drawer-content"
       aria-labelledby={titleId}
       container={container}

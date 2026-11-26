@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useEffect, useState } from 'react';
-import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { PermissionLock } from '@components/common/PermissionLock';
 import { usePermission } from '@/features/me/useMe';
 import { Alert } from '@components/common/Alert';
@@ -115,94 +116,96 @@ export function RoleEditModal({
   };
 
   return (
-    <Modal show onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title style={{ fontSize: '1rem' }}>
-          Edit role
-          {snapshotName && <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshotName}</span>}
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted small mb-2">
-          Sets the role for <code>{entityKey}</code> from this snapshot onward — it applies to this
-          snapshot and <strong>carries forward</strong> to later ones. <strong>Earlier snapshots are
-          not changed.</strong> To label the whole timeline, edit the first snapshot the entity
-          appears in.
-        </p>
-        {loading ? (
-          <div className="text-muted small py-2"><Spinner size="sm" className="me-2" />Loading…</div>
-        ) : (
-          <>
-            {stale && (
-              <Alert variant="warning" className="p-2 mb-2 small">
-                This label was flagged stale in this snapshot. Update it, or dismiss to accept the current behaviour.
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
-                <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
-              </Alert>
-            )}
-            <Form.Label className="small mb-1">Role label</Form.Label>
-            <Form.Control
-              size="sm"
-              className="mb-2"
-              placeholder="e.g. File Server (SMB)"
-              value={label}
-              onChange={e => setLabel(e.target.value)}
-              autoFocus
-            />
-            <Form.Label className="small mb-1">Description (optional)</Form.Label>
-            <Form.Control
-              as="textarea"
-              size="sm"
-              className="mb-2"
-              rows={2}
-              placeholder="Short description of what this host does"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-            />
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={suggest}
-              disabled={suggesting || saving || !ai.allowed}
-            >
-              {suggesting
-                ? <><Spinner size="sm" className="me-1" />Suggesting…</>
-                : <><i className="bi bi-stars me-1" />Suggest with AI</>}
-            </Button>
-            <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
-            {previewJob.active && previewJob.job && (
-              <div className="mt-2">
-                <AiJobStatus
-                  compact
-                  job={previewJob.job}
-                  doing="Suggesting a role"
-                  whenDone="You can close this; the suggestion fills in here when you're back."
-                  onCancel={() => { previewJob.cancel().catch(() => {}); }}
-                />
-              </div>
-            )}
-          </>
-        )}
-      </Modal.Body>
-      <Modal.Footer className="d-flex justify-content-between">
-        <div>
-          {stale && hasRole && (
-            <Button variant="outline-secondary" size="sm" onClick={dismiss} disabled={saving || !labels.allowed}>
-              <i className="bi bi-check-lg me-1" />Dismiss — still correct
-            </Button>
+    <SideDrawer
+      show
+      onHide={onClose}
+      title={<>Edit role
+              {snapshotName && <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshotName}</span>}</>}
+      titleId="role-edit-title"
+      footer={
+        <>
+          <div className="d-flex justify-content-between w-100">
+            <div>
+              {stale && hasRole && (
+                <Button variant="outline-secondary" size="sm" onClick={dismiss} disabled={saving || !labels.allowed}>
+                  <i className="bi bi-check-lg me-1" />Dismiss — still correct
+                </Button>
+              )}
+            </div>
+            <div className="d-flex gap-2">
+              <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+              <PermissionLock action="LABEL_HOSTS" className="align-self-center" />
+              <Button variant="primary" size="sm" onClick={save} disabled={saving || loading || !label.trim() || !labels.allowed}>
+                {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </>
+      }
+    >
+      <p className="text-muted small mb-2">
+        Sets the role for <code>{entityKey}</code> from this snapshot onward — it applies to this
+        snapshot and <strong>carries forward</strong> to later ones. <strong>Earlier snapshots are
+        not changed.</strong> To label the whole timeline, edit the first snapshot the entity
+        appears in.
+      </p>
+      {loading ? (
+        <div className="text-muted small py-2"><Spinner size="sm" className="me-2" />Loading…</div>
+      ) : (
+        <>
+          {stale && (
+            <Alert variant="warning" className="p-2 mb-2 small">
+              This label was flagged stale in this snapshot. Update it, or dismiss to accept the current behaviour.
+            </Alert>
           )}
-        </div>
-        <div className="d-flex gap-2">
-          <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-          <PermissionLock action="LABEL_HOSTS" className="align-self-center" />
-          <Button variant="primary" size="sm" onClick={save} disabled={saving || loading || !label.trim() || !labels.allowed}>
-            {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
+          {error && (
+            <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
+              <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
+            </Alert>
+          )}
+          <Form.Label className="small mb-1">Role label</Form.Label>
+          <Form.Control
+            size="sm"
+            className="mb-2"
+            placeholder="e.g. File Server (SMB)"
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            autoFocus
+          />
+          <Form.Label className="small mb-1">Description (optional)</Form.Label>
+          <Form.Control
+            as="textarea"
+            size="sm"
+            className="mb-2"
+            rows={2}
+            placeholder="Short description of what this host does"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+          />
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={suggest}
+            disabled={suggesting || saving || !ai.allowed}
+          >
+            {suggesting
+              ? <><Spinner size="sm" className="me-1" />Suggesting…</>
+              : <><i className="bi bi-stars me-1" />Suggest with AI</>}
           </Button>
-        </div>
-      </Modal.Footer>
-    </Modal>
+          <PermissionLock action="ASK_AI" className="ms-1 align-self-center" />
+          {previewJob.active && previewJob.job && (
+            <div className="mt-2">
+              <AiJobStatus
+                compact
+                job={previewJob.job}
+                doing="Suggesting a role"
+                whenDone="You can close this; the suggestion fills in here when you're back."
+                onCancel={() => { previewJob.cancel().catch(() => {}); }}
+              />
+            </div>
+          )}
+        </>
+      )}
+    </SideDrawer>
   );
 }
