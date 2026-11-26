@@ -2893,6 +2893,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List the LLM server's models
+         * @description The models the server at the given URL offers, with each one's context length when the server says, for picking one before saving. Blank fields use the current settings; a POST because the key travels in the body. Other values than the current ones require the permission to edit the LLM connection.
+         */
+        post: operations["models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/llm/test": {
         parameters: {
             query?: never;
@@ -4485,6 +4505,17 @@ export interface components {
         MergeFilesRequest: {
             fileIds: string[];
             mergedFileName?: string;
+        };
+        ModelList: {
+            baseUrl?: string;
+            detail?: string;
+            models?: components["schemas"]["ModelOption"][];
+            ok?: boolean;
+        };
+        ModelOption: {
+            /** Format: int32 */
+            contextLength?: number;
+            id?: string;
         };
         NarrativeSection: {
             content?: string;
@@ -10247,6 +10278,30 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LlmTestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ModelList"];
                 };
             };
         };

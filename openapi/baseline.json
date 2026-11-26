@@ -3819,6 +3819,38 @@
         ],
         "type": "object"
       },
+      "ModelList": {
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOption"
+            },
+            "type": "array"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ModelOption": {
+        "properties": {
+          "contextLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NarrativeSection": {
         "properties": {
           "content": {
@@ -15031,6 +15063,37 @@
         "summary": "Get runtime limits (upload size, analysis and LLM timeouts, capture retention)",
         "tags": [
           "System"
+        ]
+      }
+    },
+    "/api/v1/system/llm/models": {
+      "post": {
+        "description": "The models the server at the given URL offers, with each one's context length when the server says, for picking one before saving. Blank fields use the current settings; a POST because the key travels in the body. Other values than the current ones require the permission to edit the LLM connection.",
+        "operationId": "models",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List the LLM server's models",
+        "tags": [
+          "LLM Connection"
         ]
       }
     },

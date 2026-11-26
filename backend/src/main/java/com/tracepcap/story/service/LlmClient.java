@@ -205,29 +205,50 @@ public class LlmClient {
    * #namesItsLimit}). Null when nothing could be learnt.
    */
   Integer probeContextLength(String forKey) {
+    Probed p = probe(llmHealthCheckRestTemplate, settings.baseUrl(), settings.apiKey(), settings.model());
+    if (p.maxOutput() != null && forKey != null && forKey.equals(capabilitiesFor)) serverMaxOutput = p.maxOutput();
+    return p.contextLength();
+  }
+
+  /** What a server's refusal of an impossible reply said about its limits; nulls when nothing. */
+  record Probed(Integer contextLength, Integer maxOutput) {}
+
+  /**
+   * Asks for an impossible {@code max_tokens} and reads the limits from the refusal. Only for
+   * servers that refuse before generating ({@link #namesItsLimit}); shared with the connection test.
+   */
+  static Probed probe(RestTemplate template, String baseUrl, String apiKey, String model) {
     try {
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
-      headers.setBearerAuth(settings.apiKey());
+      if (apiKey != null && !apiKey.isBlank()) headers.setBearerAuth(apiKey);
       ChatCompletionRequest probe =
           ChatCompletionRequest.builder()
-              .model(settings.model())
+              .model(model)
               .messages(List.of(new Message("user", "Reply with OK.")))
               .maxTokens(PROBE_MAX_TOKENS)
               .build();
-      llmHealthCheckRestTemplate.exchange(
-          settings.baseUrl() + "/chat/completions", HttpMethod.POST, new HttpEntity<>(probe, headers), String.class);
+      template.exchange(baseUrl + "/chat/completions", HttpMethod.POST, new HttpEntity<>(probe, headers), String.class);
     } catch (HttpStatusCodeException e) {
       String body = e.getResponseBodyAsString();
       int ctx = contextLengthIn(body);
       int out = parseGroup(body, PATTERN_MAX_OUTPUT);
-      if (out > 0 && forKey != null && forKey.equals(capabilitiesFor)) serverMaxOutput = out;
-      return ctx > 0 ? ctx : null;
+      return new Probed(ctx > 0 ? ctx : null, out > 0 ? out : null);
     } catch (Exception e) {
       log.debug("Context-length probe got no answer: {}", e.getMessage());
     }
+    return new Probed(null, null);
+  }
+
+  /** The context length a {@code /models} entry gives, from whichever field its server uses. */
+  static Integer contextLengthOf(com.fasterxml.jackson.databind.JsonNode entry) {
+    if (entry == null) return null;
+    for (String f : List.of("context_length", "max_model_len", "max_context_length")) {
+      if (entry.path(f).canConvertToInt() && entry.path(f).asInt() > 0) return entry.path(f).asInt();
+    }
     return null;
   }
+
 
   /** Query the LLM server for model information */
   private ModelInfo queryModelCapabilities() {

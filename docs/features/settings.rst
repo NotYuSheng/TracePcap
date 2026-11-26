@@ -62,8 +62,10 @@ is listed with its **effective value**, including values derived from ``APP_MEMO
 such as the upload cap. They are grouped as:
 
 - **Analysis policy**: detection thresholds, retention, display limits.
-- **LLM**: the server Story and Insights use, with **Test connection** (see
-  :doc:`../configuration/llm-setup`).
+- **LLM**: the server Story and Insights use. **Change connection…** sets its URL,
+  key and model in one form, picking the model from the server's own list, and
+  **Test connection** checks it, warning when the model is too small or slow for a
+  story (see :doc:`../configuration/llm-setup`).
 - **Memory and capacity**: limits tied to how much memory the backend has.
 - **Infrastructure**: servers, storage and login.
 

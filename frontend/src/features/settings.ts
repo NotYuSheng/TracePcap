@@ -30,11 +30,25 @@ export interface SystemSetting {
 
 /** One step of the LLM connection test. */
 export interface LlmTestStep {
-  key: 'reach' | 'key' | 'model' | 'reply';
+  key: 'reach' | 'key' | 'model' | 'reply' | 'tools' | 'capacity';
   label: string;
   status: 'OK' | 'WARN' | 'FAIL' | 'SKIPPED';
   detail: string;
   ms?: number | null;
+}
+
+/** A model the LLM server offers, with its context length when the server says. */
+export interface LlmModelOption {
+  id: string;
+  contextLength?: number | null;
+}
+
+export interface LlmModelList {
+  ok: boolean;
+  baseUrl: string;
+  models: LlmModelOption[];
+  /** Why they couldn't be listed, or that the server doesn't list them. */
+  detail?: string | null;
 }
 
 export interface LlmTestResult {
@@ -51,6 +65,9 @@ export const settingsService = {
    * Tests the LLM connection step by step. Blank fields use the current settings, so `{}` tests
    * what's in effect and e.g. `{ model }` tests a change before saving it.
    */
+  /** The server's models for these values (blank = current), to pick one before saving. */
+  listLlmModels: async (candidate: { baseUrl?: string; apiKey?: string } = {}): Promise<LlmModelList> =>
+    (await apiClient.post<LlmModelList>(API_ENDPOINTS.LLM_MODELS, candidate)).data,
   testLlm: async (candidate: { baseUrl?: string; apiKey?: string; model?: string } = {}): Promise<LlmTestResult> =>
     (await apiClient.post<LlmTestResult>(API_ENDPOINTS.LLM_TEST, candidate)).data,
   getSystemSettings: async (): Promise<SystemSetting[]> =>
