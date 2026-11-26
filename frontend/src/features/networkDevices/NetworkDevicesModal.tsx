@@ -401,12 +401,13 @@ function DecisionModal({
   return (
     <SideDrawer
       show
-      onHide={onHide}
-      title={<>{same ? 'Same device?' : 'Not the same device?'}</>}
+      onHide={() => !busy && onHide()}
+      closable={!busy}
+      title={same ? 'Same device?' : 'Not the same device?'}
       titleId="same-device-title"
       footer={
         <>
-          <Button type="button" variant="outline-secondary" onClick={onHide}>
+          <Button type="button" variant="outline-secondary" onClick={onHide} disabled={busy}>
             Cancel
           </Button>
           <Button type="button" variant="primary" onClick={save} disabled={busy || !reason.trim()}>

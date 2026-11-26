@@ -119,8 +119,12 @@ export function RoleEditModal({
     <SideDrawer
       show
       onHide={onClose}
-      title={<>Edit role
-              {snapshotName && <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshotName}</span>}</>}
+      title={
+        <>
+          Edit role
+          {snapshotName && <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshotName}</span>}
+        </>
+      }
       titleId="role-edit-title"
       footer={
         <>

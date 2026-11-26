@@ -12,8 +12,10 @@ interface SideDrawerProps {
   badge?: number;
   /** Extra class on the dialog, for content-specific styling. */
   className?: string;
-  /** Wider (720px), for forms with tables or several columns. */
+  /** Wider (640px, `.side-drawer-wide`), for forms with tables or several columns. */
   wide?: boolean;
+  /** Shows the × (default). False while work is running that closing must not cut off. */
+  closable?: boolean;
   /** Where to portal the drawer; pass the fullscreen element so it shows in fullscreen. */
   container?: HTMLElement;
   footer?: ReactNode;
@@ -34,6 +36,7 @@ export function SideDrawer({
   badge,
   className,
   wide,
+  closable = true,
   container,
   footer,
   children,
@@ -47,7 +50,7 @@ export function SideDrawer({
       aria-labelledby={titleId}
       container={container}
     >
-      <Modal.Header closeButton>
+      <Modal.Header closeButton={closable}>
         <Modal.Title id={titleId} as="h2" className="side-drawer-title">
           {title}
           {badge !== undefined && badge > 0 && (

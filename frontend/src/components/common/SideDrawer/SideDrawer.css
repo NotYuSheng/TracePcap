@@ -10,9 +10,6 @@
   height: 100%;
   transform: none;
 }
-.modal-dialog.side-drawer.side-drawer-wide {
-  width: 720px;
-}
 .modal.fade .modal-dialog.side-drawer {
   transform: translateX(100%);
   transition: transform 0.2s ease-out;

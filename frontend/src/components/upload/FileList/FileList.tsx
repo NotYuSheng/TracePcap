@@ -716,6 +716,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
       <SideDrawer
         show={showMerge}
         onHide={() => !merging && setShowMerge(false)}
+        closable={!merging}
         title={<>Merge {selectedCount} captures into one</>}
         titleId="merge-captures-title"
         footer={

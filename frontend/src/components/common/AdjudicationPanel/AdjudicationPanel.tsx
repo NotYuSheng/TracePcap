@@ -521,6 +521,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
           <SideDrawer
             show={addingEvidence}
             onHide={() => !busy && resetEvidenceForm()}
+            closable={!busy}
             title={<>{editingEvidenceId != null ? 'Edit' : 'Add'} evidence · {title}</>}
             titleId="evidence-edit-title"
             footer={
@@ -528,12 +529,20 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 <Button variant="outline-secondary" size="sm" onClick={resetEvidenceForm} disabled={busy || locked}>
                   Cancel
                 </Button>
-                <Button variant="primary" size="sm" onClick={handleSaveEvidence} disabled={busy || locked || !evLabel.trim() || !evReason.trim()}>
-                  {busy ? <><Spinner size="sm" className="me-1" />Saving…</> : <><i className="bi bi-check-lg me-1" />{editingEvidenceId != null ? 'Save changes' : 'Add evidence'}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveEvidence}
+                  disabled={busy || locked || !evLabel.trim() || !evReason.trim()}
+                >
+                  {busy ? (
+                    <><Spinner size="sm" className="me-1" />Saving…</>
+                  ) : (
+                    <><i className="bi bi-check-lg me-1" />{editingEvidenceId != null ? 'Save changes' : 'Add evidence'}</>
+                  )}
+                </Button>
               </>
             }
-                        </Button>
-                      </>}
           >
             <Form.Label className="small mb-1">Supports which label</Form.Label>
             <LabelField

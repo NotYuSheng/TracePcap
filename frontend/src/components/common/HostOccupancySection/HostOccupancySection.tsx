@@ -349,6 +349,7 @@ function SplitModal({
     <SideDrawer
       show={show}
       onHide={() => !busy && onHide()}
+      closable={!busy}
       title={<>Split {data.ip} by time</>}
       titleId="split-by-time-title"
       footer={
@@ -465,6 +466,7 @@ function MergeModal({
     <SideDrawer
       show={!!target}
       onHide={() => !busy && onHide()}
+      closable={!busy}
       title="Not a different device?"
       titleId="not-different-device-title"
       footer={

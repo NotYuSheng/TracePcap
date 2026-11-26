@@ -93,8 +93,12 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
     <SideDrawer
       show
       onHide={onClose}
-      title={<>Edit label for this snapshot
-              <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshot.fileName}</span></>}
+      title={
+        <>
+          Edit label for this snapshot
+          <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshot.fileName}</span>
+        </>
+      }
       titleId="subnet-snapshot-edit-title"
       footer={
         <>

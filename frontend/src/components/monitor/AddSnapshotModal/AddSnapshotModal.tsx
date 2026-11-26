@@ -217,6 +217,22 @@ export const AddSnapshotModal = ({
       title="Add PCAP Snapshot"
       titleId="add-snapshot-title"
       wide
+      closable={!isBusy}
+      footer={
+        uploadPhase === 'idle' || uploadPhase === 'error' ? (
+          <>
+            <Button variant="outline-secondary" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={uploadFiles.length === 0} onClick={handleUploadAndAdd}>
+              <i className="bi bi-upload me-1"></i>
+              {uploadFiles.length > 1
+                ? `Upload ${uploadFiles.length} files & add to network`
+                : 'Upload & add to network'}
+            </Button>
+          </>
+        ) : undefined
+      }
     >
       {uploadPhase === 'idle' || uploadPhase === 'error' ? (
         <>
@@ -459,17 +475,6 @@ export const AddSnapshotModal = ({
           </div>
 
           {uploadError && <Alert variant="danger" className="py-2">{uploadError}</Alert>}
-          <Button
-            variant="primary"
-            className="w-100"
-            disabled={uploadFiles.length === 0}
-            onClick={handleUploadAndAdd}
-          >
-            <i className="bi bi-upload me-1"></i>
-            {uploadFiles.length > 1
-              ? `Upload ${uploadFiles.length} files & add to network`
-              : 'Upload & add to network'}
-          </Button>
         </>
       ) : (
         <div className="text-center py-4">
