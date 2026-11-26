@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Modal } from '@govtechsg/sgds-react';
-import type { Answer, CategoryStatus, GoalOutcome } from '@/types';
+import type { Answer, CaptureContext, CategoryStatus, GoalOutcome } from '@/types';
 import { plural, summarySentence, worthALookNext } from '@/features/insights/categoryStatus';
 import { GOAL_QUESTION } from '@/features/story/services/storyService';
 import { QUESTION_META } from '@/features/story/questionMeta';
 import { HowWeGotHere } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
+import { CaptureContextLine } from './CaptureContextLine';
 import './StorySummary.css';
 
 type Status = CategoryStatus['status'];
@@ -42,6 +43,10 @@ interface StorySummaryProps {
   additional: Answer[];
   /** Every category's status on this capture; null from a backend that doesn't report them. */
   categories: CategoryStatus[] | null;
+  /** Where the capture was taken, how complete it is, the time it spans; null from older backends. */
+  context?: CaptureContext | null;
+  /** Called after an analyst overrides or adds evidence to the context, to re-read it. */
+  onContextChanged?: () => void;
   loading: boolean;
 }
 
@@ -50,7 +55,9 @@ interface StorySummaryProps {
  * one sentence and one bar for where the investigation stands, what it answered, the open
  * categories worth a look next, and the ruled-out and not-observable ones folded away with why.
  */
-export function StorySummary({ fileId, goals, additional, categories, loading }: StorySummaryProps) {
+export function StorySummary({
+  fileId, goals, additional, categories, context = null, onContextChanged = () => {}, loading,
+}: StorySummaryProps) {
   const [showMoreOpen, setShowMoreOpen] = useState(false);
   const [showRuledOut, setShowRuledOut] = useState(false);
   const [showUnseen, setShowUnseen] = useState(false);
@@ -101,6 +108,7 @@ export function StorySummary({ fileId, goals, additional, categories, loading }:
 
   return (
     <section className="story-summary" aria-label="Where the investigation stands" data-testid="story-summary">
+      {context && <CaptureContextLine fileId={fileId} context={context} onChanged={onContextChanged} />}
       {categories && counted.length > 0 && (
         <>
           <div className="story-summary-scope">{plural(counted.length, 'category', 'categories')} checked</div>

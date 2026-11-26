@@ -1,8 +1,21 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
-import type { CategoryStatus, GoalOutcome } from '@/types';
+import { describe, expect, it, vi } from 'vitest';
+import type { CaptureContext, CategoryStatus, GoalOutcome } from '@/types';
+import { adjudicationService } from '@/features/insights/services/adjudicationService';
+import { contextParts } from '@/features/insights/captureContext';
+
+vi.mock('@/features/insights/services/adjudicationService', () => ({
+  adjudicationService: {
+    getOverride: vi.fn().mockResolvedValue(null),
+    listEvidence: vi.fn().mockResolvedValue([]),
+    setOverride: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+vi.mock('@/features/me/useMe', () => ({
+  usePermission: () => ({ allowed: true, reason: null, permission: null }),
+}));
 import { StorySummary } from '../StorySummary';
 import { summarySentence, worthALookNext } from '@/features/insights/categoryStatus';
 
@@ -123,5 +136,74 @@ describe('StorySummary', () => {
     renderIt({ categories: null, goals: [goal('C2', '203.0.113.9 is a C2')] });
     expect(screen.queryByTestId('story-summary-sentence')).not.toBeInTheDocument();
     expect(screen.getByText('203.0.113.9 is a C2')).toBeInTheDocument();
+  });
+});
+
+const CONTEXT: CaptureContext = {
+  vantage: {
+    key: 'sensor',
+    label: 'On a honeypot or sensor',
+    host: '192.168.100.28',
+    basis: 'MACHINE',
+    confidence: 75,
+    contested: false,
+    candidates: [
+      { label: 'On a honeypot or sensor', score: 75, reasons: ['18 hosts opened 44 conversations to it on 18 ports'] },
+      { label: 'On an exposed server', score: 35, reasons: [] },
+    ],
+    reason: '18 hosts opened 44 conversations to it on 18 ports',
+    overriddenBy: null,
+    question: 'vantage-point',
+    entityKey: 'capture',
+    options: ['Inside the LAN', 'On the internet uplink', 'On one host', 'On an exposed server', 'On a honeypot or sensor'],
+  },
+  completeness: { label: 'Complete: no gaps', level: 'complete', notes: [] },
+  timeSpan: { start: null, end: null, durationMs: 86_000_000, label: '24 h, 2002-11-29 14:26 to 2002-11-30 14:19' },
+};
+
+describe('contextParts', () => {
+  it('reads the context as one line, the vantage first', () => {
+    expect(contextParts(CONTEXT)).toEqual({
+      vantage: 'On a honeypot or sensor (192.168.100.28)',
+      grade: 'inferred',
+      rest: ['complete', '24 h'],
+    });
+  });
+
+  it('says when the vantage is undetermined, or an analyst set it', () => {
+    const none = { ...CONTEXT, vantage: { ...CONTEXT.vantage, key: null, label: null, host: null } };
+    expect(contextParts(none).vantage).toBe('Vantage point not determined');
+    expect(contextParts(none).grade).toBeNull();
+    const human = { ...CONTEXT, vantage: { ...CONTEXT.vantage, basis: 'HUMAN' as const } };
+    expect(contextParts(human).grade).toBe('set by an analyst');
+  });
+});
+
+describe('StorySummary capture context', () => {
+  it('frames the summary with where the capture was taken', () => {
+    renderIt({ context: CONTEXT });
+    expect(screen.getByTestId('story-summary-context')).toHaveTextContent(
+      'On a honeypot or sensor (192.168.100.28) · inferred · complete · 24 h'
+    );
+  });
+
+  it('opens the vote with its reasons, and lets an analyst override it', async () => {
+    const onContextChanged = vi.fn();
+    renderIt({ context: CONTEXT, onContextChanged });
+    await userEvent.click(screen.getByRole('button', { name: 'Why · change' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/18 hosts opened 44 conversations/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: /I disagree/ }));
+    await userEvent.selectOptions(within(dialog).getAllByRole('combobox')[0], 'Inside the LAN');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Save/ }));
+    expect(adjudicationService.setOverride).toHaveBeenCalledWith(
+      'f1', 'vantage-point', 'capture', 'Inside the LAN', undefined
+    );
+    expect(onContextChanged).toHaveBeenCalled();
+  });
+
+  it('shows no context line from a backend that has none', () => {
+    renderIt();
+    expect(screen.queryByTestId('story-summary-context')).not.toBeInTheDocument();
   });
 });

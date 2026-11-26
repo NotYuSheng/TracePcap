@@ -377,6 +377,28 @@ public interface ConversationRepository
   List<Object[]> findFanOutCandidatesByFileId(@Param("fileId") UUID fileId);
 
   /**
+   * Conversations per pair of hosts and which side opened them, for the capture's vantage point.
+   * Columns: [src_ip, dst_ip, conversations, opened_by_src, opened_by_dst]
+   */
+  @Query(
+      value =
+          "SELECT src_ip, dst_ip, COUNT(*),"
+              + " COUNT(*) FILTER (WHERE initiator_ip = src_ip),"
+              + " COUNT(*) FILTER (WHERE initiator_ip = dst_ip)"
+              + " FROM conversations WHERE file_id = :fileId GROUP BY src_ip, dst_ip",
+      nativeQuery = true)
+  List<Object[]> findHostPairsByFileId(@Param("fileId") UUID fileId);
+
+  /** Distinct ports {@code ip} answered on, in conversations another host opened to it. */
+  @Query(
+      value =
+          "SELECT COUNT(DISTINCT CASE WHEN dst_ip = :ip THEN dst_port ELSE src_port END)"
+              + " FROM conversations WHERE file_id = :fileId AND initiator_ip IS NOT NULL"
+              + " AND initiator_ip <> :ip AND (src_ip = :ip OR dst_ip = :ip)",
+      nativeQuery = true)
+  long countDistinctAnsweredPorts(@Param("fileId") UUID fileId, @Param("ip") String ip);
+
+  /**
    * Returns top senders by total bytes for volume anomaly detection. Columns: [src_ip, total_bytes,
    * flow_count]
    */

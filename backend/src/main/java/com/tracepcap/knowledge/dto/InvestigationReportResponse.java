@@ -1,6 +1,7 @@
 package com.tracepcap.knowledge.dto;
 
 import com.tracepcap.knowledge.dto.CaseKnowledgeResponse.EntityRefDto;
+import com.tracepcap.knowledge.service.CaptureContextService;
 import com.tracepcap.knowledge.spi.Goal;
 import com.tracepcap.knowledge.spi.InvestigationReport;
 import java.util.List;
@@ -13,7 +14,64 @@ public record InvestigationReportResponse(
     List<String> coverage,
     List<ConsideredResponse> considered,
     // Every framework category's status on this capture, with where to look.
-    List<CategoryStatusResponse> categories) {
+    List<CategoryStatusResponse> categories,
+    // What the capture can show: where it was taken, how complete it is, the time it spans. Null
+    // when not computed.
+    CaptureContextResponse context) {
+
+  /** Where the capture was taken, how complete it is, and the time it spans. */
+  public record CaptureContextResponse(
+      VantageResponse vantage, CompletenessResponse completeness, TimeSpanResponse timeSpan) {
+
+    public static CaptureContextResponse from(CaptureContextService.CaptureContext c) {
+      if (c == null) return null;
+      var v = c.vantage();
+      var q = c.completeness();
+      var t = c.timeSpan();
+      return new CaptureContextResponse(
+          new VantageResponse(v.key(), v.label(), v.host(), v.basis(), v.confidence(), v.contested(),
+              v.candidates().stream()
+                  .map(k -> new VantageCandidateResponse(k.label(), k.score(), k.reasons())).toList(),
+              v.reason(), v.overriddenBy(), CaptureContextService.QUESTION, CaptureContextService.ENTITY,
+              java.util.Arrays.stream(CaptureContextService.Vantage.values())
+                  .map(CaptureContextService.Vantage::label).toList()),
+          new CompletenessResponse(q.label(), q.level(),
+              q.notes().stream().map(n -> new QualityNoteResponse(n.kind(), n.level(), n.text())).toList()),
+          new TimeSpanResponse(t.start(), t.end(), t.durationMs(), t.label()));
+    }
+  }
+
+  /**
+   * Where the capture was taken: an inferred vote an analyst can override or add evidence to, at
+   * the adjudication endpoints for {@code question} and {@code entityKey}.
+   *
+   * @param key lan, uplink, client, server, sensor, "other" (an analyst's own), or null: undetermined
+   * @param basis MACHINE (inferred) or HUMAN (overridden)
+   * @param options the labels an analyst can pick from
+   */
+  public record VantageResponse(
+      String key,
+      String label,
+      String host,
+      String basis,
+      int confidence,
+      boolean contested,
+      List<VantageCandidateResponse> candidates,
+      String reason,
+      String overriddenBy,
+      String question,
+      String entityKey,
+      List<String> options) {}
+
+  public record VantageCandidateResponse(String label, int score, List<String> reasons) {}
+
+  /** {@code level}: complete, partial (traffic missing or uninspected) or notes. */
+  public record CompletenessResponse(String label, String level, List<QualityNoteResponse> notes) {}
+
+  public record QualityNoteResponse(String kind, String level, String text) {}
+
+  public record TimeSpanResponse(
+      java.time.LocalDateTime start, java.time.LocalDateTime end, Long durationMs, String label) {}
 
   /** One investigation-framework category on this capture. */
   public record CategoryStatusResponse(
@@ -44,12 +102,13 @@ public record InvestigationReportResponse(
 
 
   public static InvestigationReportResponse from(InvestigationReport report) {
-    return from(report, List.of());
+    return from(report, List.of(), null);
   }
 
   public static InvestigationReportResponse from(
       InvestigationReport report,
-      List<com.tracepcap.knowledge.service.CategoryCoverage.CategoryStatus> categories) {
+      List<com.tracepcap.knowledge.service.CategoryCoverage.CategoryStatus> categories,
+      CaptureContextService.CaptureContext context) {
     return new InvestigationReportResponse(
         report.outcomes().stream().map(GoalOutcomeDto::from).toList(),
         report.additional().stream().map(AnswerResponse::from).toList(),
@@ -58,7 +117,8 @@ public record InvestigationReportResponse(
         report.considered().stream()
             .map(c -> new ConsideredResponse(c.question(), c.candidate(), c.rule(), c.reason(), c.conversations()))
             .toList(),
-        categories.stream().map(CategoryStatusResponse::from).toList());
+        categories.stream().map(CategoryStatusResponse::from).toList(),
+        CaptureContextResponse.from(context));
   }
 
   public record GoalOutcomeDto(

@@ -680,6 +680,49 @@ export interface InvestigationReport {
   considered?: Considered[];
   /** Every investigation-framework category's status on this capture; absent from older backends. */
   categories?: CategoryStatus[];
+  /** Where the capture was taken, how complete it is, the time it spans; absent from older backends. */
+  context?: CaptureContext | null;
+}
+
+/** One vantage point the vote considered, and why. */
+export interface VantageCandidate {
+  label: string;
+  score: number;
+  reasons: string[];
+}
+
+/**
+ * Where a capture was taken: inferred from its address mix, and overridable. Overrides and analyst
+ * evidence go to the generic adjudication endpoints for `question` / `entityKey`.
+ */
+export interface VantagePoint {
+  /** lan, uplink, client, server, sensor, "other" (an analyst's own label), or null: undetermined. */
+  key: string | null;
+  label: string | null;
+  /** The one host the capture is centred on, when it is. */
+  host: string | null;
+  basis: 'MACHINE' | 'HUMAN';
+  confidence: number;
+  contested: boolean;
+  candidates: VantageCandidate[];
+  /** Why: the inference, the override's rationale, or why it can't tell. */
+  reason: string | null;
+  overriddenBy: string | null;
+  question: string;
+  entityKey: string;
+  /** The labels an analyst can pick from. */
+  options: string[];
+}
+
+export interface CaptureContext {
+  vantage: VantagePoint;
+  completeness: {
+    label: string;
+    /** complete, partial (traffic missing or uninspected) or notes. */
+    level: 'complete' | 'partial' | 'notes';
+    notes: { kind: string; level: string; text: string }[];
+  };
+  timeSpan: { start: string | null; end: string | null; durationMs: number | null; label: string | null };
 }
 
 /** A protocol in this capture worth a look for a category: what it shows, and its conversations. */

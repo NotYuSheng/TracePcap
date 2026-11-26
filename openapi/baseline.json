@@ -430,6 +430,20 @@
         },
         "type": "object"
       },
+      "CaptureContextResponse": {
+        "properties": {
+          "completeness": {
+            "$ref": "#/components/schemas/CompletenessResponse"
+          },
+          "timeSpan": {
+            "$ref": "#/components/schemas/TimeSpanResponse"
+          },
+          "vantage": {
+            "$ref": "#/components/schemas/VantageResponse"
+          }
+        },
+        "type": "object"
+      },
       "CaptureMark": {
         "properties": {
           "baseline": {
@@ -998,6 +1012,23 @@
           },
           "nodeLimitNote": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CompletenessResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/QualityNoteResponse"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -3412,6 +3443,9 @@
             },
             "type": "array"
           },
+          "context": {
+            "$ref": "#/components/schemas/CaptureContextResponse"
+          },
           "coverage": {
             "items": {
               "type": "string"
@@ -4923,6 +4957,20 @@
         },
         "type": "object"
       },
+      "QualityNoteResponse": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ReanalyseRequest": {
         "properties": {
           "enableFileExtraction": {
@@ -6121,6 +6169,26 @@
         },
         "type": "object"
       },
+      "TimeSpanResponse": {
+        "properties": {
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TimelineDataDto": {
         "properties": {
           "bytes": {
@@ -6626,6 +6694,72 @@
           "name",
           "parentId"
         ],
+        "type": "object"
+      },
+      "VantageCandidateResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "score": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "VantageResponse": {
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/VantageCandidateResponse"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contested": {
+            "type": "boolean"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "overriddenBy": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "WebServerDetailResponse": {

@@ -157,9 +157,14 @@ The Story tab is laid out as an investigation, read top to bottom, with the
 questions and answers beside it:
 
 - **Where the investigation stands** comes first, summary first (see
-  :doc:`../architecture/investigation-framework`). One sentence and one bar count
-  the investigation's categories by status: "Nothing is concluded yet. 17 are still
-  open and 4 can't be seen in this capture." Under it:
+  :doc:`../architecture/investigation-framework`). A line first says what the
+  capture can show: where it was taken, how complete it is and how long it spans
+  ("On a honeypot or sensor (192.168.100.28) · inferred · complete · 24 h").
+  Where it was taken is inferred from who talks to whom, so *Why · change* opens
+  the reasons, and lets you set it yourself or add evidence toward one answer.
+  Then one sentence and one bar count the investigation's categories by status:
+  "Nothing is concluded yet. 17 are still open and 4 can't be seen in this
+  capture." Under it:
 
   - **Answered**: each answer with its grade and confidence.
   - **Worth a look next**: the open categories, those with traffic in this capture

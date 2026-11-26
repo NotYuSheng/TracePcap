@@ -5,6 +5,7 @@ import com.tracepcap.analysis.dto.CaptureQualityResponse.Note;
 import com.tracepcap.analysis.entity.CaptureStatsEntity;
 import com.tracepcap.analysis.repository.CaptureStatsRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.CaptureQualityLookup;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.repository.FileRepository;
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class CaptureQualityService {
+public class CaptureQualityService implements CaptureQualityLookup {
 
   /** Above this share of TCP conversations without a handshake, it's worth saying. */
   static final double MIDSTREAM_SHARE = 0.10;
@@ -52,6 +53,14 @@ public class CaptureQualityService {
         .streamDepthReached(s == null ? null : s.getStreamDepthReached())
         .memcapDrops(s == null ? null : s.getMemcapDrops())
         .build();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<QualityNote> qualityNotes(UUID fileId) {
+    return forFile(fileId).getNotes().stream()
+        .map(n -> new QualityNote(n.getKind(), n.getLevel(), n.getText()))
+        .toList();
   }
 
   /** Below this share of the file's packets read by Suricata, its alerts are incomplete. */
