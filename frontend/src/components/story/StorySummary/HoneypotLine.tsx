@@ -1,5 +1,6 @@
+import { SideDrawer } from '@components/common/SideDrawer';
 import { useState } from 'react';
-import { Button, Modal } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
 import type { HoneypotHost, Honeypots } from '@/types';
 import { AdjudicationPanel } from '@components/common/AdjudicationPanel/AdjudicationPanel';
 import { honeypotGrade, honeypotLines, honeypotText, isHoneypot } from '@/features/insights/honeypots';
@@ -37,12 +38,15 @@ export function HoneypotLine({ fileId, honeypots, onChanged }: Props) {
           </Button>
         </div>
       ))}
-      <Modal show={!!shown} onHide={() => setOpen(null)} size="lg" scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Is {shown?.host} a honeypot?</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>{shown && <HostBody fileId={fileId} honeypots={honeypots} host={shown} onChanged={onChanged} />}</Modal.Body>
-      </Modal>
+      <SideDrawer
+        show={!!shown}
+        onHide={() => setOpen(null)}
+        title={<>Is {shown?.host} a honeypot?</>}
+        titleId="honeypot-host-title"
+        wide
+      >
+        {shown && <HostBody fileId={fileId} honeypots={honeypots} host={shown} onChanged={onChanged} />}
+      </SideDrawer>
     </>
   );
 }
