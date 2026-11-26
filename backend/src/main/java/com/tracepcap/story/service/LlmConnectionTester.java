@@ -183,7 +183,7 @@ public class LlmConnectionTester {
       // A reply that isn't JSON still counts as a reply.
     }
     String think = reasoning
-        ? " It's a reasoning model: it thinks before it answers, so give it a large LLM_MAX_TOKENS (24000 or more) and a long LLM_TIMEOUT."
+        ? " It's a reasoning model: it thinks before it answers, so leave LLM_MAX_TOKENS at 0 (or 24000 or more) and give it a long LLM_TIMEOUT."
         : "";
     if (!ModelProfiles.sameModel(asked, answered)) {
       return warn("reply", "Model replies",

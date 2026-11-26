@@ -74,6 +74,7 @@ public class LlmClient {
       if (key.equals(capabilitiesFor)) return;
       capabilitiesFor = key;
       modelContextLength = null;
+      serverMaxOutput = null;
       toolCallingSupported = null;
       toolChoiceRequiredSupported = true;
       servedModel = null;
@@ -86,8 +87,21 @@ public class LlmClient {
   private static final Pattern PATTERN_PROMPT_TOKENS = Pattern.compile("\\((\\d+) in the messages");
   private static final Pattern PATTERN_CONTEXT_LENGTH = Pattern.compile("maximum context length is (\\d+)");
   private static final Pattern PATTERN_CONTEXT_LENGTH_ALT = Pattern.compile("context length is (\\d+)");
+  /** vLLM, GPUStack: "max_tokens=… cannot be greater than max_model_len=max_total_tokens=262144". */
+  private static final Pattern PATTERN_MAX_MODEL_LEN =
+      Pattern.compile("max_model_len(?:=max_total_tokens)?=(\\d+)");
+  /** OpenAI and its kin cap the reply on its own: "supports at most 16384 completion tokens". */
+  private static final Pattern PATTERN_MAX_OUTPUT = Pattern.compile("at most (\\d+) completion tokens");
 
-  private volatile Integer effectiveMaxTokens;
+  /** Asked for by the context-length probe: more than any model's context. */
+  static final int PROBE_MAX_TOKENS = 100_000_000;
+  /** Room kept between prompt and reply for the chat template's own tokens. */
+  static final int TEMPLATE_MARGIN = 64;
+  /** The least reply worth asking for: a prompt that leaves less than this is too large. */
+  static final int MIN_REPLY_TOKENS = 1024;
+
+  /** The most the server lets one reply be, apart from the context, when it said so. */
+  private volatile Integer serverMaxOutput;
 
   /** What the configured model is (chat, vision, embedding) and whether it takes tools. */
   private volatile ModelProfiles.Profile profile;
@@ -124,69 +138,70 @@ public class LlmClient {
   }
 
   private void initializeModelCapabilities() {
-    // Set a safe default immediately so the app is usable before the background check finishes
-    effectiveMaxTokens = settings.maxTokens();
-
     Thread.ofVirtual()
         .name("llm-capability-check")
         .start(
             () -> {
               try {
                 describeModel();
-                // If LLM_CONTEXT_LENGTH is explicitly configured, use it directly and skip
-                // the /v1/models auto-detection call.
+                // LLM_CONTEXT_LENGTH, when set, wins over what the server says.
                 if (llmConfig.getApi().getContextLength() != null) {
                   modelContextLength = llmConfig.getApi().getContextLength();
-                  log.info(
-                      "Using configured context length for model '{}': {}",
-                      settings.model(),
-                      modelContextLength);
-                } else {
-                  log.info("Querying LLM server for model capabilities...");
-                  ModelInfo modelInfo = queryModelCapabilities();
-                  if (modelInfo != null && modelInfo.getContextLength() != null) {
-                    modelContextLength = modelInfo.getContextLength();
-                    log.info(
-                        "Auto-detected context length for model '{}': {}",
-                        settings.model(),
-                        modelContextLength);
-                  } else {
-                    log.warn(
-                        "Could not determine model context length, using configured max_tokens: {}",
-                        settings.maxTokens());
-                  }
+                  log.info("Using configured context length for model '{}': {}", settings.model(), modelContextLength);
+                  return;
                 }
-
-                if (modelContextLength != null) {
-                  // Guard: cap effectiveMaxTokens so it never exceeds 80% of the context window.
-                  // LLM_MAX_TOKENS controls response length; this guard prevents accidentally
-                  // reserving more tokens for the response than the context window can support.
-                  int recommendedMaxTokens = (int) (modelContextLength * 0.8);
-                  effectiveMaxTokens =
-                      Math.min(settings.maxTokens(), recommendedMaxTokens);
-
+                ModelInfo modelInfo = queryModelCapabilities();
+                Integer fromList = modelInfo == null ? null : modelInfo.contextLength();
+                if (fromList != null) {
+                  modelContextLength = fromList;
+                  log.info("Context length for model '{}' from /models: {}", settings.model(), fromList);
+                  return;
+                }
+                Integer probed = probeContextLength();
+                if (probed != null) {
+                  modelContextLength = probed;
+                  log.info("Context length for model '{}' from the server's limit: {}", settings.model(), probed);
+                } else {
                   log.info(
-                      "Model '{}': context_length={}, configured_max_tokens={}, effective_max_tokens={}",
+                      "Context length for model '{}' unknown: max_tokens is left to the server{}",
                       settings.model(),
-                      modelContextLength,
-                      settings.maxTokens(),
-                      effectiveMaxTokens);
-
-                  if (settings.maxTokens() > recommendedMaxTokens) {
-                    log.warn(
-                        "Configured LLM_MAX_TOKENS ({}) exceeds 80% of context window ({}). Using {} tokens for responses.",
-                        settings.maxTokens(),
-                        modelContextLength,
-                        effectiveMaxTokens);
-                  }
+                      settings.maxTokens() > 0 ? " up to LLM_MAX_TOKENS=" + settings.maxTokens() : "");
                 }
               } catch (Exception e) {
-                log.warn(
-                    "Failed to initialise model capabilities: {}. Using configured max_tokens: {}",
-                    e.getMessage(),
-                    settings.maxTokens());
+                log.warn("Failed to initialise model capabilities: {}", e.getMessage());
               }
             });
+  }
+
+  /**
+   * The context length, from the server's refusal of an impossible {@code max_tokens}: vLLM,
+   * GPUStack and SGLang name their limit when refusing one ("cannot be greater than
+   * max_model_len=262144"). A server that accepts it has no limit to tell; the short timeout drops
+   * the request. Null when nothing could be learnt.
+   */
+  Integer probeContextLength() {
+    try {
+      HttpHeaders headers = new HttpHeaders();
+      headers.setContentType(MediaType.APPLICATION_JSON);
+      headers.setBearerAuth(settings.apiKey());
+      ChatCompletionRequest probe =
+          ChatCompletionRequest.builder()
+              .model(settings.model())
+              .messages(List.of(new Message("user", "Reply with OK.")))
+              .maxTokens(PROBE_MAX_TOKENS)
+              .build();
+      llmHealthCheckRestTemplate.exchange(
+          settings.baseUrl() + "/chat/completions", HttpMethod.POST, new HttpEntity<>(probe, headers), String.class);
+    } catch (HttpStatusCodeException e) {
+      String body = e.getResponseBodyAsString();
+      int ctx = contextLengthIn(body);
+      int out = parseGroup(body, PATTERN_MAX_OUTPUT);
+      if (out > 0) serverMaxOutput = out;
+      return ctx > 0 ? ctx : null;
+    } catch (Exception e) {
+      log.debug("Context-length probe got no answer: {}", e.getMessage());
+    }
+    return null;
   }
 
   /** Query the LLM server for model information */
@@ -288,9 +303,34 @@ public class LlmClient {
     if (Boolean.FALSE.equals(p.toolUse()) && isAutoToolCalling()) toolCallingSupported = Boolean.FALSE;
   }
 
-  /** Get the effective max tokens (adjusted based on model capabilities) */
-  public Integer getEffectiveMaxTokens() {
-    return effectiveMaxTokens != null ? effectiveMaxTokens : settings.maxTokens();
+  /**
+   * How long a reply may be, for a prompt of this many tokens: what the context has left after it,
+   * under LLM_MAX_TOKENS when that's set (0 = no ceiling) and under the server's own reply cap. Null
+   * when neither the context nor a ceiling is known: {@code max_tokens} is then left off, and
+   * OpenAI-compatible servers give the reply whatever room the context has.
+   */
+  Integer outputBudget(int promptTokens) {
+    Integer ctx = modelContextLength;
+    Integer cap = serverMaxOutput;
+    int ceiling = settings.maxTokens();
+    Integer budget = ctx == null ? null : Math.max(ctx - promptTokens - TEMPLATE_MARGIN, MIN_REPLY_TOKENS);
+    if (ceiling > 0) budget = budget == null ? ceiling : Math.min(budget, ceiling);
+    if (cap != null) budget = budget == null ? cap : Math.min(budget, cap);
+    return budget;
+  }
+
+  /** For tests: the limits, as if the server had named them. */
+  void assumeLimits(Integer contextLength, Integer maxOutput) {
+    refreshCapabilitiesIfChanged();
+    modelContextLength = contextLength;
+    serverMaxOutput = maxOutput;
+  }
+
+  /** The prompt's size in tokens, guessed high: ~2 chars a token for logs, JSON and hex. */
+  static int estimateTokens(String... parts) {
+    long chars = 0;
+    for (String p : parts) chars += p == null ? 0 : p.length();
+    return (int) Math.min(Integer.MAX_VALUE, chars / 2);
   }
 
   /** Get the model's context length */
@@ -472,8 +512,9 @@ public class LlmClient {
           LlmException.ErrorCode.LLM_BAD_RESPONSE);
     }
     if (modelContextLength != null) {
-      int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 2;
-      int responseReserve = getEffectiveMaxTokens();
+      int estimatedPromptTokens = estimateTokens(systemPrompt, userPrompt);
+      // The reply's budget shrinks to fit, so only a prompt that leaves no useful room fails here.
+      int responseReserve = MIN_REPLY_TOKENS;
       if (estimatedPromptTokens + responseReserve > modelContextLength) {
         log.warn(
             "Pre-flight check: estimated prompt ({} tokens) + response reserve ({} tokens) exceeds context length ({}). Failing early.",
@@ -579,7 +620,7 @@ public class LlmClient {
         .model(settings.model())
         .messages(messages)
         .temperature(settings.temperature())
-        .maxTokens(getEffectiveMaxTokens())
+        .maxTokens(outputBudget(estimateTokens(turns.stream().map(Turn::content).toArray(String[]::new))))
         .tools(tools)
         .toolChoice(tools == null ? null : "auto")
         .build();
@@ -604,7 +645,7 @@ public class LlmClient {
         .model(settings.model())
         .messages(List.of(new Message("system", systemPrompt), new Message("user", userPrompt)))
         .temperature(settings.temperature())
-        .maxTokens(getEffectiveMaxTokens())
+        .maxTokens(outputBudget(estimateTokens(systemPrompt, userPrompt)))
         .tools(tools)
         .toolChoice(toolChoice)
         .build();
@@ -615,11 +656,16 @@ public class LlmClient {
    * classification the callers depend on.
    */
   private Message post(ChatCompletionRequest request, String systemPrompt, String userPrompt) {
+    return post(request, systemPrompt, userPrompt, false);
+  }
+
+  private Message post(
+      ChatCompletionRequest request, String systemPrompt, String userPrompt, boolean retried) {
     try {
       log.info("Sending request to LLM API: {}", settings.baseUrl());
       log.debug(
           "Generating completion with max_tokens: {}, tools: {}",
-          getEffectiveMaxTokens(),
+          request.getMaxTokens() == null ? "(server's)" : request.getMaxTokens(),
           request.getTools() == null ? 0 : request.getTools().size());
 
       HttpHeaders headers = new HttpHeaders();
@@ -641,13 +687,19 @@ public class LlmClient {
         // response is truncated. Fail here with a clear, typed error instead of letting the partial
         // (invalid) JSON blow up later as a cryptic parse failure.
         if ("length".equalsIgnoreCase(choice.getFinishReason())) {
-          throw new LlmException(
-              "The model's response exceeded the output token budget ("
-                  + getEffectiveMaxTokens()
-                  + " tokens) and was cut off before it was complete. Raise LLM_MAX_TOKENS, or for a"
-                  + " story, reduce the amount to narrate (lower maxFindings / maxRiskMatrix).",
-              null,
-              LlmException.ErrorCode.OUTPUT_TRUNCATED);
+          // The budget came from a guess at the prompt's size; the server counted it. When the
+          // real count leaves clearly more room, ask once more with that.
+          Usage usage = response.getBody().getUsage();
+          Integer roomier =
+              usage == null || usage.getPromptTokens() == null ? null : outputBudget(usage.getPromptTokens());
+          Integer asked = request.getMaxTokens();
+          if (!retried && asked != null && roomier != null && roomier > asked + asked / 10) {
+            log.info("Reply cut off at {} tokens; the prompt was {} tokens, so retrying with {}",
+                asked, usage.getPromptTokens(), roomier);
+            request.setMaxTokens(roomier);
+            return post(request, systemPrompt, userPrompt, true);
+          }
+          throw new LlmException(truncatedMessage(asked), null, LlmException.ErrorCode.OUTPUT_TRUNCATED);
         }
         // Checked after the cap: a model that spends its budget reasoning can stop with no message.
         if (choice.getMessage() == null) throw new LlmException("Empty response from LLM API");
@@ -660,8 +712,11 @@ public class LlmClient {
         if (!calls && (content == null || content.isBlank()) && thought) {
           // A reasoning model that used its whole reply thinking.
           throw new LlmException(
-              "The model spent its whole reply reasoning and never gave an answer. Raise LLM_MAX_TOKENS"
-                  + " (reasoning models need 24000 or more) and LLM_TIMEOUT.",
+              "The model spent its whole reply reasoning and never gave an answer. "
+                  + (settings.maxTokens() > 0
+                      ? "Raise LLM_MAX_TOKENS (reasoning models need 24000 or more), or set it to 0 to"
+                          + " let the reply use the whole context, and raise LLM_TIMEOUT."
+                      : "Raise LLM_TIMEOUT, or use a model with a larger context."),
               null,
               LlmException.ErrorCode.OUTPUT_TRUNCATED);
         }
@@ -679,15 +734,28 @@ public class LlmClient {
       // Fallback: any HTTP 400 whose message hints at context/token overflow — different
       // providers (Ollama, LM Studio, vLLM) use varying formats so regex may not match.
       String msg = e.getMessage() != null ? e.getMessage() : "";
+      if (e instanceof HttpStatusCodeException h) msg = msg + " " + h.getResponseBodyAsString();
+      if (!retried && request.getMaxTokens() != null && learnLimits(msg)) {
+        // The budget overshot a limit the server has now named; size it to that and ask again.
+        int prompt = parseGroup(msg, PATTERN_PROMPT_TOKENS);
+        Integer ctx = modelContextLength;
+        boolean promptFits = prompt == 0 || ctx == null || prompt + MIN_REPLY_TOKENS <= ctx;
+        Integer budget = outputBudget(prompt > 0 ? prompt : estimateTokens(systemPrompt, userPrompt));
+        if (promptFits && budget != null && budget < request.getMaxTokens()) {
+          log.info("LLM refused max_tokens={}; retrying with {}", request.getMaxTokens(), budget);
+          request.setMaxTokens(budget);
+          return post(request, systemPrompt, userPrompt, true);
+        }
+      }
       boolean isHttp400 = msg.contains("400");
       boolean looksLikeContextError = msg.contains("maximum context length")
+          || msg.contains("max_model_len")
           || msg.contains("context_length_exceeded")
           || msg.contains("context window")
           || msg.contains("token limit");
       if (looksLikeContextError) {
         int promptTokens = parseGroup(msg, PATTERN_PROMPT_TOKENS);
-        int contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH);
-        if (contextTokens == 0) contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH_ALT);
+        int contextTokens = contextLengthIn(msg);
         // If regex couldn't extract counts, use the pre-flight estimate as a best-effort value
         // so the UI shows something meaningful rather than "0 tokens".
         if (promptTokens == 0) {
@@ -744,6 +812,46 @@ public class LlmClient {
     int open = out.indexOf("<think>");
     if (open >= 0) out = out.substring(0, open);
     return out.trim();
+  }
+
+  /**
+   * Notes the context length or reply cap an error names. True when either is new, so the request
+   * that hit it is worth sizing again.
+   */
+  private boolean learnLimits(String msg) {
+    boolean learnt = false;
+    int ctx = contextLengthIn(msg);
+    if (ctx > 0 && !Integer.valueOf(ctx).equals(modelContextLength)) {
+      modelContextLength = ctx;
+      learnt = true;
+    }
+    int out = parseGroup(msg, PATTERN_MAX_OUTPUT);
+    if (out > 0 && !Integer.valueOf(out).equals(serverMaxOutput)) {
+      serverMaxOutput = out;
+      learnt = true;
+    }
+    return learnt;
+  }
+
+  /** The context length a server's message names, or 0. */
+  static int contextLengthIn(String text) {
+    if (text == null) return 0;
+    int n = parseGroup(text, PATTERN_MAX_MODEL_LEN);
+    if (n == 0) n = parseGroup(text, PATTERN_CONTEXT_LENGTH);
+    if (n == 0) n = parseGroup(text, PATTERN_CONTEXT_LENGTH_ALT);
+    return n;
+  }
+
+  /** Why a reply was cut off, and what would let the next one finish. */
+  private String truncatedMessage(Integer asked) {
+    String size = asked == null ? "" : " (" + asked + " tokens)";
+    String fix =
+        settings.maxTokens() > 0 && asked != null && asked >= settings.maxTokens()
+            ? "Raise LLM_MAX_TOKENS, or set it to 0 to let the reply use what the context has left"
+            : "The prompt and reply filled the model's context. Use a model with a larger context";
+    return "The model's response exceeded the output token budget" + size
+        + " and was cut off before it was complete. " + fix
+        + ", or for a story, reduce the amount to narrate (lower maxFindings / maxRiskMatrix).";
   }
 
   private static int parseGroup(String text, Pattern pattern) {
@@ -845,6 +953,15 @@ public class LlmClient {
     private String model;
 
     private List<Choice> choices;
+
+    private Usage usage;
+  }
+
+  /** The tokens the server counted. */
+  @Data
+  private static class Usage {
+    @JsonProperty("prompt_tokens")
+    private Integer promptTokens;
   }
 
   /** Choice in the response */
@@ -873,10 +990,34 @@ public class LlmClient {
     @JsonProperty("owned_by")
     private String ownedBy;
 
+    /** LM Studio. */
     @JsonProperty("context_length")
     private Integer contextLength;
 
+    /** vLLM. */
+    @JsonProperty("max_model_len")
+    private Integer maxModelLen;
+
+    @JsonProperty("max_context_length")
+    private Integer maxContextLength;
+
+    /** llama.cpp: {@code meta.n_ctx_train}. */
+    private java.util.Map<String, Object> meta;
+
     @JsonProperty("max_tokens")
     private Integer maxTokens;
+
+    /** The context length, from whichever field this server uses for it. */
+    Integer contextLength() {
+      if (contextLength != null) return contextLength;
+      if (maxModelLen != null) return maxModelLen;
+      if (maxContextLength != null) return maxContextLength;
+      if (meta != null) {
+        for (String k : List.of("n_ctx", "n_ctx_train")) {
+          if (meta.get(k) instanceof Number n && n.intValue() > 0) return n.intValue();
+        }
+      }
+      return null;
+    }
   }
 }

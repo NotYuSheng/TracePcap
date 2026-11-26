@@ -105,8 +105,9 @@ TracePcap needs a model that chats. What it does with the other kinds:
    * - **Reasoning** (thinks before it answers: DeepSeek-R1, Qwen3 thinking, …)
      - Works. Its thinking is dropped before the answer is read, whether the server sends
        it apart or inline as ``<think>…</think>``. The test says it's a reasoning model:
-       give it ``LLM_MAX_TOKENS`` of 24000 or more and a long ``LLM_TIMEOUT``, or it can
-       spend the whole reply thinking. If it does, the error says so and what to raise.
+       leave ``LLM_MAX_TOKENS`` at ``0`` (each reply gets what the context has left) or
+       give it 24000 or more, and a long ``LLM_TIMEOUT``, or it can spend the whole reply
+       thinking. If it does, the error says so and what to raise.
    * - **Embedding** (``text-embedding-…``, ``bge-…``)
      - Refused, with a clear message: it turns text into numbers for search and can't
        write answers. The test stops at *Model available*; Story and the chat fail at

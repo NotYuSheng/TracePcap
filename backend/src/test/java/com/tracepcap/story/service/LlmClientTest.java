@@ -57,11 +57,15 @@ class LlmClientTest {
     restTemplate = new RestTemplate();
     RestTemplate healthRestTemplate = new RestTemplate();
     server = MockRestServiceServer.createServer(restTemplate);
-    healthServer = MockRestServiceServer.createServer(healthRestTemplate);
+    healthServer = MockRestServiceServer.bindTo(healthRestTemplate).ignoreExpectOrder(true).build();
     // Every generation call runs the reachability probe first.
     healthServer
         .expect(ExpectedCount.manyTimes(), requestTo(MODELS_URL))
         .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
+    // The context-length probe, in the background: this server names no limit.
+    healthServer
+        .expect(ExpectedCount.manyTimes(), requestTo(COMPLETIONS_URL))
+        .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
     client = new LlmClient(config, settingsFrom(config), restTemplate, healthRestTemplate);
   }
@@ -310,6 +314,155 @@ class LlmClientTest {
         .isInstanceOf(LlmException.class)
         .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.OUTPUT_TRUNCATED);
     server.verify();
+  }
+
+  /** A client whose LLM_MAX_TOKENS is this (0 = size each reply to the context). */
+  private LlmClient withCeiling(int maxTokens) {
+    config.getApi().setMaxTokens(maxTokens);
+    RestTemplate health = new RestTemplate();
+    MockRestServiceServer h = MockRestServiceServer.bindTo(health).ignoreExpectOrder(true).build();
+    h.expect(ExpectedCount.manyTimes(), requestTo(MODELS_URL))
+        .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
+    h.expect(ExpectedCount.manyTimes(), requestTo(COMPLETIONS_URL))
+        .andRespond(withStatus(HttpStatus.NOT_FOUND));
+    return new LlmClient(config, settingsFrom(config), restTemplate, health);
+  }
+
+  @Test
+  void withNoCeilingAndNoKnownContextTheReplyLengthIsLeftToTheServer() {
+    LlmClient auto = withCeiling(0);
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").doesNotExist())
+        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+
+    assertThat(auto.generateCompletion("sys", "user")).isEqualTo("hello");
+    server.verify();
+  }
+
+  @Test
+  void withNoCeilingTheReplyGetsWhatTheContextLeaves() {
+    LlmClient auto = withCeiling(0);
+    auto.assumeLimits(32_768, null);
+    // "sys" + "user" is 7 chars: 3 tokens by the high guess, and the template's margin.
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(32_768 - 3 - LlmClient.TEMPLATE_MARGIN))
+        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+
+    auto.generateCompletion("sys", "user");
+    server.verify();
+  }
+
+  @Test
+  void aCeilingCapsTheReplyAndSoDoesTheServersOwnCap() {
+    client.assumeLimits(32_768, null);
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(2000))
+        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+    client.generateCompletion("sys", "user");
+    server.verify();
+
+    server.reset();
+    LlmClient auto = withCeiling(0);
+    auto.assumeLimits(262_144, 16_384);
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(16_384))
+        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+    auto.generateCompletion("sys", "user");
+    server.verify();
+  }
+
+  @Test
+  void aReplyCutOffShortOfTheRealRoomIsAskedAgainWithIt() {
+    LlmClient auto = withCeiling(0);
+    auto.assumeLimits(10_000, null);
+    String prompt = "x".repeat(7_997); // with "sys": 8000 chars, guessed at 4000 tokens
+    int guessed = 10_000 - 4_000 - LlmClient.TEMPLATE_MARGIN;
+    int counted = 10_000 - 2_000 - LlmClient.TEMPLATE_MARGIN;
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(guessed))
+        .andRespond(
+            withSuccess(
+                "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"cut\"}}],"
+                    + "\"usage\":{\"prompt_tokens\":2000}}",
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(counted))
+        .andRespond(withSuccess(messageResponse("whole"), MediaType.APPLICATION_JSON));
+
+    assertThat(auto.generateCompletion("sys", prompt)).isEqualTo("whole");
+    server.verify();
+  }
+
+  @Test
+  void aReplyCutOffAtTheCeilingSaysToRaiseIt() {
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(
+            withSuccess(
+                "{\"choices\":[{\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":3}}",
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasMessageContaining("(2000 tokens)")
+        .hasMessageContaining("Raise LLM_MAX_TOKENS, or set it to 0");
+    server.verify();
+  }
+
+  @Test
+  void aBudgetTheServerRefusesByNamingItsLimitIsAskedAgainWithinIt() {
+    LlmClient high = withCeiling(300_000);
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(300_000))
+        .andRespond(
+            withStatus(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    "{\"error\":{\"message\":\"max_tokens=300000 cannot be greater than"
+                        + " max_model_len=max_total_tokens=262144.\"}}"));
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(262_144 - 3 - LlmClient.TEMPLATE_MARGIN))
+        .andRespond(withSuccess(messageResponse("hello"), MediaType.APPLICATION_JSON));
+
+    assertThat(high.generateCompletion("sys", "user")).isEqualTo("hello");
+    assertThat(high.getModelContextLength()).isEqualTo(262_144);
+    server.verify();
+  }
+
+  @Test
+  void theProbeReadsTheLimitTheServerNames() {
+    RestTemplate health = new RestTemplate();
+    MockRestServiceServer h = MockRestServiceServer.createServer(health);
+    h.expect(requestTo(COMPLETIONS_URL))
+        .andExpect(jsonPath("$.max_tokens").value(LlmClient.PROBE_MAX_TOKENS))
+        .andRespond(
+            withStatus(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    "{\"error\":{\"message\":\"max_tokens=100000000 cannot be greater than"
+                        + " max_model_len=max_total_tokens=262144.\"}}"));
+    LlmClient probing = new LlmClient(config, settingsFrom(config), restTemplate, health);
+
+    assertThat(probing.probeContextLength()).isEqualTo(262_144);
+    h.verify();
+  }
+
+  @Test
+  void readsTheContextLengthFromEachServersWording() {
+    assertThat(LlmClient.contextLengthIn("cannot be greater than max_model_len=max_total_tokens=262144"))
+        .isEqualTo(262_144);
+    assertThat(LlmClient.contextLengthIn("max_model_len=8192")).isEqualTo(8192);
+    assertThat(LlmClient.contextLengthIn("This model's maximum context length is 4096 tokens"))
+        .isEqualTo(4096);
+    assertThat(LlmClient.contextLengthIn("nothing here")).isZero();
   }
 
   @Test
