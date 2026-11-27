@@ -47,4 +47,15 @@ class CidrTest {
     assertThat(Cidr.isIpv4(Cidr.normalise("10.0.0.0/8"))).isTrue();
     assertThat(Cidr.isIpv4(Cidr.normalise("fd00::/8"))).isFalse();
   }
+
+  @Test
+  void aStoredCidrIsComparedByTheNetworkItNames() {
+    assertThat(Cidr.same("fd00::/8", "fd00:0:0:0:0:0:0:0/8")).isTrue();
+    assertThat(Cidr.same("10.1.2.3/24", "10.1.2.0/24")).isTrue();
+    assertThat(Cidr.same("10.1.2.0/24", "10.1.3.0/24")).isFalse();
+    assertThat(Cidr.same(null, "10.0.0.0/8")).isFalse();
+    // A row saved from free text before #1351 is kept as it was: never a match for a real CIDR.
+    assertThat(Cidr.key(" gw.corp/24 ")).isEqualTo("gw.corp/24");
+    assertThat(Cidr.same("gw.corp/24", "10.0.0.0/24")).isFalse();
+  }
 }

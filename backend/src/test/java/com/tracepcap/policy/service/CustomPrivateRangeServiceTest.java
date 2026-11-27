@@ -60,4 +60,41 @@ class CustomPrivateRangeServiceTest {
     assertThat(service.overrideFor("10.1.2.3", null)).isEqualTo(Override.NONE);
     assertThat(service.overrideFor("10.1.2.3", List.of())).isEqualTo(Override.NONE);
   }
+
+  // --- rows saved before #1351 keep their text, and are still the same entry ---------------
+
+  private static CustomPrivateRangeService withRows(
+      com.tracepcap.policy.repository.CustomPrivateRangeRepository repo, CustomPrivateRangeEntity... rows) {
+    org.mockito.Mockito.when(repo.findByNetworkIdIsNullOrderByCreatedAtDesc()).thenReturn(List.of(rows));
+    org.mockito.Mockito.when(repo.save(org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    return new CustomPrivateRangeService(repo,
+        org.mockito.Mockito.mock(com.tracepcap.governance.PermissionService.class),
+        org.mockito.Mockito.mock(com.tracepcap.governance.AuditLogService.class));
+  }
+
+  @Test
+  void savingARangeFindsTheRowSavedEarlierInAnotherSpelling() {
+    var repo = org.mockito.Mockito.mock(com.tracepcap.policy.repository.CustomPrivateRangeRepository.class);
+    CustomPrivateRangeEntity old = range("fd00::/8", IpClassification.PRIVATE); // stored short
+    old.setId(7L);
+    CustomPrivateRangeEntity hostBits = range("10.1.2.3/8", IpClassification.PRIVATE);
+    hostBits.setId(8L);
+    var svc = withRows(repo, old, hostBits);
+
+    var v6 = com.tracepcap.policy.dto.CustomPrivateRangeDto.builder()
+        .cidr("fd00:0:0:0:0:0:0:0/8").classification("PUBLIC").build();
+    assertThat(svc.create(v6).getId()).isEqualTo(7L); // updated, not a second row
+    var v4 = com.tracepcap.policy.dto.CustomPrivateRangeDto.builder()
+        .cidr("10.0.0.0/8").classification("PUBLIC").build();
+    assertThat(svc.create(v4).getId()).isEqualTo(8L);
+  }
+
+  @Test
+  void theListAnswersInTheFormASaveWrites() {
+    var repo = org.mockito.Mockito.mock(com.tracepcap.policy.repository.CustomPrivateRangeRepository.class);
+    var svc = withRows(repo, range("10.1.2.3/8", IpClassification.PRIVATE));
+    assertThat(svc.list()).extracting(com.tracepcap.policy.dto.CustomPrivateRangeDto::getCidr)
+        .containsExactly("10.0.0.0/8");
+  }
 }

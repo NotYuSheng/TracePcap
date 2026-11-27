@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.common.net.Cidr;
 import java.util.Set;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.common.exception.InvalidFileException;
@@ -117,7 +118,7 @@ public class SnapshotService {
       List<SnapshotSubnetOverrideEntity> entities = subnetOverrides.stream()
           .map(o -> SnapshotSubnetOverrideEntity.builder()
               .snapshot(savedSnapshot)
-              .cidr(o.getCidr())
+              .cidr(Cidr.key(o.getCidr()))
               .label(o.getLabel())
               .description(o.getDescription())
               .inherited(o.isInherited())
@@ -188,7 +189,7 @@ public class SnapshotService {
         List<SnapshotSubnetOverrideEntity> entities = req.getSubnetOverrides().stream()
             .map(o -> SnapshotSubnetOverrideEntity.builder()
                 .snapshot(savedSnapshot)
-                .cidr(o.getCidr())
+                .cidr(Cidr.key(o.getCidr()))
                 .label(o.getLabel())
                 .description(o.getDescription())
                 .inherited(o.isInherited())
@@ -321,7 +322,7 @@ public class SnapshotService {
   private SnapshotSubnetOverrideDto toOverrideDto(SnapshotSubnetOverrideEntity o) {
     return SnapshotSubnetOverrideDto.builder()
         .id(o.getId())
-        .cidr(o.getCidr())
+        .cidr(Cidr.key(o.getCidr()))
         .label(o.getLabel())
         .description(o.getDescription())
         .inherited(o.isInherited())

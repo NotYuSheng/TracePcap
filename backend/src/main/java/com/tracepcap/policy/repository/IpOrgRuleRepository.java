@@ -11,7 +11,5 @@ public interface IpOrgRuleRepository extends JpaRepository<IpOrgRuleEntity, Long
   /** One network's own entries (#915 phase 4), hidden ones included. */
   List<IpOrgRuleEntity> findByNetworkIdOrderByPrefixLengthDescLabelAsc(java.util.UUID networkId);
 
-  java.util.Optional<IpOrgRuleEntity> findByNetworkIdAndCidr(java.util.UUID networkId, String cidr);
-
   long countByNetworkIdIsNull();
 }

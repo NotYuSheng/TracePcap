@@ -32,7 +32,7 @@ public class IpOrgRuleService {
   /** The shared default. */
   public List<IpOrgRuleDto> list() {
     return repository.findByNetworkIdIsNullOrderByPrefixLengthDescLabelAsc().stream()
-        .map(e -> IpOrgRuleDto.builder().id(e.getId()).label(e.getLabel()).cidr(e.getCidr()).build())
+        .map(e -> IpOrgRuleDto.builder().id(e.getId()).label(e.getLabel()).cidr(Cidr.key(e.getCidr())).build())
         .collect(Collectors.toList());
   }
 
@@ -47,7 +47,7 @@ public class IpOrgRuleService {
     if (dto.getLabel() == null || dto.getLabel().isBlank()) throw new IllegalArgumentException("A label is required");
     IpOrgRuleEntity entity =
         loadRules().stream()
-            .filter(e -> e.getCidr().equals(cidr))
+            .filter(e -> Cidr.same(e.getCidr(), cidr))
             .findFirst()
             .orElseGet(() -> IpOrgRuleEntity.builder().cidr(cidr).build());
     IpOrgRuleDto before = entity.getId() == null ? null : toDto(entity);
@@ -105,19 +105,19 @@ public class IpOrgRuleService {
   /** A network's view: its own entries (hidden ones included), then the default's it leaves alone. */
   public List<IpOrgRuleDto> listForNetwork(UUID networkId) {
     List<IpOrgRuleEntity> defaults = loadRules();
-    java.util.Set<String> defaultCidrs = defaults.stream().map(IpOrgRuleEntity::getCidr).collect(Collectors.toSet());
+    java.util.Set<String> defaultCidrs = defaults.stream().map(e -> Cidr.key(e.getCidr())).collect(Collectors.toSet());
     List<IpOrgRuleEntity> own = repository.findByNetworkIdOrderByPrefixLengthDescLabelAsc(networkId);
-    java.util.Set<String> ownCidrs = own.stream().map(IpOrgRuleEntity::getCidr).collect(Collectors.toSet());
+    java.util.Set<String> ownCidrs = own.stream().map(e -> Cidr.key(e.getCidr())).collect(Collectors.toSet());
     List<IpOrgRuleDto> out = new java.util.ArrayList<>();
     for (var e : own) {
       IpOrgRuleDto d = toDto(e);
       d.setScope("network");
       d.setHidden(e.isHidden());
-      d.setOverridesDefault(defaultCidrs.contains(e.getCidr()));
+      d.setOverridesDefault(defaultCidrs.contains(Cidr.key(e.getCidr())));
       out.add(d);
     }
     for (var e : defaults) {
-      if (ownCidrs.contains(e.getCidr())) continue;
+      if (ownCidrs.contains(Cidr.key(e.getCidr()))) continue;
       IpOrgRuleDto d = toDto(e);
       d.setScope("default");
       out.add(d);
@@ -137,7 +137,7 @@ public class IpOrgRuleService {
     if (hidden) {
       label =
           loadRules().stream()
-              .filter(e -> e.getCidr().equals(cidr))
+              .filter(e -> Cidr.same(e.getCidr(), cidr))
               .map(IpOrgRuleEntity::getLabel)
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException("The default has no rule for " + cidr + " to hide."));
@@ -146,8 +146,9 @@ public class IpOrgRuleService {
       label = dto.getLabel().trim();
     }
     IpOrgRuleEntity e =
-        repository
-            .findByNetworkIdAndCidr(networkId, cidr)
+        repository.findByNetworkIdOrderByPrefixLengthDescLabelAsc(networkId).stream()
+            .filter(r -> Cidr.same(r.getCidr(), cidr))
+            .findFirst()
             .orElseGet(() -> IpOrgRuleEntity.builder().networkId(networkId).cidr(cidr).build());
     IpOrgRuleDto before = e.getId() == null ? null : toDto(e);
     e.setLabel(label);
@@ -178,7 +179,7 @@ public class IpOrgRuleService {
   }
 
   private static IpOrgRuleDto toDto(IpOrgRuleEntity e) {
-    return IpOrgRuleDto.builder().id(e.getId()).label(e.getLabel()).cidr(e.getCidr()).build();
+    return IpOrgRuleDto.builder().id(e.getId()).label(e.getLabel()).cidr(Cidr.key(e.getCidr())).build();
   }
 
   /**

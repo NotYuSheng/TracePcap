@@ -62,6 +62,26 @@ public final class Cidr {
     }
   }
 
+  /**
+   * The form a stored CIDR is compared and shown in: {@link #normalise}d, or as stored (trimmed)
+   * when it isn't a literal CIDR (a row saved before #1351 from free text). Rows saved earlier keep
+   * their text in the database ({@code fd00::/8}, {@code 10.1.2.3/8}); comparing and answering in
+   * this form makes them the same entry as what a save writes now, with nothing to migrate.
+   */
+  public static String key(String stored) {
+    if (stored == null) return null;
+    try {
+      return normalise(stored);
+    } catch (IllegalArgumentException e) {
+      return stored.trim();
+    }
+  }
+
+  /** Whether two CIDRs, stored or typed, name the same network. */
+  public static boolean same(String a, String b) {
+    return a != null && b != null && key(a).equals(key(b));
+  }
+
   /** Whether a CIDR {@link #normalise} wrote is IPv4. */
   public static boolean isIpv4(String normalised) {
     return normalised != null && normalised.indexOf(':') < 0;

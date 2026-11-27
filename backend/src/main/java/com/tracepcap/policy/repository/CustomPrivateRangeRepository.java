@@ -10,6 +10,4 @@ public interface CustomPrivateRangeRepository extends JpaRepository<CustomPrivat
 
   /** One network's own entries, hidden ones included, newest first. */
   List<CustomPrivateRangeEntity> findByNetworkIdOrderByCreatedAtDesc(java.util.UUID networkId);
-
-  java.util.Optional<CustomPrivateRangeEntity> findByNetworkIdAndCidr(java.util.UUID networkId, String cidr);
 }
