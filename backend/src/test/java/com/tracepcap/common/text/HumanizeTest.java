@@ -8,15 +8,23 @@ import org.junit.jupiter.api.Test;
 class HumanizeTest {
 
   @Test
-  void bytesAreBase1024WithOneDecimalAndClampAtPetabytes() {
+  void bytesMatchTheFrontendsFormatBytes_base1024TwoDecimalsClampedAtPetabytes() {
     assertThat(Humanize.bytes(0)).isEqualTo("0 B");
     assertThat(Humanize.bytes(1023)).isEqualTo("1023 B");
-    assertThat(Humanize.bytes(1536)).isEqualTo("1.5 KB");
-    assertThat(Humanize.bytes(2_000_000)).isEqualTo("1.9 MB"); // the PDF and the answers agree now
-    assertThat(Humanize.bytes(6L * 1024 * 1024)).isEqualTo("6.0 MB");
-    assertThat(Humanize.bytes(3L << 40)).isEqualTo("3.0 TB");
+    assertThat(Humanize.bytes(1536)).isEqualTo("1.50 KB");
+    assertThat(Humanize.bytes(2_000_000)).isEqualTo("1.91 MB"); // the PDF, the answers and the UI agree
+    assertThat(Humanize.bytes(6L * 1024 * 1024)).isEqualTo("6.00 MB");
+    assertThat(Humanize.bytes(3L << 40)).isEqualTo("3.00 TB");
     assertThat(Humanize.bytes(Long.MAX_VALUE)).endsWith(" PB");
-    assertThat(Humanize.bytes(-2048)).isEqualTo("-2.0 KB");
+    assertThat(Humanize.bytes(-2048)).isEqualTo("-2.00 KB");
+    assertThat(Humanize.bytes(Long.MIN_VALUE)).startsWith("-").doesNotStartWith("--").endsWith(" PB");
+  }
+
+  @Test
+  void aValueThatRoundsUpToTheNextUnitIsWrittenInIt() {
+    assertThat(Humanize.bytes(1_048_575)).isEqualTo("1.00 MB");
+    assertThat(Humanize.bytes(1_073_741_000)).isEqualTo("1.00 GB");
+    assertThat(Humanize.bytes(1_048_000)).isEqualTo("1023.44 KB");
   }
 
   @Test

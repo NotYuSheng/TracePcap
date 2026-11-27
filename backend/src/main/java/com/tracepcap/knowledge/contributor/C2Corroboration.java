@@ -71,7 +71,7 @@ public final class C2Corroboration {
   static final Duration INSTALL_WINDOW = Duration.ofMinutes(10);
 
   /** A payload at least this big, from the server the script fetched from. */
-  static final long PAYLOAD_BYTES = 1_000_000L;
+  static final long PAYLOAD_BYTES = 1024L * 1024; // 1 MB, base 1024 as Humanize writes it
 
   private record Pair(String host, String external) {}
 

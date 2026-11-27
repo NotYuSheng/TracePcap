@@ -33,7 +33,8 @@ public class DataTransferQuestion implements StandardQuestion {
   static final String QUESTION = "data-transfer";
 
   /** Only transfers of at least this size are worth surfacing. */
-  static final long BULK_THRESHOLD_BYTES = 5_000_000L;
+  /** 5 MB as the answers write sizes (base 1024, #1340), so a flagged transfer never reads smaller. */
+  static final long BULK_THRESHOLD_BYTES = 5L * 1024 * 1024;
 
   /**
    * Distinctive brand substrings safe to match anywhere in the org name (checked against the org and

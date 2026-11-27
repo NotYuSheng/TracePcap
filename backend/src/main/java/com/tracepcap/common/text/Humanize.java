@@ -18,20 +18,21 @@ public final class Humanize {
   private static final String[] UNITS = {"B", "KB", "MB", "GB", "TB", "PB"};
 
   /**
-   * "512 B", "1.5 KB", "6.0 MB", "2.1 TB": base 1024 like the frontend, one decimal past bytes. The
-   * unit is clamped at PB, so nothing past it reads as "1.0 null".
+   * "512 B", "1.50 KB", "6.00 MB", "2.10 TB": the frontend's {@code formatBytes} exactly, base
+   * 1024 and two decimals past bytes. The unit is clamped at PB, and a value that rounds up to
+   * 1024 of a unit moves to the next ("1.00 MB", not "1024.00 KB").
    */
   public static String bytes(long bytes) {
-    long magnitude = Math.abs(bytes);
     String sign = bytes < 0 ? "-" : "";
-    if (magnitude < 1024) return sign + magnitude + " B";
+    // As a double: Math.abs(Long.MIN_VALUE) is still negative.
+    double value = Math.abs((double) bytes);
+    if (value < 1024) return sign + (long) value + " B";
     int i = 0;
-    double value = magnitude;
-    while (value >= 1024 && i < UNITS.length - 1) {
+    while (i < UNITS.length - 1 && Math.round(value * 100) / 100.0 >= 1024) {
       value /= 1024;
       i++;
     }
-    return sign + String.format(Locale.ROOT, "%.1f %s", value, UNITS[i]);
+    return sign + String.format(Locale.ROOT, "%.2f %s", value, UNITS[i]);
   }
 
   private static final long HOUR_MS = 3_600_000L;

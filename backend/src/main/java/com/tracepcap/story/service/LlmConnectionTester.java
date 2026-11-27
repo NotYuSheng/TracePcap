@@ -299,7 +299,7 @@ public class LlmConnectionTester {
       String speed = "about " + Math.round(perSecond) + " tokens a second";
       if (storySeconds > timeoutSeconds) {
         warnings.add("It writes " + speed + ", so a story (about " + n(storyTokens) + " tokens) may take "
-            + Humanize.span(storySeconds * 1000L) + ", past LLM_TIMEOUT of " + timeoutSeconds + " s. Raise LLM_TIMEOUT to "
+            + storySeconds + " s, past LLM_TIMEOUT of " + timeoutSeconds + " s. Raise LLM_TIMEOUT to "
             + n(storySeconds + 60) + " or more, or use a faster model or server.");
       } else {
         notes.add("It writes " + speed + ": a story takes about " + Humanize.span(storySeconds * 1000L) + ".");
