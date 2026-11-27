@@ -39,7 +39,7 @@ CONCEPT = re.compile(
         format[A-Z]\w* | humani[sz]e\w* | human | plural\w* | pct | percent\w* |
         bytes | megabytes | fmtBytes | duration | span |
         is(?:Private|Internal|Local|Rfc1918|Public|External|HostAddress|Unspecified|Broadcast|Multicast|Special)\w* |
-        normali[sz]eCidr | severity\w*
+        (?:normali[sz]e|valid|validate|parse|canonical)Cidr\w* | severity\w*
     )$"""
 )
 
