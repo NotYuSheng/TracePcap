@@ -28,7 +28,8 @@ const DAY_MS = 24 * HOUR_MS;
 const MONTH_MS = 30.44 * DAY_MS;
 const YEAR_MS = 365.25 * DAY_MS;
 
-const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+/** "1 day", "3 days"; `many` for an irregular plural ("category is" / "categories are"). */
+export const plural = (n: number, one: string, many: string = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const oneDecimal = (n: number) => Math.round(n * 10) / 10;
 
 /**
@@ -149,4 +150,19 @@ export const formatIpPort = (ip: string, port?: number): string => {
  */
 export const formatPercentage = (value: number, decimals: number = 1): string => {
   return `${(value * 100).toFixed(decimals)}%`;
+};
+
+/** A ratio (0–1) as a whole percent, without the sign: 0.457 → 46. */
+export const wholePercent = (ratio: number): number => Math.round(ratio * 100);
+
+/** A chart's bin width in seconds, compactly: "30s", "5m", "1m 30s", "2h", "1h 15m", "3d". */
+export const formatInterval = (secs: number): string => {
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  if (secs < 3600) return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  const h = Math.floor(secs / 3600);
+  const rem = Math.floor((secs % 3600) / 60);
+  if (secs < 86400) return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+  return `${Math.floor(secs / 86400)}d`;
 };

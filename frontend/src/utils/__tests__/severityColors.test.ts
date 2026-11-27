@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { severityBadgeBg, severityHex, severityIcon } from '../severityColors'
+import { findingBadgeBg, findingBadgeText, severityHex, severityIcon } from '../severityColors'
 
 describe('severityColors', () => {
   it('gives each severity one colour across every panel', () => {
@@ -39,9 +39,12 @@ describe('severityColors', () => {
     expect(severityIcon('SOMETHING_NEW')).toBe('bi-circle-fill')
   })
 
-  it('maps to Bootstrap badge variants for the legend copy', () => {
-    expect(severityBadgeBg('CRITICAL')).toBe('danger')
-    expect(severityBadgeBg('WARNING')).toBe('warning')
-    expect(severityBadgeBg('INFO')).toBe('secondary')
+  it("gives a Story finding's severity its badge, dark text on the light ones", () => {
+    expect(findingBadgeBg('CRITICAL')).toBe('danger')
+    expect(findingBadgeBg('HIGH')).toBe('warning')
+    expect(findingBadgeBg('MEDIUM')).toBe('info')
+    expect(findingBadgeBg('LOW')).toBe('secondary')
+    expect(findingBadgeText('HIGH')).toBe('dark')
+    expect(findingBadgeText('CRITICAL')).toBeUndefined()
   })
 })

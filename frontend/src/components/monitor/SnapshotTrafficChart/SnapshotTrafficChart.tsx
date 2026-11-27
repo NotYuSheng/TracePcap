@@ -16,7 +16,7 @@ import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import type { TimelineDataPoint } from '@/types';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import { parseDateTime } from '@/utils/dateUtils';
-import { formatBytes, formatNumber } from '@/utils/formatters';
+import { formatBytes, formatNumber, formatInterval } from '@/utils/formatters';
 
 // Same palette as TrafficTimeline
 const PROTOCOL_COLORS = [
@@ -50,17 +50,6 @@ function formatSnapLabel(snap: NetworkSnapshot): string {
 function effectiveInterval(points: TimelineDataPoint[]): number | null {
   if (points.length < 2) return null;
   return Math.round((points[points.length - 1].timestamp - points[0].timestamp) / (points.length - 1) / 1000);
-}
-
-function formatInterval(secs: number): string {
-  if (secs < 60) return `${secs}s`;
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  if (secs < 3600) return s === 0 ? `${m}m` : `${m}m ${s}s`;
-  const h = Math.floor(secs / 3600);
-  const rem = Math.floor((secs % 3600) / 60);
-  if (secs < 86400) return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
-  return `${Math.floor(secs / 86400)}d`;
 }
 
 interface ChartBin {

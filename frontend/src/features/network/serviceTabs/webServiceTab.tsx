@@ -4,8 +4,8 @@ import {
   type HttpEndpoint,
 } from '@/features/cluster/services/clusterApi';
 import type { ServiceTabConfig, ServiceLogInfoField } from './types';
+import { wholePercent } from '@/utils/formatters';
 
-const pct = (ratio: number) => Math.round(ratio * 100);
 
 function statusClass(status: number | null): string {
   if (status == null) return 'text-muted';
@@ -49,7 +49,7 @@ export const webServiceTab: ServiceTabConfig<WebServerDetail, HttpEndpoint> = {
   getSummary: d =>
     d.totalRequests === 0
       ? 'No cleartext HTTP requests observed (HTTPS endpoints are encrypted).'
-      : `${d.successCount} ok / ${d.clientErrorCount} 4xx / ${d.serverErrorCount} 5xx (${pct(d.clientErrorRatio)}% client errors)`,
+      : `${d.successCount} ok / ${d.clientErrorCount} 4xx / ${d.serverErrorCount} 5xx (${wholePercent(d.clientErrorRatio)}% client errors)`,
   getBanner: d =>
     d.suspicious
       ? 'Possible endpoint enumeration / scanning detected — this server returned an unusually high rate of client errors (4xx).'

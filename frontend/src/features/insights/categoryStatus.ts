@@ -6,7 +6,8 @@ import type { CategoryLead, CategoryStatus } from '@/types';
 
 type Status = CategoryStatus['status'];
 
-export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+export { plural } from '@/utils/formatters';
+import { plural } from '@/utils/formatters';
 
 export interface WorthALookGroup {
   key: string;

@@ -5,8 +5,8 @@ import {
 } from '@/features/cluster/services/clusterApi';
 import type { ServiceTabConfig } from './types';
 import { IpList } from './IpList';
+import { wholePercent } from '@/utils/formatters';
 
-const pct = (ratio: number) => Math.round(ratio * 100);
 
 /**
  * DNS query-log tab for the node modal (#362). Shown for hosts whose `serviceRoles` include "dns".
@@ -20,7 +20,7 @@ export const dnsServiceTab: ServiceTabConfig<DnsQueryLogResponse, DnsQueryEntry>
   fetchDetail: (fileId, ip) => clusterApi.getDnsQueryLog(fileId, ip),
   getRows: d => d.entries,
   getSummary: d =>
-    `${d.resolvedCount} resolved / ${d.failedCount} failed (${pct(d.nxdomainRatio)}% NXDOMAIN)`,
+    `${d.resolvedCount} resolved / ${d.failedCount} failed (${wholePercent(d.nxdomainRatio)}% NXDOMAIN)`,
   getBanner: d =>
     d.suspicious
       ? 'Possible DNS tunnelling or domain-generation algorithm detected — this server returned an unusually high share of NXDOMAIN responses.'

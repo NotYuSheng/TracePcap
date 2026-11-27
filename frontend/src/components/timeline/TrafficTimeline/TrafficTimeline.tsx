@@ -12,7 +12,7 @@ import {
   Cell,
 } from 'recharts';
 import type { TimelineDataPoint } from '@/types';
-import { formatTimestamp, formatBytes, formatNumber } from '@/utils/formatters';
+import { formatTimestamp, formatBytes, formatNumber, formatInterval } from '@/utils/formatters';
 import { OTHER_SERIES, selectProtocolSeries, toProtocolCounts } from './protocolSeries';
 
 const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
@@ -52,17 +52,6 @@ function effectiveInterval(data: TimelineDataPoint[]): number | null {
 }
 
 /** Format seconds as a human-readable label, e.g. 90 → "1m 30s". */
-function formatInterval(secs: number): string {
-  if (secs < 60) return `${secs}s`;
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  if (secs < 3600) return s === 0 ? `${m}m` : `${m}m ${s}s`;
-  const h = Math.floor(secs / 3600);
-  const rem = Math.floor((secs % 3600) / 60);
-  if (secs < 86400) return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
-  return `${Math.floor(secs / 86400)}d`;
-}
-
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ name?: string; value?: number; color?: string }>;

@@ -5,6 +5,7 @@ import type { Finding, FindingSeverity } from '@/types';
 import { useMemo, useState } from 'react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import './FindingsPanel.css';
+import { findingBadgeBg, findingBadgeText } from '@/utils/severityColors';
 
 function FindingsInfoPopover() {
   const popover = (
@@ -42,23 +43,6 @@ function FindingsInfoPopover() {
 
 const SEVERITY_ORDER: FindingSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 
-function severityBadgeBg(severity: FindingSeverity): string {
-  switch (severity) {
-    case 'CRITICAL': return 'danger';
-    case 'HIGH': return 'warning';
-    case 'MEDIUM': return 'info';
-    case 'LOW': return 'secondary';
-  }
-}
-
-function severityBadgeText(severity: FindingSeverity): 'dark' | undefined {
-  switch (severity) {
-    case 'HIGH':
-    case 'MEDIUM': return 'dark';
-    default: return undefined;
-  }
-}
-
 function severityHeaderClass(severity: FindingSeverity): string {
   switch (severity) {
     case 'CRITICAL':
@@ -86,8 +70,8 @@ function FindingCard({ finding }: FindingCardProps) {
       <Card.Body className="py-2 px-3">
         <div className="d-flex align-items-start gap-2 mb-1">
           <Badge
-            bg={severityBadgeBg(finding.severity)}
-            text={severityBadgeText(finding.severity)}
+            bg={findingBadgeBg(finding.severity)}
+            text={findingBadgeText(finding.severity)}
             style={{ whiteSpace: 'nowrap', fontSize: '0.7rem' }}
           >
             {finding.severity}
