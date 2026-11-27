@@ -151,7 +151,7 @@ class LlmConnectionTesterTest {
     // 24 tokens in 4.8 s: 5 a second, so a 4000-token story takes 800 s against a 300 s timeout.
     var slow = LlmConnectionTester.capacityStep(131_072, false, 24, 4_800, 0, 300);
     assertThat(slow.getStatus()).isEqualTo("WARN");
-    assertThat(slow.getDetail()).contains("about 5 tokens a second").contains("13 minutes").contains("LLM_TIMEOUT to 860");
+    assertThat(slow.getDetail()).contains("about 5 tokens a second").contains("13 min").contains("LLM_TIMEOUT to 860");
 
     var fast = LlmConnectionTester.capacityStep(131_072, false, 24, 480, 0, 300);
     assertThat(fast.getStatus()).isEqualTo("OK");

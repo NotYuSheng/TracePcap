@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.dto.SessionResponse;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
@@ -53,10 +54,8 @@ public class SessionReconstructionService {
     Long pcapSize = conv.getFile().getFileSize();
     if (pcapSize != null && pcapSize > MAX_PCAP_FILE_BYTES) {
       return error(
-          String.format(
-              "Capture file is too large for session reconstruction (%.0f MB). "
-                  + "The limit is %d MB.",
-              pcapSize / 1_048_576.0, MAX_PCAP_FILE_BYTES / 1_048_576));
+          "Capture file is too large for session reconstruction (" + Humanize.bytes(pcapSize)
+              + "). The limit is " + Humanize.bytes(MAX_PCAP_FILE_BYTES) + ".");
     }
 
     File tempFile = null;

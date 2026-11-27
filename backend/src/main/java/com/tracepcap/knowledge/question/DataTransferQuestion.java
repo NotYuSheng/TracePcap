@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.question;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.Entity;
@@ -99,7 +100,7 @@ public class DataTransferQuestion implements StandardQuestion {
               QUESTION,
               r.from().key()
                   + (directional ? " sent " : " exchanged ")
-                  + megabytes(bytes)
+                  + Humanize.bytes(bytes)
                   + (directional ? " to " : " with ")
                   + r.to().key()
                   + " ("
@@ -107,10 +108,10 @@ public class DataTransferQuestion implements StandardQuestion {
                   + ") — not a known CDN; review for data staging / exfiltration",
               Grade.INFERRED,
               List.of(r.from(), r.to()),
-              List.of(megabytes(bytes) + " transferred; external org: " + (org != null ? org : "unknown")),
+              List.of(Humanize.bytes(bytes) + " transferred; external org: " + (org != null ? org : "unknown")),
               attrs).withDerivation(List.of(
                   com.tracepcap.knowledge.spi.Step.of(r.from().key() + (directional ? " sent " : " exchanged ")
-                      + megabytes(bytes) + (directional ? " to " : " with ") + r.to().key()
+                      + Humanize.bytes(bytes) + (directional ? " to " : " with ") + r.to().key()
                       + ", counted from the capture's own byte totals.", null, Grade.MEASURED),
                   com.tracepcap.knowledge.spi.Step.of(r.to().key() + (org != null
                       ? " belongs to " + where + " (GeoIP), which isn't a known CDN or cloud provider."
@@ -136,9 +137,5 @@ public class DataTransferQuestion implements StandardQuestion {
     }
     Set<String> tokens = new HashSet<>(Arrays.asList(lower.split("[^a-z0-9]+")));
     return tokens.stream().anyMatch(CDN_CLOUD_TOKENS::contains);
-  }
-
-  private String megabytes(long bytes) {
-    return String.format(Locale.ROOT, "%.1f MB", bytes / 1_000_000.0);
   }
 }

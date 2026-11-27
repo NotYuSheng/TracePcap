@@ -1,5 +1,6 @@
 package com.tracepcap.story.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.common.exception.ForbiddenException;
@@ -298,10 +299,10 @@ public class LlmConnectionTester {
       String speed = "about " + Math.round(perSecond) + " tokens a second";
       if (storySeconds > timeoutSeconds) {
         warnings.add("It writes " + speed + ", so a story (about " + n(storyTokens) + " tokens) may take "
-            + minutes(storySeconds) + ", past LLM_TIMEOUT of " + timeoutSeconds + " s. Raise LLM_TIMEOUT to "
+            + Humanize.span(storySeconds * 1000L) + ", past LLM_TIMEOUT of " + timeoutSeconds + " s. Raise LLM_TIMEOUT to "
             + n(storySeconds + 60) + " or more, or use a faster model or server.");
       } else {
-        notes.add("It writes " + speed + ": a story takes about " + minutes(storySeconds) + ".");
+        notes.add("It writes " + speed + ": a story takes about " + Humanize.span(storySeconds * 1000L) + ".");
       }
     }
     String detail = String.join(" ", warnings.isEmpty() ? notes : warnings);
@@ -312,10 +313,6 @@ public class LlmConnectionTester {
 
   private static String n(long v) {
     return String.format(java.util.Locale.ROOT, "%,d", v);
-  }
-
-  private static String minutes(long seconds) {
-    return seconds < 90 ? seconds + " s" : Math.round(seconds / 60.0) + " minutes";
   }
 
   /** The reply's own model and form: a different model answering, or a reasoning model. */

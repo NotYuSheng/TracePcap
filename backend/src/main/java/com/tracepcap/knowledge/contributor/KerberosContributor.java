@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.spi.KerberosLookup;
 import com.tracepcap.analysis.spi.KerberosLookup.KerberosFacts;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
@@ -125,8 +126,8 @@ public class KerberosContributor implements KnowledgeContributor {
       }
 
       List<String> lines = new ArrayList<>();
-      if (!wrong.isEmpty()) lines.add("Wrong password for " + wrong.size() + " account" + plural(wrong.size()) + ": " + list(wrong));
-      if (!unknown.isEmpty()) lines.add("No such account for " + unknown.size() + " name" + plural(unknown.size()) + ": " + list(unknown));
+      if (!wrong.isEmpty()) lines.add("Wrong password for " + Humanize.plural(wrong.size(), "account") + ": " + list(wrong));
+      if (!unknown.isEmpty()) lines.add("No such account for " + Humanize.plural(unknown.size(), "name") + ": " + list(unknown));
       Map<String, Object> attrs = new LinkedHashMap<>();
       attrs.put("technique", PASSWORD_GUESSING);
       attrs.put("client", pair.get(0));
@@ -138,7 +139,7 @@ public class KerberosContributor implements KnowledgeContributor {
       first(errors, attrs);
       board.addFinding(new Finding(
           KERBEROS_ATTACK,
-          pair.get(0) + " failed to sign in as " + all.size() + " account" + plural(all.size()) + " at " + pair.get(1),
+          pair.get(0) + " failed to sign in as " + Humanize.plural(all.size(), "account") + " at " + pair.get(1),
           Severity.HIGH, Grade.MEASURED, "suricata",
           List.of(EntityRef.host(pair.get(0)), EntityRef.host(pair.get(1))),
           conversations(errors), attrs));
@@ -180,7 +181,7 @@ public class KerberosContributor implements KnowledgeContributor {
       attrs.put("tickets", tickets);
       board.addFinding(new Finding(
           KERBEROS_ATTACK,
-          pair.get(1) + " issued " + tickets + " weak ticket" + plural(tickets) + " to " + pair.get(0)
+          pair.get(1) + " issued " + Humanize.plural(tickets, "weak ticket") + " to " + pair.get(0)
               + " while using AES elsewhere",
           Severity.MEDIUM, Grade.MEASURED, "suricata",
           List.of(EntityRef.host(pair.get(0)), EntityRef.host(pair.get(1))),
@@ -234,9 +235,5 @@ public class KerberosContributor implements KnowledgeContributor {
     List<String> l = new ArrayList<>(names);
     if (l.size() <= 6) return String.join(", ", l);
     return String.join(", ", l.subList(0, 5)) + " and " + (l.size() - 5) + " more";
-  }
-
-  private static String plural(int n) {
-    return n == 1 ? "" : "s";
   }
 }

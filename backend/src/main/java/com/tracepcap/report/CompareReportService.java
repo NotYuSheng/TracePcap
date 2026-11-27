@@ -1,5 +1,6 @@
 package com.tracepcap.report;
 
+import com.tracepcap.common.text.Humanize;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
@@ -177,7 +178,7 @@ public class CompareReportService {
 
       var analysis = analysisSummaryLookup.summaryFor(id).orElse(null);
       String packets  = analysis != null ? String.valueOf(analysis.packetCount()) : "—";
-      String data     = analysis != null ? formatBytes(analysis.totalBytes()) : "—";
+      String data     = analysis != null ? Humanize.bytes(analysis.totalBytes()) : "—";
       String riskPct  = totalConvs > 0
           ? String.format("%.1f%%", riskCount * 100.0 / totalConvs) : "—";
 
@@ -233,7 +234,7 @@ public class CompareReportService {
           endpoint(c.flow().dstIp(), c.flow().dstPort()),
           nvl(c.flow().protocol()),
           nvl(c.findings().appName()),
-          formatBytes(c.flow().totalBytes()),
+          Humanize.bytes(c.flow().totalBytes()),
           risks.isBlank() ? "—" : risks);
     }
     doc.add(table);
@@ -448,13 +449,6 @@ public class CompareReportService {
 
   private static Font cellFont() {
     return new Font(Font.HELVETICA, 9, Font.NORMAL, C_TEXT);
-  }
-
-  private static String formatBytes(long bytes) {
-    if (bytes < 1_024)         return bytes + " B";
-    if (bytes < 1_048_576)     return String.format("%.1f KB", bytes / 1_024.0);
-    if (bytes < 1_073_741_824) return String.format("%.1f MB", bytes / 1_048_576.0);
-    return String.format("%.2f GB", bytes / 1_073_741_824.0);
   }
 
   private static String nvl(String s) {

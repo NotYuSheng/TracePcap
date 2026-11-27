@@ -134,8 +134,9 @@ class ReportFindingsTest {
 
   @Test
   void longCapturesReadInDays() {
-    assertThat(ReportService.duration(27 * 60_000L)).isEqualTo("27 min");
-    assertThat(ReportService.duration(26 * 3_600_000L)).isEqualTo("26 h 0 min");
-    assertThat(ReportService.duration(10 * 86_400_000L)).isEqualTo("10 days");
+    // The report writes spans as the answers do (#1340): "26 h", not "26 h 0 min".
+    assertThat(com.tracepcap.common.text.Humanize.span(27 * 60_000L)).isEqualTo("27 min");
+    assertThat(com.tracepcap.common.text.Humanize.span(26 * 3_600_000L)).isEqualTo("26 h");
+    assertThat(com.tracepcap.common.text.Humanize.span(10 * 86_400_000L)).isEqualTo("10 days");
   }
 }

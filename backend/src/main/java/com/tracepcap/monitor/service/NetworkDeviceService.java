@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.spi.DeviceKeys;
 import com.tracepcap.analysis.spi.DeviceTraitLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
@@ -308,7 +309,7 @@ public class NetworkDeviceService {
     int score = 0;
     Duration gap = Duration.between(tx.last, ty.first);
     ev.add(evidence(gap.compareTo(QUICK_HANDOVER) <= 0 ? STRONG : WEAK, "Hand-over in time",
-        "One MAC was last active " + human(gap) + " before the other was first; they never overlapped."));
+        "One MAC was last active " + Humanize.span(gap.toMillis()) + " before the other was first; they never overlapped."));
     if (!disjoint(tx.dhcp, ty.dhcp)) {
       score += 3;
       ev.add(evidence(STRONG, "Same DHCP fingerprint",
@@ -366,14 +367,6 @@ public class NetworkDeviceService {
 
   private static String shorten(String s) {
     return s.length() > 40 ? s.substring(0, 40) + "…" : s;
-  }
-
-  static String human(Duration d) {
-    long minutes = Math.max(0, d.toMinutes());
-    if (minutes < 60) return minutes + " min";
-    long hours = minutes / 60;
-    if (hours < 48) return hours + " h";
-    return (hours / 24) + " days";
   }
 
   private static String[] ordered(String a, String b) {

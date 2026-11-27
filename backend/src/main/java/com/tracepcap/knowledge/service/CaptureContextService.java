@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.spi.AnalysisSummaryLookup;
 import com.tracepcap.analysis.spi.CaptureQualityLookup;
 import com.tracepcap.analysis.spi.CaptureQualityLookup.QualityNote;
@@ -280,9 +281,9 @@ public class CaptureContextService {
             List.of(centred, "which side opened them isn't known (no TCP handshakes)")));
       } else {
         String opened = m.focalAnswered() == 0
-            ? "it opened " + plural(m.focalOpened(), "conversation") + "; no host opened one to it"
-            : plural(m.focalOpeners(), "host") + " opened " + plural(m.focalAnswered(), "conversation")
-                + " to it on " + plural(answeredPorts, "port") + "; it opened " + m.focalOpened();
+            ? "it opened " + Humanize.plural(m.focalOpened(), "conversation") + "; no host opened one to it"
+            : Humanize.plural(m.focalOpeners(), "host") + " opened " + Humanize.plural(m.focalAnswered(), "conversation")
+                + " to it on " + Humanize.plural(answeredPorts, "port") + "; it opened " + m.focalOpened();
         boolean probed = m.focalOpeners() >= SENSOR_OPENERS && answeredPorts >= SENSOR_PORTS;
         String sensorShape = "many hosts probing many ports is a sensor's shape; a server answers a few";
         if ((double) m.focalAnswered() / known >= 0.5) {
@@ -307,7 +308,7 @@ public class CaptureContextService {
     if (m.internalHosts() < 2) return List.of();
     double ii = (double) m.internalToInternal() / m.conversations();
     double ie = (double) m.internalExternal() / m.conversations();
-    String hosts = plural(m.internalHosts(), "internal host");
+    String hosts = Humanize.plural(m.internalHosts(), "internal host");
     if (ii >= LAN_SHARE) {
       out.add(new Candidate(Vantage.LAN.label(), 70,
           List.of(hosts, pct(ii) + " of conversations are between internal hosts")));
@@ -326,7 +327,7 @@ public class CaptureContextService {
   /** Why the mix can't place a capture. */
   static String undetermined(Mix m) {
     if (m.conversations() < MIN_CONVERSATIONS) {
-      return "only " + plural(m.conversations(), "conversation") + ", too few to tell where it was taken";
+      return "only " + Humanize.plural(m.conversations(), "conversation") + ", too few to tell where it was taken";
     }
     if (m.twoEnded()) {
       return "most of it is between two hosts, " + m.focal() + " and " + m.runnerUp()
@@ -426,30 +427,13 @@ public class CaptureContextService {
 
   static TimeSpan timeSpan(LocalDateTime start, LocalDateTime end, Long durationMs) {
     if (start == null || end == null || durationMs == null) return new TimeSpan(start, end, durationMs, null);
-    String label = duration(durationMs) + ", " + WHEN.format(start) + " to "
+    String label = Humanize.span(durationMs) + ", " + WHEN.format(start) + " to "
         + (start.toLocalDate().equals(end.toLocalDate()) ? end.toLocalTime().toString().substring(0, 5)
             : WHEN.format(end));
     return new TimeSpan(start, end, durationMs, label);
   }
 
-  /** "16 s", "33 min", "24 h", "3 days". */
-  static String duration(long ms) {
-    long s = Math.round(ms / 1000.0);
-    if (s < 60) return s + " s";
-    long min = Math.round(s / 60.0);
-    if (min < 60) return min + " min";
-    long h = Math.round(s / 3600.0);
-    if (h < 48) return h + " h";
-    long days = Math.round(s / 86400.0);
-    if (days < 730) return days + " days";
-    return Math.round(days / 365.25) + " years";
-  }
-
   private static String pct(double share) {
     return Math.round(100 * share) + "%";
-  }
-
-  private static String plural(long n, String noun) {
-    return n + " " + noun + (n == 1 ? "" : "s");
   }
 }

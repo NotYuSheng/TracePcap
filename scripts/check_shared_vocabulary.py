@@ -57,11 +57,38 @@ RULES = [
     {
         "name": "byte-size unit ladder",
         "why": "nine implementations, two of which rendered '1.0 undefined' past GB (#733)",
-        "owner": "frontend utils/formatters",
+        "owner": "frontend utils/formatters, backend common/text/Humanize.java",
         # Two adjacent rungs, not one unit: 'GB' alone is also a country code, and
         # matching it flagged a country-code map on the first run.
         "pattern": re.compile(r"""["']KB["']\s*,\s*["']MB["']"""),
-        "owners": {"frontend/src/utils/formatters/index.ts"},
+        "owners": {
+            "frontend/src/utils/formatters/index.ts",
+            "backend/src/main/java/com/tracepcap/common/text/Humanize.java",
+        },
+        "exempt": set(),
+    },
+    {
+        "name": "fractional byte-size format",
+        "why": "seven backend formatters disagreed on base 1000 vs 1024: the PDF said"
+        " 1.9 MB where the answers said 2.0 MB (#1340)",
+        "owner": "backend common/text/Humanize.java",
+        # A size written with decimals ("%.1f MB") is a formatter; a whole-MB limit
+        # in a message ("%d MB") is not.
+        "pattern": re.compile(r"""%\.\d+f\s?(?:KB|MB|GB|TB)\b"""),
+        "owners": {"backend/src/main/java/com/tracepcap/common/text/Humanize.java"},
+        "exempt": set(),
+    },
+    {
+        "name": "duration unit ladder",
+        "why": "five backend formatters wrote the same span as '2 h 5 min', '2 h' or"
+        " '2.1 h' (#1340)",
+        "owner": "backend common/text/Humanize.java, frontend utils/formatters",
+        # The unit literal a ladder returns: '+ " min"', '+ " h"'.
+        "pattern": re.compile(r"""\+\s*["'] (?:min|h)["']"""),
+        "owners": {
+            "backend/src/main/java/com/tracepcap/common/text/Humanize.java",
+            "frontend/src/utils/formatters/index.ts",
+        },
         "exempt": set(),
     },
 ]

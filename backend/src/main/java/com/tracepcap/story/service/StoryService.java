@@ -1,5 +1,6 @@
 package com.tracepcap.story.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.timeline.dto.TimelineDataDto;
@@ -990,10 +991,7 @@ public class StoryService {
     for (TimelineDataDto bin : bins) {
       String ts = bin.getTimestamp() != null ? bin.getTimestamp().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")) : "-";
       long bytes = bin.getBytes() != null ? bin.getBytes() : 0;
-      String bytesHuman =
-          bytes > 1_048_576
-              ? String.format("%.1fMB", bytes / 1_048_576.0)
-              : bytes > 1024 ? String.format("%.1fKB", bytes / 1024.0) : bytes + "B";
+      String bytesHuman = Humanize.bytes(bytes);
       prompt.append(
           String.format(
               "| %s | %d | %s |\n",
