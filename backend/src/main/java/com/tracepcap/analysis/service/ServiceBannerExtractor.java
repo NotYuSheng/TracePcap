@@ -83,9 +83,18 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
   @Override
   @Transactional(readOnly = true)
   public List<Banner> banners(UUID fileId) {
-    return repository.findByFileId(fileId).stream()
-        .map(e -> new Banner(e.getServerIp(), e.getPort(), e.getKind(), e.getValue(), e.getSeenCount()))
-        .toList();
+    return repository.findByFileId(fileId).stream().map(ServiceBannerExtractor::toBanner).toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Banner> banners(UUID fileId, String ip) {
+    return repository.findByFileIdAndServerIp(fileId, ip).stream()
+        .map(ServiceBannerExtractor::toBanner).toList();
+  }
+
+  private static Banner toBanner(ServiceBannerEntity e) {
+    return new Banner(e.getServerIp(), e.getPort(), e.getKind(), e.getValue(), e.getSeenCount());
   }
 
   /**

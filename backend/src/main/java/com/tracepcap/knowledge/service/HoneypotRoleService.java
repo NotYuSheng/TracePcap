@@ -3,8 +3,8 @@ package com.tracepcap.knowledge.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.spi.ConversationLookup;
-import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.analysis.spi.ConversationLookup.HostPair;
+import com.tracepcap.analysis.spi.ConversationLookup.HostOpenings;
+import com.tracepcap.analysis.spi.ConversationLookup.ServerCertificate;
 import com.tracepcap.analysis.spi.ServiceBannerLookup;
 import com.tracepcap.analysis.spi.ServiceBannerLookup.Banner;
 import com.tracepcap.common.adjudication.HumanOverrideEntity;
@@ -15,7 +15,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -166,7 +165,8 @@ public class HoneypotRoleService {
 
   public HoneypotReport forFile(UUID fileId) {
     SignatureFile file = signatures();
-    Map<String, List<String[]>> observed = observations(fileId);
+    Map<String, List<String[]>> observed =
+        observations(banners.banners(fileId), conversations.serverCertificates(fileId));
     Map<String, List<Signal>> signals = new LinkedHashMap<>();
     observed.forEach((host, seen) -> {
       List<Signal> s = signatureSignals(seen, file.signatures());
@@ -194,14 +194,13 @@ public class HoneypotRoleService {
             .thenComparing(h -> -signals.getOrDefault(h, List.of()).stream().mapToInt(Signal::points).sum())
             .thenComparing(h -> h))
         .toList();
-    List<HostPair> pairs = conversations.hostPairs(fileId);
     List<HostRole> out = new ArrayList<>();
     int single = 0;
     for (int i = 0; i < examined.size(); i++) {
       String host = examined.get(i);
       List<Signal> all = new ArrayList<>(signals.getOrDefault(host, List.of()));
       if (i < MAX_EXAMINED) {
-        all.addAll(behaviourSignals(host, pairs, conversations.distinctAnsweredPorts(fileId, host),
+        all.addAll(behaviourSignals(conversations.hostOpenings(fileId, host),
             observed.getOrDefault(host, List.of())));
       }
       HostRole inferred = decide(host, all, analyst.getOrDefault(host, List.of()));
@@ -225,10 +224,11 @@ public class HoneypotRoleService {
    */
   public HoneypotReport forHost(UUID fileId, String host) {
     SignatureFile file = signatures();
-    List<String[]> seen = observations(fileId).getOrDefault(host, List.of());
+    // Only this host's rows: opening its drawer doesn't read the whole capture.
+    List<String[]> seen = observations(banners.banners(fileId, host),
+        conversations.serverCertificates(fileId, host)).getOrDefault(host, List.of());
     List<Signal> all = new ArrayList<>(signatureSignals(seen, file.signatures()));
-    all.addAll(behaviourSignals(host, conversations.hostPairs(fileId),
-        conversations.distinctAnsweredPorts(fileId, host), seen));
+    all.addAll(behaviourSignals(conversations.hostOpenings(fileId, host), seen));
     // The same query and order forFile reads, so the drawer and the Story summary agree on a host
     // with more than one label of the analyst's own.
     HostRole inferred = decide(host, all, evidence.findByQuestionAndFileId(QUESTION, fileId).stream()
@@ -242,27 +242,21 @@ public class HoneypotRoleService {
 
   // ── What each server said ─────────────────────────────────────────────────────────────────
 
-  /** Per server: each (kind, value, port) it sent, banners and certificates both. */
-  private Map<String, List<String[]>> observations(UUID fileId) {
+  /**
+   * Per server: each (kind, value, port) it sent, banners and certificates both. The certificates
+   * come distinct from the database (#1326), not as every TLS conversation.
+   */
+  static Map<String, List<String[]>> observations(List<Banner> sent, List<ServerCertificate> certs) {
     Map<String, List<String[]>> out = new LinkedHashMap<>();
-    for (Banner b : banners.banners(fileId)) {
+    for (Banner b : sent) {
       out.computeIfAbsent(b.ip(), k -> new ArrayList<>())
           .add(new String[] {b.kind(), b.value(), Integer.toString(b.port())});
     }
-    Set<String> seenCerts = new HashSet<>();
-    for (ConversationFacts c : conversations.tlsConversations(fileId)) {
-      var flow = c.flow();
-      var tls = c.tls();
-      if (tls == null || (tls.tlsSubject() == null && tls.tlsIssuer() == null)) continue;
-      // The server is the side that didn't open it; without a handshake, the destination.
-      boolean dstOpened = flow.initiatorIp() != null && flow.initiatorIp().equals(flow.dstIp());
-      String server = dstOpened ? flow.srcIp() : flow.dstIp();
-      Integer port = dstOpened ? flow.srcPort() : flow.dstPort();
-      String cert = "subject " + nz(tls.tlsSubject()) + "; issuer " + nz(tls.tlsIssuer());
-      if (server != null && seenCerts.add(server + "|" + port + "|" + cert)) {
-        out.computeIfAbsent(server, k -> new ArrayList<>())
-            .add(new String[] {"tls-cert", cert, port == null ? "" : port.toString()});
-      }
+    for (ServerCertificate c : certs) {
+      if (c.server() == null || (c.subject() == null && c.issuer() == null)) continue;
+      String cert = "subject " + nz(c.subject()) + "; issuer " + nz(c.issuer());
+      out.computeIfAbsent(c.server(), k -> new ArrayList<>())
+          .add(new String[] {"tls-cert", cert, c.port() == null ? "" : c.port().toString()});
     }
     return out;
   }
@@ -295,26 +289,13 @@ public class HoneypotRoleService {
 
   // ── How it behaves ────────────────────────────────────────────────────────────────────────
 
-  static List<Signal> behaviourSignals(String host, List<HostPair> pairs, long answeredPorts,
-      List<String[]> seen) {
+  static List<Signal> behaviourSignals(HostOpenings h, List<String[]> seen) {
     List<Signal> out = new ArrayList<>();
-    long opened = 0, answered = 0;
-    Set<String> openers = new HashSet<>();
-    for (HostPair p : pairs) {
-      if (host.equals(p.a())) {
-        opened += p.openedByA();
-        answered += p.openedByB();
-        if (p.openedByB() > 0) openers.add(p.b());
-      } else if (host.equals(p.b())) {
-        opened += p.openedByB();
-        answered += p.openedByA();
-        if (p.openedByA() > 0) openers.add(p.a());
-      }
-    }
+    long opened = h.opened(), answered = h.answered(), answeredPorts = h.answeredPorts();
     long known = opened + answered;
-    if (openers.size() >= FAN_IN_OPENERS && known > 0 && (double) opened / known <= FAN_OUT_SHARE) {
+    if (h.openers() >= FAN_IN_OPENERS && known > 0 && (double) opened / known <= FAN_OUT_SHARE) {
       out.add(new Signal("behaviour", "fan-in", null, Strength.WEAK.name(), Strength.WEAK.points,
-          openers.size() + " hosts opened " + answered + " conversations to it; it opened "
+          h.openers() + " hosts opened " + answered + " conversations to it; it opened "
               + (opened == 0 ? "none" : opened) + ": a decoy draws connections and starts none"));
     }
     if (answeredPorts >= MANY_PORTS) {

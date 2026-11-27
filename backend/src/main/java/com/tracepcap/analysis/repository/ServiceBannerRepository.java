@@ -12,6 +12,8 @@ public interface ServiceBannerRepository extends JpaRepository<ServiceBannerEnti
 
   List<ServiceBannerEntity> findByFileId(UUID fileId);
 
+  List<ServiceBannerEntity> findByFileIdAndServerIp(UUID fileId, String serverIp);
+
   @Modifying
   @Query("DELETE FROM ServiceBannerEntity b WHERE b.fileId = :fileId")
   void deleteByFileId(@Param("fileId") UUID fileId);

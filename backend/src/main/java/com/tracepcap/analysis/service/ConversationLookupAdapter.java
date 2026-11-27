@@ -272,6 +272,40 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public HostOpenings hostOpenings(UUID fileId, String ip) {
+    List<Object[]> rows = repository.findHostOpenings(fileId, ip);
+    if (rows.isEmpty()) return new HostOpenings(0, 0, 0, 0);
+    Object[] r = rows.get(0);
+    return new HostOpenings(asLong(r[0]), asLong(r[1]), asLong(r[2]), asLong(r[3]));
+  }
+
+  @Override
+  public List<Opening> openingsTo(UUID fileId, Collection<String> targets) {
+    if (targets == null || targets.isEmpty()) return List.of();
+    return repository.findOpeningsTo(fileId, List.copyOf(targets)).stream()
+        .map(r -> new Opening((String) r[0], (String) r[1], asLong(r[2])))
+        .toList();
+  }
+
+  @Override
+  public List<ServerCertificate> serverCertificates(UUID fileId) {
+    return certificates(repository.findServerCertificates(fileId, null));
+  }
+
+  @Override
+  public List<ServerCertificate> serverCertificates(UUID fileId, String server) {
+    return certificates(repository.findServerCertificates(fileId, server));
+  }
+
+  private static List<ServerCertificate> certificates(List<Object[]> rows) {
+    return rows.stream()
+        .filter(r -> r[0] != null)
+        .map(r -> new ServerCertificate((String) r[0],
+            r[1] == null ? null : ((Number) r[1]).intValue(), (String) r[2], (String) r[3]))
+        .toList();
+  }
+
+  @Override
   public List<HostVolume> topSenders(UUID fileId) {
     return repository.findTopSendersByFileId(fileId).stream()
         .map(r -> new HostVolume((String) r[0], asLong(r[1]), asLong(r[2])))
