@@ -64,4 +64,15 @@ class CidrTest {
     assertThat(Cidr.normaliseIpv4("10.1.2.3/24")).isEqualTo("10.1.2.0/24");
     assertThatThrownBy(() -> Cidr.normaliseIpv4("fd00::/64")).hasMessageContaining("IPv4 for now");
   }
+
+  @Test
+  void aSpellingSentBackExactlyAsSavedIsKept_anythingNewIsNormalised() {
+    java.util.Set<String> saved = java.util.Set.of("10.62.0.9/24", "10.0.0.01/24");
+    // A row V86 left in its old spelling: still the same entry when the list sends it back.
+    assertThat(Cidr.asSaved(" 10.62.0.9/24 ", saved, Cidr::normaliseIpv4)).isEqualTo("10.62.0.9/24");
+    assertThat(Cidr.asSaved("10.0.0.01/24", saved, Cidr::normaliseIpv4)).isEqualTo("10.0.0.01/24");
+    assertThat(Cidr.asSaved("10.63.0.9/24", saved, Cidr::normaliseIpv4)).isEqualTo("10.63.0.0/24");
+    assertThatThrownBy(() -> Cidr.asSaved("10.0.0.02/24", saved, Cidr::normaliseIpv4))
+        .hasMessageStartingWith("Invalid CIDR");
+  }
 }

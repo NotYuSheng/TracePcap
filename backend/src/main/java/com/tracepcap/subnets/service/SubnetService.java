@@ -89,7 +89,7 @@ public class SubnetService {
   @Transactional
   public SubnetDefinitionDto upsert(UpsertSubnetRequest req) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = subnetCidr(req.getCidr());
+    String cidr = Cidr.asSaved(req.getCidr(), defaultCidrs(), SubnetService::subnetCidr);
     SubnetDefinitionEntity entity =
         subnetRepo
             .findByCidrAndNetworkIdIsNull(cidr)
@@ -136,7 +136,7 @@ public class SubnetService {
   @Transactional
   public SubnetDefinitionDto saveDetected(UpsertSubnetRequest req) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = subnetCidr(req.getCidr());
+    String cidr = Cidr.asSaved(req.getCidr(), defaultCidrs(), SubnetService::subnetCidr);
     SubnetDefinitionEntity entity =
         subnetRepo
             .findByCidrAndNetworkIdIsNull(cidr)
@@ -203,7 +203,9 @@ public class SubnetService {
   public SubnetDefinitionDto putForNetwork(UUID networkId, UpsertSubnetRequest req) {
     permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
     requireNetwork(networkId);
-    String cidr = subnetCidr(req.getCidr());
+    java.util.Set<String> saved = new java.util.HashSet<>(defaultCidrs());
+    subnetRepo.findByNetworkIdOrderByCidr(networkId).forEach(e -> saved.add(e.getCidr()));
+    String cidr = Cidr.asSaved(req.getCidr(), saved, SubnetService::subnetCidr);
     req.setNetworkId(networkId);
     String segment = req.getSegmentKey() == null || req.getSegmentKey().isBlank() ? null : req.getSegmentKey().trim();
     if (req.isHidden() && segment != null) {
@@ -546,6 +548,13 @@ public class SubnetService {
 
   /** Delegates to the shared predicate so all four call sites agree (#694). */
 
+
+  /** The shared default's CIDRs as stored. */
+  private java.util.Set<String> defaultCidrs() {
+    return subnetRepo.findByNetworkIdIsNullOrderByCidr().stream()
+        .map(SubnetDefinitionEntity::getCidr)
+        .collect(Collectors.toSet());
+  }
 
   /** The CIDR as a subnet label saves it: {@link Cidr#normaliseIpv4}. */
   static String subnetCidr(String raw) {

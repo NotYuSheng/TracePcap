@@ -8,6 +8,7 @@ import javax.sql.DataSource;
 import org.flywaydb.core.api.migration.Context;
 import org.mockito.Mockito;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -97,5 +98,22 @@ class CidrMigrationIntegrationTest {
 
     migrate(); // nothing left to do
     assertThat(cidrs("subnet_definitions", "m-a")).containsExactly("10.61.2.0/24");
+  }
+
+  @Test
+  void aNetworkContestedInTheDefaultIsLeftAsSavedInEveryListThatJoinsToIt() throws Exception {
+    UUID net = UUID.randomUUID();
+    jdbc.update("INSERT INTO networks (id, name) VALUES (?, 'm-net')", net);
+    jdbc.update("INSERT INTO custom_private_ranges (cidr, classification) VALUES ('10.70.0.9/16', 'PRIVATE')");
+    jdbc.update("INSERT INTO custom_private_ranges (cidr, classification) VALUES ('10.70.0.0/16', 'PUBLIC')");
+    // Alone in its network's list, but the default it overrides is contested: rewriting it would
+    // stop it matching either default spelling.
+    jdbc.update("INSERT INTO custom_private_ranges (cidr, classification, network_id) VALUES ('10.70.5.5/16', 'PRIVATE', ?)", net);
+    jdbc.update("INSERT INTO custom_private_ranges (cidr, classification, network_id) VALUES ('10.71.5.5/16', 'PRIVATE', ?)", net);
+
+    migrate();
+
+    assertThat(jdbc.queryForList("SELECT cidr FROM custom_private_ranges WHERE network_id = ? ORDER BY id", String.class, net))
+        .containsExactly("10.70.5.5/16", "10.71.0.0/16");
   }
 }

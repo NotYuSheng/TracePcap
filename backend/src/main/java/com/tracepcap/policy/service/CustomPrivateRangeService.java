@@ -41,6 +41,10 @@ public class CustomPrivateRangeService {
         .collect(Collectors.toList());
   }
 
+  private static java.util.Set<String> savedCidrs(List<CustomPrivateRangeEntity> rows) {
+    return rows.stream().map(CustomPrivateRangeEntity::getCidr).collect(Collectors.toCollection(java.util.HashSet::new));
+  }
+
   private static CustomPrivateRangeDto toDto(CustomPrivateRangeEntity e) {
     return CustomPrivateRangeDto.builder()
         .id(e.getId())
@@ -56,7 +60,7 @@ public class CustomPrivateRangeService {
   @org.springframework.transaction.annotation.Transactional
   public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = Cidr.normalise(dto.getCidr());
+    String cidr = Cidr.asSaved(dto.getCidr(), savedCidrs(loadRanges()), Cidr::normalise);
     IpClassification classification = parseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity =
         loadRanges().stream()
@@ -154,7 +158,9 @@ public class CustomPrivateRangeService {
   @org.springframework.transaction.annotation.Transactional
   public CustomPrivateRangeDto putForNetwork(UUID networkId, CustomPrivateRangeDto dto, boolean hidden) {
     permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
-    String cidr = Cidr.normalise(dto.getCidr());
+    java.util.Set<String> saved = savedCidrs(loadRanges());
+    saved.addAll(savedCidrs(repository.findByNetworkIdOrderByCreatedAtDesc(networkId)));
+    String cidr = Cidr.asSaved(dto.getCidr(), saved, Cidr::normalise);
     IpClassification classification;
     if (hidden) {
       CustomPrivateRangeEntity def =

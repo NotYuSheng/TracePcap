@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.common.exception.FieldValidationException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import com.tracepcap.common.net.Cidr;
@@ -116,7 +117,7 @@ public class SnapshotService {
 
     // Save subnet overrides if provided
     if (subnetOverrides != null && !subnetOverrides.isEmpty()) {
-      List<SnapshotSubnetOverrideEntity> entities = overrideRows(snapshot, subnetOverrides);
+      List<SnapshotSubnetOverrideEntity> entities = overrideRows(snapshot, subnetOverrides, java.util.Set.of());
       subnetOverrideRepository.saveAll(entities);
     }
 
@@ -177,7 +178,10 @@ public class SnapshotService {
     // null = untouched; empty list = clear all; non-empty = replace
     if (req.getSubnetOverrides() != null) {
       // Checked before the old rows go, so a bad CIDR leaves them in place.
-      List<SnapshotSubnetOverrideEntity> entities = overrideRows(snapshot, req.getSubnetOverrides());
+      List<SnapshotSubnetOverrideEntity> entities = overrideRows(snapshot, req.getSubnetOverrides(),
+          subnetOverrideRepository.findBySnapshotId(snapshotId).stream()
+              .map(SnapshotSubnetOverrideEntity::getCidr)
+              .collect(Collectors.toSet()));
       subnetOverrideRepository.deleteBySnapshotId(snapshotId);
       if (!entities.isEmpty()) {
         subnetOverrideRepository.saveAll(entities);
@@ -305,16 +309,32 @@ public class SnapshotService {
   }
 
   /**
-   * A snapshot's subnet overrides as rows: each CIDR written as a subnet label writes it
-   * ({@link Cidr#normaliseIpv4}, 400 on one that isn't an IPv4 CIDR), and one row per network, the last
-   * given winning, since two spellings of one range would break the (snapshot, cidr) unique key.
+   * A snapshot's subnet overrides as rows. A row copied from saved data (inherited) or sent back
+   * exactly as this snapshot saved it keeps its text ({@link Cidr#asSaved}), so a subnet left in an
+   * old spelling still carries and edits. Anything new is written as a subnet label writes it
+   * ({@link Cidr#normaliseIpv4}). A bad CIDR, or two rows naming one network, is a 400 on that
+   * field: nothing is dropped silently.
    */
   private static List<SnapshotSubnetOverrideEntity> overrideRows(
-      NetworkSnapshotEntity snapshot, List<SubnetOverrideInput> overrides) {
+      NetworkSnapshotEntity snapshot, List<SubnetOverrideInput> overrides, java.util.Set<String> saved) {
     Map<String, SnapshotSubnetOverrideEntity> byCidr = new LinkedHashMap<>();
-    for (SubnetOverrideInput o : overrides) {
-      String cidr = Cidr.normaliseIpv4(o.getCidr());
-      byCidr.remove(cidr);
+    Map<String, Integer> firstIndex = new java.util.HashMap<>();
+    for (int i = 0; i < overrides.size(); i++) {
+      SubnetOverrideInput o = overrides.get(i);
+      String field = "subnetOverrides[" + i + "].cidr";
+      String cidr;
+      try {
+        cidr = o.isInherited() && o.getCidr() != null && !o.getCidr().isBlank()
+            ? o.getCidr().trim()
+            : Cidr.asSaved(o.getCidr(), saved, Cidr::normaliseIpv4);
+      } catch (IllegalArgumentException e) {
+        throw new FieldValidationException(e.getMessage(), Map.of(field, e.getMessage()));
+      }
+      Integer earlier = firstIndex.putIfAbsent(cidr, i);
+      if (earlier != null) {
+        String msg = "Two overrides name " + cidr + " (rows " + (earlier + 1) + " and " + (i + 1) + "): keep one";
+        throw new FieldValidationException(msg, Map.of(field, msg));
+      }
       byCidr.put(cidr, SnapshotSubnetOverrideEntity.builder()
           .snapshot(snapshot)
           .cidr(cidr)

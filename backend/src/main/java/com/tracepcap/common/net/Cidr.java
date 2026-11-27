@@ -70,6 +70,19 @@ public final class Cidr {
   }
 
   /**
+   * {@code raw} as already saved, when it is exactly one of {@code saved}; otherwise {@code
+   * normaliser}'s answer. A list answers with what it stores, and V86 leaves a few rows in their
+   * old spelling (two spellings of one network, or text the parser refuses), so an entry sent back
+   * exactly as listed (to hide, edit or carry it) is the same entry, not refused or re-spelled.
+   * Anything new is normalised.
+   */
+  public static String asSaved(
+      String raw, java.util.Collection<String> saved, java.util.function.UnaryOperator<String> normaliser) {
+    if (raw != null && saved != null && saved.contains(raw.trim())) return raw.trim();
+    return normaliser.apply(raw);
+  }
+
+  /**
    * The form a stored CIDR is written in: {@link #normalise}d, or as stored (trimmed) when it isn't
    * a literal CIDR (free text an older validator let through). For moving rows saved before #1351
    * onto what a save writes now (V86).

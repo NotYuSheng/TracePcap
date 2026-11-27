@@ -36,6 +36,10 @@ public class IpOrgRuleService {
         .collect(Collectors.toList());
   }
 
+  private static java.util.Set<String> savedCidrs(List<IpOrgRuleEntity> rows) {
+    return rows.stream().map(IpOrgRuleEntity::getCidr).collect(Collectors.toCollection(java.util.HashSet::new));
+  }
+
   /**
    * Sets the shared default's rule for a CIDR (adding it, or changing its label). Needs
    * ADDRESS_DEFAULTS; audited.
@@ -43,7 +47,7 @@ public class IpOrgRuleService {
   @org.springframework.transaction.annotation.Transactional
   public IpOrgRuleDto create(IpOrgRuleDto dto) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = Cidr.normalise(dto.getCidr());
+    String cidr = Cidr.asSaved(dto.getCidr(), savedCidrs(loadRules()), Cidr::normalise);
     if (dto.getLabel() == null || dto.getLabel().isBlank()) throw new IllegalArgumentException("A label is required");
     IpOrgRuleEntity entity =
         loadRules().stream()
@@ -132,7 +136,9 @@ public class IpOrgRuleService {
   @org.springframework.transaction.annotation.Transactional
   public IpOrgRuleDto putForNetwork(UUID networkId, IpOrgRuleDto dto, boolean hidden) {
     permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
-    String cidr = Cidr.normalise(dto.getCidr());
+    java.util.Set<String> saved = savedCidrs(loadRules());
+    saved.addAll(savedCidrs(repository.findByNetworkIdOrderByPrefixLengthDescLabelAsc(networkId)));
+    String cidr = Cidr.asSaved(dto.getCidr(), saved, Cidr::normalise);
     String label;
     if (hidden) {
       label =
