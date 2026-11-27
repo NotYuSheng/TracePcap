@@ -67,7 +67,7 @@ public class DownloadsQuestion implements StandardQuestion {
         answers.add(
             new Answer(
                 QUESTION,
-                first.attributes().get("host") + (decoy == null ? " downloaded " : " (a " + decoy + ") caught ") + more + " more file" + (more == 1 ? "" : "s")
+                first.attributes().get("host") + (decoy == null ? " downloaded " : " (" + HoneypotContributor.article(decoy) + ") caught ") + more + " more file" + (more == 1 ? "" : "s")
                     + " from " + first.attributes().get("external") + " (smaller ones; see the Files tab)",
                 Grade.MEASURED,
                 first.concerns(),
@@ -102,9 +102,9 @@ public class DownloadsQuestion implements StandardQuestion {
       headline = a.get("host") + " downloaded " + what + ". SHA-256 " + a.get("sha256");
     } else {
       attrs.put("decoy", decoy);
-      headline = a.get("host") + ", a " + decoy + ", caught " + what
+      headline = a.get("host") + ", " + HoneypotContributor.article(decoy) + ", caught " + what
           + ": attacker tooling, not an infection. SHA-256 " + a.get("sha256");
-      steps.add(com.tracepcap.knowledge.spi.Step.of(a.get("host") + " is a " + decoy
+      steps.add(com.tracepcap.knowledge.spi.Step.of(a.get("host") + " is " + HoneypotContributor.article(decoy)
           + " (the Honeypot answer shows how).", Derivations.RULE_DECOY_DOWNLOAD, Grade.INFERRED));
     }
     steps.add(new com.tracepcap.knowledge.spi.Step(

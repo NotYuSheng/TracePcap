@@ -59,14 +59,20 @@ class HoneypotFramingTest {
 
   @Test
   void aDecoyThatTalksToAC2IsTheAttackItRecorded() {
-    List<Answer> a = new HoneypotActivityQuestion().answer(c2Board().build());
+    List<Answer> a = new HoneypotC2Question().answer(c2Board().build());
     assertThat(a).singleElement().satisfies(ans -> {
-      assertThat(ans.question()).isEqualTo("honeypot-activity");
+      assertThat(ans.question()).isEqualTo("honeypot-c2");
       assertThat(ans.headline()).isEqualTo(DECOY + ", a Cowrie honeypot, contacted the known C2 " + C2
           + ": the attack it was set up to record, not an infection");
       assertThat(ans.attributes()).containsEntry("decoy", "Cowrie honeypot").containsEntry("c2", List.of(C2));
       assertThat(ans.derivation()).extracting(s -> s.rule()).contains(Derivations.RULE_DECOY_C2);
     });
+  }
+
+  @Test
+  void aDecoyReachingAC2IsNoScanner() {
+    assertThat(new HoneypotActivityQuestion().answer(c2Board().build())).isEmpty();
+    assertThat(new HoneypotC2Question().categories()).doesNotContain(com.tracepcap.knowledge.spi.Category.SCANNER);
   }
 
   @Test
@@ -77,6 +83,7 @@ class HoneypotFramingTest {
     b.addRelationship(Relationship.of(EntityRef.host(DECOY), "communicates-with", c2, Grade.MEASURED, "traffic"));
     CaseKnowledge board = b.build();
     assertThat(new VictimQuestion().answer(board)).hasSize(1);
+    assertThat(new HoneypotC2Question().answer(board)).isEmpty();
     assertThat(new HoneypotActivityQuestion().answer(board)).isEmpty();
   }
 
@@ -111,6 +118,7 @@ class HoneypotFramingTest {
           + " real users, so this is scanning or an attack");
       // Every host is a subject, the ones the headline only counts too.
       assertThat(ans.subjects()).hasSize(7).contains(EntityRef.host("192.0.2.1"));
+      assertThat(ans.attributes()).containsEntry("hostCount", 7);
     });
   }
 
@@ -126,6 +134,21 @@ class HoneypotFramingTest {
     assertThat(a).hasSize(HoneypotActivityQuestion.MAX_GROUPS + 1);
     assertThat(a.get(0).subjects()).containsExactly(EntityRef.host("192.0.2.13"));
     assertThat(a.get(a.size() - 1).headline()).startsWith("3 more hosts reached a honeypot");
+  }
+
+  @Test
+  void aGroupCarriesItsBusiestHostsAndCountsTheRest() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    b.addFinding(honeypot(DECOY, "Cowrie honeypot"));
+    int n = HoneypotActivityQuestion.MAX_SUBJECTS + 40;
+    for (int i = 1; i <= n; i++) b.addFinding(contact("192.0.2." + i, i, Map.of(DECOY, "Cowrie honeypot")));
+    Answer a = new HoneypotActivityQuestion().answer(b.build()).get(0);
+    assertThat(a.subjects()).hasSize(HoneypotActivityQuestion.MAX_SUBJECTS)
+        .startsWith(EntityRef.host("192.0.2." + n));
+    assertThat(a.basis()).hasSize(HoneypotActivityQuestion.MAX_SUBJECTS);
+    assertThat(a.attributes()).containsEntry("hostCount", n);
+    assertThat(a.headline()).startsWith(n + " hosts (");
+    assertThat(a.derivation().get(a.derivation().size() - 1).found()).startsWith("40 more hosts");
   }
 
   private static Finding download(String host) {

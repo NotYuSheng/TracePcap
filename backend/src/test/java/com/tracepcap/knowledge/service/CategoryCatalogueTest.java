@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tracepcap.knowledge.question.C2Question;
 import com.tracepcap.knowledge.question.DataTransferQuestion;
 import com.tracepcap.knowledge.question.DownloadsQuestion;
+import com.tracepcap.knowledge.question.HoneypotActivityQuestion;
+import com.tracepcap.knowledge.question.HoneypotC2Question;
 import com.tracepcap.knowledge.question.KerberosAttackQuestion;
 import com.tracepcap.knowledge.question.LateralMovementQuestion;
 import com.tracepcap.knowledge.question.MalwareQuestion;
@@ -25,7 +27,8 @@ class CategoryCatalogueTest {
   private static final List<StandardQuestion> QUESTIONS = List.of(
       new VictimQuestion(), new SignedInUserQuestion(), new MalwareQuestion(), new C2Question(),
       new DownloadsQuestion(), new DataTransferQuestion(), new RemoteAccessQuestion(),
-      new LateralMovementQuestion(), new KerberosAttackQuestion());
+      new LateralMovementQuestion(), new KerberosAttackQuestion(), new HoneypotActivityQuestion(),
+      new HoneypotC2Question());
 
   private final CategoryCatalogue catalogue = new CategoryCatalogue(QUESTIONS);
 
@@ -77,7 +80,8 @@ class CategoryCatalogueTest {
     assertThat(m.get(Category.C2_SERVER).questions()).containsExactly("c2");
     assertThat(m.get(Category.REMOTE_ACCESS_SERVER).questions()).containsExactly("remote-access");
     assertThat(m.get(Category.COMMAND_AND_CONTROL).questions())
-        .containsExactly("c2", "malware", "remote-access");
+        .containsExactly("c2", "honeypot-c2", "malware", "remote-access");
+    assertThat(m.get(Category.SCANNER).questions()).containsExactly("honeypot-activity");
     assertThat(m.get(Category.INITIAL_ACCESS).questions()).containsExactly("downloads");
     assertThat(m.get(Category.EXECUTION).questions()).containsExactly("downloads");
     assertThat(m.get(Category.CREDENTIAL_ACCESS).questions()).containsExactly("kerberos-attack");
@@ -89,7 +93,7 @@ class CategoryCatalogueTest {
   void aCategoryNoQuestionCoversIsStillListed() {
     var m = byCategory();
     for (Category c : List.of(Category.RECONNAISSANCE, Category.DISCOVERY, Category.DEFENSE_EVASION,
-        Category.COLLECTION, Category.IMPACT, Category.HONEYPOT, Category.SCANNER)) {
+        Category.COLLECTION, Category.IMPACT, Category.HONEYPOT)) {
       assertThat(m.get(c).unchecked()).as(c.name()).isTrue();
       assertThat(m.get(c).evidence()).as(c.name()).isEmpty();
     }

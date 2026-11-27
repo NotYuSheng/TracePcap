@@ -28,9 +28,21 @@ class HoneypotContributorTest {
   void aDecoyReachingOutAndDecoysProbingEachOtherDontCount() {
     var out = HoneypotContributor.contacts(List.of(
         new HostPair("198.51.100.22", "198.51.100.200", 2, 2, 0),
-        new HostPair("198.51.100.22", "198.51.100.45", 4, 2, 2),
-        // a UDP or mid-stream conversation: nobody known to have opened it
-        new HostPair("198.51.100.150", "198.51.100.22", 5, 0, 0)), DECOYS);
+        new HostPair("198.51.100.22", "198.51.100.45", 4, 2, 2)), DECOYS);
     assertThat(out).isEmpty();
+  }
+
+  @Test
+  void aConversationWithNoKnownOpenerDoesntCount() {
+    // A decoy's own DNS lookup to the resolver is UDP, opener unknown: the resolver isn't a scanner.
+    var out = HoneypotContributor.contacts(List.of(
+        new HostPair("10.0.0.53", "198.51.100.22", 5, 0, 0)), DECOYS);
+    assertThat(out).isEmpty();
+  }
+
+  @Test
+  void anAnalystsOwnLabelGetsTheRightArticle() {
+    assertThat(HoneypotContributor.article("Cowrie honeypot")).isEqualTo("a Cowrie honeypot");
+    assertThat(HoneypotContributor.article("Internal sensor")).isEqualTo("an Internal sensor");
   }
 }

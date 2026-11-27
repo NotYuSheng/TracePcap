@@ -2,6 +2,7 @@ package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.HostPair;
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.knowledge.service.HoneypotRoleService;
 import com.tracepcap.knowledge.service.HoneypotRoleService.HostRole;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
@@ -40,6 +41,12 @@ public class HoneypotContributor implements KnowledgeContributor {
 
   public static final String CONTACT = "honeypot-contact";
 
+  /**
+   * Hosts that reached a decoy posted to the board, the busiest first: an internet-facing decoy can
+   * draw tens of thousands of scanners. The questions only list a few of them anyway.
+   */
+  static final int MAX_CONTACTS = 500;
+
   /** Looked up when needed: a context without them (a test, a slice) still works. */
   private final ObjectProvider<HoneypotRoleService> roles;
 
@@ -73,24 +80,32 @@ public class HoneypotContributor implements KnowledgeContributor {
       attrs.put("basis", h.basis());
       board.addFinding(new Finding(HONEYPOT, h.described(), Severity.INFO,
           "HUMAN".equals(h.basis()) ? Grade.REPORTED : Grade.INFERRED, name(),
-          List.of(EntityRef.host(h.host())), List.of(), attrs));
+          List.of(ref(h.host())), List.of(), attrs));
     }
 
     ConversationLookup lookup = conversations.getIfAvailable();
     if (lookup == null) return;
-    contacts(lookup.hostPairs(context.fileId()), names).forEach((host, c) -> {
-      Map<String, Object> attrs = new LinkedHashMap<>();
-      attrs.put("host", host);
-      attrs.put("honeypots", Map.copyOf(c.reached));
-      attrs.put("conversations", c.conversations);
-      List<EntityRef> concerns = new java.util.ArrayList<>();
-      concerns.add(EntityRef.host(host));
-      c.reached.keySet().forEach(ip -> concerns.add(EntityRef.host(ip)));
-      board.addFinding(new Finding(CONTACT,
-          host + " opened " + c.conversations + " conversation" + (c.conversations == 1 ? "" : "s")
-              + " to " + String.join(", ", c.reached.keySet()),
-          Severity.MEDIUM, Grade.INFERRED, name(), concerns, List.of(), attrs));
-    });
+    Map<String, Contact> contacts = contacts(lookup.hostPairs(context.fileId()), names);
+    contacts.entrySet().stream()
+        .sorted(java.util.Comparator.comparingLong((Map.Entry<String, Contact> e) -> e.getValue().conversations)
+            .reversed().thenComparing(Map.Entry::getKey))
+        .limit(MAX_CONTACTS)
+        .forEach(e -> board.addFinding(contactFinding(e.getKey(), e.getValue())));
+  }
+
+  /** "198.51.100.101 reached 198.51.100.22 in 6 conversations", the host first among its concerns. */
+  private Finding contactFinding(String host, Contact c) {
+    Map<String, Object> attrs = new LinkedHashMap<>();
+    attrs.put("host", host);
+    attrs.put("honeypots", Map.copyOf(c.reached));
+    attrs.put("conversations", c.conversations);
+    List<EntityRef> concerns = new java.util.ArrayList<>();
+    concerns.add(ref(host));
+    c.reached.keySet().forEach(ip -> concerns.add(ref(ip)));
+    return new Finding(CONTACT,
+        host + " reached " + String.join(", ", c.reached.keySet()) + " in " + c.conversations
+            + " conversation" + (c.conversations == 1 ? "" : "s"),
+        Severity.MEDIUM, Grade.INFERRED, name(), concerns, List.of(), attrs);
   }
 
   /** Who reached a honeypot. */
@@ -103,6 +118,11 @@ public class HoneypotContributor implements KnowledgeContributor {
    * Every host that opened a conversation to a honeypot, and which ones. Another honeypot reaching
    * one doesn't count (decoys answer each other's probes in a lab), and neither does a conversation
    * the honeypot opened: that is its own reply or a scan back.
+   *
+   * <p>Only conversations with a known opener count, in practice TCP with a handshake. One with
+   * none (UDP, ARP, a connection already open when the capture began) can't say who reached whom:
+   * a decoy's own DNS lookups would make the resolver read as a scanner. A UDP-only sweep (SIP,
+   * SNMP) is missed for now.
    */
   static Map<String, Contact> contacts(List<HostPair> pairs, Map<String, String> honeypots) {
     Map<String, Contact> out = new TreeMap<>();
@@ -119,6 +139,17 @@ public class HoneypotContributor implements KnowledgeContributor {
     Contact c = out.computeIfAbsent(opener, k -> new Contact());
     c.reached.put(target, honeypots.get(target));
     c.conversations += opened;
+  }
+
+  /** A host inside the network, or one outside it: the board types them apart. */
+  private static EntityRef ref(String ip) {
+    return IpLocality.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
+  }
+
+  /** "a Cowrie honeypot", "an Internal sensor": an analyst's own label reads right too. */
+  public static String article(String name) {
+    return (name != null && !name.isEmpty() && "aeiouAEIOU".indexOf(name.charAt(0)) >= 0 ? "an " : "a ")
+        + name;
   }
 
   /** "Cowrie honeypot", "honeypot", or the analyst's own label ("T-Pot sensor"). */

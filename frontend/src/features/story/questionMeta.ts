@@ -10,4 +10,5 @@ export const QUESTION_META: Record<string, { label: string; icon: string }> = {
   'kerberos-attack': { label: 'Kerberos attack', icon: 'bi-key' },
   downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
   'honeypot-activity': { label: 'Reached a honeypot', icon: 'bi-bullseye' },
+  'honeypot-c2': { label: 'Honeypot reached a C2', icon: 'bi-bullseye' },
 };
