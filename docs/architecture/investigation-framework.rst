@@ -187,9 +187,9 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      - Yes
      -
    * - Scanner
-     - none
+     - ``honeypot-activity``
      - Yes
-     - Hosts sweeping ports or addresses
+     - Built for hosts that reached a honeypot (#1330); sweeps with no honeypot to catch them, not yet
    * - Honeypot
      - the honeypot role
      - Yes
@@ -247,7 +247,7 @@ fully or in part: Reconnaissance, Defense Evasion and Discovery, and partly Coll
      - Partly
      - Shares bulk-read before exfiltration
    * - Command and Control
-     - ``c2``, ``malware``, ``remote-access``
+     - ``c2``, ``malware``, ``remote-access``, ``honeypot-c2``
      - Yes
      -
    * - Exfiltration
@@ -476,6 +476,27 @@ How a honeypot changes other answers
 4. A capture **taken on a honeypot sensor** makes every inbound attack expected. That is capture
    context, so the whole summary is framed as a sensor log.
 
+How it's built (#1330): ``HoneypotContributor`` posts each honeypot (inferred, or set by an
+analyst) to the board as a ``honeypot`` finding, and each host that opened conversations to one as
+a ``honeypot-contact`` finding. A decoy's own conversations out, and decoys probing each other,
+don't count. The questions read them:
+
+- ``VictimQuestion`` leaves honeypots out. ``HoneypotC2Question`` (``honeypot-c2``, Command and
+  Control) answers a decoy that talked to a known C2 instead: "198.51.100.22, a Cowrie honeypot,
+  contacted the known C2 …: the attack it was set up to record, not an infection". The C2 is still
+  answered as one. It has its own key so it doesn't answer *Scanner*.
+- ``DownloadsQuestion`` says a decoy *caught* a file: "…, a Dionaea honeypot, caught x.exe (…) from
+  …: attacker tooling, not an infection. SHA-256 …".
+- ``HoneypotActivityQuestion`` (``honeypot-activity``, the *Scanner* category) names the hosts that
+  reached a decoy, those that reached the same decoys as one answer (the busiest 25 as its subjects,
+  the rest counted): "7 hosts (198.51.100.101, …) reached the Cowrie honeypot 198.51.100.22 and the
+  Dionaea honeypot 198.51.100.45 (242 conversations): a decoy has no real users, so this is
+  scanning or an attack". Only conversations with a known opener count, in practice TCP: one with
+  none (UDP, ARP) can't say who reached whom, and a decoy's own DNS lookups would make the resolver
+  read as a scanner. A UDP-only sweep (SIP, SNMP) is missed for now.
+
+Marking a host *Not a honeypot* takes it off the board, and every answer reads as before.
+
 Code changes
 ------------
 
@@ -554,16 +575,14 @@ Open questions
 
 - Tag with ATT&CK tactic ids only, or technique ids too (``T1021.002`` for SMB admin shares)?
   Techniques are more precise but need upkeep each ATT&CK release.
-- Should a honeypot change the other answers it touches (see `How a honeypot changes other
-  answers`_)? Phase 4 names the honeypot; the victim, downloads and scanner answers don't read it
-  yet.
 - High-interaction honeypots (PANDAcap, a real system) can't be told from a real server by what
   they send. Their tell is behaviour over time, such as every login accepted, which needs
   cleartext Telnet or FTP logins to count.
 - Should *Not observable* say what evidence would have answered it everywhere, as Lateral Movement
   does from the uplink?
 
-Decided: anything inferred gets an override and analyst evidence, as host roles have. The vantage
+Decided: a honeypot changes the answers it touches (see `How a honeypot changes other answers`_,
+#1330). Anything inferred gets an override and analyst evidence, as host roles have. The vantage
 point and the honeypot role have both. Test captures for phase 4: no public pcap exists, so the gate
 uses a scripted capture of the official images (``scripts/honeypot-capture.sh``).
 

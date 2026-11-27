@@ -172,6 +172,10 @@ questions and answers beside it:
   You can mark it *Not a honeypot*, or add evidence either way. Any host can be
   marked from its details drawer too (*Identity evidence*, under *Honeypot*),
   including one the signatures missed, such as a high-interaction honeypot.
+  A honeypot changes the answers it touches: it is never the victim, a file it
+  fetched is reported as attacker tooling it caught, and the hosts that reached it
+  answer *Scanner* ("7 hosts … reached the Cowrie honeypot …: a decoy has no real
+  users, so this is scanning or an attack").
   Then one sentence and one bar count the investigation's categories by status:
   "Nothing is concluded yet. 17 are still open and 4 can't be seen in this
   capture." Under it:

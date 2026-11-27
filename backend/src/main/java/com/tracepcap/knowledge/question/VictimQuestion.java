@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.question;
 
+import com.tracepcap.knowledge.contributor.HoneypotContributor;
 import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.EntityRef;
@@ -21,6 +22,9 @@ import org.springframework.stereotype.Component;
  * C2 (a {@code communicates-with} edge to an external that a {@code c2-of} edge marks). Keyed on the
  * C2, not on "any host in any IDS alert", so the domain controller a policy alert happens to mention
  * is not mislabelled a victim. Enriched with the signed-in user so the answer is a real lead.
+ *
+ * <p>A honeypot is never a victim: it talks to the C2 because it was built to be attacked, so {@link
+ * HoneypotActivityQuestion} answers it, as the attack it recorded.
  */
 @Component
 public class VictimQuestion implements StandardQuestion {
@@ -49,8 +53,10 @@ public class VictimQuestion implements StandardQuestion {
     // per alerted conversation plus the aggregated traffic edge — can name the same C2)
     Map<EntityRef, Set<String>> victims = new LinkedHashMap<>();
     Map<EntityRef, Set<EntityRef>> contacted = new LinkedHashMap<>();
+    Set<String> decoys = HoneypotContributor.honeypots(board).keySet();
     for (Relationship comm : board.relationshipsWithPredicate("communicates-with")) {
-      if (comm.from().type() == EntityType.HOST && c2s.contains(comm.to())) {
+      if (comm.from().type() == EntityType.HOST && c2s.contains(comm.to())
+          && !decoys.contains(comm.from().key())) {
         victims.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>())
             .add("contacted C2 " + comm.to().key());
         contacted.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>()).add(comm.to());
