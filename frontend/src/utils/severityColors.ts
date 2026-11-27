@@ -35,14 +35,17 @@ export function severityIcon(severity: string | null | undefined): string {
   return SEVERITY_ICON[severity as MonitorSeverity] ?? 'bi-circle-fill';
 }
 
-/** Bootstrap `bg` variant, for the SGDS/Bootstrap Badge in the legend copy. */
-export function severityBadgeBg(severity: string | null | undefined): string {
+/** A Story finding's severity (CRITICAL, HIGH, MEDIUM, LOW) as a Badge's `bg` variant. */
+export function findingBadgeBg(severity: string | null | undefined): string {
   switch (severity) {
-    case 'CRITICAL':
-      return 'danger';
-    case 'WARNING':
-      return 'warning';
-    default:
-      return 'secondary';
+    case 'CRITICAL': return 'danger';
+    case 'HIGH': return 'warning';
+    case 'MEDIUM': return 'info';
+    default: return 'secondary';
   }
+}
+
+/** Dark text on the light badges (HIGH's yellow, MEDIUM's cyan), so they stay readable. */
+export function findingBadgeText(severity: string | null | undefined): 'dark' | undefined {
+  return severity === 'HIGH' || severity === 'MEDIUM' ? 'dark' : undefined;
 }

@@ -205,7 +205,7 @@ export function TimeScrubber({
     set(next);
   };
 
-  const pct = (t: number) => ((t - bounds.from) / span) * 100;
+  const leftPct = (t: number) => ((t - bounds.from) / span) * 100;
 
   const settings = (
     <Popover id="time-scrubber-settings" className="ts-popover">
@@ -325,7 +325,7 @@ export function TimeScrubber({
           })}
         </div>
         {win && (
-          <div className="ts-window" style={{ left: `${pct(win.from)}%`, width: `${Math.max(0.5, pct(win.to) - pct(win.from))}%` }}>
+          <div className="ts-window" style={{ left: `${leftPct(win.from)}%`, width: `${Math.max(0.5, leftPct(win.to) - leftPct(win.from))}%` }}>
             <span className="ts-handle ts-handle-from" />
             <span className="ts-handle ts-handle-to" />
           </div>

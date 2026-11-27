@@ -47,13 +47,13 @@ CONCEPT = re.compile(
 # (not a call or an abstract signature).
 JAVA_DEF = re.compile(
     r"""^\s*(?:(?:public|protected|private|static|final|synchronized|default|@\w+(?:\([^)]*\))?)\s+)*"""
-    r"""(?!return\b|new\b|else\b|throw\b)[\w<>\[\],.?]+(?:\s*<[^>]*>)?\s+(\w+)\s*\([^;=]*$"""
+    r"""(?!return\b|new\b|else\b|throw\b)[\w<>\[\],.?]+(?:\s*<[^>]*>)?\s+(\w+)\s*\([^;]*$"""
 )
 JAVA_KEYWORDS = {"if", "for", "while", "switch", "catch", "synchronized", "return", "new"}
 # A TypeScript function: `function name(`, `const name = (…) =>`, `const name = function`.
 TS_DEF = re.compile(
     r"""^\s*(?:export\s+(?:default\s+)?)?(?:(?:async\s+)?function\*?\s+(\w+)\s*[<(]"""
-    r"""|(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\([^)]*\)|\w+)\s*(?::\s*[^=]+)?=>"""
+    r"""|(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\(.*\)|\w+)\s*(?::\s*[^=]+)?=>"""
     r"""|(?:const|let)\s+(\w+)\s*=\s*function\b"""
     # a class or object-literal method: `formatBytes(n: number): string {`
     r"""|(?:(?:public|private|protected|static|async|readonly)\s+)*(\w+)\s*(?:<[^>]*>)?\([^)]*\)\s*(?::\s*[^{=]+)?\{\s*$)"""

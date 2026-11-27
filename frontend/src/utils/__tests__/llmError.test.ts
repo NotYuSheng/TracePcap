@@ -37,14 +37,14 @@ describe('describeLlmError', () => {
     ['the client', Object.assign(new Error('timeout'), { code: 'ECONNABORTED' })],
   ])('explains a timeout from %s using the caller wording', (_, err) => {
     expect(describeLlmError(err, options)).toBe(
-      'Story generation timed out after 15 minutes. ' +
+      'Story generation timed out after 15 min. ' +
         'The LLM is responding but took too long — try again or reduce the capture size.'
     );
   });
 
-  it('counts short timeouts in seconds', () => {
+  it('counts short timeouts in seconds, as formatSpan writes them', () => {
     const err = httpError(502, { errorCode: 'LLM_TIMEOUT' });
-    expect(describeLlmError(err, { ...options, timeoutMs: 1000 })).toContain('after 1 second.');
+    expect(describeLlmError(err, { ...options, timeoutMs: 1000 })).toContain('after 1 s.');
   });
 
   it('falls back to the error message, then the caller fallback', () => {

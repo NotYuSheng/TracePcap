@@ -3,10 +3,10 @@
  * the helpers the Overview's "Worth a look" and Story's summary share.
  */
 import type { CategoryLead, CategoryStatus } from '@/types';
+import { plural } from '@/utils/formatters';
 
 type Status = CategoryStatus['status'];
 
-export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export interface WorthALookGroup {
   key: string;

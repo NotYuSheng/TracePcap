@@ -85,14 +85,15 @@ const PLURAL: Record<string, string> = {
   'missing baselined item': 'missing baselined items',
   'new ISP': 'new ISPs',
 };
-const plural = (kind: string, n: number) => (n === 1 ? kind : (PLURAL[kind] ?? `${kind}s`));
+/** The change kind's noun for a count: "new device" / "new devices". */
+const kindNoun = (kind: string, n: number) => (n === 1 ? kind : (PLURAL[kind] ?? `${kind}s`));
 /** "164 new devices · 7 new apps · 2 gateway changes", biggest first. */
 export function changeSummary(events: ChangeEvent[]): string {
   const counts = new Map<string, number>();
   for (const e of events) counts.set(changeKind(e), (counts.get(changeKind(e)) ?? 0) + 1);
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([kind, n]) => `${n.toLocaleString()} ${plural(kind, n)}`)
+    .map(([kind, n]) => `${n.toLocaleString()} ${kindNoun(kind, n)}`)
     .join(' · ');
 }
 

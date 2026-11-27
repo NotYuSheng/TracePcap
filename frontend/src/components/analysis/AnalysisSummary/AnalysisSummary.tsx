@@ -1,6 +1,6 @@
 import type { AnalysisSummary as AnalysisSummaryType } from '@/types';
 import './AnalysisSummary.css';
-import { formatBytes } from '@/utils/formatters';
+import { formatBytes, formatDuration, formatNumber } from '@/utils/formatters';
 
 interface AnalysisSummaryProps {
   summary: AnalysisSummaryType;
@@ -8,31 +8,6 @@ interface AnalysisSummaryProps {
 }
 
 export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummaryProps) => {
-
-  const formatDuration = (
-    start: number | undefined | null,
-    end: number | undefined | null
-  ): string => {
-    if (!start || !end) return 'N/A';
-    const durationMs = end - start;
-    const seconds = Math.floor(durationMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    // If more than 48 hours, show in days with 1 decimal place
-    if (hours > 48) {
-      const days = hours / 24;
-      return `${days.toFixed(1)} days`;
-    }
-
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-    return `${seconds}s`;
-  };
-
-  const formatNumber = (num: number | undefined | null): string => {
-    return num?.toLocaleString() || '0';
-  };
 
   return (
     <div className="analysis-summary">
@@ -65,7 +40,7 @@ export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummar
           </div>
           <div className="card-content">
             <div className="card-label">Total Packets</div>
-            <div className="card-value">{formatNumber(summary.totalPackets)}</div>
+            <div className="card-value">{formatNumber(summary.totalPackets ?? 0)}</div>
           </div>
         </div>
 
@@ -76,7 +51,7 @@ export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummar
           <div className="card-content">
             <div className="card-label">Duration</div>
             <div className="card-value">
-              {formatDuration(summary.timeRange?.[0], summary.timeRange?.[1])}
+              {summary.timeRange?.[0] && summary.timeRange?.[1] ? formatDuration(Math.max(0, Math.round(summary.timeRange[1] - summary.timeRange[0]))) : 'N/A'}
             </div>
           </div>
         </div>

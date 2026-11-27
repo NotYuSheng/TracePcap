@@ -1,3 +1,4 @@
+import { formatSpan } from '@/utils/formatters';
 /**
  * Whether a 502 came from nginx because the backend itself is down.
  *
@@ -14,13 +15,6 @@ const BACKEND_UNREACHABLE_MESSAGE =
 
 const LLM_UNREACHABLE_MESSAGE =
   'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.';
-
-function formatDuration(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds} second${seconds !== 1 ? 's' : ''}`;
-  const minutes = Math.round(seconds / 60);
-  return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
-}
 
 export interface LlmErrorOptions {
   /** What timed out, as it should read at the start of a sentence. */
@@ -44,7 +38,7 @@ export function describeLlmError(err: unknown, options: LlmErrorOptions): string
   if (errorCode === 'LLM_UNREACHABLE') return LLM_UNREACHABLE_MESSAGE;
   if (errorCode === 'LLM_TIMEOUT' || code === 'ECONNABORTED') {
     return (
-      `${options.subject} timed out after ${formatDuration(options.timeoutMs)}. ` +
+      `${options.subject} timed out after ${formatSpan(options.timeoutMs)}. ` +
       `The LLM is responding but took too long — try again or ${options.timeoutHint}.`
     );
   }
