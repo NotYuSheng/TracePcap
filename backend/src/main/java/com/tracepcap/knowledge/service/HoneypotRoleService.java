@@ -218,6 +218,28 @@ public class HoneypotRoleService {
     return new HoneypotReport(List.copyOf(out), single, checked, file.version());
   }
 
+  /**
+   * One host's role, whatever it shows: its signatures and behaviour read like {@link #forFile}'s,
+   * with no {@value #MAX_EXAMINED}-host cap, plus analyst evidence and any override. A host with no
+   * signal still gets an answer (undetermined), so an analyst can mark one the signatures missed.
+   */
+  public HoneypotReport forHost(UUID fileId, String host) {
+    SignatureFile file = signatures();
+    List<String[]> seen = observations(fileId).getOrDefault(host, List.of());
+    List<Signal> all = new ArrayList<>(signatureSignals(seen, file.signatures()));
+    all.addAll(behaviourSignals(host, conversations.hostPairs(fileId),
+        conversations.distinctAnsweredPorts(fileId, host), seen));
+    // The same query and order forFile reads, so the drawer and the Story summary agree on a host
+    // with more than one label of the analyst's own.
+    HostRole inferred = decide(host, all, evidence.findByQuestionAndFileId(QUESTION, fileId).stream()
+        .filter(e -> host.equals(e.getEntityKey())).toList());
+    HostRole role = overrides.find(QUESTION, fileId, host)
+        .map(o -> overridden(inferred, o.getLabel(), o.getRationale(), o.getActor()))
+        .orElse(inferred);
+    int checked = seen.stream().anyMatch(o -> !"ttl".equals(o[0])) ? 1 : 0;
+    return new HoneypotReport(List.of(role), 0, checked, file.version());
+  }
+
   // ── What each server said ─────────────────────────────────────────────────────────────────
 
   /** Per server: each (kind, value, port) it sent, banners and certificates both. */
@@ -360,7 +382,9 @@ public class HoneypotRoleService {
           String.join("; ", againstReasons), null);
     }
     if (!concluded) {
-      return new HostRole(host, null, honeypot, signals.isEmpty() ? "HUMAN" : "MACHINE", forIt,
+      // Only analyst evidence, short of settling it, is theirs; nothing at all is no one's word.
+      String basis = signals.isEmpty() && !analyst.isEmpty() ? "HUMAN" : "MACHINE";
+      return new HostRole(host, null, honeypot, basis, forIt,
           contested, candidates, all, notEnough(all, signature, forIt), null);
     }
     String basis = signals.isEmpty() ? "HUMAN" : "MACHINE";
@@ -370,6 +394,9 @@ public class HoneypotRoleService {
 
   /** Why a host's signals fall short. */
   static String notEnough(List<Signal> signals, boolean signature, int points) {
+    if (signals.isEmpty()) {
+      return "nothing it sent matches a honeypot signature, and it doesn't behave like a decoy";
+    }
     if (signals.stream().allMatch(s -> "analyst".equals(s.source()))) {
       return "only analyst evidence, worth " + points + " points of the " + CONCLUDE + " it needs";
     }

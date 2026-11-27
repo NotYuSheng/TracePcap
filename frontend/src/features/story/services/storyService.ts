@@ -1,6 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import type { Answer, InvestigationReport, Story, Considered, CategoryStatus } from '@/types';
+import type { Answer, InvestigationReport, Story, Considered, CategoryStatus, Honeypots } from '@/types';
 
 /** Goal → the standard-question key the panel already has a label and icon for. */
 export const GOAL_QUESTION: Record<string, string> = {
@@ -74,6 +74,12 @@ export const storyService = {
   /** The investigation as reported: every standing goal with its outcome, answered or not. */
   getInvestigationReport: async (fileId: string): Promise<InvestigationReport> => {
     const response = await apiClient.get<InvestigationReport>(API_ENDPOINTS.INVESTIGATION(fileId));
+    return response.data;
+  },
+
+  /** One host's honeypot role: its signals, analyst evidence and any override, as one-host Honeypots. */
+  getHoneypotRole: async (fileId: string, ip: string): Promise<Honeypots> => {
+    const response = await apiClient.get<Honeypots>(API_ENDPOINTS.HONEYPOT_ROLE(fileId, ip));
     return response.data;
   },
 

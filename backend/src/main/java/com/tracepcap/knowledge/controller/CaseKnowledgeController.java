@@ -64,4 +64,18 @@ public class CaseKnowledgeController {
     return ResponseEntity.ok(InvestigationReportResponse.from(
         report, categoryCoverage.coverage(fileId, report, context, honeypots), context, honeypots));
   }
+
+  @GetMapping("/{fileId}/honeypots/{ip}")
+  @Operation(
+      summary = "One host's honeypot role",
+      description =
+          "Whether this host reads as a honeypot, from its banners, certificates and behaviour,"
+              + " with analyst evidence and any override. Answers for any host, with no signal"
+              + " too, so an analyst can mark one the signatures missed: override or add evidence"
+              + " at the adjudication endpoints for the returned question and the host's address.")
+  public ResponseEntity<InvestigationReportResponse.HoneypotsResponse> getHoneypotRole(
+      @PathVariable UUID fileId, @PathVariable String ip) {
+    return ResponseEntity.ok(
+        InvestigationReportResponse.HoneypotsResponse.from(honeypotRoles.forHost(fileId, ip)));
+  }
 }

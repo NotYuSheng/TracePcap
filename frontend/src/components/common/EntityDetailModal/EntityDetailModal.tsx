@@ -9,6 +9,7 @@ import { useIpSnapshotHistory } from './hooks/useIpSnapshotHistory';
 import { RoleSection } from './sections/RoleSection';
 import { Alert } from '@components/common/Alert';
 import { HostIdentitySection } from '@components/common/HostIdentitySection';
+import { HoneypotRoleSection } from '@components/common/HostIdentitySection/HoneypotRoleSection';
 import { EntityStatsSection } from './sections/EntityStatsSection';
 import { SnapshotHistoryTable } from './sections/SnapshotHistoryTable';
 import { CaptureHistoryTable } from './sections/CaptureHistoryTable';
@@ -256,14 +257,18 @@ export function EntityDetailModal({
                   </>
                 )}
                 {activeTab === 'identity' && canIdentify && (
-                  <HostIdentitySection
-                    fileId={fileId}
-                    ip={entityType === 'IP' ? entityKey : node.data.ip}
-                    occupancyIdx={nodeDevice?.idx}
-                    deviceKey={nodeDevice?.key}
-                    fromGraphNode={!!nodeDevice}
-                    onSelectDevice={(idx, key) => setDevice({ idx, key })}
-                  />
+                  <>
+                    <HostIdentitySection
+                      fileId={fileId}
+                      ip={entityType === 'IP' ? entityKey : node.data.ip}
+                      occupancyIdx={nodeDevice?.idx}
+                      deviceKey={nodeDevice?.key}
+                      fromGraphNode={!!nodeDevice}
+                      onSelectDevice={(idx, key) => setDevice({ idx, key })}
+                    />
+                    {/* Beside, not inside: the identity's reload spinner mustn't unmount its form. */}
+                    <HoneypotRoleSection fileId={fileId} ip={entityType === 'IP' ? entityKey : node.data.ip} />
+                  </>
                 )}
                 {activeTab === 'history' &&
                   // Opened from a monitored network: its history across the network's captures.
@@ -377,14 +382,17 @@ export function EntityDetailModal({
                 {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
                 {entityType === 'IP' && fileId && (
-                  <HostIdentitySection
-                    fileId={fileId}
-                    ip={entityKey}
-                    occupancyIdx={nodeDevice?.idx}
-                    deviceKey={nodeDevice?.key}
-                    fromGraphNode={!!nodeDevice}
-                    onSelectDevice={(idx, key) => setDevice({ idx, key })}
-                  />
+                  <>
+                    <HostIdentitySection
+                      fileId={fileId}
+                      ip={entityKey}
+                      occupancyIdx={nodeDevice?.idx}
+                      deviceKey={nodeDevice?.key}
+                      fromGraphNode={!!nodeDevice}
+                      onSelectDevice={(idx, key) => setDevice({ idx, key })}
+                    />
+                    <HoneypotRoleSection fileId={fileId} ip={entityKey} />
+                  </>
                 )}
 
                 {hasFileStats && (

@@ -55,6 +55,8 @@ export const API_ENDPOINTS = {
   CAPTURE_QUALITY: (fileId: string) => `/files/${fileId}/capture-quality`,
   /** Goal-driven autonomous investigation report — producers plus pivots (#819). */
   INVESTIGATION: (fileId: string) => `/files/${fileId}/investigation`,
+  /** One host's honeypot role, with no signal too, so an analyst can mark any host. */
+  HONEYPOT_ROLE: (fileId: string, ip: string) => `/files/${fileId}/honeypots/${encodeURIComponent(ip)}`,
   HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,
   /** Full explainable classification (verdict + evidence axes) for one host. */
   HOST_IDENTITY_EVIDENCE: (fileId: string, ip: string) =>

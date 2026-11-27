@@ -169,7 +169,9 @@ questions and answers beside it:
   A host that reads as a honeypot gets a line of its own ("198.51.100.45 is a
   Dionaea honeypot · inferred, 95%"), and its *Why · change* lists the signals:
   the signatures it matched (a stock banner or certificate) and how it behaves.
-  You can mark it *Not a honeypot*, or add evidence either way.
+  You can mark it *Not a honeypot*, or add evidence either way. Any host can be
+  marked from its details drawer too (*Identity evidence*, under *Honeypot*),
+  including one the signatures missed, such as a high-interaction honeypot.
   Then one sentence and one bar count the investigation's categories by status:
   "Nothing is concluded yet. 17 are still open and 4 can't be seen in this
   capture." Under it:
