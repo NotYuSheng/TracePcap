@@ -87,5 +87,8 @@ describe('isUnspecified / isHostAddress (as the backend IpLocality answers them)
     expect(isHostAddress('ff02::fb')).toBe(false);
     expect(isHostAddress('FF:FF:FF:FF:FF:FF')).toBe(false);
     expect(isHostAddress('not-an-ip')).toBe(true); // unparseable: callers keep treating it as a host
+    expect(isHostAddress('300.0.0.1')).toBe(true); // an octet past 255 is unparseable, as on the backend
+    expect(isHostAddress(undefined)).toBe(false);
+    expect(isUnspecified(null)).toBe(false);
   });
 });

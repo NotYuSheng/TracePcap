@@ -56,7 +56,8 @@ export function isPrivateIp(ip: string, customRanges: CustomPrivateRange[] = [])
  * The unspecified address, `0.0.0.0` or `::`: what a client sends from before it has an address (a
  * DHCP request). The backend's `IpLocality.isUnspecified`.
  */
-export function isUnspecified(ip: string): boolean {
+export function isUnspecified(ip: string | null | undefined): boolean {
+  if (!ip) return false;
   const a = ip.trim();
   return a === '0.0.0.0' || a === '::';
 }
@@ -66,12 +67,14 @@ export function isUnspecified(ip: string): boolean {
  * multicast and reserved space (224.0.0.0 and up), IPv6 multicast (`ff00::/8`) and the broadcast
  * MAC. Anything it can't parse counts as a host. The backend's `IpLocality.isHostAddress`.
  */
-export function isHostAddress(ip: string): boolean {
+export function isHostAddress(ip: string | null | undefined): boolean {
+  if (!ip) return false;
   const a = ip.trim().toLowerCase();
   if (!a || a === 'ff:ff:ff:ff:ff:ff' || isUnspecified(a)) return false;
   if (!a.includes(':')) {
     const parts = a.split('.');
-    if (parts.length !== 4 || parts.some(p => !/^\d{1,3}$/.test(p))) return true;
+    // Unparseable (not four octets of 0–255) counts as a host, as the backend's toLong does.
+    if (parts.length !== 4 || parts.some(p => !/^\d{1,3}$/.test(p) || Number(p) > 255)) return true;
     return Number(parts[0]) < 224;
   }
   const first = a.slice(0, a.indexOf(':'));

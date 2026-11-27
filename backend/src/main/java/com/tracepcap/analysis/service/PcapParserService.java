@@ -1,8 +1,8 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.common.TsharkHexUtil;
+import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;

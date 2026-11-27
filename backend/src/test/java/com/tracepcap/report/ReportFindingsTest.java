@@ -8,6 +8,7 @@ import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.Findings;
 import com.tracepcap.analysis.spi.ConversationLookup.FlowIdentity;
 import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
+import com.tracepcap.common.net.IpLocality;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -114,11 +115,13 @@ class ReportFindingsTest {
 
   @Test
   void broadcastMulticastAndUnspecifiedAreNotHosts() {
-    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("93.184.216.50")).isTrue();
-    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("0.0.0.0")).isFalse();
-    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("255.255.255.255")).isFalse();
-    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("224.0.0.251")).isFalse();
-    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("ff02::fb")).isFalse();
+    assertThat(IpLocality.isHostAddress("93.184.216.50")).isTrue();
+    assertThat(IpLocality.isHostAddress("0.0.0.0")).isFalse();
+    assertThat(IpLocality.isHostAddress("255.255.255.255")).isFalse();
+    assertThat(IpLocality.isHostAddress("224.0.0.251")).isFalse();
+    assertThat(IpLocality.isHostAddress("ff02::fb")).isFalse();
+    // Reserved 240.0.0.0/4 too (#1339): no device holds it, so the report no longer counts one.
+    assertThat(IpLocality.isHostAddress("240.0.0.5")).isFalse();
   }
 
   @Test

@@ -73,6 +73,16 @@ describe('networkGroups', () => {
     expect(find(tree, 'special')?.nodeIds).not.toContain('10.20.31.255')
   })
 
+  it('groups multicast and reserved 240.0.0.0/4 with the broadcasts, as isHostAddress reads them (#1339)', () => {
+    const tree = buildGroupTree([
+      node('93.184.216.34'),
+      node('224.0.0.251'),
+      node('240.1.2.3'),
+    ])
+    expect(find(tree, 'special')?.nodeIds).toEqual(expect.arrayContaining(['224.0.0.251', '240.1.2.3']))
+    expect(find(tree, 'special')?.nodeIds).not.toContain('93.184.216.34')
+  })
+
   it('puts a client nobody answered in the network on the VLAN it asked on', () => {
     const devices = { ...seg('vlan:30', 'devices.office.example', [['10.20.30.31', 'aa:00:00:00:00:31']], '10.20.30'),
       unanswered: [{ mac: 'b8:27:eb:5e:00:01', hostname: 'raspberrypi', vlanId: 30, requests: 6 }] }

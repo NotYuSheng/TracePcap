@@ -258,8 +258,10 @@ public class DhcpLeaseResolverService {
     noteAsking(f, type, at, vendorClass, asking, acked);
     String ip =
         switch (type) {
-          case "5" -> IpLocality.isAssigned(f[2]) ? f[2].trim() : IpLocality.isAssigned(f[3]) ? f[3].trim() : null;
-          case "3" -> IpLocality.isAssigned(f[4]) ? f[4].trim() : IpLocality.isAssigned(f[3]) ? f[3].trim() : null;
+          case "5" ->
+              IpLocality.isAssigned(f[2]) ? f[2].trim() : IpLocality.isAssigned(f[3]) ? f[3].trim() : null;
+          case "3" ->
+              IpLocality.isAssigned(f[4]) ? f[4].trim() : IpLocality.isAssigned(f[3]) ? f[3].trim() : null;
           default -> null;
         };
     String mac = f[5].trim().toLowerCase();
