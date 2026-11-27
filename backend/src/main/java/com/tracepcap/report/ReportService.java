@@ -1,5 +1,6 @@
 package com.tracepcap.report;
 
+import com.tracepcap.common.text.Humanize;
 import static com.tracepcap.report.ReportPdf.cell;
 import static com.tracepcap.report.ReportPdf.font;
 import static com.tracepcap.report.ReportPdf.heading;
@@ -276,11 +277,11 @@ public class ReportService {
         when += " to " + (s.endTime().toLocalDate().equals(s.startTime().toLocalDate())
             ? s.endTime().format(HM) : s.endTime().format(DAY) + ", " + s.endTime().format(HM));
       }
-      if (s.durationMs() != null) when += " (" + duration(s.durationMs()) + ")";
+      if (s.durationMs() != null) when += " (" + Humanize.span(s.durationMs()) + ")";
       parts.add(when);
     }
     if (s != null) parts.add(String.format("%,d packets", s.packetCount()));
-    if (s != null) parts.add(bytes(s.totalBytes()));
+    if (s != null) parts.add(Humanize.bytes(s.totalBytes()));
     parts.add(req.getNetworkId() != null ? "with a monitored network's detection rules" : "with the shared detection rules");
     return String.join(" · ", parts);
   }
@@ -550,7 +551,7 @@ public class ReportService {
             t.addCell(cell(label.getOrDefault(e.getTargetId(), e.getTargetId()), ReportPdf.small()));
             t.addCell(cell(e.getDominantProtocol(), ReportPdf.small()));
             t.addCell(right(String.format("%,d", e.getConversationCount()), ReportPdf.small()));
-            t.addCell(right(bytes(e.getTotalBytes()), ReportPdf.small()));
+            t.addCell(right(Humanize.bytes(e.getTotalBytes()), ReportPdf.small()));
           });
       doc.add(t);
     }
@@ -562,7 +563,7 @@ public class ReportService {
           .forEach(e -> {
             t.addCell(cell(e.getKey(), ReportPdf.small()));
             t.addCell(right(String.format("%,d", stat(e.getValue(), "packetCount")), ReportPdf.small()));
-            t.addCell(right(bytes(stat(e.getValue(), "bytes")), ReportPdf.small()));
+            t.addCell(right(Humanize.bytes(stat(e.getValue(), "bytes")), ReportPdf.small()));
             t.addCell(right(String.format("%.1f%%", statD(e.getValue(), "percentage")), ReportPdf.small()));
           });
       doc.add(t);
@@ -582,7 +583,7 @@ public class ReportService {
     for (NamedTotals n : rows) {
       t.addCell(cell(n.name(), ReportPdf.small()));
       t.addCell(right(String.format("%,d", n.packetCount()), ReportPdf.small()));
-      if (withBytes) t.addCell(right(bytes(n.totalBytes()), ReportPdf.small()));
+      if (withBytes) t.addCell(right(Humanize.bytes(n.totalBytes()), ReportPdf.small()));
     }
     doc.add(t);
   }
@@ -612,7 +613,7 @@ public class ReportService {
         t.addCell(cell(r[0], ReportPdf.mono()));
         t.addCell(cell(r[1], ReportPdf.small()));
         t.addCell(right(String.format("%,d", Long.parseLong(r[2])), ReportPdf.small()));
-        t.addCell(right(bytes(Long.parseLong(r[3])), ReportPdf.small()));
+        t.addCell(right(Humanize.bytes(Long.parseLong(r[3])), ReportPdf.small()));
       }
       doc.add(t);
     }
@@ -633,11 +634,11 @@ public class ReportService {
       t.addCell(cell(names.label(to, fl.startTime()) + (port != null ? " :" + port : ""), ReportPdf.small()));
       t.addCell(cell(ReportFindings.app(c), ReportPdf.small()));
       if (withFlags) {
-        t.addCell(right(bytes(fl.totalBytes()), ReportPdf.small()));
+        t.addCell(right(Humanize.bytes(fl.totalBytes()), ReportPdf.small()));
         t.addCell(cell(ReportFindings.flagText(c), font(7.2f, Font.NORMAL, ReportPdf.MUTED)));
       } else {
         t.addCell(right(String.format("%,d", fl.packetCount()), ReportPdf.small()));
-        t.addCell(right(bytes(fl.totalBytes()), ReportPdf.small()));
+        t.addCell(right(Humanize.bytes(fl.totalBytes()), ReportPdf.small()));
       }
     }
     return t;
@@ -651,7 +652,7 @@ public class ReportService {
     for (ExtractedFileEntity ef : files) {
       t.addCell(cell(ef.getFilename(), ReportPdf.small()));
       t.addCell(cell(ef.getMimeType(), ReportPdf.small()));
-      t.addCell(right(ef.getFileSize() != null ? bytes(ef.getFileSize()) : "—", ReportPdf.small()));
+      t.addCell(right(ef.getFileSize() != null ? Humanize.bytes(ef.getFileSize()) : "—", ReportPdf.small()));
       t.addCell(cell(ef.getExtractionMethod(), ReportPdf.small()));
       t.addCell(cell(ef.getSha256(), font(6.4f, Font.NORMAL, ReportPdf.TEXT)));
     }
@@ -709,7 +710,7 @@ public class ReportService {
     long b = realBytes(n);
     t.addCell(cell(n.getLabel(), ReportPdf.small()));
     t.addCell(right(String.valueOf(realHosts(n).size()), ReportPdf.small()));
-    t.addCell(right(bytes(b), ReportPdf.small()));
+    t.addCell(right(Humanize.bytes(b), ReportPdf.small()));
     t.addCell(right(total > 0 ? String.format("%.1f%%", 100.0 * b / total) : "—", ReportPdf.small()));
   }
 
@@ -785,24 +786,6 @@ public class ReportService {
   private static String cap(String s) {
     String l = s.toLowerCase();
     return Character.toUpperCase(l.charAt(0)) + l.substring(1);
-  }
-
-  static String bytes(long b) {
-    if (b < 1024) return b + " B";
-    if (b < 1024 * 1024) return String.format("%.1f KB", b / 1024.0);
-    if (b < 1024L * 1024 * 1024) return String.format("%.1f MB", b / (1024.0 * 1024));
-    return String.format("%.2f GB", b / (1024.0 * 1024 * 1024));
-  }
-
-  static String duration(long ms) {
-    long s = ms / 1000;
-    if (s < 60) return s + " s";
-    long m = Math.round(s / 60.0);
-    if (m < 60) return m + " min";
-    long h = m / 60;
-    if (h < 48) return h + " h " + (m % 60) + " min";
-    long d = Math.round(h / 24.0);
-    return d < 730 ? d + " days" : Math.round(d / 365.0) + " years";
   }
 
   private static long stat(Object stat, String key) {

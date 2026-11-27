@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.dto.CaptureQualityResponse;
 import com.tracepcap.analysis.dto.CaptureQualityResponse.Note;
 import com.tracepcap.analysis.entity.CaptureStatsEntity;
@@ -88,13 +89,12 @@ public class CaptureQualityService implements CaptureQualityLookup {
               + " pcapng) does this."));
     }
     if (s != null && pos(s.getReassemblyGaps())) {
-      out.add(note("gaps", "warning", s.getReassemblyGaps() + " gap" + plural(s.getReassemblyGaps())
+      out.add(note("gaps", "warning", Humanize.plural(s.getReassemblyGaps(), "gap")
           + " in TCP streams: packets are missing from the capture, so alerts and files in those"
           + " streams can be missed."));
     }
     if (s != null && pos(s.getMemcapDrops())) {
-      out.add(note("memcap", "warning", "Suricata ran out of memory " + s.getMemcapDrops() + " time"
-          + plural(s.getMemcapDrops()) + " on this capture, so some traffic wasn't inspected."));
+      out.add(note("memcap", "warning", "Suricata ran out of memory " + Humanize.plural(s.getMemcapDrops(), "time") + " on this capture, so some traffic wasn't inspected."));
     }
     // Every connection mid-stream is the case that needs this most (a capture that began after its
     // sessions did). Captures analysed before connection outcomes existed (#1233) have no transport
@@ -105,12 +105,12 @@ public class CaptureQualityService implements CaptureQualityLookup {
           + " how they started, and which side opened them, isn't in it."));
     }
     if (s != null && pos(s.getInvalidPackets())) {
-      out.add(note("invalid", "info", s.getInvalidPackets() + " packet" + plural(s.getInvalidPackets())
+      out.add(note("invalid", "info", Humanize.plural(s.getInvalidPackets(), "packet")
           + " couldn't be decoded (truncated or malformed)."));
     }
     if (s != null && pos(s.getStreamDepthReached())) {
-      out.add(note("depth", "info", s.getStreamDepthReached() + " TCP session"
-          + plural(s.getStreamDepthReached()) + " ran past the first 1 MiB Suricata inspects in each:"
+      out.add(note("depth", "info", Humanize.plural(s.getStreamDepthReached(), "TCP session")
+          + " ran past the first 1 MiB Suricata inspects in each:"
           + " an alert later in those sessions can be missed."));
     }
     return out;
@@ -118,10 +118,6 @@ public class CaptureQualityService implements CaptureQualityLookup {
 
   private static boolean pos(Long v) {
     return v != null && v > 0;
-  }
-
-  private static String plural(long n) {
-    return n == 1 ? "" : "s";
   }
 
   private static Note note(String kind, String level, String text) {

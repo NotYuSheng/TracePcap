@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.question;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.knowledge.contributor.DownloadContributor;
 import com.tracepcap.knowledge.contributor.HoneypotContributor;
 import com.tracepcap.knowledge.spi.Answer;
@@ -94,7 +95,7 @@ public class DownloadsQuestion implements StandardQuestion {
             ? a.get("url") + " (" + a.get("external") + ")"
             : String.valueOf(a.getOrDefault("serverName", a.get("external")));
     String what = a.get("name") + " (" + kindOf(String.valueOf(a.get("mimeType")), a.get("name"))
-        + (size instanceof Number n ? ", " + human(n.longValue()) : "") + ") from " + from;
+        + (size instanceof Number n ? ", " + Humanize.bytes(n.longValue()) : "") + ") from " + from;
     Map<String, Object> attrs = new LinkedHashMap<>(a);
     List<com.tracepcap.knowledge.spi.Step> steps = new ArrayList<>();
     String headline;
@@ -136,11 +137,5 @@ public class DownloadsQuestion implements StandardQuestion {
     if (n.endsWith(".hta")) return "HTML application";
     if (n.endsWith(".bat") || n.endsWith(".cmd")) return "batch script";
     return kind(mime);
-  }
-
-  static String human(long bytes) {
-    if (bytes >= 1_000_000) return String.format("%.1f MB", bytes / 1_000_000.0);
-    if (bytes >= 1_000) return String.format("%.0f KB", bytes / 1_000.0);
-    return bytes + " bytes";
   }
 }

@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.common.net.LocalityRules;
 import java.time.Duration;
@@ -70,7 +71,7 @@ public final class C2Corroboration {
   static final Duration INSTALL_WINDOW = Duration.ofMinutes(10);
 
   /** A payload at least this big, from the server the script fetched from. */
-  static final long PAYLOAD_BYTES = 1_000_000L;
+  static final long PAYLOAD_BYTES = 1024L * 1024; // 1 MB, base 1024 as Humanize writes it
 
   private record Pair(String host, String external) {}
 
@@ -293,7 +294,7 @@ public final class C2Corroboration {
         long gap = Duration.between(payload.flow().startTime(), checkIn).getSeconds();
         out.add(new Escalation(p.host(), p.external(), family,
             family + " (probable unsanctioned install): a script engine on " + p.host() + " fetched from "
-                + server + ", which then sent " + megabytes(received(payload, p.host())) + "; " + gap
+                + server + ", which then sent " + Humanize.bytes(received(payload, p.host())) + "; " + gap
                 + " seconds later " + tool + " began checking in to the bare IP " + p.external() + ".",
             INSTALL_CHAIN));
         return;
@@ -328,9 +329,5 @@ public final class C2Corroboration {
     if (rule.toUpperCase().contains("CINS")) return "CINS";
     if (rule.toUpperCase().contains("COMPROMISED")) return "known compromised";
     return rule;
-  }
-
-  private static String megabytes(long bytes) {
-    return String.format("%.1f MB", bytes / 1_000_000.0);
   }
 }

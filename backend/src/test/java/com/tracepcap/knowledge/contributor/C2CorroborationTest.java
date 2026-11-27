@@ -103,7 +103,7 @@ class C2CorroborationTest {
           assertThat(x.external()).isEqualTo("93.152.209.36");
           assertThat(x.family()).isEqualTo("NetSupport RAT");
           assertThat(x.kind()).isEqualTo(C2Corroboration.INSTALL_CHAIN);
-          assertThat(x.reason()).contains("vericheckusgo.com (96.62.224.200)").contains("6.3 MB")
+          assertThat(x.reason()).contains("vericheckusgo.com (96.62.224.200)").contains("5.99 MB")
               .contains("9 seconds later NetSupport");
         });
   }

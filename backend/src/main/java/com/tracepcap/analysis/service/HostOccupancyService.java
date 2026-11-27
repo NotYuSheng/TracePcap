@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.dto.occupancy.HostOccupancyResponse;
 import com.tracepcap.analysis.dto.occupancy.OccupancyDecisionRequest;
 import com.tracepcap.analysis.entity.DhcpLeaseEntity;
@@ -602,7 +603,7 @@ public class HostOccupancyService {
       if (t[0] == null) continue;
       if (reach != null && Duration.between(reach, t[0]).compareTo(SILENCE) >= 0 && !boundaries.contains(t[0])) {
         long minutes = Duration.between(reach, t[0]).toMinutes();
-        gaps.add(new Gap(suggestion(t[0], "silence", "No traffic for " + humanMinutes(minutes) + " before this"), minutes));
+        gaps.add(new Gap(suggestion(t[0], "silence", "No traffic for " + Humanize.span(minutes * 60_000L) + " before this"), minutes));
       }
       LocalDateTime end = t[1] != null ? t[1] : t[0];
       if (reach == null || end.isAfter(reach)) reach = end;
@@ -623,13 +624,6 @@ public class HostOccupancyService {
         .kind(kind)
         .description(description)
         .build();
-  }
-
-  private static String humanMinutes(long minutes) {
-    if (minutes < 60) return minutes + " min";
-    long h = minutes / 60;
-    long m = minutes % 60;
-    return m == 0 ? h + " h" : h + " h " + m + " min";
   }
 
   private void requireFile(UUID fileId) {

@@ -63,7 +63,7 @@ class DownloadContributorTest {
       assertThat(x.attributes()).containsEntry("sha256",
           "b7aec5f73d2a6bbd8cd920edb4760e2edadc98c3a45bf4fa994d47ca9cbd02f6");
       assertThat(x.headline()).contains("10.8.15.133 downloaded").contains("Windows program or DLL")
-          .contains("159 KB").contains("72.5.43.29");
+          .contains("155.50 KB").contains("72.5.43.29");
     });
   }
 

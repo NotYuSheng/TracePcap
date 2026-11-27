@@ -1,5 +1,6 @@
 package com.tracepcap.story.service.detector;
 
+import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.HostVolume;
 import com.tracepcap.story.dto.Finding;
@@ -75,11 +76,11 @@ public class VolumeDetector implements Scanner {
                 .type(FindingType.VOLUME)
                 .severity(severity)
                 .title(
-                    String.format("High Outbound Volume: %s sent %s", srcIp, fmtBytes(senderBytes)))
+                    String.format("High Outbound Volume: %s sent %s", srcIp, Humanize.bytes(senderBytes)))
                 .summary(
                     String.format(
                         "%s sent %d bytes (%s) across %d outbound flows — warrants review for data exfiltration.",
-                        srcIp, senderBytes, fmtBytes(senderBytes), flowCount))
+                        srcIp, senderBytes, Humanize.bytes(senderBytes), flowCount))
                 .metrics(metrics)
                 .affectedIps(List.of(srcIp))
                 .build());
@@ -97,12 +98,5 @@ public class VolumeDetector implements Scanner {
       }
     }
     return new ArrayList<>(bestBySrc.values());
-  }
-
-  private static String fmtBytes(long bytes) {
-    if (bytes >= 1_073_741_824L) return String.format("%.1f GB", bytes / 1_073_741_824.0);
-    if (bytes >= 1_048_576L) return String.format("%.1f MB", bytes / 1_048_576.0);
-    if (bytes >= 1_024L) return String.format("%.1f KB", bytes / 1_024.0);
-    return bytes + " B";
   }
 }

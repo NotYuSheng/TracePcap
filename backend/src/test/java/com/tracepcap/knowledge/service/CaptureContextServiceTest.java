@@ -181,8 +181,9 @@ class CaptureContextServiceTest {
         LocalDateTime.of(2024, 8, 15, 8, 42), 33 * 60_000L);
     // In the server's zone, as stored: no "UTC" on it.
     assertThat(t.label()).isEqualTo("33 min, 2024-08-15 08:09 to 08:42");
-    assertThat(CaptureContextService.duration(16_219)).isEqualTo("16 s");
-    assertThat(CaptureContextService.duration(85_987_389)).isEqualTo("24 h");
-    assertThat(CaptureContextService.duration(6143L * 86_400_000)).isEqualTo("17 years");
+    // The span reads as Humanize writes it everywhere else (#1340).
+    assertThat(com.tracepcap.common.text.Humanize.span(16_219)).isEqualTo("16 s");
+    assertThat(com.tracepcap.common.text.Humanize.span(85_987_389)).isEqualTo("23.9 h");
+    assertThat(com.tracepcap.common.text.Humanize.span(6143L * 86_400_000)).isEqualTo("16.8 years");
   }
 }
