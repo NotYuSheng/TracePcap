@@ -508,6 +508,42 @@ public interface ConversationLookup {
    */
   long distinctAnsweredPorts(UUID fileId, String ip);
 
+  /**
+   * How one host's conversations were opened, counted in the database: {@code opened} by it,
+   * {@code answered} (opened to it by another host), from how many distinct {@code openers}, and on
+   * how many distinct {@code answeredPorts}. Conversations with no known opener count in none.
+   */
+  record HostOpenings(long opened, long answered, long openers, long answeredPorts) {}
+
+  /** {@link HostOpenings} for one host, without reading every host pair. */
+  HostOpenings hostOpenings(UUID fileId, String ip);
+
+  /** {@code conversations} that {@code opener} opened to {@code target}. */
+  record Opening(String opener, String target, long conversations) {}
+
+  /**
+   * Who opened conversations to any of {@code targets}, per opener and target, aggregated in the
+   * database: the target is the side that didn't open it, so a target's own outbound
+   * conversations aren't here (one target opening to another is). Only conversations with a known
+   * opener; none for an empty {@code targets}.
+   */
+  List<Opening> openingsTo(UUID fileId, Collection<String> targets);
+
+  /**
+   * A certificate one server presented on a port. The server is the side that didn't open the
+   * conversation, or the destination when nobody knows who opened it.
+   */
+  record ServerCertificate(String server, Integer port, String subject, String issuer) {}
+
+  /**
+   * Each distinct certificate a server presented, without loading the TLS conversations: the same
+   * rows {@link #tlsConversations(UUID)} reads (an issuer recorded).
+   */
+  List<ServerCertificate> serverCertificates(UUID fileId);
+
+  /** {@link #serverCertificates(UUID)} for one server. */
+  List<ServerCertificate> serverCertificates(UUID fileId, String server);
+
   /** One host's outbound volume. */
   record HostVolume(String srcIp, long totalBytes, long flowCount) {}
 

@@ -18,4 +18,7 @@ public interface ServiceBannerLookup {
   record Banner(String ip, int port, String kind, String value, int count) {}
 
   List<Banner> banners(UUID fileId);
+
+  /** What one server sent. */
+  List<Banner> banners(UUID fileId, String ip);
 }

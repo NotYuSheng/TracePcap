@@ -3,7 +3,9 @@ package com.tracepcap.knowledge.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tracepcap.analysis.spi.ConversationLookup.HostOpenings;
 import com.tracepcap.analysis.spi.ConversationLookup.HostPair;
+import com.tracepcap.analysis.spi.ConversationLookup.ServerCertificate;
 import com.tracepcap.common.adjudication.ManualEvidenceEntity;
 import com.tracepcap.knowledge.service.HoneypotRoleService.HostRole;
 import com.tracepcap.knowledge.service.HoneypotRoleService.Signal;
@@ -44,10 +46,28 @@ class HoneypotRoleServiceTest {
     return pairs;
   }
 
+  /** What the database sums for {@code host} from these pairs (the old in-Java aggregation). */
+  static HostOpenings openings(String host, List<HostPair> pairs, long ports) {
+    long opened = 0, answered = 0;
+    java.util.Set<String> openers = new java.util.HashSet<>();
+    for (HostPair p : pairs) {
+      if (host.equals(p.a())) {
+        opened += p.openedByA();
+        answered += p.openedByB();
+        if (p.openedByB() > 0) openers.add(p.b());
+      } else if (host.equals(p.b())) {
+        opened += p.openedByB();
+        answered += p.openedByA();
+        if (p.openedByA() > 0) openers.add(p.a());
+      }
+    }
+    return new HostOpenings(opened, answered, openers.size(), ports);
+  }
+
   private static HostRole role(String host, List<String[]> seen, List<HostPair> pairs, long ports,
       ManualEvidenceEntity... ev) {
     List<Signal> signals = new ArrayList<>(HoneypotRoleService.signatureSignals(seen, SIGNATURES));
-    signals.addAll(HoneypotRoleService.behaviourSignals(host, pairs, ports, seen));
+    signals.addAll(HoneypotRoleService.behaviourSignals(openings(host, pairs, ports), seen));
     return HoneypotRoleService.decide(host, signals, List.of(ev));
   }
 
@@ -133,7 +153,7 @@ class HoneypotRoleServiceTest {
 
   @Test
   void aHostThatOpensItsOwnConnectionsDrawsNoFanInSignal() {
-    assertThat(HoneypotRoleService.behaviourSignals("198.51.100.22", probed("198.51.100.22", 6, 40), 2,
+    assertThat(HoneypotRoleService.behaviourSignals(openings("198.51.100.22", probed("198.51.100.22", 6, 40), 2),
         List.of())).isEmpty();
   }
 
@@ -141,7 +161,7 @@ class HoneypotRoleServiceTest {
   void aWindowsTtlBehindWindowsSmbIsNoMismatch() {
     List<String[]> seen = List.<String[]>of(seen("smb-os", "Windows 5.1 / Windows 2000 LAN Manager", 445),
         seen("ttl", "128", 445));
-    assertThat(HoneypotRoleService.behaviourSignals("10.0.0.7", List.of(), 1, seen)).isEmpty();
+    assertThat(HoneypotRoleService.behaviourSignals(new HostOpenings(0, 0, 0, 1), seen)).isEmpty();
   }
 
   @Test
@@ -207,6 +227,19 @@ class HoneypotRoleServiceTest {
   }
 
   @Test
+  void aServersCertificatesJoinItsBanners() {
+    var seen = HoneypotRoleService.observations(
+        List.of(new Banner("198.51.100.45", 21, "ftp-banner", "DiskStation FTP server ready.", 1)),
+        List.of(new ServerCertificate("198.51.100.45", 443, "CN=x", "O=dionaea.carnivore.it"),
+            new ServerCertificate("198.51.100.46", null, null, null), // nothing to compare
+            new ServerCertificate(null, 443, "CN=y", null)));
+    assertThat(seen).containsOnlyKeys("198.51.100.45");
+    assertThat(seen.get("198.51.100.45")).extracting(o -> o[0]).containsExactly("ftp-banner", "tls-cert");
+    assertThat(seen.get("198.51.100.45").get(1))
+        .containsExactly("tls-cert", "subject CN=x; issuer O=dionaea.carnivore.it", "443");
+  }
+
+  @Test
   void aTlsSignatureMatchesTheSubjectOrIssuer() {
     List<Signal> s = HoneypotRoleService.signatureSignals(
         List.<String[]>of(seen("tls-cert", "subject CN=x; issuer O=dionaea.carnivore.it", 443)), SIGNATURES);
@@ -223,9 +256,12 @@ class HoneypotRoleServiceTest {
     ServiceBannerLookup b = mock(ServiceBannerLookup.class);
     when(b.banners(FILE)).thenReturn(banners);
     ConversationLookup c = mock(ConversationLookup.class);
-    when(c.hostPairs(FILE)).thenReturn(pairs);
-    when(c.tlsConversations(FILE)).thenReturn(List.of());
-    when(c.distinctAnsweredPorts(eq(FILE), anyString())).thenReturn(1L);
+    when(b.banners(eq(FILE), anyString())).thenAnswer(inv ->
+        banners.stream().filter(x -> x.ip().equals(inv.getArgument(1))).toList());
+    when(c.hostOpenings(eq(FILE), anyString()))
+        .thenAnswer(inv -> openings(inv.getArgument(1), pairs, 1));
+    when(c.serverCertificates(FILE)).thenReturn(List.of());
+    when(c.serverCertificates(eq(FILE), anyString())).thenReturn(List.of());
     HumanOverrideService o = mock(HumanOverrideService.class);
     when(o.findAll(HoneypotRoleService.QUESTION, FILE))
         .thenReturn(override == null ? List.of() : List.of(override));

@@ -2,7 +2,7 @@ package com.tracepcap.knowledge.contributor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tracepcap.analysis.spi.ConversationLookup.HostPair;
+import com.tracepcap.analysis.spi.ConversationLookup.Opening;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,9 +15,8 @@ class HoneypotContributorTest {
   @Test
   void whoOpenedConversationsToADecoyReachedIt() {
     var out = HoneypotContributor.contacts(List.of(
-        // stored either way round: the opener counts, wherever it is in the pair
-        new HostPair("198.51.100.101", "198.51.100.22", 6, 6, 0),
-        new HostPair("198.51.100.45", "198.51.100.101", 3, 0, 3)), DECOYS);
+        new Opening("198.51.100.101", "198.51.100.22", 6),
+        new Opening("198.51.100.101", "198.51.100.45", 3)), DECOYS);
     assertThat(out).containsOnlyKeys("198.51.100.101");
     assertThat(out.get("198.51.100.101").conversations).isEqualTo(9);
     assertThat(out.get("198.51.100.101").reached)
@@ -27,16 +26,10 @@ class HoneypotContributorTest {
   @Test
   void aDecoyReachingOutAndDecoysProbingEachOtherDontCount() {
     var out = HoneypotContributor.contacts(List.of(
-        new HostPair("198.51.100.22", "198.51.100.200", 2, 2, 0),
-        new HostPair("198.51.100.22", "198.51.100.45", 4, 2, 2)), DECOYS);
-    assertThat(out).isEmpty();
-  }
-
-  @Test
-  void aConversationWithNoKnownOpenerDoesntCount() {
-    // A decoy's own DNS lookup to the resolver is UDP, opener unknown: the resolver isn't a scanner.
-    var out = HoneypotContributor.contacts(List.of(
-        new HostPair("10.0.0.53", "198.51.100.22", 5, 0, 0)), DECOYS);
+        // the decoy opened these: the database returns them only as openings to their targets
+        new Opening("198.51.100.22", "198.51.100.200", 2),
+        new Opening("198.51.100.22", "198.51.100.45", 2),
+        new Opening("198.51.100.45", "198.51.100.22", 2)), DECOYS);
     assertThat(out).isEmpty();
   }
 

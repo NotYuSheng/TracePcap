@@ -1,7 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup;
-import com.tracepcap.analysis.spi.ConversationLookup.HostPair;
+import com.tracepcap.analysis.spi.ConversationLookup.Opening;
 import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.knowledge.service.HoneypotRoleService;
 import com.tracepcap.knowledge.service.HoneypotRoleService.HostRole;
@@ -85,7 +85,7 @@ public class HoneypotContributor implements KnowledgeContributor {
 
     ConversationLookup lookup = conversations.getIfAvailable();
     if (lookup == null) return;
-    Map<String, Contact> contacts = contacts(lookup.hostPairs(context.fileId()), names);
+    Map<String, Contact> contacts = contacts(lookup.openingsTo(context.fileId(), names.keySet()), names);
     contacts.entrySet().stream()
         .sorted(java.util.Comparator.comparingLong((Map.Entry<String, Contact> e) -> e.getValue().conversations)
             .reversed().thenComparing(Map.Entry::getKey))
@@ -117,28 +117,24 @@ public class HoneypotContributor implements KnowledgeContributor {
   /**
    * Every host that opened a conversation to a honeypot, and which ones. Another honeypot reaching
    * one doesn't count (decoys answer each other's probes in a lab), and neither does a conversation
-   * the honeypot opened: that is its own reply or a scan back.
+   * the honeypot opened: that is its own reply or a scan back. The database sends only openings to
+   * a honeypot, so this never reads every host pair.
    *
    * <p>Only conversations with a known opener count, in practice TCP with a handshake. One with
    * none (UDP, ARP, a connection already open when the capture began) can't say who reached whom:
    * a decoy's own DNS lookups would make the resolver read as a scanner. A UDP-only sweep (SIP,
    * SNMP) is missed for now.
    */
-  static Map<String, Contact> contacts(List<HostPair> pairs, Map<String, String> honeypots) {
+  static Map<String, Contact> contacts(List<Opening> openings, Map<String, String> honeypots) {
     Map<String, Contact> out = new TreeMap<>();
-    for (HostPair p : pairs) {
-      add(out, p.b(), p.a(), p.openedByB(), honeypots);
-      add(out, p.a(), p.b(), p.openedByA(), honeypots);
+    for (Opening o : openings) {
+      if (o.conversations() <= 0 || !honeypots.containsKey(o.target())
+          || honeypots.containsKey(o.opener())) continue;
+      Contact c = out.computeIfAbsent(o.opener(), k -> new Contact());
+      c.reached.put(o.target(), honeypots.get(o.target()));
+      c.conversations += o.conversations();
     }
     return out;
-  }
-
-  private static void add(Map<String, Contact> out, String opener, String target, long opened,
-      Map<String, String> honeypots) {
-    if (opened <= 0 || !honeypots.containsKey(target) || honeypots.containsKey(opener)) return;
-    Contact c = out.computeIfAbsent(opener, k -> new Contact());
-    c.reached.put(target, honeypots.get(target));
-    c.conversations += opened;
   }
 
   /** A host inside the network, or one outside it: the board types them apart. */
