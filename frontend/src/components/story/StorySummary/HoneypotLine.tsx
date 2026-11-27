@@ -102,8 +102,9 @@ export function HoneypotHostBody({
         <>
           {panel}
           <p className="small text-muted mb-2">
-            TracePcap needs two signals, one a match in its signature file. If you know it&apos;s a
-            decoy, or that it isn&apos;t, say so: your answer replaces the inference.
+            For the whole address, every device that used it. TracePcap needs two signals, one a
+            match in its signature file. If you know it&apos;s a decoy, or that it isn&apos;t, say
+            so: your answer replaces the inference.
           </p>
           {undetermined}
         </>

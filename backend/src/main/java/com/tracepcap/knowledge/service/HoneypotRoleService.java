@@ -229,8 +229,10 @@ public class HoneypotRoleService {
     List<Signal> all = new ArrayList<>(signatureSignals(seen, file.signatures()));
     all.addAll(behaviourSignals(host, conversations.hostPairs(fileId),
         conversations.distinctAnsweredPorts(fileId, host), seen));
-    HostRole inferred = decide(host, all,
-        evidence.findByQuestionAndFileIdAndEntityKeyOrderByCreatedAtDesc(QUESTION, fileId, host));
+    // The same query and order forFile reads, so the drawer and the Story summary agree on a host
+    // with more than one label of the analyst's own.
+    HostRole inferred = decide(host, all, evidence.findByQuestionAndFileId(QUESTION, fileId).stream()
+        .filter(e -> host.equals(e.getEntityKey())).toList());
     HostRole role = overrides.find(QUESTION, fileId, host)
         .map(o -> overridden(inferred, o.getLabel(), o.getRationale(), o.getActor()))
         .orElse(inferred);

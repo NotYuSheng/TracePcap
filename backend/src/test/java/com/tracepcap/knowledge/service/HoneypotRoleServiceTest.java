@@ -235,9 +235,6 @@ class HoneypotRoleServiceTest {
     when(o.find(eq(HoneypotRoleService.QUESTION), eq(FILE), anyString())).thenAnswer(inv ->
         java.util.Optional.ofNullable(override)
             .filter(x -> x.getEntityKey().equals(inv.getArgument(2))));
-    when(e.findByQuestionAndFileIdAndEntityKeyOrderByCreatedAtDesc(any(), any(), anyString()))
-        .thenAnswer(inv -> java.util.Arrays.stream(ev)
-            .filter(x -> x.getEntityKey().equals(inv.getArgument(2))).toList());
     return new HoneypotRoleService(b, c, o, e, new ObjectMapper());
   }
 
