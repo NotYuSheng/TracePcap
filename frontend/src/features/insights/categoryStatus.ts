@@ -3,11 +3,10 @@
  * the helpers the Overview's "Worth a look" and Story's summary share.
  */
 import type { CategoryLead, CategoryStatus } from '@/types';
+import { plural } from '@/utils/formatters';
 
 type Status = CategoryStatus['status'];
 
-export { plural } from '@/utils/formatters';
-import { plural } from '@/utils/formatters';
 
 export interface WorthALookGroup {
   key: string;

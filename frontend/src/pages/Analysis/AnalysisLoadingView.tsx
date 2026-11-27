@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import { formatBytes, formatSpan } from '@/utils/formatters';
+import { formatBytes, formatDuration } from '@/utils/formatters';
 
 interface FileMetadata {
   fileName: string;
@@ -33,6 +33,9 @@ interface Props {
 const SECONDS_PER_MB = 0.5;
 const MIN_ESTIMATE_S = 10;
 
+
+/** A running clock that changes every second ("45s", "2m 30s"); a one-unit span ("3 min") would sit still for a minute. */
+const tick = (seconds: number) => (seconds > 0 ? formatDuration(Math.round(seconds) * 1000) : '0s');
 
 export const AnalysisLoadingView = ({ fileId }: Props) => {
   const [fileMeta, setFileMeta] = useState<FileMetadata | null>(null);
@@ -169,11 +172,11 @@ export const AnalysisLoadingView = ({ fileId }: Props) => {
         <div className="d-flex justify-content-between text-muted" style={{ fontSize: '0.82rem' }}>
           <span>
             <i className="bi bi-stopwatch me-1" />
-            Elapsed: <strong className="text-body">{formatSpan(elapsed * 1000)}</strong>
+            Elapsed: <strong className="text-body">{tick(elapsed)}</strong>
           </span>
           {estimatedSeconds != null && (
             <span>
-              Est. time: <strong className="text-body">~{formatSpan(estimatedSeconds * 1000)}</strong>
+              Est. time: <strong className="text-body">~{tick(estimatedSeconds)}</strong>
             </span>
           )}
         </div>

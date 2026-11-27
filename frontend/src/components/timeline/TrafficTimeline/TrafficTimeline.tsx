@@ -51,7 +51,6 @@ function effectiveInterval(data: TimelineDataPoint[]): number | null {
   );
 }
 
-/** Format seconds as a human-readable label, e.g. 90 → "1m 30s". */
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ name?: string; value?: number; color?: string }>;

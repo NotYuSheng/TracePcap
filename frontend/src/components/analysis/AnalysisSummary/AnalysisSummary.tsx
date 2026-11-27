@@ -51,7 +51,7 @@ export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummar
           <div className="card-content">
             <div className="card-label">Duration</div>
             <div className="card-value">
-              {summary.timeRange?.[0] && summary.timeRange?.[1] ? formatDuration(summary.timeRange[1] - summary.timeRange[0]) : 'N/A'}
+              {summary.timeRange?.[0] && summary.timeRange?.[1] ? formatDuration(Math.max(0, Math.round(summary.timeRange[1] - summary.timeRange[0]))) : 'N/A'}
             </div>
           </div>
         </div>

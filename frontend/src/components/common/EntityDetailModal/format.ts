@@ -6,7 +6,6 @@ import type { CSSProperties } from 'react';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
 
-
 export function formatSnapTime(snap: NetworkSnapshot): string {
   if (!snap.startTime) return snap.fileName;
   const ms = parseDateTime(snap.startTime);
