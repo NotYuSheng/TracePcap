@@ -291,6 +291,9 @@ public class CustomPrivateRangeService {
   }
 
   private byte[] resolveAddress(String ip) {
+    // A literal only: getByName on anything else (a MAC endpoint, a name) is a DNS lookup, which
+    // offline blocks until it times out.
+    if (ip == null || !NUMERIC_IP.matcher(ip.trim()).matches()) return null;
     try {
       return InetAddress.getByName(ip).getAddress();
     } catch (Exception e) {

@@ -30,7 +30,7 @@ class HostIdentityContributorTest {
   private CaseKnowledge run(HostFacts... hosts) {
     when(hostClassificationLookup.hostFacts(FILE)).thenReturn(List.of(hosts));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new HostIdentityContributor().contribute(KnowledgeContext.of(FILE, null, hostClassificationLookup), board);
+    new HostIdentityContributor().contribute(KnowledgeContext.of(FILE, null, hostClassificationLookup, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     return board.build();
   }
 

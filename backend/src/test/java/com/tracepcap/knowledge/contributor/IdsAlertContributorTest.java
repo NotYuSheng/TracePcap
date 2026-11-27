@@ -41,7 +41,7 @@ class IdsAlertContributorTest {
   private CaseKnowledge run(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new IdsAlertContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    new IdsAlertContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     return board.build();
   }
 
@@ -183,7 +183,7 @@ class IdsAlertContributorTest {
   private CaseKnowledge runWithEt(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new IdsAlertContributor(ET).contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    new IdsAlertContributor(ET).contribute(KnowledgeContext.of(FILE, conversationLookup, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     return board.build();
   }
 

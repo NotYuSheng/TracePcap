@@ -38,15 +38,10 @@ public final class KnowledgeContext {
   }
 
   /**
-   * A context over these lookups, with the RFC ranges alone for locality. A null lookup reads as an
-   * empty list, for tests that need one.
+   * A context over these lookups, whose locality is the operator's rules, custom ranges included
+   * (null: the RFC ranges alone). A null lookup reads as an empty list, for tests that need one.
+   * There's no overload without the rules: leaving them out is how #1338 happened.
    */
-  public static KnowledgeContext of(
-      UUID fileId, ConversationLookup conversations, HostClassificationLookup hosts) {
-    return of(fileId, conversations, hosts, LocalityRules.RFC_ONLY);
-  }
-
-  /** A context whose locality is the operator's rules, custom ranges included. */
   public static KnowledgeContext of(UUID fileId, ConversationLookup conversations,
       HostClassificationLookup hosts, LocalityRules locality) {
     return new KnowledgeContext(

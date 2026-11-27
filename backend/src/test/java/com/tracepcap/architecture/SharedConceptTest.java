@@ -40,18 +40,16 @@ class SharedConceptTest {
                   + " KnowledgeContext.locality(), ScanContext.locality() or LocalityPolicy (#1338)");
 
   /**
-   * The bare RFC rules are a default for contexts built without a policy (tests), not something to
-   * pick in production code.
+   * The bare RFC rules are the policy's answer when no range is configured, and a context's
+   * fallback when the ranges can't be read; production code doesn't pick them itself.
    */
   @ArchTest
   static final ArchRule rfc_only_rules_are_only_a_default =
       ArchRuleDefinition.noClasses()
           .that()
-          .resideOutsideOfPackages("com.tracepcap.common.net..")
+          .resideOutsideOfPackages("com.tracepcap.common.net..", "com.tracepcap.policy.service..")
           .and()
           .doNotHaveFullyQualifiedName("com.tracepcap.knowledge.spi.KnowledgeContext")
-          .and()
-          .doNotHaveFullyQualifiedName("com.tracepcap.story.spi.ScanContext")
           .and()
           .doNotHaveFullyQualifiedName("com.tracepcap.story.service.LazyScanContext")
           .should()

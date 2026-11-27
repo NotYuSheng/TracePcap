@@ -34,7 +34,11 @@ public class CustomRangeLocalityPolicy implements LocalityPolicy {
   public LocalityRules currentRules(java.util.UUID networkId, LocalityRules.CidrSet additionalPrivate) {
     // Loaded once here rather than per address: the callers classify every host in a capture.
     List<CustomPrivateRangeEntity> overrides = customPrivateRangeService.loadRanges(networkId);
-    return ip -> classify(ip, overrides, additionalPrivate);
+    if (overrides.isEmpty() && additionalPrivate == null) return LocalityRules.RFC_ONLY;
+    // Callers ask about every endpoint of every conversation, several times each: one answer per
+    // address. Held only as long as the caller holds these rules (one board, one scan).
+    java.util.Map<String, Boolean> answers = new java.util.concurrent.ConcurrentHashMap<>();
+    return ip -> ip != null && answers.computeIfAbsent(ip, a -> classify(a, overrides, additionalPrivate));
   }
 
   private boolean classify(

@@ -43,7 +43,9 @@ public class FindingsService {
   public List<Finding> detectAll(UUID fileId, long totalConversations, long totalBytes, UUID networkId) {
     ScanContext context =
         new LazyScanContext(fileId, networkId, totalConversations, totalBytes, conversationLookup,
-            networkId == null ? localityPolicy.currentRules() : localityPolicy.currentRules(networkId, null));
+            // The default ranges, as the rest of a story (aggregates, investigation) reads them:
+            // one story must not call a host internal in one panel and external in the next.
+            localityPolicy.currentRules());
 
     List<Finding> findings = new ArrayList<>();
     for (Scanner scanner : scanners) {

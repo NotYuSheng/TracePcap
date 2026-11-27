@@ -28,6 +28,20 @@ public class CaseKnowledgeService {
   private final com.tracepcap.analysis.spi.HostClassificationLookup hostClassificationLookup;
   private final com.tracepcap.common.net.LocalityPolicy locality;
 
+  /**
+   * The operator's ranges, or null (the RFC ranges) if they can't be read: a board with the bare
+   * ranges beats no board.
+   */
+  private com.tracepcap.common.net.LocalityRules rules(UUID fileId) {
+    if (locality == null) return null;
+    try {
+      return locality.currentRules();
+    } catch (Exception e) {
+      log.warn("Custom ranges unreadable for file {}, using the RFC ranges: {}", fileId, e.getMessage());
+      return null;
+    }
+  }
+
   /** Runs every contributor and returns the assembled board. Never throws for a single bad source. */
   public CaseKnowledge assemble(UUID fileId) {
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(fileId);
@@ -35,7 +49,7 @@ public class CaseKnowledgeService {
     // contributor (#816).
     com.tracepcap.knowledge.spi.KnowledgeContext context =
         com.tracepcap.knowledge.spi.KnowledgeContext.of(fileId, conversationLookup,
-            hostClassificationLookup, locality == null ? null : locality.currentRules());
+            hostClassificationLookup, rules(fileId));
     for (KnowledgeContributor contributor : contributors) {
       try {
         contributor.contribute(context, board);

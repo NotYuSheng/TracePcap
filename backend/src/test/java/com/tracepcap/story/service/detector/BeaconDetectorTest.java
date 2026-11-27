@@ -30,6 +30,11 @@ class BeaconDetectorTest {
 
   private ScanContext context(List<ConversationFacts> convs) {
     return new ScanContext() {
+      @Override
+      public com.tracepcap.common.net.LocalityRules locality() {
+        return com.tracepcap.common.net.LocalityRules.RFC_ONLY;
+      }
+
       public UUID fileId() { return FILE; }
       public long totalConversations() { return convs.size(); }
       public long totalBytes() { return 0; }

@@ -28,11 +28,9 @@ public interface ScanContext {
   /**
    * Is this address inside the network: the operator's custom ranges (and, viewed in a network,
    * its own) before the RFC ranges, resolved once per scan run (#1338). Scanners ask this, never
-   * {@code IpLocality} itself. The default, the RFC ranges alone, is for test contexts.
+   * {@code IpLocality} itself.
    */
-  default com.tracepcap.common.net.LocalityRules locality() {
-    return com.tracepcap.common.net.LocalityRules.RFC_ONLY;
-  }
+  com.tracepcap.common.net.LocalityRules locality();
 
   /** The file being scanned. */
   UUID fileId();

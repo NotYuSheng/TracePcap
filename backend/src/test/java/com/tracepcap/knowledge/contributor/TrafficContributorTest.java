@@ -39,7 +39,7 @@ class TrafficContributorTest {
   private CaseKnowledge run(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new TrafficContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    new TrafficContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     return board.build();
   }
 
