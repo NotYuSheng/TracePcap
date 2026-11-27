@@ -75,4 +75,13 @@ class CidrTest {
     assertThatThrownBy(() -> Cidr.asSaved("10.0.0.02/24", saved, Cidr::normaliseIpv4))
         .hasMessageStartingWith("Invalid CIDR");
   }
+
+  @Test
+  void aNumericLiteralNeverNeedsADnsLookup() {
+    assertThat(Cidr.isNumericLiteral("10.0.0.01")).isTrue(); // an old row the matchers still read
+    assertThat(Cidr.isNumericLiteral("fd00::1")).isTrue();
+    assertThat(Cidr.isNumericLiteral("gw.corp")).isFalse();
+    assertThat(Cidr.isNumericLiteral("dead.beef")).isFalse(); // hex letters, but a name to InetAddress
+    assertThat(Cidr.isNumericLiteral(" ")).isFalse();
+  }
 }

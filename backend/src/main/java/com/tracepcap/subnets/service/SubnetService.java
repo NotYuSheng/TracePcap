@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class SubnetService {
+public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs {
 
   private static final int MIN_HOSTS_PER_SUBNET = 3;
   // Prefix lengths to evaluate (inclusive). /20–/29 covers everything from
@@ -548,6 +548,13 @@ public class SubnetService {
 
   /** Delegates to the shared predicate so all four call sites agree (#694). */
 
+
+  @Override
+  public java.util.Set<String> forNetwork(java.util.UUID networkId) {
+    java.util.Set<String> out = new java.util.HashSet<>(defaultCidrs());
+    if (networkId != null) subnetRepo.findByNetworkIdOrderByCidr(networkId).forEach(e -> out.add(e.getCidr()));
+    return out;
+  }
 
   /** The shared default's CIDRs as stored. */
   private java.util.Set<String> defaultCidrs() {

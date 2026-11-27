@@ -295,6 +295,9 @@ public class CustomPrivateRangeService {
     try {
       String[] parts = cidr.split("/");
       if (parts.length != 2) return Optional.empty();
+      // A numeric literal only: getByName on anything else (free text an older validator let
+      // through, such as "gw.corp/24") is a DNS lookup, which offline blocks until it times out.
+      if (!Cidr.isNumericLiteral(parts[0])) return Optional.empty();
       byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
       int prefixLen = Integer.parseInt(parts[1].trim());
       int maxPrefix = networkBytes.length * 8;

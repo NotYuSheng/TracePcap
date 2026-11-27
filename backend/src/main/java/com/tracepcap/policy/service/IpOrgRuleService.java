@@ -221,6 +221,7 @@ public class IpOrgRuleService {
       Optional<ParsedCidr> opt = cidrCache.computeIfAbsent(cidr, this::parseCidr);
       if (opt.isEmpty()) return false;
       ParsedCidr parsed = opt.get();
+      if (!Cidr.isNumericLiteral(ip)) return false; // never a DNS lookup for an endpoint string
       byte[] addrBytes = InetAddress.getByName(ip).getAddress();
       byte[] netBytes = parsed.networkBytes();
       int prefixLen = parsed.prefixLen();
@@ -246,6 +247,9 @@ public class IpOrgRuleService {
     try {
       String[] parts = cidr.split("/");
       if (parts.length != 2) return Optional.empty();
+      // A numeric literal only: getByName on anything else (free text an older validator let
+      // through, such as "gw.corp/24") is a DNS lookup, which offline blocks until it times out.
+      if (!Cidr.isNumericLiteral(parts[0])) return Optional.empty();
       byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
       int prefixLen = Integer.parseInt(parts[1].trim());
       return Optional.of(new ParsedCidr(networkBytes, prefixLen));

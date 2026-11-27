@@ -129,6 +129,17 @@ public final class Cidr {
     return out.toString();
   }
 
+  /**
+   * Digits and dots, or an IPv6 literal (hex and colons): text {@code InetAddress.getByName} reads
+   * without a DNS lookup. Looser than {@link #normalise} on purpose ("10.0.0.01" passes), for
+   * matchers reading rows saved before it.
+   */
+  public static boolean isNumericLiteral(String address) {
+    if (address == null) return false;
+    String a = address.trim();
+    return !a.isEmpty() && (a.matches("[0-9.]+") || IPV6.matcher(a).matches());
+  }
+
   /** Whether a CIDR {@link #normalise} wrote is IPv4. */
   public static boolean isIpv4(String normalised) {
     return normalised != null && normalised.indexOf(':') < 0;
