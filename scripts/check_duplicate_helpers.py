@@ -46,20 +46,30 @@ CONCEPT = re.compile(
 # A Java method declaration: modifiers, a return type, the name, an open paren, and a body
 # (not a call or an abstract signature).
 JAVA_DEF = re.compile(
-    r"""^\s*(?:(?:public|protected|private|static|final|synchronized)\s+)+[\w<>\[\],.? ]+?\s+(\w+)\s*\([^;]*$"""
+    r"""^\s*(?:(?:public|protected|private|static|final|synchronized|default|@\w+(?:\([^)]*\))?)\s+)*"""
+    r"""(?!return\b|new\b|else\b|throw\b)[\w<>\[\],.?]+(?:\s*<[^>]*>)?\s+(\w+)\s*\([^;=]*$"""
 )
+JAVA_KEYWORDS = {"if", "for", "while", "switch", "catch", "synchronized", "return", "new"}
 # A TypeScript function: `function name(`, `const name = (…) =>`, `const name = function`.
 TS_DEF = re.compile(
-    r"""^\s*(?:export\s+)?(?:(?:async\s+)?function\s+(\w+)\s*[<(]"""
-    r"""|(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*(?::\s*[^=]+)?=>"""
-    r"""|(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?\(\s*$"""  # parameters on the next lines
-    r"""|(?:const|let)\s+(\w+)\s*=\s*function\b)"""
+    r"""^\s*(?:export\s+(?:default\s+)?)?(?:(?:async\s+)?function\*?\s+(\w+)\s*[<(]"""
+    r"""|(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\([^)]*\)|\w+)\s*(?::\s*[^=]+)?=>"""
+    r"""|(?:const|let)\s+(\w+)\s*=\s*function\b"""
+    # a class or object-literal method: `formatBytes(n: number): string {`
+    r"""|(?:(?:public|private|protected|static|async|readonly)\s+)*(\w+)\s*(?:<[^>]*>)?\([^)]*\)\s*(?::\s*[^{=]+)?\{\s*$)"""
 )
+# An arrow whose parameters run over several lines: the name here, `) =>` on a later line.
+TS_ARROW_START = re.compile(r"""^\s*(?:export\s+)?(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?\(\s*$""")
+TS_ARROW_END = re.compile(r"""^[^;]*\)\s*(?::\s*[^=]+)?=>""")
+TS_KEYWORDS = {"if", "for", "while", "switch", "catch", "return", "function", "constructor"}
 
 # The shared definitions (CLAUDE.md, "Shared Concepts"): a copy elsewhere is the finding, not
 # the owner it copies.
 OWNERS = {
     "backend/src/main/java/com/tracepcap/common/text/Humanize.java",
+    "backend/src/main/java/com/tracepcap/common/net/IpLocality.java",
+    "backend/src/main/java/com/tracepcap/common/net/LocalityRules.java",
+    "backend/src/main/java/com/tracepcap/common/net/LocalityPolicy.java",
     "frontend/src/utils/formatters/index.ts",
     "frontend/src/utils/ipClassification.ts",
     "frontend/src/utils/severityColors.ts",
@@ -70,7 +80,9 @@ BASELINE = "scripts/duplicate_helpers_baseline.txt"
 
 
 def is_test(rel: str) -> bool:
-    return "__tests__" in rel or rel.endswith("Test.java") or ".test." in rel or "/generated/" in rel
+    """Tests, test support, mocks, stories and generated code define helpers of their own."""
+    return (rel.endswith("Test.java") or "/generated/" in rel
+            or any(m in rel for m in ("__tests__", ".test.", ".spec.", "__mocks__", ".stories.", "/test/")))
 
 
 def definitions(root: Path) -> dict[str, set[str]]:
@@ -84,15 +96,34 @@ def definitions(root: Path) -> dict[str, set[str]]:
             rel = path.relative_to(root).as_posix()
             if is_test(rel):
                 continue
-            pattern = JAVA_DEF if path.suffix == ".java" else TS_DEF
-            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-                m = pattern.match(line)
-                if not m:
-                    continue
-                name = next(g for g in m.groups() if g)
-                if CONCEPT.match(name):
-                    out[("java:" if path.suffix == ".java" else "ts:") + name].add(rel)
+            java = path.suffix == ".java"
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            for n, line in enumerate(lines):
+                name = None
+                if java:
+                    m = JAVA_DEF.match(line)
+                    # An @Override implements a shared interface (LocalityRules.isLocal): the entry
+                    # point working as designed, not a copy of it.
+                    if m and m.group(1) not in JAVA_KEYWORDS and not overridden(lines, n):
+                        name = m.group(1)
+                else:
+                    m = TS_DEF.match(line)
+                    if m:
+                        name = next(g for g in m.groups() if g)
+                        if name in TS_KEYWORDS:
+                            name = None
+                    else:
+                        m = TS_ARROW_START.match(line)
+                        if m and any(TS_ARROW_END.match(l) for l in lines[n + 1:n + 6]):
+                            name = m.group(1)
+                if name and CONCEPT.match(name):
+                    out[("java:" if java else "ts:") + name].add(rel)
     return out
+
+
+def overridden(lines: list[str], n: int) -> bool:
+    """`@Override` on this line or the lines just above it."""
+    return any("@Override" in l for l in lines[max(0, n - 3):n + 1])
 
 
 def duplicates(root: Path) -> dict[str, set[str]]:
@@ -104,12 +135,14 @@ def read_baseline(root: Path) -> dict[str, set[str]]:
     path = root / BASELINE
     if not path.exists():
         return out
-    for line in path.read_text().splitlines():
+    for n, line in enumerate(path.read_text().splitlines(), 1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        name, rel = line.split(None, 1)  # name is "java:plural", "ts:formatDuration"
-        out[name].add(rel.strip())
+        parts = line.split(None, 1)  # "java:plural <file>", "ts:formatDuration <file>"
+        if len(parts) != 2 or ":" not in parts[0]:
+            raise SystemExit(f"{BASELINE}:{n}: expected '<java|ts>:<name> <file>', got {line!r}")
+        out[parts[0]].add(parts[1].strip())
     return out
 
 

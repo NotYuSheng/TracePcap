@@ -148,12 +148,12 @@ If the check fails, run the loop above and commit the result.
 
 ## Shared Concepts
 
-Formatting sizes and durations, plurals, and deciding whether an address is internal each have one owner, listed in the **Shared Concepts** table in [`CLAUDE.md`](./CLAUDE.md#shared-concepts). Three checks run on every PR (the *Shared concepts have one definition* job):
+Formatting sizes and durations, plurals, and deciding whether an address is internal each have one owner, listed in the **Shared Concepts** table in [`CLAUDE.md`](./CLAUDE.md#shared-concepts). Three checks run on every PR. The first two are the *Shared concepts have one definition* job; `SharedConceptTest` (ArchUnit) runs with the backend tests in *mvn verify*.
 
 ```bash
 python3 scripts/check_shared_vocabulary.py   # a concept's literals outside its owner
 python3 scripts/check_duplicate_helpers.py   # a concept-named helper defined twice
-cd backend && mvn -q test -Dtest=SharedConceptTest   # a caller going around the entry point
+scripts/mem-guard.sh "SharedConceptTest" && (cd backend && mvn -q test -Dtest=SharedConceptTest)   # a caller going around the entry point
 ```
 
 `scripts/duplicate_helpers_baseline.txt` lists the duplicates that existed when the check was added. It **may only shrink**: a new duplicate fails, and so does a line for one you've fixed, so delete it in the same PR. Don't regenerate it to make a failure go away (`--print-baseline` is there to check what's left, not to grow it).
