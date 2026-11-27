@@ -21,6 +21,8 @@ on:
       - 'backend/src/main/java/**'
       - 'frontend/src/**'
       - 'scripts/check_shared_vocabulary.py'
+      - 'scripts/check_duplicate_helpers.py'
+      - 'scripts/duplicate_helpers_baseline.txt'
       - '.github/workflows/shared-vocabulary.yml'
   push:
     branches:
@@ -30,6 +32,8 @@ on:
       - 'backend/src/main/java/**'
       - 'frontend/src/**'
       - 'scripts/check_shared_vocabulary.py'
+      - 'scripts/check_duplicate_helpers.py'
+      - 'scripts/duplicate_helpers_baseline.txt'
   workflow_dispatch:
 
 permissions:
@@ -49,3 +53,6 @@ jobs:
 
       - name: Check shared concepts are not redefined per-module
         run: python3 scripts/check_shared_vocabulary.py
+
+      - name: Check no concept-named helper is defined twice
+        run: python3 scripts/check_duplicate_helpers.py

@@ -1,0 +1,23 @@
+# Known duplicate helpers: <name> <file>. MAY ONLY SHRINK (#1342).
+# Fix one by routing it to the shared definition, then delete its lines here.
+java:formatValue backend/src/main/java/com/tracepcap/insights/service/NetworkInsightService.java
+java:formatValue backend/src/main/java/com/tracepcap/insights/service/SnapshotInsightService.java
+java:normaliseCidr backend/src/main/java/com/tracepcap/policy/service/CustomPrivateRangeService.java
+java:normaliseCidr backend/src/main/java/com/tracepcap/subnets/service/SubnetService.java
+ts:formatDuration frontend/src/components/analysis/AnalysisSummary/AnalysisSummary.tsx
+ts:formatDuration frontend/src/pages/Analysis/AnalysisLoadingView.tsx
+ts:formatDuration frontend/src/utils/formatters/index.ts
+ts:formatDuration frontend/src/utils/llmError.ts
+ts:formatInterval frontend/src/components/monitor/SnapshotTrafficChart/SnapshotTrafficChart.tsx
+ts:formatInterval frontend/src/components/timeline/TrafficTimeline/TrafficTimeline.tsx
+ts:formatNumber frontend/src/components/analysis/AnalysisSummary/AnalysisSummary.tsx
+ts:formatNumber frontend/src/components/common/EntityDetailModal/format.ts
+ts:formatNumber frontend/src/utils/formatters/index.ts
+ts:pct frontend/src/features/network/components/TimeScrubber.tsx
+ts:pct frontend/src/features/network/serviceTabs/dnsServiceTab.tsx
+ts:pct frontend/src/features/network/serviceTabs/webServiceTab.tsx
+ts:plural frontend/src/features/insights/categoryStatus.ts
+ts:plural frontend/src/features/monitor/utils/describeChange.ts
+ts:plural frontend/src/utils/formatters/index.ts
+ts:severityBadgeBg frontend/src/components/story/FindingsPanel/FindingsPanel.tsx
+ts:severityBadgeBg frontend/src/utils/severityColors.ts

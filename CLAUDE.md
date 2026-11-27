@@ -17,6 +17,27 @@ Only build a custom component if SGDS has no equivalent.
 - **Click-toggled info/help popovers** use `EscapableOverlayTrigger` from `@components/common/EscapableOverlayTrigger` — same props as SGDS `OverlayTrigger`, but it owns `show` and joins the Escape stack. Never `OverlayTrigger … rootClose`: inside a `Modal`, one Escape closes both. Give the `Popover` an `id` (it locates the layer by it).
 - **The popover itself is `InfoPopover`** from `@components/common/InfoPopover`: a small `kind` label ("How it works", "How it's measured"), a `title`, the note, and a footer with its `source` and a `docs` page link. Every SGDS popover already gets the card style (rounded, shadow, no grey title bar) from `sgds-overrides.css`; use `InfoPopover` for any explainer so they all read the same.
 
+## Shared Concepts
+
+Some concepts have **one definition and one way in**. Before writing a helper that formats, counts, or classifies, look here and use the owner. The second module that needs something moves it into `common/` (backend) or `utils/` (frontend); it doesn't get a private copy.
+
+| Concept | Backend | Frontend |
+|---|---|---|
+| Is this address inside the network | `LocalityRules` from `KnowledgeContext.locality()` / `ScanContext.locality()` / `LocalityPolicy` (custom ranges first). Never `IpLocality.isLocal` directly: only `common/net`, the policy and GeoIP may | `isPrivateIp` (custom ranges) / `isRfc1918` in `utils/ipClassification.ts` |
+| Is this a real host / unspecified address | `IpLocality.isHostAddress` | `utils/ipClassification.ts` |
+| Bytes, lengths of time, counted nouns | `common/text/Humanize` (`bytes`, `span`, `plural`) | `utils/formatters` (`formatBytes`, `formatSpan`, `formatDuration`, `formatNumber`) |
+| MAC addresses | `common/net/MacAddress` | — |
+| Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |
+| Severity colours | — | `utils/severityColors.ts` |
+
+Three checks hold this in place; when you add a shared concept, add it to the table **and** to a check, or it erodes:
+
+- `scripts/check_shared_vocabulary.py`: a concept's literals (address ranges, the byte and duration unit ladders) appear only in its owner.
+- `scripts/check_duplicate_helpers.py`: a concept-named helper (`format*`, `plural`, `pct`, `is*Local*`, `bytes`, `duration`, `severity*`, …) is defined in one file per side. Today's duplicates are a baseline that **may only shrink**: fix one, delete its line.
+- `SharedConceptTest` (ArchUnit): callers go through the entry point, not around it.
+
+**In code review**, a new helper that repeats a concept in this table is a finding, even when it's correct today: that's how five "is this local" helpers came to disagree (#694, #1338).
+
 ## Branching
 
 - `dev` is the integration branch; `main` is the release branch and remains the repo default.
