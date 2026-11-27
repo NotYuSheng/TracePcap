@@ -69,6 +69,11 @@ Where Each Applies
   **Custom detection rules** picker at the top of the page. The Overview's traffic
   groups follow the picker; Story still uses the default.
 - **Captures in no network**: the default.
+- **Investigation answers and Story findings** (victim, downloads, remote
+  access, C2, beacons, honeypot contacts): the default internal/external
+  ranges, the same ones the graph and the vantage point use. A range marked
+  internal here makes its hosts victims and sources rather than outside
+  servers.
 
 A snapshot's own subnet overrides (set when adding or editing a snapshot) still
 come first, then the network's entries, then the default.

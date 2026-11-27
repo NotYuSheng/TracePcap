@@ -2,6 +2,7 @@ package com.tracepcap.story.service;
 
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.story.spi.ScanContext;
 import java.util.List;
 import java.util.UUID;
@@ -22,15 +23,12 @@ final class LazyScanContext implements ScanContext {
   private final long totalBytes;
   private final Supplier<List<ConversationFacts>> conversations;
   private final Supplier<List<ConversationFacts>> tlsConversations;
+  private final LocalityRules locality;
 
-  LazyScanContext(
-      UUID fileId, long totalConversations, long totalBytes, ConversationLookup lookup) {
-    this(fileId, null, totalConversations, totalBytes, lookup);
-  }
-
-  LazyScanContext(
-      UUID fileId, UUID networkId, long totalConversations, long totalBytes, ConversationLookup lookup) {
+  LazyScanContext(UUID fileId, UUID networkId, long totalConversations, long totalBytes,
+      ConversationLookup lookup, LocalityRules locality) {
     this.fileId = fileId;
+    this.locality = locality == null ? LocalityRules.RFC_ONLY : locality;
     this.networkId = networkId;
     this.totalConversations = totalConversations;
     this.totalBytes = totalBytes;
@@ -42,6 +40,11 @@ final class LazyScanContext implements ScanContext {
                 this.conversations.get().stream()
                     .filter(c -> c.tls().tlsIssuer() != null)
                     .toList());
+  }
+
+  @Override
+  public LocalityRules locality() {
+    return locality;
   }
 
   /** Runs the supplier at most once; later calls return the first result. */

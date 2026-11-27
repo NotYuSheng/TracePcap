@@ -2,7 +2,7 @@ package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.Opening;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.knowledge.service.HoneypotRoleService;
 import com.tracepcap.knowledge.service.HoneypotRoleService.HostRole;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
@@ -68,6 +68,7 @@ public class HoneypotContributor implements KnowledgeContributor {
     HoneypotRoleService service = roles.getIfAvailable();
     if (service == null) return;
     List<HostRole> honeypots = service.forFile(context.fileId()).honeypots();
+    LocalityRules local = context.locality();
     if (honeypots.isEmpty()) return;
 
     Map<String, String> names = new LinkedHashMap<>();
@@ -80,7 +81,7 @@ public class HoneypotContributor implements KnowledgeContributor {
       attrs.put("basis", h.basis());
       board.addFinding(new Finding(HONEYPOT, h.described(), Severity.INFO,
           "HUMAN".equals(h.basis()) ? Grade.REPORTED : Grade.INFERRED, name(),
-          List.of(ref(h.host())), List.of(), attrs));
+          List.of(ref(h.host(), local)), List.of(), attrs));
     }
 
     ConversationLookup lookup = conversations.getIfAvailable();
@@ -90,18 +91,18 @@ public class HoneypotContributor implements KnowledgeContributor {
         .sorted(java.util.Comparator.comparingLong((Map.Entry<String, Contact> e) -> e.getValue().conversations)
             .reversed().thenComparing(Map.Entry::getKey))
         .limit(MAX_CONTACTS)
-        .forEach(e -> board.addFinding(contactFinding(e.getKey(), e.getValue())));
+        .forEach(e -> board.addFinding(contactFinding(e.getKey(), e.getValue(), local)));
   }
 
   /** "198.51.100.101 reached 198.51.100.22 in 6 conversations", the host first among its concerns. */
-  private Finding contactFinding(String host, Contact c) {
+  private Finding contactFinding(String host, Contact c, LocalityRules local) {
     Map<String, Object> attrs = new LinkedHashMap<>();
     attrs.put("host", host);
     attrs.put("honeypots", Map.copyOf(c.reached));
     attrs.put("conversations", c.conversations);
     List<EntityRef> concerns = new java.util.ArrayList<>();
-    concerns.add(ref(host));
-    c.reached.keySet().forEach(ip -> concerns.add(ref(ip)));
+    concerns.add(ref(host, local));
+    c.reached.keySet().forEach(ip -> concerns.add(ref(ip, local)));
     return new Finding(CONTACT,
         host + " reached " + String.join(", ", c.reached.keySet()) + " in " + c.conversations
             + " conversation" + (c.conversations == 1 ? "" : "s"),
@@ -138,8 +139,8 @@ public class HoneypotContributor implements KnowledgeContributor {
   }
 
   /** A host inside the network, or one outside it: the board types them apart. */
-  private static EntityRef ref(String ip) {
-    return IpLocality.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
+  private static EntityRef ref(String ip, LocalityRules local) {
+    return local.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
   }
 
   /** "a Cowrie honeypot", "an Internal sensor": an analyst's own label reads right too. */

@@ -3,7 +3,7 @@ package com.tracepcap.knowledge.contributor;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.FlowIdentity;
 import com.tracepcap.analysis.spi.ConversationLookup.TlsFacts;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.common.net.ServicePorts;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
@@ -56,13 +56,14 @@ public class BeaconContributor implements KnowledgeContributor {
 
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    LocalityRules local = context.locality();
     for (ConversationFacts conv : context.conversationFacts()) {
       FlowIdentity f = conv.flow();
       if (f.protocol() == null || !"TCP".equalsIgnoreCase(f.protocol())) continue;
       if (f.srcIp() == null || f.dstIp() == null) continue;
 
-      boolean srcLocal = IpLocality.isLocal(f.srcIp());
-      boolean dstLocal = IpLocality.isLocal(f.dstIp());
+      boolean srcLocal = local.isLocal(f.srcIp());
+      boolean dstLocal = local.isLocal(f.dstIp());
       if (srcLocal == dstLocal) continue; // need exactly one internal ↔ one external endpoint
 
       String hostIp = srcLocal ? f.srcIp() : f.dstIp();

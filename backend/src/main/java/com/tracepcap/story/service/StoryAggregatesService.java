@@ -270,7 +270,7 @@ public class StoryAggregatesService {
    * reporting it. External candidates come first, then the most regular; top 5.
    */
   private List<BeaconCandidate> computeBeaconCandidates(UUID fileId) {
-    return BeaconAnalysis.analyse(conversationLookup.conversationFacts(fileId)).stream()
+    return BeaconAnalysis.analyse(conversationLookup.conversationFacts(fileId), localityPolicy.currentRules()).stream()
         .limit(5)
         .map(
             c ->

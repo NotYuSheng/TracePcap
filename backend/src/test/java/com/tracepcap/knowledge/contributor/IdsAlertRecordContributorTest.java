@@ -3,6 +3,7 @@ package com.tracepcap.knowledge.contributor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tracepcap.analysis.spi.IdsAlertLookup.IdsAlertFacts;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.knowledge.question.C2Question;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
@@ -16,6 +17,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class IdsAlertRecordContributorTest {
+
+  private static final LocalityRules RFC = LocalityRules.RFC_ONLY;
 
   private static IdsAlertFacts alert(LocalDateTime t, String src, String dst, String method, String host, String url) {
     return new IdsAlertFacts(UUID.randomUUID(), t, src, 50000, dst, 443, 2035892L, 2,
@@ -33,7 +36,7 @@ class IdsAlertRecordContributorTest {
     l.add(alert(t0, "10.11.26.183", "10.11.26.3", null, null, null)); // internal: not a server outside
 
     CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
-    IdsAlertRecordContributor.post(l, b);
+    IdsAlertRecordContributor.post(l, RFC, b);
     var board = b.build();
 
     Map<String, Object> a = board.entity(EntityRef.external("194.180.191.64")).orElseThrow().attributes();
@@ -52,7 +55,7 @@ class IdsAlertRecordContributorTest {
     EntityRef c2 = EntityRef.external("194.180.191.64");
     b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "suricata"));
     IdsAlertRecordContributor.post(
-        List.of(alert(t0, "10.11.26.183", "194.180.191.64", "POST", "194.180.191.64", "http://194.180.191.64/fakeurl.htm")), b);
+        List.of(alert(t0, "10.11.26.183", "194.180.191.64", "POST", "194.180.191.64", "http://194.180.191.64/fakeurl.htm")), RFC, b);
 
     assertThat(new C2Question().answer(b.build())).singleElement().satisfies(ans -> {
       assertThat(ans.attributes()).containsEntry("requests", List.of("POST http://194.180.191.64/fakeurl.htm"));
@@ -69,7 +72,7 @@ class IdsAlertRecordContributorTest {
         Grade.INFERRED, "suricata", List.of(EntityRef.host("10.11.26.183"), EntityRef.external("194.180.191.64")),
         List.of(), Map.of()));
     IdsAlertRecordContributor.post(List.of(alert(LocalDateTime.of(2024, 11, 26, 12, 50), "10.11.26.183",
-        "194.180.191.64", "POST", "194.180.191.64", "/fakeurl.htm")), b);
+        "194.180.191.64", "POST", "194.180.191.64", "/fakeurl.htm")), RFC, b);
     assertThat(new com.tracepcap.knowledge.question.RemoteAccessQuestion().answer(b.build())).singleElement()
         .satisfies(a -> assertThat(a.basis()).contains("Alerts fired on: POST http://194.180.191.64/fakeurl.htm"));
   }
@@ -86,7 +89,7 @@ class IdsAlertRecordContributorTest {
     CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
     EntityRef c2 = EntityRef.external("194.180.191.64");
     b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "suricata"));
-    IdsAlertRecordContributor.post(kept, counts, b);
+    IdsAlertRecordContributor.post(kept, counts, RFC, b);
     var board = b.build();
 
     Map<String, Object> a = board.entity(c2).orElseThrow().attributes();
@@ -110,7 +113,7 @@ class IdsAlertRecordContributorTest {
     CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
     EntityRef c2 = EntityRef.external("203.0.113.9");
     b.addRelationship(Relationship.of(c2, "c2-of", EntityRef.malware("NetSupport RAT"), Grade.INFERRED, "suricata"));
-    IdsAlertRecordContributor.post(List.of(), counts, b);
+    IdsAlertRecordContributor.post(List.of(), counts, RFC, b);
     var board = b.build();
 
     assertThat(board.entity(c2).orElseThrow().attributes())

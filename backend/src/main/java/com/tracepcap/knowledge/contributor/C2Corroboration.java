@@ -1,7 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -89,17 +89,19 @@ public final class C2Corroboration {
           + " already talking to a confirmed C2 reaches it by bare IP, in repeated rounds (or seconds"
           + " after another such server).";
 
-  public static List<Escalation> find(List<ConversationFacts> convs, Set<String> confirmedC2) {
-    return analyse(convs, confirmedC2).escalations();
+  public static List<Escalation> find(
+      List<ConversationFacts> convs, Set<String> confirmedC2, LocalityRules local) {
+    return analyse(convs, confirmedC2, local).escalations();
   }
 
-  public static Analysis analyse(List<ConversationFacts> convs, Set<String> confirmedC2) {
+  public static Analysis analyse(
+      List<ConversationFacts> convs, Set<String> confirmedC2, LocalityRules local) {
     // Every internal host <-> external conversation, by pair, in time order.
     Map<Pair, List<ConversationFacts>> byPair = new LinkedHashMap<>();
     for (ConversationFacts c : convs) {
       String a = c.flow().srcIp(), b = c.flow().dstIp();
       if (a == null || b == null || c.flow().startTime() == null) continue;
-      boolean aLocal = IpLocality.isLocal(a), bLocal = IpLocality.isLocal(b);
+      boolean aLocal = local.isLocal(a), bLocal = local.isLocal(b);
       if (aLocal == bLocal) continue;
       Pair p = aLocal ? new Pair(a, b) : new Pair(b, a);
       byPair.computeIfAbsent(p, k -> new ArrayList<>()).add(c);

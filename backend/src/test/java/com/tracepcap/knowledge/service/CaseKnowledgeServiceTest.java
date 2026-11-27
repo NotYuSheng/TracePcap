@@ -63,7 +63,7 @@ class CaseKnowledgeServiceTest {
       org.mockito.Mockito.mock(com.tracepcap.analysis.spi.HostClassificationLookup.class);
 
   private CaseKnowledgeService service(List<KnowledgeContributor> contributors) {
-    return new CaseKnowledgeService(contributors, conversations, hosts);
+    return new CaseKnowledgeService(contributors, conversations, hosts, null);
   }
 
   /** One assembly loads each fact list once, however many contributors read it (#816). */

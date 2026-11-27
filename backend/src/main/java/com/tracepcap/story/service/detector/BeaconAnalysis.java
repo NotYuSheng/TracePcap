@@ -2,7 +2,7 @@ package com.tracepcap.story.service.detector;
 
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.FlowIdentity;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.common.net.ServicePorts;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -78,10 +78,10 @@ public final class BeaconAnalysis {
   private record View(Pair pair, String proto) {}
 
   /** Periodic client→server flows in reporting order: external before internal, then most regular. */
-  public static List<Candidate> analyse(List<ConversationFacts> conversations) {
+  public static List<Candidate> analyse(List<ConversationFacts> conversations, LocalityRules local) {
     Map<View, List<Oriented>> views = new LinkedHashMap<>();
     for (ConversationFacts c : conversations) {
-      Oriented o = orient(c);
+      Oriented o = orient(c, local);
       if (o == null) continue;
       views
           .computeIfAbsent(new View(new Pair(o.client(), o.server(), o.port()), o.proto()), k -> new ArrayList<>())
@@ -92,7 +92,7 @@ public final class BeaconAnalysis {
     Map<Pair, Set<String>> protocolsByPair = new LinkedHashMap<>();
     Map<Pair, String> appByPair = new LinkedHashMap<>();
     for (Map.Entry<View, List<Oriented>> e : views.entrySet()) {
-      Candidate c = candidate(e.getKey(), e.getValue());
+      Candidate c = candidate(e.getKey(), e.getValue(), local);
       if (c == null) continue;
       Pair pair = e.getKey().pair();
       protocolsByPair.computeIfAbsent(pair, k -> new LinkedHashSet<>()).addAll(c.protocols());
@@ -119,7 +119,7 @@ public final class BeaconAnalysis {
    * is not (UDP/ICMP, or a capture that began mid-flow) and exactly one endpoint is internal, the
    * internal host is taken as the client — it is the one that would be beaconing out.
    */
-  private static Oriented orient(ConversationFacts c) {
+  private static Oriented orient(ConversationFacts c, LocalityRules local) {
     FlowIdentity f = c.flow();
     if (f.srcIp() == null || f.dstIp() == null || f.startTime() == null) return null;
 
@@ -130,8 +130,8 @@ public final class BeaconAnalysis {
     } else if (initiator != null && initiator.equals(f.dstIp())) {
       serverIsDst = false;
     } else {
-      boolean srcLocal = IpLocality.isLocal(f.srcIp());
-      boolean dstLocal = IpLocality.isLocal(f.dstIp());
+      boolean srcLocal = local.isLocal(f.srcIp());
+      boolean dstLocal = local.isLocal(f.dstIp());
       serverIsDst = srcLocal == dstLocal || srcLocal; // exactly one internal endpoint → it is the client
     }
 
@@ -147,7 +147,7 @@ public final class BeaconAnalysis {
   }
 
   /** The periodicity of one protocol view, or null if it is not periodic or not worth reporting. */
-  private static Candidate candidate(View view, List<Oriented> flows) {
+  private static Candidate candidate(View view, List<Oriented> flows, LocalityRules local) {
     if (flows.size() < MIN_FLOWS) return null;
 
     List<LocalDateTime> times = flows.stream().map(Oriented::start).sorted().collect(Collectors.toList());
@@ -165,11 +165,11 @@ public final class BeaconAnalysis {
     if (cv >= MAX_CV) return null;
 
     Pair pair = view.pair();
-    if (!IpLocality.isLocal(pair.client())) return null; // inbound, or external↔external
+    if (!local.isLocal(pair.client())) return null; // inbound, or external↔external
 
     Scope scope;
     String app = flows.stream().map(Oriented::app).filter(a -> a != null).findFirst().orElse(null);
-    if (!IpLocality.isLocal(pair.server())) {
+    if (!local.isLocal(pair.server())) {
       scope = Scope.OUTBOUND;
     } else {
       // Internal → internal: regular traffic to a domain controller / file server / printer is the
