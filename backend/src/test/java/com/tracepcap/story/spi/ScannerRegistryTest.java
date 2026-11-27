@@ -81,6 +81,13 @@ class ScannerRegistryTest {
     }
 
     @Bean
+    com.tracepcap.common.net.LocalityPolicy localityPolicy() {
+      com.tracepcap.common.net.LocalityPolicy p = Mockito.mock(com.tracepcap.common.net.LocalityPolicy.class);
+      Mockito.when(p.currentRules()).thenReturn(com.tracepcap.common.net.LocalityRules.RFC_ONLY);
+      return p;
+    }
+
+    @Bean
     com.tracepcap.analysis.spi.DetectionRuleCatalog detectionRuleCatalog() {
       return Mockito.mock(com.tracepcap.analysis.spi.DetectionRuleCatalog.class);
     }
