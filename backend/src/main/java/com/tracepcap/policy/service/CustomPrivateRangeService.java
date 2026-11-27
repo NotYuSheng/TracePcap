@@ -1,5 +1,6 @@
 package com.tracepcap.policy.service;
 
+import com.tracepcap.common.net.Cidr;
 import com.tracepcap.policy.dto.CustomPrivateRangeDto;
 import com.tracepcap.policy.entity.CustomPrivateRangeEntity;
 import com.tracepcap.policy.entity.IpClassification;
@@ -40,50 +41,16 @@ public class CustomPrivateRangeService {
         .collect(Collectors.toList());
   }
 
+  private static java.util.Set<String> savedCidrs(List<CustomPrivateRangeEntity> rows) {
+    return rows.stream().map(CustomPrivateRangeEntity::getCidr).collect(Collectors.toCollection(java.util.HashSet::new));
+  }
+
   private static CustomPrivateRangeDto toDto(CustomPrivateRangeEntity e) {
     return CustomPrivateRangeDto.builder()
         .id(e.getId())
         .cidr(e.getCidr())
         .classification(e.getClassification().name())
         .build();
-  }
-
-  /** A bare IP or CIDR, validated and normalised (bare IPs become /32 or /128). */
-  static String normaliseCidr(String raw) {
-    if (raw == null || raw.isBlank()) throw new IllegalArgumentException("A CIDR is required");
-    String cidr = raw.trim();
-    // Determine IP and optional prefix parts — indexOf avoids split edge-case with bare "/"
-    int slashIdx = cidr.indexOf('/');
-    String ipPart = slashIdx >= 0 ? cidr.substring(0, slashIdx).trim() : cidr;
-    // Reject hostnames — only numeric IPs are accepted to prevent DNS resolution
-    if (!NUMERIC_IP.matcher(ipPart).matches()) {
-      throw new IllegalArgumentException("Invalid IP address: " + ipPart);
-    }
-    // Normalise bare IP to /32 or /128
-    if (!cidr.contains("/")) {
-      try {
-        InetAddress addr = InetAddress.getByName(ipPart);
-        cidr = addr.getHostAddress() + (addr.getAddress().length == 4 ? "/32" : "/128");
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid IP address: " + ipPart);
-      }
-    }
-    // Validate CIDR
-    String[] parts = cidr.split("/");
-    if (parts.length != 2) throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
-    try {
-      InetAddress addr = InetAddress.getByName(parts[0].trim());
-      int prefixMax = (addr.getAddress().length == 4) ? 32 : 128;
-      int prefix = Integer.parseInt(parts[1].trim());
-      if (prefix < 0 || prefix > prefixMax)
-        throw new IllegalArgumentException("Prefix length out of range for " + cidr);
-      cidr = addr.getHostAddress() + "/" + prefix;
-    } catch (IllegalArgumentException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
-    }
-    return cidr;
   }
 
   /**
@@ -93,7 +60,7 @@ public class CustomPrivateRangeService {
   @org.springframework.transaction.annotation.Transactional
   public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = normaliseCidr(dto.getCidr());
+    String cidr = Cidr.asSaved(dto.getCidr(), savedCidrs(loadRanges()), Cidr::normalise);
     IpClassification classification = parseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity =
         loadRanges().stream()
@@ -191,7 +158,9 @@ public class CustomPrivateRangeService {
   @org.springframework.transaction.annotation.Transactional
   public CustomPrivateRangeDto putForNetwork(UUID networkId, CustomPrivateRangeDto dto, boolean hidden) {
     permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
-    String cidr = normaliseCidr(dto.getCidr());
+    java.util.Set<String> saved = savedCidrs(loadRanges());
+    saved.addAll(savedCidrs(repository.findByNetworkIdOrderByCreatedAtDesc(networkId)));
+    String cidr = Cidr.asSaved(dto.getCidr(), saved, Cidr::normalise);
     IpClassification classification;
     if (hidden) {
       CustomPrivateRangeEntity def =
@@ -326,6 +295,9 @@ public class CustomPrivateRangeService {
     try {
       String[] parts = cidr.split("/");
       if (parts.length != 2) return Optional.empty();
+      // A numeric literal only: getByName on anything else (free text an older validator let
+      // through, such as "gw.corp/24") is a DNS lookup, which offline blocks until it times out.
+      if (!Cidr.isNumericLiteral(parts[0])) return Optional.empty();
       byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
       int prefixLen = Integer.parseInt(parts[1].trim());
       int maxPrefix = networkBytes.length * 8;

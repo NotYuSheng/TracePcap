@@ -1,5 +1,9 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.common.exception.FieldValidationException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import com.tracepcap.common.net.Cidr;
 import java.util.Set;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.common.exception.InvalidFileException;
@@ -45,6 +49,7 @@ public class SnapshotService {
   private final ConversationLookup conversationLookup;
   private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
   private final org.springframework.context.ApplicationEventPublisher events;
+  private final org.springframework.beans.factory.ObjectProvider<com.tracepcap.common.net.SavedSubnetCidrs> savedSubnets;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -113,16 +118,7 @@ public class SnapshotService {
 
     // Save subnet overrides if provided
     if (subnetOverrides != null && !subnetOverrides.isEmpty()) {
-      final NetworkSnapshotEntity savedSnapshot = snapshot;
-      List<SnapshotSubnetOverrideEntity> entities = subnetOverrides.stream()
-          .map(o -> SnapshotSubnetOverrideEntity.builder()
-              .snapshot(savedSnapshot)
-              .cidr(o.getCidr())
-              .label(o.getLabel())
-              .description(o.getDescription())
-              .inherited(o.isInherited())
-              .build())
-          .collect(Collectors.toList());
+      List<SnapshotSubnetOverrideEntity> entities = overrideRows(snapshot, subnetOverrides, savedSpellings(networkId, null));
       subnetOverrideRepository.saveAll(entities);
     }
 
@@ -182,18 +178,11 @@ public class SnapshotService {
 
     // null = untouched; empty list = clear all; non-empty = replace
     if (req.getSubnetOverrides() != null) {
+      // Checked before the old rows go, so a bad CIDR leaves them in place.
+      List<SnapshotSubnetOverrideEntity> entities =
+          overrideRows(snapshot, req.getSubnetOverrides(), savedSpellings(networkId, snapshotId));
       subnetOverrideRepository.deleteBySnapshotId(snapshotId);
-      if (!req.getSubnetOverrides().isEmpty()) {
-        final NetworkSnapshotEntity savedSnapshot = snapshot;
-        List<SnapshotSubnetOverrideEntity> entities = req.getSubnetOverrides().stream()
-            .map(o -> SnapshotSubnetOverrideEntity.builder()
-                .snapshot(savedSnapshot)
-                .cidr(o.getCidr())
-                .label(o.getLabel())
-                .description(o.getDescription())
-                .inherited(o.isInherited())
-                .build())
-            .collect(Collectors.toList());
+      if (!entities.isEmpty()) {
         subnetOverrideRepository.saveAll(entities);
       }
       // Subnet classification changed — recompute only the transitions involving this
@@ -316,6 +305,53 @@ public class SnapshotService {
     return subnetOverrideRepository.findBySnapshotId(snapshotId).stream()
         .map(this::toOverrideDto)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * A snapshot's subnet overrides as rows. A CIDR spelled exactly as a subnet label or this
+   * snapshot's override is stored keeps that text ({@link Cidr#asSaved}), inherited or not, so a
+   * label for a subnet left in an old spelling attaches to it. Anything new is written as a subnet label writes it
+   * ({@link Cidr#normaliseIpv4}). A bad CIDR, or two rows naming one network, is a 400 on that
+   * field: nothing is dropped silently.
+   */
+  private static List<SnapshotSubnetOverrideEntity> overrideRows(
+      NetworkSnapshotEntity snapshot, List<SubnetOverrideInput> overrides, java.util.Set<String> saved) {
+    Map<String, SnapshotSubnetOverrideEntity> byCidr = new LinkedHashMap<>();
+    Map<String, Integer> firstIndex = new java.util.HashMap<>();
+    for (int i = 0; i < overrides.size(); i++) {
+      SubnetOverrideInput o = overrides.get(i);
+      String field = "subnetOverrides[" + i + "].cidr";
+      String cidr;
+      try {
+        cidr = Cidr.asSaved(o.getCidr(), saved, Cidr::normaliseIpv4);
+      } catch (IllegalArgumentException e) {
+        throw new FieldValidationException(e.getMessage(), Map.of(field, e.getMessage()));
+      }
+      Integer earlier = firstIndex.putIfAbsent(cidr, i);
+      if (earlier != null) {
+        String msg = "Two overrides name " + cidr + " (rows " + (earlier + 1) + " and " + (i + 1) + "): keep one";
+        throw new FieldValidationException(msg, Map.of(field, msg));
+      }
+      byCidr.put(cidr, SnapshotSubnetOverrideEntity.builder()
+          .snapshot(snapshot)
+          .cidr(cidr)
+          .label(o.getLabel())
+          .description(o.getDescription())
+          .inherited(o.isInherited())
+          .build());
+    }
+    return new ArrayList<>(byCidr.values());
+  }
+
+  /** The spellings a snapshot's overrides may keep: the network's subnet labels and its own rows. */
+  private java.util.Set<String> savedSpellings(UUID networkId, UUID snapshotId) {
+    java.util.Set<String> saved = new java.util.HashSet<>();
+    com.tracepcap.common.net.SavedSubnetCidrs subnets = savedSubnets.getIfAvailable();
+    if (subnets != null) saved.addAll(subnets.forNetwork(networkId));
+    if (snapshotId != null) {
+      subnetOverrideRepository.findBySnapshotId(snapshotId).forEach(o -> saved.add(o.getCidr()));
+    }
+    return saved;
   }
 
   private SnapshotSubnetOverrideDto toOverrideDto(SnapshotSubnetOverrideEntity o) {

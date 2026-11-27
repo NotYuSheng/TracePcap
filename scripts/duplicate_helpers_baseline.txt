@@ -1,5 +1,5 @@
 # Known duplicate helpers: <name> <file>. MAY ONLY SHRINK (#1342).
 # Fix one by routing it to the shared definition, then delete its lines here.
-# normaliseCidr: #1351
-java:normaliseCidr backend/src/main/java/com/tracepcap/policy/service/CustomPrivateRangeService.java
-java:normaliseCidr backend/src/main/java/com/tracepcap/subnets/service/SubnetService.java
+# parseCidr (CIDR containment): #1354
+java:parseCidr backend/src/main/java/com/tracepcap/policy/service/CustomPrivateRangeService.java
+java:parseCidr backend/src/main/java/com/tracepcap/policy/service/IpOrgRuleService.java

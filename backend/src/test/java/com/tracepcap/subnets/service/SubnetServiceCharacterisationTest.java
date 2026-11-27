@@ -112,35 +112,39 @@ class SubnetServiceCharacterisationTest {
 
 
 
-  // --- normaliseCidr ---------------------------------------------------------
+  // --- subnetCidr (#1351: Cidr.normalise, IPv4 only) --------------------------
+  // Was normaliseCidr, which kept host bits and refused bare addresses. The change is deliberate:
+  // these pins moved with it.
 
   @ParameterizedTest
-  @CsvSource({"10.0.0.0/8, 10.0.0.0/8", "'  192.168.1.0/24  ', 192.168.1.0/24", "0.0.0.0/0, 0.0.0.0/0"})
-  void normaliseCidr_trimsAndOtherwisePassesThrough(String input, String expected) {
-    // Note it does *not* canonicalise the network address: "10.0.0.5/8" is returned unchanged
-    // rather than becoming "10.0.0.0/8". Pinned below.
-    assertThat(invoke("normaliseCidr", String.class, input)).isEqualTo(expected);
+  @CsvSource({"10.0.0.0/8, 10.0.0.0/8", "'  192.168.1.0/24  ', 192.168.1.0/24", "0.0.0.0/0, 0.0.0.0/0",
+      "10.1.2.3/8, 10.0.0.0/8", "10.0.0.5, 10.0.0.5/32"})
+  void subnetCidr_savesTheNetworkItNames(String input, String expected) {
+    assertThat(SubnetService.subnetCidr(input)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"10.0.0.0/33", "10.0.0.256/24", "999.1.1.1/24", "abc/24", "10.1/8"})
+  void subnetCidr_rejectsMalformedInput(String cidr) {
+    assertThatThrownBy(() -> SubnetService.subnetCidr(cidr))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Invalid CIDR");
   }
 
   @Test
-  void normaliseCidr_doesNotZeroTheHostBits() {
-    assertThat(invoke("normaliseCidr", String.class, "10.1.2.3/8")).isEqualTo("10.1.2.3/8");
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"10.0.0.0/33", "10.0.0.0", "10.0.0.256/24", "999.1.1.1/24", "abc/24"})
-  void normaliseCidr_rejectsMalformedInput(String cidr) {
-    assertThatThrownBy(() -> invoke("normaliseCidr", String.class, cidr))
+  void subnetCidr_saysIpv6IsNotYetASubnet() {
+    // Matching is IPv4 arithmetic: an IPv6 label would save and never match.
+    assertThatThrownBy(() -> SubnetService.subnetCidr("fd00::/64"))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Invalid CIDR format");
+        .hasMessageContaining("IPv4 for now");
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "   "})
-  void normaliseCidr_rejectsBlankWithItsOwnMessage(String cidr) {
+  void subnetCidr_rejectsBlankWithItsOwnMessage(String cidr) {
     // A different message from the malformed case, so the two are distinguishable in logs.
-    assertThatThrownBy(() -> invoke("normaliseCidr", String.class, cidr))
+    assertThatThrownBy(() -> SubnetService.subnetCidr(cidr))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("must not be blank");
+        .hasMessageContaining("required");
   }
 }

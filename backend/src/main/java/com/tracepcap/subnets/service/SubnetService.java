@@ -1,5 +1,6 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.common.net.Cidr;
 import com.tracepcap.common.net.LocalityPolicy;
 import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
@@ -16,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class SubnetService {
+public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs {
 
   private static final int MIN_HOSTS_PER_SUBNET = 3;
   // Prefix lengths to evaluate (inclusive). /20–/29 covers everything from
@@ -88,7 +89,7 @@ public class SubnetService {
   @Transactional
   public SubnetDefinitionDto upsert(UpsertSubnetRequest req) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = normaliseCidr(req.getCidr());
+    String cidr = Cidr.asSaved(req.getCidr(), defaultCidrs(), SubnetService::subnetCidr);
     SubnetDefinitionEntity entity =
         subnetRepo
             .findByCidrAndNetworkIdIsNull(cidr)
@@ -135,7 +136,7 @@ public class SubnetService {
   @Transactional
   public SubnetDefinitionDto saveDetected(UpsertSubnetRequest req) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = normaliseCidr(req.getCidr());
+    String cidr = Cidr.asSaved(req.getCidr(), defaultCidrs(), SubnetService::subnetCidr);
     SubnetDefinitionEntity entity =
         subnetRepo
             .findByCidrAndNetworkIdIsNull(cidr)
@@ -202,7 +203,9 @@ public class SubnetService {
   public SubnetDefinitionDto putForNetwork(UUID networkId, UpsertSubnetRequest req) {
     permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
     requireNetwork(networkId);
-    String cidr = normaliseCidr(req.getCidr());
+    java.util.Set<String> saved = new java.util.HashSet<>(defaultCidrs());
+    subnetRepo.findByNetworkIdOrderByCidr(networkId).forEach(e -> saved.add(e.getCidr()));
+    String cidr = Cidr.asSaved(req.getCidr(), saved, SubnetService::subnetCidr);
     req.setNetworkId(networkId);
     String segment = req.getSegmentKey() == null || req.getSegmentKey().isBlank() ? null : req.getSegmentKey().trim();
     if (req.isHidden() && segment != null) {
@@ -546,22 +549,23 @@ public class SubnetService {
   /** Delegates to the shared predicate so all four call sites agree (#694). */
 
 
-  private static final java.util.regex.Pattern CIDR_PATTERN =
-      java.util.regex.Pattern.compile(
-          "^(\\d{1,3}\\.){3}\\d{1,3}/([0-9]|[1-2]\\d|3[0-2])$");
-
-  private static String normaliseCidr(String cidr) {
-    if (cidr == null || cidr.isBlank()) throw new IllegalArgumentException("CIDR must not be blank");
-    cidr = cidr.trim();
-    if (!CIDR_PATTERN.matcher(cidr).matches()) {
-      throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
-    }
-    // Verify each octet is 0–255
-    String[] parts = cidr.split("[./]");
-    for (int i = 0; i < 4; i++) {
-      int octet = Integer.parseInt(parts[i]);
-      if (octet < 0 || octet > 255) throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
-    }
-    return cidr;
+  @Override
+  public java.util.Set<String> forNetwork(java.util.UUID networkId) {
+    java.util.Set<String> out = new java.util.HashSet<>(defaultCidrs());
+    if (networkId != null) subnetRepo.findByNetworkIdOrderByCidr(networkId).forEach(e -> out.add(e.getCidr()));
+    return out;
   }
+
+  /** The shared default's CIDRs as stored. */
+  private java.util.Set<String> defaultCidrs() {
+    return subnetRepo.findByNetworkIdIsNullOrderByCidr().stream()
+        .map(SubnetDefinitionEntity::getCidr)
+        .collect(Collectors.toSet());
+  }
+
+  /** The CIDR as a subnet label saves it: {@link Cidr#normaliseIpv4}. */
+  static String subnetCidr(String raw) {
+    return Cidr.normaliseIpv4(raw);
+  }
+
 }

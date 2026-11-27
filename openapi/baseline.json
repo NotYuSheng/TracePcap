@@ -6182,7 +6182,6 @@
       "SubnetOverrideInput": {
         "properties": {
           "cidr": {
-            "pattern": "^((25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d\\d?)/(\\d|[12]\\d|3[0-2])$",
             "type": "string"
           },
           "description": {

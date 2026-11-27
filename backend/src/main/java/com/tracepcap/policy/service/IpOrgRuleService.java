@@ -1,5 +1,6 @@
 package com.tracepcap.policy.service;
 
+import com.tracepcap.common.net.Cidr;
 import com.tracepcap.policy.dto.IpOrgRuleDto;
 import com.tracepcap.policy.entity.IpOrgRuleEntity;
 import com.tracepcap.policy.repository.IpOrgRuleRepository;
@@ -35,25 +36,8 @@ public class IpOrgRuleService {
         .collect(Collectors.toList());
   }
 
-  /** Validates a CIDR (an address and a prefix length). */
-  private static String validCidr(String raw) {
-    if (raw == null || raw.isBlank()) throw new IllegalArgumentException("A CIDR is required");
-    String cidr = raw.trim();
-    // Validate IP and prefix before persisting
-    String[] parts = cidr.split("/");
-    if (parts.length != 2) throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
-    try {
-      InetAddress addr = InetAddress.getByName(parts[0].trim());
-      int prefixMax = (addr.getAddress().length == 4) ? 32 : 128;
-      int prefix = Integer.parseInt(parts[1].trim());
-      if (prefix < 0 || prefix > prefixMax)
-        throw new IllegalArgumentException("Prefix length out of range for " + cidr);
-    } catch (IllegalArgumentException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
-    }
-    return cidr;
+  private static java.util.Set<String> savedCidrs(List<IpOrgRuleEntity> rows) {
+    return rows.stream().map(IpOrgRuleEntity::getCidr).collect(Collectors.toCollection(java.util.HashSet::new));
   }
 
   /**
@@ -63,7 +47,7 @@ public class IpOrgRuleService {
   @org.springframework.transaction.annotation.Transactional
   public IpOrgRuleDto create(IpOrgRuleDto dto) {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
-    String cidr = validCidr(dto.getCidr());
+    String cidr = Cidr.asSaved(dto.getCidr(), savedCidrs(loadRules()), Cidr::normalise);
     if (dto.getLabel() == null || dto.getLabel().isBlank()) throw new IllegalArgumentException("A label is required");
     IpOrgRuleEntity entity =
         loadRules().stream()
@@ -152,7 +136,9 @@ public class IpOrgRuleService {
   @org.springframework.transaction.annotation.Transactional
   public IpOrgRuleDto putForNetwork(UUID networkId, IpOrgRuleDto dto, boolean hidden) {
     permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
-    String cidr = validCidr(dto.getCidr());
+    java.util.Set<String> saved = savedCidrs(loadRules());
+    saved.addAll(savedCidrs(repository.findByNetworkIdOrderByPrefixLengthDescLabelAsc(networkId)));
+    String cidr = Cidr.asSaved(dto.getCidr(), saved, Cidr::normalise);
     String label;
     if (hidden) {
       label =
@@ -235,6 +221,7 @@ public class IpOrgRuleService {
       Optional<ParsedCidr> opt = cidrCache.computeIfAbsent(cidr, this::parseCidr);
       if (opt.isEmpty()) return false;
       ParsedCidr parsed = opt.get();
+      if (!Cidr.isNumericLiteral(ip)) return false; // never a DNS lookup for an endpoint string
       byte[] addrBytes = InetAddress.getByName(ip).getAddress();
       byte[] netBytes = parsed.networkBytes();
       int prefixLen = parsed.prefixLen();
@@ -260,6 +247,9 @@ public class IpOrgRuleService {
     try {
       String[] parts = cidr.split("/");
       if (parts.length != 2) return Optional.empty();
+      // A numeric literal only: getByName on anything else (free text an older validator let
+      // through, such as "gw.corp/24") is a DNS lookup, which offline blocks until it times out.
+      if (!Cidr.isNumericLiteral(parts[0])) return Optional.empty();
       byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
       int prefixLen = Integer.parseInt(parts[1].trim());
       return Optional.of(new ParsedCidr(networkBytes, prefixLen));
