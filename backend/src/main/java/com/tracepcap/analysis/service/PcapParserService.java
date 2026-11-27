@@ -2,6 +2,7 @@ package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.common.TsharkHexUtil;
+import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -331,7 +332,7 @@ public class PcapParserService {
             // A client with no address yet (a DHCP request from 0.0.0.0) is told apart only by its
             // MAC. Without it in the key, every such client merged into one conversation credited
             // to whichever MAC came first, so the map drew one "0.0.0.0" device for all of them.
-            if (srcMac != null && isUnspecified(srcIp)) convKey += "|" + srcMac;
+            if (srcMac != null && IpLocality.isUnspecified(srcIp)) convKey += "|" + srcMac;
             if (!conversationMap.containsKey(convKey) && conversationMap.size() >= maxConversations) {
               throw new RuntimeException(
                   "Capture exceeds "
@@ -616,11 +617,6 @@ public class PcapParserService {
   private void incrementProtocolCount(PcapAnalysisResult result, String protocol, int packetSize) {
     result.getProtocolCounts().merge(protocol, 1L, Long::sum);
     result.getProtocolBytes().merge(protocol, (long) packetSize, Long::sum);
-  }
-
-  /** The unspecified address: a sender that has no address yet, so its MAC is its identity. */
-  static boolean isUnspecified(String ip) {
-    return "0.0.0.0".equals(ip) || "::".equals(ip);
   }
 
   /** The conversation's transport: TCP or UDP when it has ports, else the packet's own label. */

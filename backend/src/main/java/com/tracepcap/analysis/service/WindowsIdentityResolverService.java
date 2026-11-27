@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.IpLocality;
 import java.time.LocalDateTime;
 import java.io.BufferedReader;
 import java.io.File;
@@ -478,7 +479,7 @@ public class WindowsIdentityResolverService {
   private void record(
       Map<LogonKey, LogonAgg> result, String ip, String rawUsername, String source,
       String directoryEntry, String folder, FolderKind kind, String domain, LocalDateTime at) {
-    if (!isUsableIp(ip)) return;
+    if (!IpLocality.isAssigned(ip)) return;
     String username = cleanUsername(rawUsername);
     if (username == null) return;
     LogonKey key = new LogonKey(ip, username, source, directoryEntry);
@@ -604,9 +605,5 @@ public class WindowsIdentityResolverService {
     if (raw == null) return null;
     String t = raw.trim();
     return t.isEmpty() ? null : t;
-  }
-
-  private boolean isUsableIp(String ip) {
-    return ip != null && !ip.isBlank() && !ip.equals("0.0.0.0") && !ip.equals("::");
   }
 }

@@ -36,14 +36,6 @@ public final class IpLocality {
   };
 
   /**
-   * True when the address is loopback, link-local, or private/unique-local — anything not
-   * routable on the public internet.
-   *
-   * <p>A null, blank or unparseable address is <b>not</b> local. Three of the four old
-   * implementations already agreed on that; the fourth treated null as local, which silently
-   * counted rows with no address as internal traffic.
-   */
-  /**
    * True when the address can be one machine (#918). False for the unspecified address
    * ({@code 0.0.0.0}, {@code ::}, a DHCP client before it has an address), IPv4 limited broadcast
    * and multicast/reserved space ({@code 224.0.0.0/3} and up), IPv6 multicast ({@code ff00::/8}),
@@ -72,6 +64,14 @@ public final class IpLocality {
     return true;
   }
 
+  /**
+   * True when the address is loopback, link-local, or private/unique-local — anything not
+   * routable on the public internet.
+   *
+   * <p>A null, blank or unparseable address is <b>not</b> local. Three of the four old
+   * implementations already agreed on that; the fourth treated null as local, which silently
+   * counted rows with no address as internal traffic.
+   */
   public static boolean isLocal(String ip) {
     if (ip == null) {
       return false;
@@ -81,6 +81,26 @@ public final class IpLocality {
       return false;
     }
     return addr.indexOf(':') >= 0 ? isLocalV6(addr) : isLocalV4(addr);
+  }
+
+  /**
+   * The unspecified address, {@code 0.0.0.0} or {@code ::}: what a sender with no address yet (a
+   * DHCP client) sends from, and what a protocol writes in an address field it leaves empty. A
+   * narrower question than {@link #isHostAddress}: broadcast and multicast are specified, they just
+   * aren't one machine.
+   */
+  public static boolean isUnspecified(String ip) {
+    if (ip == null) return false;
+    String a = ip.trim();
+    return a.equals("0.0.0.0") || a.equals("::");
+  }
+
+  /**
+   * An address field that holds an address: not null, blank or unspecified. For fields a protocol
+   * fills in (a DHCP lease, a DNS answer, a failover VIP), where {@code 0.0.0.0} means "none".
+   */
+  public static boolean isAssigned(String ip) {
+    return ip != null && !ip.isBlank() && !isUnspecified(ip);
   }
 
   private static boolean isLocalV4(String ip) {

@@ -55,6 +55,20 @@ RULES = [
         },
     },
     {
+        "name": "unspecified and broadcast address literals",
+        "why": "nine hand-written 'is this a real host' checks disagreed on broadcast,"
+        " multicast and :: (#1339)",
+        "owner": "backend common/net/IpLocality.java (isUnspecified, isHostAddress, isAssigned),"
+        " frontend utils/ipClassification.ts",
+        # Not "::" alone: it's also a separator in cache keys.
+        "pattern": re.compile(r"""["'](?:0\.0\.0\.0|255\.255\.255\.255)["']"""),
+        "owners": {
+            "backend/src/main/java/com/tracepcap/common/net/IpLocality.java",
+            "frontend/src/utils/ipClassification.ts",
+        },
+        "exempt": set(),
+    },
+    {
         "name": "byte-size unit ladder",
         "why": "nine implementations, two of which rendered '1.0 undefined' past GB (#733)",
         "owner": "frontend utils/formatters, backend common/text/Humanize.java",

@@ -3,6 +3,7 @@ package com.tracepcap.report;
 import com.tracepcap.analysis.dto.occupancy.HostOccupancyResponse;
 import com.tracepcap.analysis.dto.segments.NetworkSegmentsResponse;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.common.net.IpLocality;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -100,7 +101,7 @@ final class ReportFindings {
 
     // Addresses that changed hands.
     for (var r : sharedAddresses) {
-      if (r.occupancies().size() < 2 || !ReportService.isHost(r.ip())) continue;
+      if (r.occupancies().size() < 2 || !IpLocality.isHostAddress(r.ip())) continue;
       List<String> parts = new ArrayList<>();
       var holders = r.occupancies();
       for (int i = 0; i < holders.size(); i++) {

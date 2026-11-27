@@ -24,7 +24,7 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | Concept | Backend | Frontend |
 |---|---|---|
 | Is this address inside the network | `LocalityRules` from `KnowledgeContext.locality()` / `ScanContext.locality()` / `LocalityPolicy` (custom ranges first). Never `IpLocality.isLocal` directly: only `common/net`, the policy and GeoIP may | `isPrivateIp` (custom ranges) / `isRfc1918` in `utils/ipClassification.ts` |
-| Is this a real host / unspecified address | `IpLocality.isHostAddress` | `utils/ipClassification.ts` |
+| Is this a real host / unspecified / a filled-in address field | `IpLocality.isHostAddress` / `isUnspecified` / `isAssigned` | `isHostAddress` / `isUnspecified` in `utils/ipClassification.ts` |
 | Bytes, lengths of time, counted nouns | `common/text/Humanize` (`bytes`, `span`, `plural`) | `utils/formatters` (`formatBytes`, `formatSpan`, `formatDuration`, `formatNumber`) |
 | MAC addresses | `common/net/MacAddress` | — |
 | Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |

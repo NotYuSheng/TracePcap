@@ -1,6 +1,5 @@
 # Known duplicate helpers: <name> <file>. MAY ONLY SHRINK (#1342).
 # Fix one by routing it to the shared definition, then delete its lines here.
-java:formatValue backend/src/main/java/com/tracepcap/insights/service/NetworkInsightService.java
-java:formatValue backend/src/main/java/com/tracepcap/insights/service/SnapshotInsightService.java
+# normaliseCidr: #1351
 java:normaliseCidr backend/src/main/java/com/tracepcap/policy/service/CustomPrivateRangeService.java
 java:normaliseCidr backend/src/main/java/com/tracepcap/subnets/service/SubnetService.java

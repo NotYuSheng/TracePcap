@@ -1,5 +1,6 @@
 package com.tracepcap.report;
 
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.common.text.Humanize;
 import static com.tracepcap.report.ReportPdf.cell;
 import static com.tracepcap.report.ReportPdf.font;
@@ -288,7 +289,7 @@ public class ReportService {
 
   private static long localDevices(Facts f) {
     Set<String> local = new java.util.LinkedHashSet<>();
-    for (HostFacts h : f.hosts()) if (h.ip() != null && isHost(h.ip()) && !f.internet().contains(h.ip())) local.add(h.ip());
+    for (HostFacts h : f.hosts()) if (h.ip() != null && IpLocality.isHostAddress(h.ip()) && !f.internet().contains(h.ip())) local.add(h.ip());
     List<String[]> same = new ArrayList<>();
     for (DeviceMoveDto m : f.moves()) same.add(new String[] {m.fromIp(), m.toIp()});
     if (f.networks() != null) {
@@ -718,24 +719,12 @@ public class ReportService {
   static Map<String, Long> realHosts(ClusterNodeDto n) {
     if (n.getIpBytes() == null) return Map.of();
     Map<String, Long> out = new LinkedHashMap<>();
-    n.getIpBytes().forEach((ip, b) -> { if (isHost(ip)) out.put(ip, b); });
+    n.getIpBytes().forEach((ip, b) -> { if (IpLocality.isHostAddress(ip)) out.put(ip, b); });
     return out;
   }
 
   private static long realBytes(ClusterNodeDto n) {
     return realHosts(n).values().stream().mapToLong(Long::longValue).sum();
-  }
-
-  /** False for the unspecified, broadcast and multicast addresses, which no device holds. */
-  static boolean isHost(String ip) {
-    if (ip == null || ip.equals("0.0.0.0") || ip.equals("::") || ip.equals("255.255.255.255")) return false;
-    if (ip.toLowerCase().startsWith("ff")) return false;
-    int dot = ip.indexOf('.');
-    if (dot > 0) {
-      int first = parseOr(ip.substring(0, dot));
-      if (first >= 224 && first <= 239) return false;
-    }
-    return true;
   }
 
   /** "LAPTOP_DESKTOP" → "Laptop/desktop"; a DHCP gateway is a gateway whatever its traffic says. */
