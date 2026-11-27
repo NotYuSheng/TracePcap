@@ -446,7 +446,8 @@ honeypot*, or a label of your own) wins outright and keeps the signals for refer
 its weight to *Honeypot* or *Not a honeypot*, and counts as a signal, so an analyst's word plus one
 signature can settle a host. Evidence worth 60 points settles a host on its own: the two-signal rule
 guards against a real server's stock banner, and an analyst's word isn't one. An override on any
-address, signals or not, answers it.
+address, signals or not, answers it. The host details drawer reads one host's role
+(``GET /files/{fileId}/honeypots/{ip}``), with no signal too, so any host can be marked there.
 
 **Where it shows.** The Honeypot category is *Answered* when a host reads as one, *Open* when a host
 has two or more signals but not enough, and *Ruled out* when every server's banners and

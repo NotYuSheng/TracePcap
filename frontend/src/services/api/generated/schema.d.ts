@@ -1185,6 +1185,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/honeypots/{ip}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One host's honeypot role
+         * @description Whether this host reads as a honeypot, from its banners, certificates and behaviour, with analyst evidence and any override. Answers for any host, with no signal too, so an analyst can mark one the signatures missed: override or add evidence at the adjudication endpoints for the returned question and the host's address.
+         */
+        get: operations["getHoneypotRole"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/host-classifications": {
         parameters: {
             query?: never;
@@ -7541,6 +7561,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getHoneypotRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HoneypotsResponse"];
+                };
             };
         };
     };

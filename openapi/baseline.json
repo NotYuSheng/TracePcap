@@ -10700,6 +10700,47 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/honeypots/{ip}": {
+      "get": {
+        "description": "Whether this host reads as a honeypot, from its banners, certificates and behaviour, with analyst evidence and any override. Answers for any host, with no signal too, so an analyst can mark one the signatures missed: override or add evidence at the adjudication endpoints for the returned question and the host's address.",
+        "operationId": "getHoneypotRole",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoneypotsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One host's honeypot role",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/host-classifications": {
       "get": {
         "operationId": "getHostClassifications",

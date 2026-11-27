@@ -14,6 +14,13 @@ function serve(evidence: Record<string, unknown>) {
   server.use(
     http.get('*/files/f1/hosts/:ip/identity', () => HttpResponse.json({ ...base, ...evidence })),
     http.get('*/custom-private-ranges', () => HttpResponse.json([])),
+    http.get('*/files/f1/honeypots/:ip', ({ params }) =>
+      HttpResponse.json({
+        hosts: [{ host: params.ip, label: null, basis: 'MACHINE', confidence: 0, contested: false,
+          candidates: [], signals: [], reason: 'nothing it sent matches a honeypot signature' }],
+        singleSignal: 0, serversChecked: 0, question: 'honeypot', options: ['Honeypot', 'Not a honeypot'],
+      })
+    ),
     http.get('*/files/f1/hosts/:ip/occupancies', () =>
       HttpResponse.json({
         ip: '10.0.0.70', overlapping: false, virtualAddress: false, decisions: [], suggestions: [],

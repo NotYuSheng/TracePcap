@@ -2,6 +2,7 @@ import { Alert } from '@components/common/Alert';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@govtechsg/sgds-react';
 import { AdjudicationPanel } from '@components/common/AdjudicationPanel/AdjudicationPanel';
+import { HoneypotRoleSection } from './HoneypotRoleSection';
 import {
   AXIS_ORDER,
   AXIS_META,
@@ -435,6 +436,9 @@ export function HostIdentitySection({
           ) : null;
         })()}
       </div>
+
+      {/* Honeypot role: any host can be marked a decoy, or not one. */}
+      <HoneypotRoleSection fileId={fileId} ip={ip} />
 
       {/* Geolocation — external-host country/ASN/org, restored from the old conversation modal. */}
       <GeoBlock ev={evidence} isPrivate={isPrivateIp(ip, customRanges)} />

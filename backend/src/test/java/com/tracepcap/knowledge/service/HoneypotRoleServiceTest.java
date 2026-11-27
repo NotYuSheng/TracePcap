@@ -231,6 +231,13 @@ class HoneypotRoleServiceTest {
         .thenReturn(override == null ? List.of() : List.of(override));
     ManualEvidenceRepository e = mock(ManualEvidenceRepository.class);
     when(e.findByQuestionAndFileId(any(), any())).thenReturn(List.of(ev));
+    // One host's reads: its override and its evidence, by address.
+    when(o.find(eq(HoneypotRoleService.QUESTION), eq(FILE), anyString())).thenAnswer(inv ->
+        java.util.Optional.ofNullable(override)
+            .filter(x -> x.getEntityKey().equals(inv.getArgument(2))));
+    when(e.findByQuestionAndFileIdAndEntityKeyOrderByCreatedAtDesc(any(), any(), anyString()))
+        .thenAnswer(inv -> java.util.Arrays.stream(ev)
+            .filter(x -> x.getEntityKey().equals(inv.getArgument(2))).toList());
     return new HoneypotRoleService(b, c, o, e, new ObjectMapper());
   }
 
@@ -297,5 +304,54 @@ class HoneypotRoleServiceTest {
         .forFile(FILE);
     assertThat(r.hosts()).isEmpty();
     assertThat(r.serversChecked()).isEqualTo(1);
+  }
+
+  // ── One host ─────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  void oneHostWithNoSignalIsUndeterminedAndSaysWhy() {
+    var r = service(List.of(new Banner("192.0.2.80", 80, "http-server", "nginx", 4)), List.of(), null)
+        .forHost(FILE, "192.0.2.80");
+    assertThat(r.hosts()).singleElement().satisfies(h -> {
+      assertThat(h.host()).isEqualTo("192.0.2.80");
+      assertThat(h.label()).isNull();
+      assertThat(h.signals()).isEmpty();
+      assertThat(h.reason()).contains("nothing it sent matches");
+      assertThat(h.basis()).isEqualTo("MACHINE");
+    });
+    assertThat(r.serversChecked()).isEqualTo(1);
+  }
+
+  @Test
+  void oneHostReadsLikeTheCaptureDoes() {
+    var r = service(cowrie("198.51.100.22"), probed("198.51.100.22", 6, 0), null)
+        .forHost(FILE, "198.51.100.22");
+    assertThat(r.honeypots()).singleElement().satisfies(h -> {
+      assertThat(h.honeypot()).isEqualTo("Cowrie");
+      assertThat(h.basis()).isEqualTo("MACHINE");
+    });
+  }
+
+  @Test
+  void anAnalystCanMarkAHostTheSignaturesMissed() {
+    HumanOverrideEntity o = mock(HumanOverrideEntity.class);
+    when(o.getEntityKey()).thenReturn("10.0.2.15");
+    when(o.getLabel()).thenReturn("Honeypot");
+    var r = service(List.of(), List.of(), o).forHost(FILE, "10.0.2.15");
+    assertThat(r.honeypots()).singleElement()
+        .satisfies(h -> assertThat(h.basis()).isEqualTo("HUMAN"));
+    // Another host is not touched by that override.
+    assertThat(service(List.of(), List.of(), o).forHost(FILE, "10.0.2.16").honeypots()).isEmpty();
+  }
+
+  @Test
+  void oneHostCountsOnlyItsOwnEvidence() {
+    ManualEvidenceEntity mine = ManualEvidenceEntity.builder().label("Honeypot").weight(70)
+        .reason("our T-Pot").entityKey("10.0.0.5").build();
+    ManualEvidenceEntity other = ManualEvidenceEntity.builder().label("Honeypot").weight(70)
+        .reason("another").entityKey("10.0.0.6").build();
+    var svc = service(List.of(), List.of(), null, mine, other);
+    assertThat(svc.forHost(FILE, "10.0.0.5").honeypots()).hasSize(1);
+    assertThat(svc.forHost(FILE, "10.0.0.7").honeypots()).isEmpty();
   }
 }

@@ -45,51 +45,89 @@ export function HoneypotLine({ fileId, honeypots, onChanged }: Props) {
         titleId="honeypot-host-title"
         wide
       >
-        {shown && <HostBody fileId={fileId} honeypots={honeypots} host={shown} onChanged={onChanged} />}
+        {shown && <HoneypotHostBody fileId={fileId} honeypots={honeypots} host={shown} onChanged={onChanged} />}
       </SideDrawer>
     </>
   );
 }
 
-function HostBody({ fileId, honeypots, host, onChanged }: Props & { host: HoneypotHost }) {
+/**
+ * One host's honeypot role: what the signals say, an override, analyst evidence and the signals
+ * themselves. In the Story line's drawer and in the host details drawer.
+ */
+export function HoneypotHostBody({
+  fileId,
+  honeypots,
+  host,
+  onChanged,
+  compact = false,
+}: Props & {
+  host: HoneypotHost;
+  /** In the host drawer, beside the identity: the verdict first, one line of explanation. */
+  compact?: boolean;
+}) {
+  const panel = (
+    <AdjudicationPanel
+      fileId={fileId}
+      question={honeypots.question}
+      entityKey={host.host}
+      title="Honeypot"
+      verdict={{
+        label: host.label ? (host.honeypot && isHoneypot(host) && host.label === 'Honeypot'
+          ? `Honeypot (${host.honeypot})` : host.label) : 'Not settled',
+        basis: host.basis,
+        confidence: host.label ? host.confidence : undefined,
+        contested: host.contested,
+        candidates: host.candidates.map(c => ({
+          label: c.label,
+          source: 'signals',
+          score: c.score,
+          reasons: c.reasons,
+        })),
+      }}
+      labelOptions={honeypots.options}
+      onChanged={onChanged}
+    />
+  );
+  const undetermined = !host.label && host.reason && (
+    <p className="small" data-testid="honeypot-undetermined">
+      <b>Not settled:</b> {host.reason}.
+    </p>
+  );
+  // In the host drawer the panel's own "Honeypot" heading leads, with one line of explanation; in
+  // the Story drawer, titled "Is … a honeypot?", the explainer comes first.
   return (
     <>
-      <p className="small text-muted">
-        A stock honeypot gives itself away: a default banner, a default certificate, a Windows SMB
-        server on a Linux stack. One signal is never enough, since a real server can send the same
-        banner: TracePcap needs two, one of them a match in its signature file
-        {honeypots.signaturesVersion ? ` (version ${honeypots.signaturesVersion})` : ''}. If you
-        know better, say so: your answer replaces the inference, and evidence you add counts toward it.
-      </p>
-      {!host.label && host.reason && (
-        <p className="small" data-testid="honeypot-undetermined">
-          <b>Not settled:</b> {host.reason}.
-        </p>
+      {compact ? (
+        <>
+          {panel}
+          <p className="small text-muted mb-2">
+            TracePcap needs two signals, one a match in its signature file. If you know it&apos;s a
+            decoy, or that it isn&apos;t, say so: your answer replaces the inference.
+          </p>
+          {undetermined}
+        </>
+      ) : (
+        <>
+          <p className="small text-muted">
+            A stock honeypot gives itself away: a default banner, a default certificate, a Windows
+            SMB server on a Linux stack. One signal is never enough, since a real server can send the
+            same banner: TracePcap needs two, one of them a match in its signature file
+            {honeypots.signaturesVersion ? ` (version ${honeypots.signaturesVersion})` : ''}. If you
+            know better, say so: your answer replaces the inference, and evidence you add counts
+            toward it.
+          </p>
+          {undetermined}
+          {panel}
+        </>
       )}
-      <AdjudicationPanel
-        fileId={fileId}
-        question={honeypots.question}
-        entityKey={host.host}
-        title="Honeypot"
-        verdict={{
-          label: host.label ? (host.honeypot && isHoneypot(host) && host.label === 'Honeypot'
-            ? `Honeypot (${host.honeypot})` : host.label) : 'Not settled',
-          basis: host.basis,
-          confidence: host.label ? host.confidence : undefined,
-          contested: host.contested,
-          candidates: host.candidates.map(c => ({
-            label: c.label,
-            source: 'signals',
-            score: c.score,
-            reasons: c.reasons,
-          })),
-        }}
-        labelOptions={honeypots.options}
-        onChanged={onChanged}
-      />
       <h6 className="border-bottom pb-1 mb-2">Signals</h6>
       {host.signals.length === 0
-        ? <p className="small text-muted mb-0">None: only an analyst&apos;s word.</p>
+        ? (
+          <p className="small text-muted mb-0">
+            {host.label ? 'None: only an analyst\u2019s word.' : 'None: nothing it sent or did points at a honeypot.'}
+          </p>
+        )
         : (
           <ul className="small mb-0" data-testid="honeypot-signals">
             {host.signals.map(s => (
