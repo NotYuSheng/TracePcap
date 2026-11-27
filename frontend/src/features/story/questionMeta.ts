@@ -9,4 +9,5 @@ export const QUESTION_META: Record<string, { label: string; icon: string }> = {
   'lateral-movement': { label: 'Lateral movement', icon: 'bi-diagram-2' },
   'kerberos-attack': { label: 'Kerberos attack', icon: 'bi-key' },
   downloads: { label: 'Downloaded file', icon: 'bi-file-earmark-arrow-down' },
+  'honeypot-activity': { label: 'Reached a honeypot', icon: 'bi-bullseye' },
 };

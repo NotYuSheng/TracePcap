@@ -1,6 +1,7 @@
 package com.tracepcap.knowledge.question;
 
 import com.tracepcap.knowledge.contributor.DownloadContributor;
+import com.tracepcap.knowledge.contributor.HoneypotContributor;
 import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.Finding;
@@ -19,6 +20,9 @@ import org.springframework.stereotype.Component;
  * over a real transfer, each with its SHA-256: what an incident report lists ("Downloaded DLL file
  * SHA256 hash: …") and what an analyst exports and checks. MEASURED, because the bytes were seen;
  * it says nothing about whether the file is malicious. One answer per distinct file.
+ *
+ * <p>A file a honeypot fetched is the catch, not an infection: an attacker made the decoy download
+ * their tooling, so its hash and URL are reported as theirs.
  */
 @Component
 public class DownloadsQuestion implements StandardQuestion {
@@ -49,18 +53,21 @@ public class DownloadsQuestion implements StandardQuestion {
     bySha.values().forEach(f -> byServer
         .computeIfAbsent(f.attributes().get("host") + ">" + f.attributes().get("external"), k -> new ArrayList<>())
         .add(f));
+    Map<String, String> decoys = HoneypotContributor.honeypots(board);
     List<Answer> answers = new ArrayList<>();
     byServer.values().forEach(files -> {
       files.sort(java.util.Comparator.comparingLong(
           (Finding f) -> f.attributes().get("size") instanceof Number n ? n.longValue() : 0L).reversed());
-      files.stream().limit(MAX_PER_SERVER).forEach(f -> answers.add(answerFor(f)));
+      files.stream().limit(MAX_PER_SERVER)
+          .forEach(f -> answers.add(answerFor(f, decoys.get(String.valueOf(f.attributes().get("host"))))));
       if (files.size() > MAX_PER_SERVER) {
         Finding first = files.get(0);
         int more = files.size() - MAX_PER_SERVER;
+        String decoy = decoys.get(String.valueOf(first.attributes().get("host")));
         answers.add(
             new Answer(
                 QUESTION,
-                first.attributes().get("host") + " downloaded " + more + " more file" + (more == 1 ? "" : "s")
+                first.attributes().get("host") + (decoy == null ? " downloaded " : " (a " + decoy + ") caught ") + more + " more file" + (more == 1 ? "" : "s")
                     + " from " + first.attributes().get("external") + " (smaller ones; see the Files tab)",
                 Grade.MEASURED,
                 first.concerns(),
@@ -74,26 +81,37 @@ public class DownloadsQuestion implements StandardQuestion {
 
   static final int MAX_PER_SERVER = 3;
 
-  /** One downloaded file: what, how big, from where, and its SHA-256. */
-  private static Answer answerFor(Finding f) {
+  /**
+   * One downloaded file: what, how big, from where, and its SHA-256.
+   *
+   * @param decoy the honeypot that fetched it ("Dionaea honeypot"), or null for a real host
+   */
+  private static Answer answerFor(Finding f, String decoy) {
     Map<String, Object> a = f.attributes();
     Object size = a.get("size");
     String from =
         a.get("url") != null
             ? a.get("url") + " (" + a.get("external") + ")"
             : String.valueOf(a.getOrDefault("serverName", a.get("external")));
-    return new Answer(
-        QUESTION,
-        a.get("host") + " downloaded " + a.get("name")
-            + " (" + kindOf(String.valueOf(a.get("mimeType")), a.get("name"))
-            + (size instanceof Number n ? ", " + human(n.longValue()) : "") + ") from " + from
-            + ". SHA-256 " + a.get("sha256"),
-        Grade.MEASURED,
-        f.concerns(),
-        List.of(f.summary()),
-        new LinkedHashMap<>(a)).withDerivation(List.of(new com.tracepcap.knowledge.spi.Step(
-            f.summary() + ", and its contents were hashed.", Derivations.RULE_DOWNLOAD, Grade.MEASURED,
-            f.evidence())));
+    String what = a.get("name") + " (" + kindOf(String.valueOf(a.get("mimeType")), a.get("name"))
+        + (size instanceof Number n ? ", " + human(n.longValue()) : "") + ") from " + from;
+    Map<String, Object> attrs = new LinkedHashMap<>(a);
+    List<com.tracepcap.knowledge.spi.Step> steps = new ArrayList<>();
+    String headline;
+    if (decoy == null) {
+      headline = a.get("host") + " downloaded " + what + ". SHA-256 " + a.get("sha256");
+    } else {
+      attrs.put("decoy", decoy);
+      headline = a.get("host") + ", a " + decoy + ", caught " + what
+          + ": attacker tooling, not an infection. SHA-256 " + a.get("sha256");
+      steps.add(com.tracepcap.knowledge.spi.Step.of(a.get("host") + " is a " + decoy
+          + " (the Honeypot answer shows how).", Derivations.RULE_DECOY_DOWNLOAD, Grade.INFERRED));
+    }
+    steps.add(new com.tracepcap.knowledge.spi.Step(
+        f.summary() + ", and its contents were hashed.", Derivations.RULE_DOWNLOAD, Grade.MEASURED,
+        f.evidence()));
+    return new Answer(QUESTION, headline, Grade.MEASURED, f.concerns(), List.of(f.summary()), attrs)
+        .withDerivation(steps);
   }
 
 

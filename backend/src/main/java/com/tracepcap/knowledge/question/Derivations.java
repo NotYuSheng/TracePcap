@@ -39,6 +39,13 @@ final class Derivations {
           + " payload from another server is how it was planted: its server is treated as a C2.";
   static final String RULE_VICTIM =
       "A host inside the network that talks to a known C2 is treated as infected: the victim.";
+  static final String RULE_DECOY_C2 =
+      "A honeypot that talks to a known C2 is recording the attack it was set up for: it has no real"
+          + " user to infect, so it isn't a victim.";
+  static final String RULE_DECOY_DOWNLOAD =
+      "A file a honeypot fetched was pushed on it by an attacker: it's their tooling, not an infection.";
+  static final String RULE_DECOY_CONTACT =
+      "A honeypot has no real users: whoever opens a connection to it is scanning or attacking it.";
   static final String RULE_FAMILY =
       "A detector that names a malware family identifies it: a Suricata rule by name, or the stream"
           + " classifier by the family's own check-in.";
