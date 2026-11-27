@@ -44,6 +44,26 @@ public final class IpLocality {
    * counted rows with no address as internal traffic.
    */
   /**
+   * The unspecified address, {@code 0.0.0.0} or {@code ::}: what a sender with no address yet (a
+   * DHCP client) sends from, and what a protocol writes in an address field it leaves empty. A
+   * narrower question than {@link #isHostAddress}: broadcast and multicast are specified, they just
+   * aren't one machine.
+   */
+  public static boolean isUnspecified(String ip) {
+    if (ip == null) return false;
+    String a = ip.trim();
+    return a.equals("0.0.0.0") || a.equals("::");
+  }
+
+  /**
+   * An address field that holds an address: not null, blank or unspecified. For fields a protocol
+   * fills in (a DHCP lease, a DNS answer, a failover VIP), where {@code 0.0.0.0} means "none".
+   */
+  public static boolean isAssigned(String ip) {
+    return ip != null && !ip.isBlank() && !isUnspecified(ip);
+  }
+
+  /**
    * True when the address can be one machine (#918). False for the unspecified address
    * ({@code 0.0.0.0}, {@code ::}, a DHCP client before it has an address), IPv4 limited broadcast
    * and multicast/reserved space ({@code 224.0.0.0/3} and up), IPv6 multicast ({@code ff00::/8}),

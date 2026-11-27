@@ -134,17 +134,15 @@ class SnapshotInsightJsonCharacterisationTest {
     assertThat(extractJson("{\n    // c\n\"a\":1}")).isEqualTo("{\n    \n\"a\":1}");
   }
 
-  // --- formatValue -----------------------------------------------------------
+  // --- ChangeEventText.value (was each insight service's own formatValue) ---------------
 
   @Test
-  void formatValue_joinsEntriesAndRendersNullAsAnEmDash() throws Exception {
-    Method m = SnapshotInsightService.class.getDeclaredMethod("formatValue", Map.class);
-    m.setAccessible(true);
+  void changeValue_joinsEntriesAndRendersNullAsAnEmDash() {
     Map<String, Object> value = new LinkedHashMap<>();
     value.put("hosts", 3);
     value.put("subnet", "10.0.0.0/8");
 
-    assertThat(m.invoke(SERVICE, value)).isEqualTo("hosts=3, subnet=10.0.0.0/8");
-    assertThat(m.invoke(SERVICE, (Map<String, Object>) null)).isEqualTo("—");
+    assertThat(ChangeEventText.value(value)).isEqualTo("hosts=3, subnet=10.0.0.0/8");
+    assertThat(ChangeEventText.value(null)).isEqualTo("—");
   }
 }

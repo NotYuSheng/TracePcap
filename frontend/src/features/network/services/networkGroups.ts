@@ -1,7 +1,7 @@
 import type { GraphNode } from '../types';
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
-import { ipInCidr, isPrivateIp } from '@/utils/ipClassification';
+import { ipInCidr, isHostAddress, isPrivateIp } from '@/utils/ipClassification';
 import { deviceTypeLabel, nodeIdentityKey } from '@/utils/deviceType';
 import type { DeviceType } from '@/types';
 
@@ -116,13 +116,6 @@ export function dnsNamesByIp(
 /** The address part of a node id: `10.0.0.73@1700…` / `192.168.1.10~vlan:20` → the address. */
 function addressOf(id: string): string {
   return id.split(/[@~]/)[0];
-}
-
-function isSpecial(ip: string): boolean {
-  if (ip === '0.0.0.0' || ip === '255.255.255.255' || ip === '::') return true;
-  const first = Number(ip.split('.')[0]);
-  if (!ip.includes(':') && first >= 224 && first <= 239) return true;
-  return /^ff[0-9a-f]{2}:/i.test(ip);
 }
 
 /**
@@ -379,7 +372,7 @@ function automaticTree(
     const ip = addressOf(n.id);
     if (isSubnetBroadcast(n)) special.push(n);
     else if (n.data.isL2 || isPrivateIp(ip, customRanges)) local.push(n);
-    else if (isSpecial(ip)) special.push(n);
+    else if (!isHostAddress(ip)) special.push(n);
     else internet.push(n);
   }
 

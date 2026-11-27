@@ -13,6 +13,7 @@ import type {
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { parseDateTime } from '@/utils/dateUtils';
 import type { DeviceMove, Occupancy, ReusedAddress } from '@/features/occupancy/occupancyService';
+import { isUnspecified } from '@/utils/ipClassification';
 
 /** One device's stretch on a reused address, with its times as epoch ms like a conversation's. */
 interface OccupancySpan {
@@ -65,10 +66,6 @@ export function occupancyNodeId(
   return `${ip}@${hit.occ.idx}`;
 }
 
-/** 0.0.0.0 / ::, the address a client sends from before it has one (a DHCP request). */
-export function isUnspecified(ip: string): boolean {
-  return ip === '0.0.0.0' || ip === '::';
-}
 
 /**
  * Past this many unanswered clients, they are drawn as one node: hundreds of made-up MACs asking

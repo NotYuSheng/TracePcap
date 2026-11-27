@@ -114,11 +114,11 @@ class ReportFindingsTest {
 
   @Test
   void broadcastMulticastAndUnspecifiedAreNotHosts() {
-    assertThat(ReportService.isHost("93.184.216.50")).isTrue();
-    assertThat(ReportService.isHost("0.0.0.0")).isFalse();
-    assertThat(ReportService.isHost("255.255.255.255")).isFalse();
-    assertThat(ReportService.isHost("224.0.0.251")).isFalse();
-    assertThat(ReportService.isHost("ff02::fb")).isFalse();
+    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("93.184.216.50")).isTrue();
+    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("0.0.0.0")).isFalse();
+    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("255.255.255.255")).isFalse();
+    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("224.0.0.251")).isFalse();
+    assertThat(com.tracepcap.common.net.IpLocality.isHostAddress("ff02::fb")).isFalse();
   }
 
   @Test

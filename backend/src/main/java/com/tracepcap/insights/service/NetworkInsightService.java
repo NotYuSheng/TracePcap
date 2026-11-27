@@ -277,8 +277,8 @@ public class NetworkInsightService {
           .append(e.getChangeType()).append(" — ").append(e.getEntityKey());
         if (e.getDetectedAt() != null) sb.append(" at ").append(e.getDetectedAt().format(FMT));
         if (e.getOldValue() != null && e.getNewValue() != null) {
-          sb.append(" (was: ").append(formatValue(e.getOldValue()))
-            .append(", now: ").append(formatValue(e.getNewValue())).append(")");
+          sb.append(" (was: ").append(ChangeEventText.value(e.getOldValue()))
+            .append(", now: ").append(ChangeEventText.value(e.getNewValue())).append(")");
         }
         if (e.isReviewed() && e.getNotes() != null) {
           sb.append(" [reviewed: ").append(e.getNotes()).append("]");
@@ -321,13 +321,6 @@ public class NetworkInsightService {
 
     sb.append("Respond ONLY with valid JSON as specified in the system prompt.");
     return sb.toString();
-  }
-
-  private String formatValue(Map<String, Object> value) {
-    if (value == null) return "—";
-    return value.entrySet().stream()
-        .map(e -> e.getKey() + "=" + e.getValue())
-        .collect(Collectors.joining(", "));
   }
 
   // ── JSON extraction (mirrors StoryService) ────────────────────────────────

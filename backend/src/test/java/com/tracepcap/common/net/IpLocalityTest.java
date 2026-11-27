@@ -91,4 +91,23 @@ class IpLocalityTest {
   void whitespaceIsTolerated() {
     assertThat(IpLocality.isLocal("  10.0.0.1  ")).isTrue();
   }
+
+  @Test
+  void theUnspecifiedAddressIsASenderWithNoAddressYet() {
+    assertThat(IpLocality.isUnspecified("0.0.0.0")).isTrue();
+    assertThat(IpLocality.isUnspecified(" :: ")).isTrue();
+    // Broadcast and multicast are specified; they just aren't one machine (isHostAddress).
+    assertThat(IpLocality.isUnspecified("255.255.255.255")).isFalse();
+    assertThat(IpLocality.isUnspecified("224.0.0.251")).isFalse();
+    assertThat(IpLocality.isUnspecified(null)).isFalse();
+  }
+
+  @Test
+  void anAssignedFieldHoldsAnAddress() {
+    assertThat(IpLocality.isAssigned("10.0.0.5")).isTrue();
+    assertThat(IpLocality.isAssigned("0.0.0.0")).isFalse(); // a DHCP field left empty
+    assertThat(IpLocality.isAssigned("::")).isFalse();
+    assertThat(IpLocality.isAssigned("  ")).isFalse();
+    assertThat(IpLocality.isAssigned(null)).isFalse();
+  }
 }

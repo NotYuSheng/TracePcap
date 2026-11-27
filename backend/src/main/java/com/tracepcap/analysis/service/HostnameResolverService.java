@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -199,7 +200,7 @@ public class HostnameResolverService {
     if (proto.contains("DHCP") || proto.contains("BOOTP")) {
       // option 12 hostname; IP is the requested address (option 50) or, failing that, the source.
       String ip = firstValue(f[3]);
-      if (!isUsableIp(ip)) ip = firstValue(f[1]);
+      if (!IpLocality.isAssigned(ip)) ip = firstValue(f[1]);
       record(result, ip, f[2], SOURCE_DHCP);
     } else if (proto.equals("MDNS")) {
       String ip = firstValue(f[5]);
@@ -209,7 +210,7 @@ public class HostnameResolverService {
       if (isPlausibleHostName(name)) record(result, ip, name, SOURCE_MDNS);
     } else if (proto.contains("NBNS")) {
       String ip = firstValue(f[10]);
-      if (!isUsableIp(ip)) ip = firstValue(f[1]);
+      if (!IpLocality.isAssigned(ip)) ip = firstValue(f[1]);
       record(result, ip, cleanNetbiosName(f[9]), SOURCE_NBNS);
     } else if (proto.contains("DNS")) {
       // Reverse PTR: question is "<ip>.in-addr.arpa", answer is the name.
@@ -220,7 +221,7 @@ public class HostnameResolverService {
 
   /** Records one claim verbatim. No winner-picking here — that is the adjudicator's job. */
   private void record(Map<Claim, Boolean> result, String ip, String rawHostname, String source) {
-    if (!isUsableIp(ip)) return;
+    if (!IpLocality.isAssigned(ip)) return;
     String hostname = cleanHostname(rawHostname);
     if (hostname == null) return;
     result.putIfAbsent(new Claim(ip, hostname, source), Boolean.TRUE);
@@ -296,9 +297,5 @@ public class HostnameResolverService {
       if (i > 0) sb.append('.');
     }
     return sb.toString();
-  }
-
-  private boolean isUsableIp(String ip) {
-    return ip != null && !ip.isBlank() && !ip.equals("0.0.0.0") && !ip.equals("::");
   }
 }

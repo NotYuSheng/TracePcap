@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -158,7 +159,7 @@ public class FailoverAddressResolverService {
     if (field == null || field.isBlank()) return;
     for (String vip : field.split(",")) {
       String ip = vip.trim();
-      if (ip.isEmpty() || ip.equals("0.0.0.0")) continue;
+      if (!IpLocality.isAssigned(ip)) continue;
       protocolByIp.putIfAbsent(ip, protocol);
       Set<String> members = membersByIp.computeIfAbsent(ip, k -> new TreeSet<>());
       if (!src.isEmpty() && !src.equals(ip)) members.add(src);

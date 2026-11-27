@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -257,8 +258,8 @@ public class DhcpLeaseResolverService {
     noteAsking(f, type, at, vendorClass, asking, acked);
     String ip =
         switch (type) {
-          case "5" -> usable(f[2]) ? f[2].trim() : usable(f[3]) ? f[3].trim() : null;
-          case "3" -> usable(f[4]) ? f[4].trim() : usable(f[3]) ? f[3].trim() : null;
+          case "5" -> IpLocality.isAssigned(f[2]) ? f[2].trim() : IpLocality.isAssigned(f[3]) ? f[3].trim() : null;
+          case "3" -> IpLocality.isAssigned(f[4]) ? f[4].trim() : IpLocality.isAssigned(f[3]) ? f[3].trim() : null;
           default -> null;
         };
     String mac = f[5].trim().toLowerCase();
@@ -347,11 +348,5 @@ public class DhcpLeaseResolverService {
     if (field == null) return "";
     int i = field.indexOf(';');
     return (i < 0 ? field : field.substring(0, i)).trim();
-  }
-
-  private static boolean usable(String ip) {
-    if (ip == null) return false;
-    String s = ip.trim();
-    return !s.isEmpty() && !s.equals("0.0.0.0");
   }
 }

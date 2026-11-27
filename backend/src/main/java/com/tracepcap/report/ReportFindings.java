@@ -100,7 +100,7 @@ final class ReportFindings {
 
     // Addresses that changed hands.
     for (var r : sharedAddresses) {
-      if (r.occupancies().size() < 2 || !ReportService.isHost(r.ip())) continue;
+      if (r.occupancies().size() < 2 || !com.tracepcap.common.net.IpLocality.isHostAddress(r.ip())) continue;
       List<String> parts = new ArrayList<>();
       var holders = r.occupancies();
       for (int i = 0; i < holders.size(); i++) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRfc1918, isPrivateIp, ipInCidr } from '../ipClassification';
+import { isRfc1918, isPrivateIp, ipInCidr, isUnspecified, isHostAddress } from '../ipClassification';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 
 describe('isRfc1918', () => {
@@ -67,5 +67,25 @@ describe('isPrivateIp with custom overrides', () => {
   it('uses the heuristic for addresses no override covers', () => {
     expect(isPrivateIp('10.0.1.5', ranges)).toBe(true);
     expect(isPrivateIp('1.1.1.1', ranges)).toBe(false);
+  });
+});
+
+describe('isUnspecified / isHostAddress (as the backend IpLocality answers them)', () => {
+  it('reads 0.0.0.0 and :: as a sender with no address yet', () => {
+    expect(isUnspecified('0.0.0.0')).toBe(true);
+    expect(isUnspecified(' :: ')).toBe(true);
+    expect(isUnspecified('255.255.255.255')).toBe(false);
+  });
+
+  it('says whether one machine can hold the address', () => {
+    expect(isHostAddress('10.0.0.5')).toBe(true);
+    expect(isHostAddress('fe80::1')).toBe(true);
+    expect(isHostAddress('0.0.0.0')).toBe(false);
+    expect(isHostAddress('255.255.255.255')).toBe(false);
+    expect(isHostAddress('224.0.0.251')).toBe(false);
+    expect(isHostAddress('240.0.0.1')).toBe(false); // reserved
+    expect(isHostAddress('ff02::fb')).toBe(false);
+    expect(isHostAddress('FF:FF:FF:FF:FF:FF')).toBe(false);
+    expect(isHostAddress('not-an-ip')).toBe(true); // unparseable: callers keep treating it as a host
   });
 });
