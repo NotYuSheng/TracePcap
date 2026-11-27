@@ -175,8 +175,8 @@ public class LateralMovementContributor implements KnowledgeContributor {
       return iface + " " + name + (o.count() > 1 ? " (" + o.count() + "×)" : "");
     }
     return switch (o.kind()) {
-      case "write" -> "wrote " + o.path() + bytes(o.bytes()) + (o.share() != null ? " to " + o.share() : "");
-      case "read" -> "read " + o.path() + bytes(o.bytes()) + (o.share() != null ? " from " + o.share() : "");
+      case "write" -> "wrote " + o.path() + exactBytes(o.bytes()) + (o.share() != null ? " to " + o.share() : "");
+      case "read" -> "read " + o.path() + exactBytes(o.bytes()) + (o.share() != null ? " from " + o.share() : "");
       case "share" -> "connected to " + o.share();
       default -> "opened " + o.path() + (o.share() != null ? " on " + o.share() : "");
     };
@@ -193,7 +193,7 @@ public class LateralMovementContributor implements KnowledgeContributor {
     return null;
   }
 
-  private static String bytes(Long n) {
+  private static String exactBytes(Long n) {
     return n == null ? "" : " (" + String.format(Locale.ROOT, "%,d", n) + " bytes)";
   }
 
