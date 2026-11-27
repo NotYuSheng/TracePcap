@@ -111,9 +111,8 @@ class HoneypotLookupIntegrationTest {
     conv(file, "61.0.0.3", 1, "61.0.0.4", 2, "61.0.0.3", null, null);
 
     assertThat(lookup.openingsTo(file, Set.of(DECOY))).containsExactlyInAnyOrder(
-        new Opening("61.0.0.1", DECOY, 2), new Opening("61.0.0.2", DECOY, 1),
-        // its own: the contributor drops what a decoy opened
-        new Opening(DECOY, "203.0.113.9", 1));
+        // not the decoy's own outbound conversation
+        new Opening("61.0.0.1", DECOY, 2), new Opening("61.0.0.2", DECOY, 1));
     assertThat(lookup.openingsTo(file, Set.of())).isEmpty();
   }
 
@@ -122,14 +121,15 @@ class HoneypotLookupIntegrationTest {
     UUID file = file();
     conv(file, "10.0.0.5", 50000, DECOY, 443, "10.0.0.5", "CN=a", "O=dionaea.carnivore.it");
     conv(file, "10.0.0.6", 50001, DECOY, 443, "10.0.0.6", "CN=a", "O=dionaea.carnivore.it");
-    conv(file, DECOY, 8443, "10.0.0.7", 50002, "10.0.0.7", "CN=b", null); // stored reversed
+    conv(file, DECOY, 8443, "10.0.0.7", 50002, "10.0.0.7", "CN=b", "O=x"); // stored reversed
     conv(file, "10.0.0.8", 50003, "192.0.2.1", 443, null, null, "CN=c"); // no opener: destination
+    conv(file, "10.0.0.8", 50005, "192.0.2.3", 443, "10.0.0.8", "CN=d", null); // no issuer
     conv(file, "10.0.0.9", 50004, "192.0.2.2", 80, "10.0.0.9", null, null); // no certificate
 
     assertThat(lookup.serverCertificates(file)).containsExactly(
         new ServerCertificate("192.0.2.1", 443, null, "CN=c"),
         new ServerCertificate(DECOY, 443, "CN=a", "O=dionaea.carnivore.it"),
-        new ServerCertificate(DECOY, 8443, "CN=b", null));
+        new ServerCertificate(DECOY, 8443, "CN=b", "O=x"));
     assertThat(lookup.serverCertificates(file, DECOY)).extracting(ServerCertificate::port)
         .containsExactly(443, 8443);
     assertThat(lookup.serverCertificates(file, "10.0.0.7")).isEmpty();

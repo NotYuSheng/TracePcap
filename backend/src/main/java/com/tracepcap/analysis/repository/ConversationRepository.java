@@ -401,7 +401,8 @@ public interface ConversationRepository
 
   /**
    * One host's conversations by who opened them. Columns: [opened, answered, openers,
-   * answered_ports]. An opener that is neither side (bad data) counts in none.
+   * answered_ports]. An opener that is neither side (bad data) counts in neither opened nor
+   * answered; answered_ports matches {@link #countDistinctAnsweredPorts}.
    */
   @Query(
       value =
@@ -409,14 +410,16 @@ public interface ConversationRepository
               + " COUNT(*) FILTER (WHERE initiator_ip <> :ip AND initiator_ip IN (src_ip, dst_ip)),"
               + " COUNT(DISTINCT initiator_ip) FILTER"
               + "   (WHERE initiator_ip <> :ip AND initiator_ip IN (src_ip, dst_ip)),"
+              // the same ports countDistinctAnsweredPorts counts
               + " COUNT(DISTINCT CASE WHEN dst_ip = :ip THEN dst_port ELSE src_port END) FILTER"
-              + "   (WHERE initiator_ip <> :ip AND initiator_ip IN (src_ip, dst_ip))"
+              + "   (WHERE initiator_ip <> :ip)"
               + " FROM conversations WHERE file_id = :fileId AND (src_ip = :ip OR dst_ip = :ip)",
       nativeQuery = true)
   List<Object[]> findHostOpenings(@Param("fileId") UUID fileId, @Param("ip") String ip);
 
   /**
-   * Who opened conversations to any of the targets. Columns: [opener, target, conversations].
+   * Who opened conversations to any of the targets, the target being the side that didn't open it.
+   * Columns: [opener, target, conversations].
    */
   @Query(
       value =
@@ -424,6 +427,7 @@ public interface ConversationRepository
               + " CASE WHEN initiator_ip = src_ip THEN dst_ip ELSE src_ip END AS target, COUNT(*)"
               + " FROM conversations WHERE file_id = :fileId AND initiator_ip IN (src_ip, dst_ip)"
               + " AND (src_ip IN (:targets) OR dst_ip IN (:targets))"
+              + " AND CASE WHEN initiator_ip = src_ip THEN dst_ip ELSE src_ip END IN (:targets)"
               + " GROUP BY 1, 2",
       nativeQuery = true)
   List<Object[]> findOpeningsTo(
@@ -440,9 +444,11 @@ public interface ConversationRepository
               + " CASE WHEN initiator_ip = dst_ip THEN src_port ELSE dst_port END AS port,"
               + " tls_subject, tls_issuer"
               + " FROM conversations WHERE file_id = :fileId"
-              + " AND (tls_subject IS NOT NULL OR tls_issuer IS NOT NULL)"
-              + " AND (CAST(:server AS varchar) IS NULL"
-              + "   OR CASE WHEN initiator_ip = dst_ip THEN src_ip ELSE dst_ip END = :server)"
+              // the rows the old whole-conversation read took
+              + " AND tls_issuer IS NOT NULL"
+              // the plain columns first, so one server's read uses the address indexes
+              + " AND (CAST(:server AS varchar) IS NULL OR ((src_ip = :server OR dst_ip = :server)"
+              + "   AND CASE WHEN initiator_ip = dst_ip THEN src_ip ELSE dst_ip END = :server))"
               + " ORDER BY 1, 2, 3, 4",
       nativeQuery = true)
   List<Object[]> findServerCertificates(

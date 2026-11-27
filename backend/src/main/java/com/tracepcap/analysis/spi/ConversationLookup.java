@@ -523,7 +523,9 @@ public interface ConversationLookup {
 
   /**
    * Who opened conversations to any of {@code targets}, per opener and target, aggregated in the
-   * database. Only conversations with a known opener; none for an empty {@code targets}.
+   * database: the target is the side that didn't open it, so a target's own outbound
+   * conversations aren't here (one target opening to another is). Only conversations with a known
+   * opener; none for an empty {@code targets}.
    */
   List<Opening> openingsTo(UUID fileId, Collection<String> targets);
 
@@ -533,7 +535,10 @@ public interface ConversationLookup {
    */
   record ServerCertificate(String server, Integer port, String subject, String issuer) {}
 
-  /** Each distinct certificate a server presented, without loading the TLS conversations. */
+  /**
+   * Each distinct certificate a server presented, without loading the TLS conversations: the same
+   * rows {@link #tlsConversations(UUID)} reads (an issuer recorded).
+   */
   List<ServerCertificate> serverCertificates(UUID fileId);
 
   /** {@link #serverCertificates(UUID)} for one server. */
