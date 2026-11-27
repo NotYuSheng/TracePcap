@@ -44,15 +44,17 @@ public class StoryAggregatesService {
       long totalBytes = conversationLookup.sumBytes(fileId);
       // Read once: the destinations and the connection outcomes both walk every conversation.
       List<ConversationFacts> all = conversationLookup.conversationFacts(fileId);
+      // Resolved once: currentRules() reads the operator's ranges.
+      LocalityRules locality = localityPolicy.currentRules();
 
       return StoryAggregates.builder()
           .coverage(
               computeCoverage(shownConversations, totalConversations, totalPackets, totalBytes))
-          .topExternalAsns(computeTopAsns(all, totalBytes))
+          .topExternalAsns(computeTopAsns(all, totalBytes, locality))
           .protocolRiskMatrix(computeProtocolRiskMatrix(fileId))
           .tlsAnomalySummary(computeTlsSummary(fileId))
           .unknownAppPct(computeUnknownAppPct(fileId, totalConversations))
-          .beaconCandidates(computeBeaconCandidates(fileId))
+          .beaconCandidates(computeBeaconCandidates(all, locality))
           .connectionOutcomes(computeConnectionOutcomes(all))
           .build();
     } catch (Exception e) {
@@ -132,14 +134,12 @@ public class StoryAggregatesService {
 
   // ── Top External ASNs ─────────────────────────────────────────────────────
 
-  private List<AsnEntry> computeTopAsns(List<ConversationFacts> all, long totalBytes) {
+  private List<AsnEntry> computeTopAsns(
+      List<ConversationFacts> all, long totalBytes, LocalityRules locality) {
 
     // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();
     Map<String, Long> ipFlows = new HashMap<>();
-    // Rules resolved once for the whole capture: currentRules() loads the operator's ranges, and
-    // this loop asks about every endpoint in every conversation.
-    LocalityRules locality = localityPolicy.currentRules();
     Map<String, Boolean> privateCache = new HashMap<>();
     for (ConversationFacts c : all) {
       String dst = c.flow().dstIp();
@@ -269,8 +269,9 @@ public class StoryAggregatesService {
    * listed here as a beacon candidate — once per protocol view — even after the detector stopped
    * reporting it. External candidates come first, then the most regular; top 5.
    */
-  private List<BeaconCandidate> computeBeaconCandidates(UUID fileId) {
-    return BeaconAnalysis.analyse(conversationLookup.conversationFacts(fileId)).stream()
+  private List<BeaconCandidate> computeBeaconCandidates(
+      List<ConversationFacts> all, LocalityRules locality) {
+    return BeaconAnalysis.analyse(all, locality).stream()
         .limit(5)
         .map(
             c ->

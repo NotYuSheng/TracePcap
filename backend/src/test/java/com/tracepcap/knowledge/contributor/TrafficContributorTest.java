@@ -39,8 +39,31 @@ class TrafficContributorTest {
   private CaseKnowledge run(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new TrafficContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    new TrafficContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     return board.build();
+  }
+
+  /**
+   * The operator's custom ranges decide (#1338): with 100.64.0.0/10 declared private, a Tailscale
+   * peer is an internal host here as it is on the graph, so its traffic to the outside is the
+   * host's, and its traffic to a LAN host is internal (no edge). Before, the contributor asked the
+   * bare RFC ranges and drew it as an external.
+   */
+  @Test
+  void aCustomPrivateRangeMakesItsHostsInternal() {
+    when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(
+        conv("100.64.0.2", "199.232.196.209", 4_000_000L),
+        conv("172.16.1.66", "100.64.0.2", 4_000_000L)));
+    com.tracepcap.common.net.LocalityRules tailnet =
+        ip -> ip.startsWith("100.64.") || com.tracepcap.common.net.LocalityRules.RFC_ONLY.isLocal(ip);
+    CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
+    new TrafficContributor().contribute(KnowledgeContext.of(FILE, conversationLookup, null, tailnet), board);
+
+    assertThat(board.build().relationshipsWithPredicate("communicates-with")).singleElement()
+        .satisfies(r -> {
+          assertThat(r.from()).isEqualTo(EntityRef.host("100.64.0.2"));
+          assertThat(r.to()).isEqualTo(EntityRef.external("199.232.196.209"));
+        });
   }
 
   @Test

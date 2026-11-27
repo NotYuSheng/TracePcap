@@ -43,7 +43,7 @@ public class BeaconDetector implements Scanner {
   public List<Finding> scan(ScanContext context) {
     // Grouped from the context's shared conversation list rather than a bespoke query: the list is
     // loaded once for the whole scan run either way, so a second read would buy nothing.
-    return BeaconAnalysis.analyse(context.conversations()).stream()
+    return BeaconAnalysis.analyse(context.conversations(), context.locality()).stream()
         .limit(MAX_FINDINGS)
         .map(BeaconDetector::toFinding)
         .collect(Collectors.toList());

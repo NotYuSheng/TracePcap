@@ -45,7 +45,7 @@ class DownloadContributorTest {
     ObjectProvider<ExtractedFileLookup> provider = mock(ObjectProvider.class);
     when(provider.getIfAvailable()).thenReturn(lookup);
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new DownloadContributor(provider).contribute(KnowledgeContext.of(FILE, conversations, null), board);
+    new DownloadContributor(provider).contribute(KnowledgeContext.of(FILE, conversations, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     return new DownloadsQuestion().answer(board.build());
   }
 

@@ -49,7 +49,7 @@ class GeoOrgContributorTest {
         .thenReturn(Map.of("141.98.10.79", new IpAttribution("141.98.10.79", "AS209605", "UAB Host Baltic", "LT")));
 
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new GeoOrgContributor(geoOrgLookup).contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    new GeoOrgContributor(geoOrgLookup).contribute(KnowledgeContext.of(FILE, conversationLookup, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
     CaseKnowledge k = board.build();
 
     assertThat(k.entity(EntityRef.external("141.98.10.79"))).isPresent().get()
@@ -71,7 +71,7 @@ class GeoOrgContributorTest {
         .thenReturn(Map.of("8.8.8.8", new IpAttribution("8.8.8.8", "AS15169", "Google LLC", "US")));
 
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new GeoOrgContributor(geoOrgLookup).contribute(KnowledgeContext.of(FILE, conversationLookup, null), board);
+    new GeoOrgContributor(geoOrgLookup).contribute(KnowledgeContext.of(FILE, conversationLookup, null, com.tracepcap.common.net.LocalityRules.RFC_ONLY), board);
 
     assertThat(board.build().entity(EntityRef.external("8.8.8.8"))).isPresent().get()
         .satisfies(e -> assertThat(e.attributes()).containsEntry("org", "Google LLC"));

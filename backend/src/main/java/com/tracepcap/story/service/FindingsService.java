@@ -1,6 +1,7 @@
 package com.tracepcap.story.service;
 
 import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.common.net.LocalityPolicy;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.Severity;
 import com.tracepcap.story.spi.ScanContext;
@@ -32,6 +33,7 @@ public class FindingsService {
 
   private final List<Scanner> scanners;
   private final ConversationLookup conversationLookup;
+  private final LocalityPolicy localityPolicy;
 
   public List<Finding> detectAll(UUID fileId, long totalConversations, long totalBytes) {
     return detectAll(fileId, totalConversations, totalBytes, null);
@@ -40,7 +42,10 @@ public class FindingsService {
   /** As above, viewed in a network (#925): rule-reading scanners include its own rules. */
   public List<Finding> detectAll(UUID fileId, long totalConversations, long totalBytes, UUID networkId) {
     ScanContext context =
-        new LazyScanContext(fileId, networkId, totalConversations, totalBytes, conversationLookup);
+        new LazyScanContext(fileId, networkId, totalConversations, totalBytes, conversationLookup,
+            // The default ranges, as the rest of a story (aggregates, investigation) reads them:
+            // one story must not call a host internal in one panel and external in the next.
+            localityPolicy.currentRules());
 
     List<Finding> findings = new ArrayList<>();
     for (Scanner scanner : scanners) {

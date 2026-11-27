@@ -2,7 +2,7 @@ package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.IdsAlertLookup;
 import com.tracepcap.analysis.spi.IdsAlertLookup.IdsAlertFacts;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.KnowledgeContext;
@@ -56,25 +56,27 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     IdsAlertLookup lookup = alerts.getIfAvailable();
     if (lookup == null) return;
-    post(lookup.forFile(context.fileId()), lookup.countsForFile(context.fileId()), board);
+    post(lookup.forFile(context.fileId()), lookup.countsForFile(context.fileId()), context.locality(),
+        board);
   }
 
-  static void post(List<IdsAlertFacts> records, CaseKnowledgeBuilder board) {
-    post(records, List.of(), board);
+  static void post(List<IdsAlertFacts> records, LocalityRules local, CaseKnowledgeBuilder board) {
+    post(records, List.of(), local, board);
   }
 
   /** The board-facing part, unit-testable without a lookup. */
   static void post(
-      List<IdsAlertFacts> records, List<IdsAlertLookup.AlertCount> counts, CaseKnowledgeBuilder board) {
+      List<IdsAlertFacts> records, List<IdsAlertLookup.AlertCount> counts, LocalityRules local,
+      CaseKnowledgeBuilder board) {
     Map<String, List<IdsAlertFacts>> byExternal = new LinkedHashMap<>();
     for (IdsAlertFacts a : records) {
-      String external = externalOf(a.srcIp(), a.dstIp());
+      String external = externalOf(a.srcIp(), a.dstIp(), local);
       if (external != null) byExternal.computeIfAbsent(external, k -> new ArrayList<>()).add(a);
     }
     // The true counts (#1284), when the capture has them: the records may be only the first.
     Map<String, Integer> totals = new LinkedHashMap<>();
     for (IdsAlertLookup.AlertCount c : counts) {
-      String external = externalOf(c.srcIp(), c.dstIp());
+      String external = externalOf(c.srcIp(), c.dstIp(), local);
       if (external == null) continue;
       totals.merge(external, c.total(), Integer::sum);
       byExternal.computeIfAbsent(external, k -> new ArrayList<>()); // every record cut, still counted
@@ -92,7 +94,7 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
           if (first == null || a.time().isBefore(first)) first = a.time();
           if (last == null || a.time().isAfter(last)) last = a.time();
         }
-        String r = request(a);
+        String r = request(a, local);
         if (r != null) requests.merge(r, 1, Integer::sum);
       }
       if (first != null) attrs.put(truncated ? FIRST_KEPT_ALERT : FIRST_ALERT, TrafficContributor.utc(first));
@@ -163,21 +165,21 @@ public class IdsAlertRecordContributor implements KnowledgeContributor {
   }
 
   /** The outside side of an alert between a local host and the outside; null otherwise. */
-  private static String externalOf(String srcIp, String dstIp) {
+  private static String externalOf(String srcIp, String dstIp, LocalityRules local) {
     if (srcIp == null || dstIp == null) return null;
-    boolean srcLocal = IpLocality.isLocal(srcIp), dstLocal = IpLocality.isLocal(dstIp);
+    boolean srcLocal = local.isLocal(srcIp), dstLocal = local.isLocal(dstIp);
     if (srcLocal == dstLocal) return null;
     return srcLocal ? dstIp : srcIp;
   }
 
   /** "METHOD absolute-url" for an HTTP alert; null when it wasn't HTTP. */
-  static String request(IdsAlertFacts a) {
+  static String request(IdsAlertFacts a, LocalityRules local) {
     if (a.httpUrl() == null || a.httpUrl().isBlank()) return null;
     String url = a.httpUrl().trim();
     if (!url.matches("(?i)^[a-z][a-z0-9+.-]*://.*")) {
       String host = a.httpHost() != null && !a.httpHost().isBlank()
           ? a.httpHost().trim()
-          : IpLocality.isLocal(a.srcIp()) ? a.dstIp() : a.srcIp();
+          : local.isLocal(a.srcIp()) ? a.dstIp() : a.srcIp();
       url = "http://" + host + (url.startsWith("/") ? "" : "/") + url;
     }
     return (a.httpMethod() == null ? "" : a.httpMethod() + " ") + url;

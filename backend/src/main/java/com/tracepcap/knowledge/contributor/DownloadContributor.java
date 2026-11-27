@@ -1,7 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.extraction.spi.ExtractedFileLookup;
 import com.tracepcap.extraction.spi.ExtractedFileLookup.ExtractedFileFacts;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
@@ -98,6 +98,7 @@ public class DownloadContributor implements KnowledgeContributor {
 
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    LocalityRules local = context.locality();
     ExtractedFileLookup lookup = files.getIfAvailable();
     if (lookup == null) return;
     List<ExtractedFileFacts> all = lookup.extractedFiles(context.fileId());
@@ -114,9 +115,9 @@ public class DownloadContributor implements KnowledgeContributor {
       if (conv == null) continue;
       String src = conv.flow().srcIp();
       String dst = conv.flow().dstIp();
-      if (src == null || dst == null || IpLocality.isLocal(src) == IpLocality.isLocal(dst)) continue;
-      String host = IpLocality.isLocal(src) ? src : dst;
-      String external = IpLocality.isLocal(src) ? dst : src;
+      if (src == null || dst == null || local.isLocal(src) == local.isLocal(dst)) continue;
+      String host = local.isLocal(src) ? src : dst;
+      String external = local.isLocal(src) ? dst : src;
       String serverName = urlHost(f.sourceUrl());
       if (serverName == null && conv.tls() != null) serverName = conv.tls().hostname();
       if (serverName != null && OS_UPDATE_HOST.matcher(serverName.trim()).find()) continue;

@@ -4,6 +4,7 @@ import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
+import com.tracepcap.common.net.LocalityRules;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -26,25 +27,41 @@ public final class KnowledgeContext {
   private final UUID fileId;
   private final Supplier<List<ConversationFacts>> conversationFacts;
   private final Supplier<List<HostFacts>> hostFacts;
+  private final LocalityRules locality;
 
-  private KnowledgeContext(
-      UUID fileId, Supplier<List<ConversationFacts>> conversations, Supplier<List<HostFacts>> hosts) {
+  private KnowledgeContext(UUID fileId, Supplier<List<ConversationFacts>> conversations,
+      Supplier<List<HostFacts>> hosts, LocalityRules locality) {
     this.fileId = fileId;
+    this.locality = locality == null ? LocalityRules.RFC_ONLY : locality;
     this.conversationFacts = memoize(conversations);
     this.hostFacts = memoize(hosts);
   }
 
-  /** A context over these lookups. A null lookup reads as an empty list, for tests that need one. */
-  public static KnowledgeContext of(
-      UUID fileId, ConversationLookup conversations, HostClassificationLookup hosts) {
+  /**
+   * A context over these lookups, whose locality is the operator's rules, custom ranges included
+   * (null: the RFC ranges alone). A null lookup reads as an empty list, for tests that need one.
+   * There's no overload without the rules: leaving them out is how #1338 happened.
+   */
+  public static KnowledgeContext of(UUID fileId, ConversationLookup conversations,
+      HostClassificationLookup hosts, LocalityRules locality) {
     return new KnowledgeContext(
         fileId,
         () -> conversations == null ? List.of() : conversations.conversationFacts(fileId),
-        () -> hosts == null ? List.of() : hosts.hostFacts(fileId));
+        () -> hosts == null ? List.of() : hosts.hostFacts(fileId),
+        locality);
   }
 
   public UUID fileId() {
     return fileId;
+  }
+
+  /**
+   * Is this address inside the network: the operator's custom ranges first, then the RFC ranges,
+   * resolved once for the whole assembly. Contributors ask this, never {@code IpLocality} itself, so
+   * a range marked private or public in settings reads the same here as on the graph (#1338).
+   */
+  public LocalityRules locality() {
+    return locality;
   }
 
   /** Every conversation in the file. Loaded on first call, then shared. */

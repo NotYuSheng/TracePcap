@@ -34,6 +34,11 @@ class UnknownAppDetectorTest {
   private ScanContext context(long totalConversations) {
     return new ScanContext() {
       @Override
+      public com.tracepcap.common.net.LocalityRules locality() {
+        return com.tracepcap.common.net.LocalityRules.RFC_ONLY;
+      }
+
+      @Override
       public UUID fileId() {
         return fileId;
       }

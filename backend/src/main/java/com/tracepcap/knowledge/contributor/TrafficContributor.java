@@ -1,7 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Grade;
@@ -59,6 +59,7 @@ public class TrafficContributor implements KnowledgeContributor {
 
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    LocalityRules local = context.locality();
     // internal host -> (external ip -> total bytes)
     Map<String, Map<String, Long>> bytesByPair = new LinkedHashMap<>();
     // internal host -> (external ip -> bytes the host sent); a pair is absent if any flow lacked it
@@ -70,8 +71,8 @@ public class TrafficContributor implements KnowledgeContributor {
       String a = conv.flow().srcIp();
       String b = conv.flow().dstIp();
       if (a == null || b == null) continue;
-      boolean aLocal = IpLocality.isLocal(a);
-      boolean bLocal = IpLocality.isLocal(b);
+      boolean aLocal = local.isLocal(a);
+      boolean bLocal = local.isLocal(b);
       // Only host <-> external pairs; skip internal-internal and external-external.
       String host;
       String external;

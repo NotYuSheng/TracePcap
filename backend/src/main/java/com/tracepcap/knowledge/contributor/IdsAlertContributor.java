@@ -1,7 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Finding;
@@ -89,6 +89,7 @@ public class IdsAlertContributor implements KnowledgeContributor {
 
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    LocalityRules local = context.locality();
     // Externals some rule tied to a named family, and externals only a family-less C2 rule hit.
     java.util.Set<EntityRef> named = new java.util.HashSet<>();
     java.util.Set<EntityRef> unnamedC2 = new java.util.LinkedHashSet<>();
@@ -98,8 +99,8 @@ public class IdsAlertContributor implements KnowledgeContributor {
 
       String srcIp = conv.flow().srcIp();
       String dstIp = conv.flow().dstIp();
-      EntityRef srcRef = endpointRef(srcIp);
-      EntityRef dstRef = endpointRef(dstIp);
+      EntityRef srcRef = endpointRef(srcIp, local);
+      EntityRef dstRef = endpointRef(dstIp, local);
       if (srcRef == null || dstRef == null) continue;
 
       // The alert itself is a real observation regardless of direction — always record it.
@@ -119,8 +120,8 @@ public class IdsAlertContributor implements KnowledgeContributor {
       // C2 attribution needs an unambiguous internal → external direction. If both endpoints are
       // local (an IDS hit on internal/lateral traffic) or both routable, there is no host↔C2 pair
       // to assert — record only the finding above, never a bogus communicates-with / c2-of edge.
-      boolean srcLocal = IpLocality.isLocal(srcIp);
-      boolean dstLocal = IpLocality.isLocal(dstIp);
+      boolean srcLocal = local.isLocal(srcIp);
+      boolean dstLocal = local.isLocal(dstIp);
       if (srcLocal == dstLocal) continue;
 
       EntityRef internal = srcLocal ? srcRef : dstRef;
@@ -157,7 +158,7 @@ public class IdsAlertContributor implements KnowledgeContributor {
     }
 
     // C2s no single alert proves: a chain of weaker signals, each link required (C2Corroboration).
-    C2Corroboration.Analysis corroboration = C2Corroboration.analyse(context.conversationFacts(), confirmed);
+    C2Corroboration.Analysis corroboration = C2Corroboration.analyse(context.conversationFacts(), confirmed, local);
     // Reputation-listed servers the rule tested and ruled out, with why (#1294).
     for (C2Corroboration.Rejection r : corroboration.rejections()) {
       board.addFinding(new com.tracepcap.knowledge.spi.Considered(
@@ -190,9 +191,9 @@ public class IdsAlertContributor implements KnowledgeContributor {
   public static final String CORROBORATION = "corroboration";
 
   /** A host if internal, an external service if routable; null for a blank/unusable address. */
-  private EntityRef endpointRef(String ip) {
+  private static EntityRef endpointRef(String ip, LocalityRules local) {
     if (ip == null || ip.isBlank()) return null;
-    return IpLocality.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
+    return local.isLocal(ip) ? EntityRef.host(ip) : EntityRef.external(ip);
   }
 
   /**

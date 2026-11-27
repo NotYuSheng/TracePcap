@@ -3,7 +3,7 @@ package com.tracepcap.knowledge.contributor;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.analysis.spi.GeoOrgLookup.IpAttribution;
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.KnowledgeContext;
@@ -36,9 +36,10 @@ public class GeoOrgContributor implements KnowledgeContributor {
   @Override
   public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     Set<String> externals = new LinkedHashSet<>();
+    LocalityRules local = context.locality();
     for (ConversationFacts conv : context.conversationFacts()) {
-      addExternal(externals, conv.flow().srcIp());
-      addExternal(externals, conv.flow().dstIp());
+      addExternal(externals, conv.flow().srcIp(), local);
+      addExternal(externals, conv.flow().dstIp(), local);
     }
     if (externals.isEmpty()) return;
 
@@ -54,8 +55,8 @@ public class GeoOrgContributor implements KnowledgeContributor {
     }
   }
 
-  private void addExternal(Set<String> set, String ip) {
-    if (ip != null && !ip.isBlank() && !IpLocality.isLocal(ip)) set.add(ip);
+  private static void addExternal(Set<String> set, String ip, LocalityRules local) {
+    if (ip != null && !ip.isBlank() && !local.isLocal(ip)) set.add(ip);
   }
 
   private static void put(Map<String, Object> attrs, String key, String value) {
