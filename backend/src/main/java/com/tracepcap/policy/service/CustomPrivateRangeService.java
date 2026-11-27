@@ -44,7 +44,7 @@ public class CustomPrivateRangeService {
   private static CustomPrivateRangeDto toDto(CustomPrivateRangeEntity e) {
     return CustomPrivateRangeDto.builder()
         .id(e.getId())
-        .cidr(Cidr.key(e.getCidr()))
+        .cidr(e.getCidr())
         .classification(e.getClassification().name())
         .build();
   }
@@ -60,7 +60,7 @@ public class CustomPrivateRangeService {
     IpClassification classification = parseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity =
         loadRanges().stream()
-            .filter(e -> Cidr.same(e.getCidr(), cidr))
+            .filter(e -> e.getCidr().equals(cidr))
             .findFirst()
             .orElseGet(() -> CustomPrivateRangeEntity.builder().cidr(cidr).build());
     CustomPrivateRangeDto before = entity.getId() == null ? null : toDto(entity);
@@ -127,19 +127,19 @@ public class CustomPrivateRangeService {
   public List<CustomPrivateRangeDto> listForNetwork(UUID networkId) {
     List<CustomPrivateRangeEntity> defaults = loadRanges();
     java.util.Set<String> defaultCidrs =
-        defaults.stream().map(e -> Cidr.key(e.getCidr())).collect(Collectors.toSet());
+        defaults.stream().map(CustomPrivateRangeEntity::getCidr).collect(Collectors.toSet());
     List<CustomPrivateRangeEntity> own = repository.findByNetworkIdOrderByCreatedAtDesc(networkId);
-    java.util.Set<String> ownCidrs = own.stream().map(e -> Cidr.key(e.getCidr())).collect(Collectors.toSet());
+    java.util.Set<String> ownCidrs = own.stream().map(CustomPrivateRangeEntity::getCidr).collect(Collectors.toSet());
     List<CustomPrivateRangeDto> out = new java.util.ArrayList<>();
     for (var e : own) {
       CustomPrivateRangeDto d = toDto(e);
       d.setScope("network");
       d.setHidden(e.isHidden());
-      d.setOverridesDefault(defaultCidrs.contains(Cidr.key(e.getCidr())));
+      d.setOverridesDefault(defaultCidrs.contains(e.getCidr()));
       out.add(d);
     }
     for (var e : defaults) {
-      if (ownCidrs.contains(Cidr.key(e.getCidr()))) continue;
+      if (ownCidrs.contains(e.getCidr())) continue;
       CustomPrivateRangeDto d = toDto(e);
       d.setScope("default");
       out.add(d);
@@ -159,7 +159,7 @@ public class CustomPrivateRangeService {
     if (hidden) {
       CustomPrivateRangeEntity def =
           loadRanges().stream()
-              .filter(e -> Cidr.same(e.getCidr(), cidr))
+              .filter(e -> e.getCidr().equals(cidr))
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException("The default has no entry for " + cidr + " to hide."));
       classification = def.getClassification();
@@ -167,9 +167,8 @@ public class CustomPrivateRangeService {
       classification = parseClassification(dto.getClassification());
     }
     CustomPrivateRangeEntity e =
-        repository.findByNetworkIdOrderByCreatedAtDesc(networkId).stream()
-            .filter(r -> Cidr.same(r.getCidr(), cidr))
-            .findFirst()
+        repository
+            .findByNetworkIdAndCidr(networkId, cidr)
             .orElseGet(() -> CustomPrivateRangeEntity.builder().networkId(networkId).cidr(cidr).build());
     CustomPrivateRangeDto before = e.getId() == null ? null : toDto(e);
     e.setClassification(classification);

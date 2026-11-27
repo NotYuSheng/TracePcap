@@ -18,9 +18,12 @@ class CidrTest {
     "192.168.1.77/24, 192.168.1.0/24",
     "10.0.0.5, 10.0.0.5/32", // a bare address is that one host
     "0.0.0.0/0, 0.0.0.0/0",
-    "fd00::/8, fd00:0:0:0:0:0:0:0/8", // Java's long form, as custom ranges are stored
-    "fd12:3456::1/64, fd12:3456:0:0:0:0:0:0/64",
-    "2001:db8::1, 2001:db8:0:0:0:0:0:1/128",
+    "fd00::/8, fd00::/8", // RFC 5952, as typed
+    "fd12:3456::1/64, fd12:3456::/64",
+    "FD00:0:0:0:0:0:0:0/8, fd00::/8", // a long or upper-case spelling of the same network
+    "2001:db8:0:0:1:0:0:1/128, 2001:db8::1:0:0:1/128", // the first of two equal zero runs
+    "2001:db8::1, 2001:db8::1/128",
+    "::1, ::1/128",
   })
   void savesTheNetworkACidrNames(String raw, String expected) {
     assertThat(Cidr.normalise(raw)).isEqualTo(expected);
@@ -49,13 +52,16 @@ class CidrTest {
   }
 
   @Test
-  void aStoredCidrIsComparedByTheNetworkItNames() {
-    assertThat(Cidr.same("fd00::/8", "fd00:0:0:0:0:0:0:0/8")).isTrue();
-    assertThat(Cidr.same("10.1.2.3/24", "10.1.2.0/24")).isTrue();
-    assertThat(Cidr.same("10.1.2.0/24", "10.1.3.0/24")).isFalse();
-    assertThat(Cidr.same(null, "10.0.0.0/8")).isFalse();
-    // A row saved from free text before #1351 is kept as it was: never a match for a real CIDR.
+  void aStoredCidrIsWrittenAsASaveWouldWriteIt() {
+    assertThat(Cidr.key("10.1.2.3/24")).isEqualTo("10.1.2.0/24");
+    assertThat(Cidr.key("fd00:0:0:0:0:0:0:0/8")).isEqualTo("fd00::/8");
+    // Free text an older validator let through is only trimmed.
     assertThat(Cidr.key(" gw.corp/24 ")).isEqualTo("gw.corp/24");
-    assertThat(Cidr.same("gw.corp/24", "10.0.0.0/24")).isFalse();
+  }
+
+  @Test
+  void subnetListsAreIpv4ForNow() {
+    assertThat(Cidr.normaliseIpv4("10.1.2.3/24")).isEqualTo("10.1.2.0/24");
+    assertThatThrownBy(() -> Cidr.normaliseIpv4("fd00::/64")).hasMessageContaining("IPv4 for now");
   }
 }

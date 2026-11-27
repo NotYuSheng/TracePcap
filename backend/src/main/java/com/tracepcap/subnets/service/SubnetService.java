@@ -40,7 +40,7 @@ public class SubnetService {
    * sharing the range, that network's segment. A default's key is its CIDR alone.
    */
   static String layerKey(SubnetDefinitionEntity e) {
-    return Cidr.key(e.getCidr()) + "|" + (e.getSegmentKey() == null ? "" : e.getSegmentKey());
+    return e.getCidr() + "|" + (e.getSegmentKey() == null ? "" : e.getSegmentKey());
   }
 
   /** The shared default. */
@@ -91,7 +91,8 @@ public class SubnetService {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     String cidr = subnetCidr(req.getCidr());
     SubnetDefinitionEntity entity =
-        defaultFor(cidr)
+        subnetRepo
+            .findByCidrAndNetworkIdIsNull(cidr)
             .orElseGet(
                 () -> SubnetDefinitionEntity.builder().cidr(cidr).source("MANUAL").build());
     SubnetDefinitionDto before = entity.getId() == null ? null : toDto(entity, null);
@@ -137,7 +138,8 @@ public class SubnetService {
     permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     String cidr = subnetCidr(req.getCidr());
     SubnetDefinitionEntity entity =
-        defaultFor(cidr)
+        subnetRepo
+            .findByCidrAndNetworkIdIsNull(cidr)
             .orElseGet(() -> SubnetDefinitionEntity.builder().cidr(cidr).source("AUTO").build());
     if (req.getLabel() != null) entity.setLabel(req.getLabel());
     if (req.getDescription() != null) entity.setDescription(req.getDescription());
@@ -207,11 +209,12 @@ public class SubnetService {
     if (req.isHidden() && segment != null) {
       throw new IllegalArgumentException("Only the range as a whole can hide the default's subnet.");
     }
-    if (req.isHidden() && defaultFor(cidr).isEmpty()) {
+    if (req.isHidden() && subnetRepo.findByCidrAndNetworkIdIsNull(cidr).isEmpty()) {
       throw new IllegalArgumentException("The default has no subnet " + cidr + " to hide.");
     }
     SubnetDefinitionEntity entity =
-        networkEntryFor(networkId, cidr, segment)
+        subnetRepo
+            .findForSegment(networkId, cidr, segment)
             .orElseGet(() -> SubnetDefinitionEntity.builder().networkId(networkId).cidr(cidr).source("MANUAL")
                 .segmentKey(segment).build());
     if (segment != null && req.getSegmentLabel() != null) entity.setSegmentLabel(req.getSegmentLabel());
@@ -402,7 +405,7 @@ public class SubnetService {
   }
 
   private static String candidateKey(SubnetDefinitionDto c) {
-    return Cidr.key(c.getCidr()) + "|" + (c.getSegmentKey() == null ? "" : c.getSegmentKey());
+    return c.getCidr() + "|" + (c.getSegmentKey() == null ? "" : c.getSegmentKey());
   }
 
   // ── core detection ────────────────────────────────────────────────────────
@@ -501,7 +504,7 @@ public class SubnetService {
     var b = stalenessService.baseline(e.getId(), networkId).orElse(null);
     return SubnetDefinitionDto.builder()
         .id(e.getId())
-        .cidr(Cidr.key(e.getCidr()))
+        .cidr(e.getCidr())
         .segmentKey(e.getSegmentKey())
         .segmentLabel(e.getSegmentLabel())
         .label(e.getLabel())
@@ -544,35 +547,9 @@ public class SubnetService {
   /** Delegates to the shared predicate so all four call sites agree (#694). */
 
 
-  /**
-   * The shared default's entry for a CIDR, matched by the network it names, not its text: a row
-   * saved before #1351 may read "10.1.2.3/24" for the "10.1.2.0/24" a save writes now.
-   */
-  private java.util.Optional<SubnetDefinitionEntity> defaultFor(String cidr) {
-    return subnetRepo.findByNetworkIdIsNullOrderByCidr().stream()
-        .filter(e -> Cidr.same(e.getCidr(), cidr))
-        .findFirst();
-  }
-
-  /** A network's entry for a CIDR on one segment (null: the range as a whole), matched likewise. */
-  private java.util.Optional<SubnetDefinitionEntity> networkEntryFor(
-      java.util.UUID networkId, String cidr, String segment) {
-    return subnetRepo.findByNetworkIdOrderByCidr(networkId).stream()
-        .filter(e -> Cidr.same(e.getCidr(), cidr))
-        .filter(e -> java.util.Objects.equals(e.getSegmentKey(), segment))
-        .findFirst();
-  }
-
-  /**
-   * The CIDR as every settings list writes it ({@link Cidr#normalise}), IPv4 only: subnet matching
-   * ({@link CidrRange}, the frontend's ipInCidr) is IPv4 arithmetic, so an IPv6 label would save and
-   * never match. Lifted when matching learns IPv6.
-   */
+  /** The CIDR as a subnet label saves it: {@link Cidr#normaliseIpv4}. */
   static String subnetCidr(String raw) {
-    String cidr = Cidr.normalise(raw);
-    if (!Cidr.isIpv4(cidr)) {
-      throw new IllegalArgumentException("Subnet labels are IPv4 for now: " + raw.trim());
-    }
-    return cidr;
+    return Cidr.normaliseIpv4(raw);
   }
+
 }

@@ -22,7 +22,7 @@ public final class Cidr {
   /**
    * {@code "10.0.0.0/8"} from {@code " 10.1.2.3/8 "}: trimmed, a bare address made {@code /32} (or
    * {@code /128}), and the host bits zeroed so the entry is the network it names. IPv6 comes back
-   * in Java's long form ({@code fd00:0:0:0:0:0:0:0/64}), as custom ranges have always been stored.
+   * in RFC 5952 form ({@code fd00::/64}).
    * Literals only: nothing here resolves a name.
    *
    * @throws IllegalArgumentException "A CIDR is required" when blank, "Invalid CIDR: …" otherwise
@@ -55,18 +55,24 @@ public final class Cidr {
       int keep = Math.max(0, Math.min(8, prefix - i * 8));
       bytes[i] &= (byte) (0xFF << (8 - keep));
     }
-    try {
-      return InetAddress.getByAddress(bytes).getHostAddress() + "/" + prefix;
-    } catch (Exception e) {
-      throw invalid(raw);
-    }
+    return (bytes.length == 4 ? v4(bytes) : v6(bytes)) + "/" + prefix;
   }
 
   /**
-   * The form a stored CIDR is compared and shown in: {@link #normalise}d, or as stored (trimmed)
-   * when it isn't a literal CIDR (a row saved before #1351 from free text). Rows saved earlier keep
-   * their text in the database ({@code fd00::/8}, {@code 10.1.2.3/8}); comparing and answering in
-   * this form makes them the same entry as what a save writes now, with nothing to migrate.
+   * {@link #normalise}, for a list that is IPv4 only for now: subnet labels and their per-snapshot
+   * overrides. Subnet matching (subnets' CidrRange, the frontend's ipInCidr) is IPv4 arithmetic, so
+   * an IPv6 entry would save and never match (#1354).
+   */
+  public static String normaliseIpv4(String raw) {
+    String cidr = normalise(raw);
+    if (!isIpv4(cidr)) throw new IllegalArgumentException("Subnet labels are IPv4 for now: " + raw.trim());
+    return cidr;
+  }
+
+  /**
+   * The form a stored CIDR is written in: {@link #normalise}d, or as stored (trimmed) when it isn't
+   * a literal CIDR (free text an older validator let through). For moving rows saved before #1351
+   * onto what a save writes now (V86).
    */
   public static String key(String stored) {
     if (stored == null) return null;
@@ -77,9 +83,37 @@ public final class Cidr {
     }
   }
 
-  /** Whether two CIDRs, stored or typed, name the same network. */
-  public static boolean same(String a, String b) {
-    return a != null && b != null && key(a).equals(key(b));
+  private static String v4(byte[] b) {
+    return (b[0] & 0xFF) + "." + (b[1] & 0xFF) + "." + (b[2] & 0xFF) + "." + (b[3] & 0xFF);
+  }
+
+  /**
+   * RFC 5952: lowercase hex without leading zeros, the longest run of two or more zero groups (the
+   * first, on a tie) as {@code ::}. What an operator types ({@code fd00::}), not Java's long form.
+   */
+  private static String v6(byte[] b) {
+    int[] g = new int[8];
+    for (int i = 0; i < 8; i++) g[i] = ((b[2 * i] & 0xFF) << 8) | (b[2 * i + 1] & 0xFF);
+    int bestStart = -1, bestLen = 0;
+    for (int i = 0; i < 8; ) {
+      if (g[i] != 0) { i++; continue; }
+      int j = i;
+      while (j < 8 && g[j] == 0) j++;
+      if (j - i > bestLen) { bestStart = i; bestLen = j - i; }
+      i = j;
+    }
+    if (bestLen < 2) bestStart = -1;
+    StringBuilder out = new StringBuilder();
+    for (int i = 0; i < 8; i++) {
+      if (i == bestStart) {
+        out.append("::");
+        i += bestLen - 1;
+        continue;
+      }
+      if (out.length() > 0 && out.charAt(out.length() - 1) != ':') out.append(':');
+      out.append(Integer.toHexString(g[i]));
+    }
+    return out.toString();
   }
 
   /** Whether a CIDR {@link #normalise} wrote is IPv4. */
