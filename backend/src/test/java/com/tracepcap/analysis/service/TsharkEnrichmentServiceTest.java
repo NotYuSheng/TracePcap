@@ -123,6 +123,17 @@ class TsharkEnrichmentServiceTest {
         .isEqualTo("XML");
   }
 
+  @Test
+  void extractAppLayerProto_quotedOrTunnelledTransport_isNeverTheProtocol() {
+    // ip.proto lists every occurrence: an ICMP error quoting UDP reads "1,17".
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ip:icmp:ip:udp:data", "1,17")).isNull();
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ipv6:ipv6.hopopts:udp:xml", "HOPOPT")).isEqualTo("XML");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:udp:sip:sdp", "UDP"))
+        .isEqualTo("SIP");
+  }
+
   // --- resolveProtoNumber ---
 
   @Test

@@ -408,20 +408,28 @@ public class TsharkEnrichmentService implements Extractor {
     return top;
   }
 
+  /**
+   * The flow's transport or any other: {@code l4proto} comes from ip.proto, which tshark writes as
+   * every occurrence ("1,17" for an ICMP error quoting UDP, "17,6" through a tunnel), so it alone
+   * can miss the UDP right under the body.
+   */
   private static boolean isTransport(String proto, String l4proto) {
-    return proto.equalsIgnoreCase(l4proto) || NON_APP_PROTOCOLS.contains(proto.toUpperCase());
+    String up = proto.toUpperCase();
+    return up.equalsIgnoreCase(l4proto) || TRANSPORTS.contains(up) || NON_APP_PROTOCOLS.contains(up);
   }
+
+  private static final Set<String> TRANSPORTS = Set.of("TCP", "UDP", "SCTP", "UDPLITE", "DCCP");
 
   /**
    * Dissectors for what a protocol carries rather than for a protocol: bodies (HTTP's media types,
-   * IMF for mail) and certificates (TLS's X.509 and PKIX). Seen on real captures as the deepest
+   * IMF for mail, SIP's SDP) and certificates (TLS's X.509 and PKIX). Seen on real captures as the deepest
    * entry of most HTTP response packets.
    */
   private static final Set<String> PAYLOAD_FORMATS =
       Set.of(
           "DATA", "DATA-TEXT-LINES", "URLENCODED-FORM", "MEDIA", "JSON", "XML", "PNG",
           "IMAGE-JFIF", "IMAGE-GIF", "MIME_MULTIPART", "IMF", "X509SAT", "X509AF", "X509CE",
-          "X509IF", "PKIX1EXPLICIT", "PKIX1IMPLICIT", "PKCS-1");
+          "X509IF", "PKIX1EXPLICIT", "PKIX1IMPLICIT", "PKCS-1", "SDP");
 
   /** Uppercase and strip a leading "The " article (e.g. "The Netherlands" → "NETHERLANDS"). */
   static String normalizeL7Protocol(String proto) {

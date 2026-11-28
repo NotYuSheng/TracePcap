@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -113,7 +114,10 @@ public class ConversationLookupAdapter implements ConversationLookup {
           case HTTP_USER_AGENT -> repository.findDistinctHttpUserAgentsByFileId(fileId);
         };
     // The port promises no nulls or blanks; the native DISTINCT queries can yield both.
-    return raw.stream().filter(v -> v != null && !v.isBlank()).toList();
+    var values = raw.stream().filter(v -> v != null && !v.isBlank());
+    // L7 names are promised upper case; rows stored before storage-time normalising aren't.
+    if (facet == Facet.PROTOCOL) values = values.map(v -> v.toUpperCase(Locale.ROOT)).distinct();
+    return values.toList();
   }
 
   @Override
