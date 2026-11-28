@@ -52,7 +52,7 @@ class ConversationLookupAdapterTest {
    */
   @Test
   void findingListsAreImmutable() {
-    when(repository.findByFileId(FILE))
+    when(repository.findByFileIdOrderByIdAsc(org.mockito.ArgumentMatchers.eq(FILE), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(conv("10.0.0.1", new String[] {"MALWARE", "SCAN"})));
 
     List<String> risks = adapter.conversationFacts(FILE).get(0).findings().flowRisks();
@@ -64,7 +64,7 @@ class ConversationLookupAdapterTest {
 
   @Test
   void absentArraysBecomeEmptyListsNotNull() {
-    when(repository.findByFileId(FILE))
+    when(repository.findByFileIdOrderByIdAsc(org.mockito.ArgumentMatchers.eq(FILE), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(conv("10.0.0.1", null), conv("10.0.0.2", new String[] {})));
 
     assertThat(adapter.conversationFacts(FILE))
@@ -80,7 +80,7 @@ class ConversationLookupAdapterTest {
   /** Grades are the point of the grouping: a measurement and an inference must not sit side by side. */
   @Test
   void factsAreGroupedByGrade() {
-    when(repository.findByFileId(FILE)).thenReturn(List.of(conv("10.0.0.1", new String[] {"SCAN"})));
+    when(repository.findByFileIdOrderByIdAsc(org.mockito.ArgumentMatchers.eq(FILE), org.mockito.ArgumentMatchers.any())).thenReturn(List.of(conv("10.0.0.1", new String[] {"SCAN"})));
 
     ConversationFacts f = adapter.conversationFacts(FILE).get(0);
 

@@ -19,10 +19,22 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
   private final com.tracepcap.analysis.repository.IpOccupancyRepository occupancies;
   private final NetworkSegmentReader networks;
 
+  /** Null in unit tests built without a session. */
+  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+
+  /** Every host of a file, mapped a page at a time (#1373). */
+  private <R> List<R> allHosts(UUID fileId, java.util.function.Function<HostClassificationEntity, R> map) {
+    return com.tracepcap.common.db.InPages.of(
+        (UUID after, org.springframework.data.domain.Limit limit) -> after == null
+            ? repository.findByFileIdOrderByIdAsc(fileId, limit)
+            : repository.findByFileIdAndIdGreaterThanOrderByIdAsc(fileId, after, limit),
+        HostClassificationEntity::getId, map, entityManager);
+  }
+
   @Override
   public List<ClassifiedHost> classifiedHosts(UUID fileId) {
-    return repository.findByFileId(fileId).stream()
-        .map(
+    return allHosts(
+        fileId,
             e ->
                 new ClassifiedHost(
                     e.getIp(),
@@ -32,8 +44,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
                     e.getRunnerUpType(),
                     e.getRunnerUpScore(),
                     splitReasons(e.getWinnerReasons()),
-                    splitReasons(e.getRunnerUpReasons())))
-        .toList();
+                    splitReasons(e.getRunnerUpReasons())));
   }
 
   @Override
@@ -134,7 +145,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
 
   @Override
   public List<HostFacts> hostFacts(UUID fileId) {
-    return repository.findByFileId(fileId).stream().map(HostClassificationLookupAdapter::toFacts).toList();
+    return allHosts(fileId, HostClassificationLookupAdapter::toFacts);
   }
 
   @Override

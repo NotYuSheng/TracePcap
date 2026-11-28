@@ -28,24 +28,15 @@ public class ConversationLookupAdapter implements ConversationLookup {
   /** Null in unit tests built without a session. */
   @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
-  /**
-   * Lets rows read only to be mapped to facts leave the session: file extraction asks for every
-   * conversation of a capture inside the analysis transaction, and 200k entities with their
-   * snapshots held until commit was the heap a scan capture ran out of. Pending changes are flushed
-   * first, so detaching one a caller had modified loses nothing.
-   */
-  private void release(List<?> rows) {
-    if (entityManager == null || rows.isEmpty()) return;
-    if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
-        && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
-      entityManager.flush();
-    }
-    rows.forEach(entityManager::detach);
-  }
 
   @Override
   public List<ConversationFacts> conversationFacts(UUID fileId) {
-    return repository.findByFileId(fileId).stream().map(ConversationLookupAdapter::toFacts).toList();
+    // A page at a time: the entities and the facts together were a scan capture's heap (#1373).
+    return com.tracepcap.common.db.InPages.of(
+        (UUID after, org.springframework.data.domain.Limit limit) -> after == null
+            ? repository.findByFileIdOrderByIdAsc(fileId, limit)
+            : repository.findByFileIdAndIdGreaterThanOrderByIdAsc(fileId, after, limit),
+        ConversationEntity::getId, ConversationLookupAdapter::toFacts, entityManager);
   }
 
   @Override
@@ -116,7 +107,7 @@ public class ConversationLookupAdapter implements ConversationLookup {
     return com.tracepcap.common.db.InBatches.of(conversationIds, batch -> {
       List<com.tracepcap.analysis.entity.ConversationEntity> rows = repository.findAllById(batch);
       List<ConversationFacts> facts = rows.stream().map(ConversationLookupAdapter::toFacts).toList();
-      release(rows);
+      com.tracepcap.common.db.InPages.release(entityManager, rows);
       return facts;
     });
   }

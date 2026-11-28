@@ -42,7 +42,7 @@ class HostClassificationLookupAdapterTest {
 
   @Test
   void splitsCommaJoinedServiceRolesAndTrimsWhitespace() {
-    when(repository.findByFileId(FILE)).thenReturn(List.of(host("10.0.0.1", "web, dns ,dhcp")));
+    when(repository.findByFileIdOrderByIdAsc(org.mockito.ArgumentMatchers.eq(FILE), org.mockito.ArgumentMatchers.any())).thenReturn(List.of(host("10.0.0.1", "web, dns ,dhcp")));
 
     assertThat(adapter.hostFacts(FILE))
         .singleElement()
@@ -52,7 +52,7 @@ class HostClassificationLookupAdapterTest {
 
   @Test
   void absentServiceRolesBecomeEmptyListNotNull() {
-    when(repository.findByFileId(FILE))
+    when(repository.findByFileIdOrderByIdAsc(org.mockito.ArgumentMatchers.eq(FILE), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(host("10.0.0.1", null), host("10.0.0.2", "  ")));
 
     assertThat(adapter.hostFacts(FILE)).extracting(HostFacts::serviceRoles).containsOnly(List.of());
@@ -105,7 +105,7 @@ class HostClassificationLookupAdapterTest {
             .ttl(null)
             .serviceRoles(null)
             .build();
-    when(repository.findByFileId(FILE)).thenReturn(List.of(bare));
+    when(repository.findByFileIdOrderByIdAsc(org.mockito.ArgumentMatchers.eq(FILE), org.mockito.ArgumentMatchers.any())).thenReturn(List.of(bare));
 
     assertThat(adapter.hostFacts(FILE))
         .singleElement()
