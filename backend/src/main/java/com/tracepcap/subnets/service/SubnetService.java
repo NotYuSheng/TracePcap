@@ -1,5 +1,6 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.common.net.Cidr;
 import com.tracepcap.common.net.LocalityPolicy;
 import com.tracepcap.common.net.LocalityRules;
@@ -291,16 +292,15 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
     if (sharing.isEmpty()) return candidates;
     List<SubnetDefinitionDto> out = new ArrayList<>();
     for (SubnetDefinitionDto c : candidates) {
-      long[] range;
-      try {
-        range = CidrRange.of(c.getCidr());
-      } catch (Exception e) {
+      var parsed = CidrBlock.parse(c.getCidr());
+      if (parsed.isEmpty()) {
         out.add(c);
         continue;
       }
+      CidrBlock range = parsed.get();
       List<SubnetDefinitionDto> split = new ArrayList<>();
       for (var seg : sharing) {
-        long n = seg.addresses().stream().map(SubnetService::parseIp).filter(v -> v >= range[0] && v <= range[1]).count();
+        long n = seg.addresses().stream().filter(range::contains).count();
         if (n == 0) continue;
         split.add(
             SubnetDefinitionDto.builder()
@@ -563,9 +563,9 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
         .collect(Collectors.toSet());
   }
 
-  /** The CIDR as a subnet label saves it: {@link Cidr#normaliseIpv4}. */
+  /** The CIDR as a subnet label saves it: {@link Cidr#normalise}, IPv4 or IPv6 (#1354). */
   static String subnetCidr(String raw) {
-    return Cidr.normaliseIpv4(raw);
+    return Cidr.normalise(raw);
   }
 
 }

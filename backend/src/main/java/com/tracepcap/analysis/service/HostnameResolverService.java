@@ -246,7 +246,7 @@ public class HostnameResolverService {
     return h;
   }
 
-  private String stripTrailingDot(String raw) {
+  private static String stripTrailingDot(String raw) {
     if (raw == null) return null;
     String h = raw.trim();
     return h.endsWith(".") ? h.substring(0, h.length() - 1) : h;
@@ -282,12 +282,17 @@ public class HostnameResolverService {
         && !lower.contains("._sub");
   }
 
-  /** Converts a reverse-DNS "4.3.2.1.in-addr.arpa" question to the IPv4 "1.2.3.4". */
-  private String arpaToIp(String qryName) {
+  /**
+   * The address a reverse-DNS question names: {@code 4.3.2.1.in-addr.arpa} is {@code 1.2.3.4}, and
+   * an {@code ip6.arpa} name (32 nibbles, last first) is the IPv6 address in RFC 5952 form, as
+   * tshark writes it elsewhere, so the claim lands on the same host. Null for anything else.
+   */
+  static String arpaToIp(String qryName) {
     if (qryName == null) return null;
     // DNS query names may carry a trailing dot ("4.3.2.1.in-addr.arpa."); strip it first.
     String name = stripTrailingDot(qryName).toLowerCase();
-    if (!name.endsWith(".in-addr.arpa")) return null; // IPv6 ip6.arpa not supported
+    if (name.endsWith(".ip6.arpa")) return ip6ArpaToIp(name.substring(0, name.length() - ".ip6.arpa".length()));
+    if (!name.endsWith(".in-addr.arpa")) return null;
     String labels = name.substring(0, name.length() - ".in-addr.arpa".length());
     String[] octets = labels.split("\\.");
     if (octets.length != 4) return null;
@@ -296,6 +301,22 @@ public class HostnameResolverService {
       sb.append(octets[i]);
       if (i > 0) sb.append('.');
     }
-    return sb.toString();
+    // Written as tshark writes it ("010" is 10), so the claim lands on the same host.
+    byte[] bytes = com.tracepcap.common.net.Cidr.addressBytes(sb.toString());
+    return bytes != null && bytes.length == 4 ? com.tracepcap.common.net.Cidr.formatAddress(bytes) : null;
   }
+
+  private static String ip6ArpaToIp(String labels) {
+    String[] nibbles = labels.split("\\.");
+    if (nibbles.length != 32) return null; // a partial name is a zone, not one host
+    byte[] b = new byte[16];
+    for (int i = 0; i < 32; i++) {
+      String n = nibbles[31 - i];
+      if (n.length() != 1 || Character.digit(n.charAt(0), 16) < 0) return null;
+      int v = Character.digit(n.charAt(0), 16);
+      b[i / 2] |= (byte) (i % 2 == 0 ? v << 4 : v);
+    }
+    return com.tracepcap.common.net.Cidr.formatAddress(b);
+  }
+
 }

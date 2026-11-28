@@ -1,5 +1,6 @@
 import type { GraphNode, GraphEdge, NodeData } from '@/features/network/types';
 import { formatBytes } from '@/utils/formatters';
+import { networkOf, parseIp } from '@/utils/ipClassification';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,7 +32,7 @@ function slash16Key(ip: string): string {
  *           IPs (e.g. 250 unique /24s) still get grouped rather than left as
  *           individual nodes.  /16 groups with only 1 member pass through unchanged.
  *
- * IPv6 nodes always group by their first 4 colon-delimited groups (/64-ish).
+ * IPv6 nodes always group by their /64.
  * L2/loopback/multicast nodes return null (never clustered).
  */
 function buildClusterKeyMap(nodes: GraphNode[]): Map<string, string> {
@@ -45,8 +46,9 @@ function buildClusterKeyMap(nodes: GraphNode[]): Map<string, string> {
     if (!ip || isNeverClustered(ip)) continue;
 
     if (ip.includes(':')) {
-      const groups = ip.split(':');
-      keyMap.set(node.id, `cluster:${groups.slice(0, 4).join(':')}::/64`);
+      // Read as an address: splitting on colons put fe80::1 and fe80::2 in different groups. An
+      // IPv4-mapped address (4 bytes) or text that isn't an address isn't clustered.
+      if (parseIp(ip)?.length === 16) keyMap.set(node.id, `cluster:${networkOf(ip, 64)}`);
       continue;
     }
 

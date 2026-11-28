@@ -311,7 +311,7 @@ public class SnapshotService {
    * A snapshot's subnet overrides as rows. A CIDR spelled exactly as a subnet label or this
    * snapshot's override is stored keeps that text ({@link Cidr#asSaved}), inherited or not, so a
    * label for a subnet left in an old spelling attaches to it. Anything new is written as a subnet label writes it
-   * ({@link Cidr#normaliseIpv4}). A bad CIDR, or two rows naming one network, is a 400 on that
+   * ({@link Cidr#normalise}). A bad CIDR, or two rows naming one network, is a 400 on that
    * field: nothing is dropped silently.
    */
   private static List<SnapshotSubnetOverrideEntity> overrideRows(
@@ -323,7 +323,7 @@ public class SnapshotService {
       String field = "subnetOverrides[" + i + "].cidr";
       String cidr;
       try {
-        cidr = Cidr.asSaved(o.getCidr(), saved, Cidr::normaliseIpv4);
+        cidr = Cidr.asSaved(o.getCidr(), saved, Cidr::normalise);
       } catch (IllegalArgumentException e) {
         throw new FieldValidationException(e.getMessage(), Map.of(field, e.getMessage()));
       }

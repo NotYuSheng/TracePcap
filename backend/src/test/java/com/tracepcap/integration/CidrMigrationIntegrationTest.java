@@ -24,7 +24,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * V86 (#1351) moves CIDRs saved before the shared normaliser onto what a save writes now, without
- * ever failing the upgrade.
+ * ever failing the upgrade. V87 (#1354) gives SQL one CIDR test for both families, {@code ip_inet}.
  */
 @SpringBootTest
 @Testcontainers
@@ -115,5 +115,26 @@ class CidrMigrationIntegrationTest {
 
     assertThat(jdbc.queryForList("SELECT cidr FROM custom_private_ranges WHERE network_id = ? ORDER BY id", String.class, net))
         .containsExactly("10.70.5.5/16", "10.71.0.0/16");
+  }
+
+  private Boolean inside(String ip, String cidr) {
+    return jdbc.queryForObject("SELECT ip_inet(?) <<= CAST(? AS inet)", Boolean.class, ip, cidr);
+  }
+
+  @Test
+  void ipInetPutsAnAddressOfEitherFamilyInItsSubnet() {
+    assertThat(inside("10.1.2.9", "10.1.2.0/24")).isTrue();
+    assertThat(inside("10.1.3.9", "10.1.2.0/24")).isFalse();
+    assertThat(inside("fd00::1:0:0:0:9", "fd00:0:0:1::/64")).isTrue();
+    assertThat(inside("fe80::1%eth0", "fe80::/10")).isTrue();
+    assertThat(inside("10.0.0.1", "::/0")).isFalse(); // never across families
+    // An IPv4-mapped address is its IPv4 address, as CidrBlock reads it.
+    assertThat(inside("::ffff:10.0.0.5", "10.0.0.0/24")).isTrue();
+    assertThat(inside("64:ff9b::192.0.2.1", "64:ff9b::/96")).isTrue(); // a dotted tail, not mapped
+    // Not an address: NULL, so never inside, and the query doesn't fail.
+    for (String bad : new String[] {"aa:bb:cc:dd:ee:ff", "1:2", "1::2::3", "1.2.3.4::", "10.0.0.256", "host.local", ""}) {
+      assertThat(jdbc.queryForObject("SELECT ip_inet(?) IS NULL", Boolean.class, bad)).as(bad).isTrue();
+    }
+    assertThat(jdbc.queryForObject("SELECT to_regprocedure('ip_to_int(text)') IS NULL", Boolean.class)).isTrue();
   }
 }

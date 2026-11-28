@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRfc1918, isPrivateIp, ipInCidr, isUnspecified, isHostAddress } from '../ipClassification';
+import { isRfc1918, isPrivateIp, ipInCidr, isUnspecified, isHostAddress, parseIp, formatIp, networkOf, compareIps } from '../ipClassification';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 
 describe('isRfc1918', () => {
@@ -42,9 +42,66 @@ describe('ipInCidr', () => {
     expect(ipInCidr('10.1.1.5', '10.0.0.0/16')).toBe(false);
   });
 
-  it('never matches when either side is IPv6', () => {
+  it('never matches across families', () => {
     expect(ipInCidr('fc00::1', '10.0.0.0/8')).toBe(false);
     expect(ipInCidr('10.0.0.1', 'fc00::/7')).toBe(false);
+    expect(ipInCidr('::1', '0.0.0.0/0')).toBe(false);
+  });
+
+  it('matches IPv6, compressed or not (#1354)', () => {
+    expect(ipInCidr('fd00::1:0:0:0:9', 'fd00:0:0:1::/64')).toBe(true);
+    expect(ipInCidr('FD00:0000:0000:0001:abcd::1', 'fd00:0:0:1::/64')).toBe(true);
+    expect(ipInCidr('fd00:0:0:2::1', 'fd00:0:0:1::/64')).toBe(false);
+    expect(ipInCidr('febf::1%eth0', 'fe80::/10')).toBe(true);
+    expect(ipInCidr('fec0::1', 'fe80::/10')).toBe(false);
+  });
+
+  it('reads saved rows as the backend does', () => {
+    expect(ipInCidr('10.1.2.9', '10.1.2.3/24')).toBe(true); // host bits ignored
+    expect(ipInCidr('10.0.0.5', '10.0.0.5')).toBe(true); // a bare address is one host
+    expect(ipInCidr('10.0.0.6', '10.0.0.5')).toBe(false);
+    expect(ipInCidr('10.0.0.1', '10.0.0.0/33')).toBe(false);
+    expect(ipInCidr('10.0.0.1', 'gw.corp/24')).toBe(false);
+    expect(ipInCidr('aa:bb:cc:dd:ee:ff', '10.0.0.0/8')).toBe(false);
+  });
+});
+
+describe('parseIp / formatIp / networkOf / compareIps', () => {
+  it('parses IPv4 and IPv6 literals only', () => {
+    expect(parseIp('10.0.0.1')).toEqual([10, 0, 0, 1]);
+    expect(parseIp('::')).toEqual(new Array(16).fill(0));
+    expect(parseIp('::ffff:10.0.0.1')).toEqual([10, 0, 0, 1]); // mapped reads as IPv4
+    expect(parseIp('64:ff9b::192.0.2.1')?.slice(12)).toEqual([192, 0, 2, 1]);
+    for (const bad of ['10.0.0.256', '10.1', '1::2::3', '1:2:3:4:5:6:7:8:9', ':1', '1.2.3.4::', '1.2.3.4:1::', 'aa:bb:cc:dd:ee:ff', 'host', '', null]) {
+      expect(parseIp(bad)).toBeNull();
+    }
+  });
+
+  it('writes IPv6 in RFC 5952 form, as the backend does', () => {
+    expect(formatIp(parseIp('2001:0db8:0000:0000:0000:0000:0000:0001')!)).toBe('2001:db8::1');
+    expect(formatIp(parseIp('2001:db8:0:1:0:0:0:1')!)).toBe('2001:db8:0:1::1');
+    expect(formatIp(parseIp('1:0:0:2:0:0:0:3')!)).toBe('1:0:0:2::3');
+    expect(formatIp(parseIp('1:0:2:3:4:5:6:7')!)).toBe('1:0:2:3:4:5:6:7');
+    expect(formatIp([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 10, 0, 0, 1])).toBe('::ffff:10.0.0.1');
+  });
+
+  it('names the network an address is on', () => {
+    expect(networkOf('10.1.2.3', 24)).toBe('10.1.2.0/24');
+    expect(networkOf('fe80::1', 64)).toBe('fe80::/64');
+    expect(networkOf('fe80::2', 64)).toBe('fe80::/64');
+    expect(networkOf('nope', 24)).toBeNull();
+  });
+
+  it('sorts by value, IPv4 first', () => {
+    expect(['10.0.0.10', 'fe80::1', '10.0.0.9', 'x', '::1'].sort(compareIps)).toEqual(['10.0.0.9', '10.0.0.10', '::1', 'fe80::1', 'x']);
+  });
+});
+
+describe('isPrivateIp with an IPv6 custom range (#1354)', () => {
+  it('honours it, as the Investigation does', () => {
+    const v6: CustomPrivateRange[] = [{ id: 3, cidr: '2001:db8::/32', classification: 'PRIVATE' }];
+    expect(isPrivateIp('2001:db8:1::5', v6)).toBe(true);
+    expect(isPrivateIp('2001:db8:1::5')).toBe(false);
   });
 });
 

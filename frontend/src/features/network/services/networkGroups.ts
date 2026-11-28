@@ -1,7 +1,7 @@
 import type { GraphNode } from '../types';
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
-import { ipInCidr, isHostAddress, isPrivateIp } from '@/utils/ipClassification';
+import { ipInCidr, isHostAddress, isPrivateIp, networkOf, parseIp } from '@/utils/ipClassification';
 import { deviceTypeLabel, nodeIdentityKey } from '@/utils/deviceType';
 import type { DeviceType } from '@/types';
 
@@ -128,12 +128,8 @@ function isSubnetBroadcast(n: GraphNode): boolean {
 
 /** `192.168.1.0/24` for IPv4, the /64 for IPv6. */
 export function subnetOf(ip: string): string {
-  if (ip.includes(':')) {
-    const parts = ip.split(':').filter(Boolean);
-    return `${parts.slice(0, 4).join(':')}::/64`;
-  }
-  const p = ip.split('.');
-  return p.length === 4 ? `${p[0]}.${p[1]}.${p[2]}.0/24` : ip;
+  const addr = parseIp(ip);
+  return addr ? (networkOf(ip, addr.length === 4 ? 24 : 64) ?? ip) : ip;
 }
 
 /** `cdn.example.co.uk` → `example.co.uk`; `www.google.com` → `google.com`. */

@@ -793,11 +793,11 @@ public class NetworkClusterService {
       }
       case "subnet24" -> {
         String prefix = key.substring("subnet24:".length());
-        yield prefix + ".x";
+        yield prefix.contains(":") ? prefix : prefix + ".x";
       }
       case "subnet16" -> {
         String prefix = key.substring("subnet16:".length());
-        yield prefix + ".x.x";
+        yield prefix.contains(":") ? prefix : prefix + ".x.x";
       }
       case "deviceType" -> {
         String type = key.substring("device:".length());
@@ -814,7 +814,7 @@ public class NetworkClusterService {
         if (key.startsWith("org:")) yield key.substring("org:".length());
         // Fallback subnet24 label
         String prefix = key.replace("subnet24:", "");
-        yield prefix + ".x (untagged)";
+        yield (prefix.contains(":") ? prefix : prefix + ".x") + " (untagged)";
       }
       default -> key;
     };
@@ -825,18 +825,30 @@ public class NetworkClusterService {
   /** Delegates to the shared predicate so all four call sites agree (#694). */
 
 
+  /**
+   * {@code 10.1.2} (the first {@code octets} of an IPv4 address), or for IPv6 the network it is on:
+   * {@code 2001:db8:1:2::/64} in place of a /24, {@code 2001:db8:1::/48} in place of a /16. Read
+   * as an address, not split on colons, which put {@code fe80::1} and {@code fe80::2} in different
+   * groups.
+   */
   private String subnetPrefix(String ip, int octets) {
     if (ip == null) return "unknown";
-    if (ip.contains(":")) {
-      // IPv6: use first N colon-separated groups
-      String[] parts = ip.split(":");
-      int take = Math.min(octets, parts.length);
-      return String.join(":", Arrays.copyOf(parts, take));
+    byte[] bytes = com.tracepcap.common.net.Cidr.addressBytes(ip);
+    if (bytes != null && bytes.length == 16) {
+      return com.tracepcap.common.net.CidrBlock.parse(ip + "/" + (octets >= 3 ? 64 : 48))
+          .map(Object::toString)
+          .orElse(ip);
     }
-    String[] parts = ip.split("\\.");
+    // An IPv4 address (an IPv4-mapped one too, by its IPv4 address), or text that isn't an
+    // address (a MAC endpoint), grouped by its leading parts as before.
+    String text = bytes != null ? com.tracepcap.common.net.Cidr.formatAddress(bytes) : ip;
+    String sep = bytes == null && text.contains(":") ? ":" : "\\.";
+    String[] parts = text.split(sep);
     int take = Math.min(octets, parts.length);
-    return String.join(".", Arrays.copyOf(parts, take));
+    return String.join(sep.equals(":") ? ":" : ".", Arrays.copyOf(parts, take));
   }
+
+
 
   private List<String> topKeys(Map<String, Long> counts, int n) {
     return counts.entrySet().stream()

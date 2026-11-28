@@ -1,5 +1,6 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.subnets.entity.SubnetNetworkBaselineEntity;
 import java.util.Optional;
 
@@ -121,20 +122,17 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
     comp.put("memberCount", 0);
     if (fileId == null) return comp;
 
-    long[] range;
-    try {
-      range = CidrRange.of(cidr);
-    } catch (Exception e) {
-      return comp;
-    }
+    var parsed = CidrBlock.parse(cidr);
+    if (parsed.isEmpty()) return comp;
+    String block = parsed.get().toString();
 
-    List<String> memberIps = memberIps(fileId, range[0], range[1]);
+    List<String> memberIps = memberIps(fileId, block);
     if (memberIps.isEmpty()) return comp;
 
     comp.put("observed", true);
     comp.put("memberCount", memberIps.size());
-    comp.put("deviceTypes", dominantDeviceTypes(fileId, range[0], range[1]));
-    comp.put("protocols", dominantProtocols(fileId, range[0], range[1]));
+    comp.put("deviceTypes", dominantDeviceTypes(fileId, block));
+    comp.put("protocols", dominantProtocols(fileId, block));
     return comp;
   }
 
@@ -210,23 +208,9 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
     comp.put("deviceTypes", List.of());
     comp.put("protocols", List.of());
     comp.put("memberCount", 0);
-    long[] range;
-    try {
-      range = CidrRange.of(cidr);
-    } catch (Exception e) {
-      return comp;
-    }
-    List<String> members =
-        seg.addresses().stream()
-            .filter(ip -> {
-              try {
-                long v = CidrRange.ipToLong(ip);
-                return v >= range[0] && v <= range[1];
-              } catch (RuntimeException e) {
-                return false; // not IPv4
-              }
-            })
-            .toList();
+    var block = CidrBlock.parse(cidr);
+    if (block.isEmpty()) return comp;
+    List<String> members = seg.addresses().stream().filter(block.get()::contains).toList();
     if (members.isEmpty()) return comp;
     comp.put("observed", true);
     comp.put("memberCount", members.size());
@@ -291,7 +275,7 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
 
   // ── composition queries ─────────────────────────────────────────────────────
 
-  private List<String> memberIps(UUID fileId, long lo, long hi) {
+  private List<String> memberIps(UUID fileId, String cidr) {
     try {
       return jdbc.query(
           con -> {
@@ -299,11 +283,10 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
                 con.prepareStatement(
                     """
                     SELECT DISTINCT ip FROM host_classifications
-                    WHERE file_id = ? AND ip_to_int(ip) BETWEEN ? AND ?
+                    WHERE file_id = ? AND ip_inet(ip) <<= CAST(? AS inet)
                     """);
             ps.setObject(1, fileId);
-            ps.setLong(2, lo);
-            ps.setLong(3, hi);
+            ps.setString(2, cidr);
             return ps;
           },
           (rs, i) -> rs.getString("ip"));
@@ -313,7 +296,7 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
     }
   }
 
-  private List<String> dominantDeviceTypes(UUID fileId, long lo, long hi) {
+  private List<String> dominantDeviceTypes(UUID fileId, String cidr) {
     try {
       return jdbc.query(
           con -> {
@@ -321,14 +304,13 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
                 con.prepareStatement(
                     """
                     SELECT device_type FROM host_classifications
-                    WHERE file_id = ? AND ip_to_int(ip) BETWEEN ? AND ?
+                    WHERE file_id = ? AND ip_inet(ip) <<= CAST(? AS inet)
                       AND device_type IS NOT NULL
                     GROUP BY device_type ORDER BY COUNT(*) DESC LIMIT ?
                     """);
             ps.setObject(1, fileId);
-            ps.setLong(2, lo);
-            ps.setLong(3, hi);
-            ps.setInt(4, TOP_DEVICE_TYPES);
+            ps.setString(2, cidr);
+            ps.setInt(3, TOP_DEVICE_TYPES);
             return ps;
           },
           (rs, i) -> rs.getString("device_type"));
@@ -338,7 +320,7 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
     }
   }
 
-  private List<String> dominantProtocols(UUID fileId, long lo, long hi) {
+  private List<String> dominantProtocols(UUID fileId, String cidr) {
     try {
       return jdbc
           .query(
@@ -348,16 +330,14 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
                         """
                         SELECT tshark_protocol FROM conversations
                         WHERE file_id = ?
-                          AND (ip_to_int(src_ip) BETWEEN ? AND ? OR ip_to_int(dst_ip) BETWEEN ? AND ?)
+                          AND (ip_inet(src_ip) <<= CAST(? AS inet) OR ip_inet(dst_ip) <<= CAST(? AS inet))
                           AND tshark_protocol IS NOT NULL
                         GROUP BY tshark_protocol ORDER BY COUNT(*) DESC LIMIT ?
                         """);
                 ps.setObject(1, fileId);
-                ps.setLong(2, lo);
-                ps.setLong(3, hi);
-                ps.setLong(4, lo);
-                ps.setLong(5, hi);
-                ps.setInt(6, TOP_PROTOCOLS);
+                ps.setString(2, cidr);
+                ps.setString(3, cidr);
+                ps.setInt(4, TOP_PROTOCOLS);
                 return ps;
               },
               (rs, i) -> rs.getString("tshark_protocol"))

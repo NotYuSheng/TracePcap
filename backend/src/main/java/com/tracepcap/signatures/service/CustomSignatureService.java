@@ -1,12 +1,11 @@
 package com.tracepcap.signatures.service;
 
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.analysis.service.PcapParserService;
 import com.tracepcap.analysis.spi.PacketLookup;
 import com.tracepcap.analysis.spi.SignatureApplier;
 import com.tracepcap.signatures.entity.DetectionRuleEntity;
 import com.tracepcap.signatures.repository.DetectionRuleRepository;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -237,7 +236,7 @@ public class CustomSignatureService implements SignatureApplier {
     }
     if (match.containsKey("cidr")) {
       String cidr = String.valueOf(match.get("cidr"));
-      return both.stream().filter(x -> inCidr(x, cidr)).toList();
+      return both.stream().filter(x -> CidrBlock.contains(cidr, x)).toList();
     }
     if (match.containsKey("dstPort") && conv.getDstIp() != null) return List.of(conv.getDstIp());
     if (match.containsKey("srcPort") && conv.getSrcIp() != null) return List.of(conv.getSrcIp());
@@ -275,7 +274,7 @@ public class CustomSignatureService implements SignatureApplier {
     // cidr — CIDR range match against srcIp OR dstIp
     if (match.containsKey("cidr")) {
       String cidr = String.valueOf(match.get("cidr"));
-      if (!inCidr(conv.getSrcIp(), cidr) && !inCidr(conv.getDstIp(), cidr)) return false;
+      if (!CidrBlock.contains(cidr, conv.getSrcIp()) && !CidrBlock.contains(cidr, conv.getDstIp())) return false;
     }
 
     // srcPort — exact match
@@ -321,40 +320,6 @@ public class CustomSignatureService implements SignatureApplier {
     }
 
     return true;
-  }
-
-  /** Returns true if {@code ip} falls within the given CIDR range. */
-  private boolean inCidr(String ip, String cidr) {
-    if (ip == null || cidr == null) return false;
-    try {
-      String[] parts = cidr.split("/");
-      if (parts.length != 2) return false;
-      int prefixLen = Integer.parseInt(parts[1]);
-
-      InetAddress network = InetAddress.getByName(parts[0]);
-      InetAddress address = InetAddress.getByName(ip);
-
-      // Must be the same address family
-      byte[] netBytes = network.getAddress();
-      byte[] addrBytes = address.getAddress();
-      if (netBytes.length != addrBytes.length) return false;
-
-      // Compare the first prefixLen bits
-      int fullBytes = prefixLen / 8;
-      int remainingBits = prefixLen % 8;
-
-      for (int i = 0; i < fullBytes; i++) {
-        if (netBytes[i] != addrBytes[i]) return false;
-      }
-      if (remainingBits > 0 && fullBytes < netBytes.length) {
-        int mask = 0xFF & (0xFF << (8 - remainingBits));
-        if ((netBytes[fullBytes] & mask) != (addrBytes[fullBytes] & mask)) return false;
-      }
-      return true;
-    } catch (UnknownHostException | NumberFormatException e) {
-      log.warn("Invalid CIDR '{}': {}", cidr, e.getMessage());
-      return false;
-    }
   }
 
   /**
