@@ -40,6 +40,8 @@ class NdpOwnershipRealCaptureTest {
     // Without NDP claims its MAC fronted three unclaimed IPs, read as a router, and no address got it.
     for (String ip : new String[] {"fe80::10", "fd00::10", "fd00::5eed:10"}) {
       assertThat(result.getHostMacs()).as(ip).containsEntry(ip, "aa:aa:aa:00:00:10");
+    }
+    for (String ip : new String[] {"fd00::10", "fd00::5eed:10"}) {
       assertThat(result.getHostMacObservations().get(ip)).as(ip).containsExactly("aa:aa:aa:00:00:10");
     }
   }
@@ -54,5 +56,18 @@ class NdpOwnershipRealCaptureTest {
   @Test
   void aDuplicateAddressProbeOrAProxyAnswerOwnsNothing() {
     assertThat(result.getHostMacObservations()).doesNotContainKeys("::", "fd00::77", "fd00::88");
+  }
+
+  @Test
+  void aLinkLocalAddressRepeatsPerLink_soItIsNeverAConflict() {
+    // Two VLANs' gateways both advertise from fe80::1, with their own MACs.
+    assertThat(result.getHostMacObservations()).doesNotContainKeys("fe80::1", "fe80::10");
+    assertThat(result.getArpClaimWindows()).doesNotContainKeys("fe80::1", "fe80::10");
+  }
+
+  @Test
+  void anIcmpv6ErrorQuotingAnNsClaimsNothingForItsSender() {
+    // fd00::1's Parameter Problem quotes the laptop's NS; the quoted option names the laptop's MAC.
+    assertThat(result.getHostMacObservations()).doesNotContainKey("fd00::1");
   }
 }

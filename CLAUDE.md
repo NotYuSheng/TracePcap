@@ -29,7 +29,7 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | A CIDR typed into settings | `common/net/Cidr.normalise` (bare IP → /32, host bits zeroed, literals only) | — (the backend validates) |
 | Is this address inside a CIDR (IPv4 and IPv6) | `common/net/CidrBlock.contains`; in SQL `ip_inet(col) <<= CAST(? AS inet)` | `ipInCidr` in `utils/ipClassification.ts` |
 | Reading, writing, sorting an address | `Cidr.addressBytes` / `Cidr.formatAddress` (RFC 5952) | `parseIp` / `formatIp` / `networkOf` / `compareIps` in `utils/ipClassification.ts` |
-| A packet's addresses from tshark (IPv4 and IPv6) | `common/net/TsharkFields` (`command`/`withIpv6` + `fold`): never `ip.src` alone | — |
+| Reading tshark fields: a packet's addresses (IPv4 and IPv6), booleans | `common/net/TsharkFields`: `command`/`withIpv6` + `fold`, never `ip.src` alone; `isTrue`, never `"1".equals` (tshark 4 writes `True`) | — |
 | MAC addresses | `common/net/MacAddress` | — |
 | Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |
 | Severity colours | — | `utils/severityColors.ts` |

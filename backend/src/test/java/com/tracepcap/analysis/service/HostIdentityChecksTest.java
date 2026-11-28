@@ -55,6 +55,10 @@ class HostIdentityChecksTest {
     assertThat(carp.getAddressKind()).isEqualTo("VIRTUAL_FAILOVER");
     assertThat(plain.getAddressKind()).isNull();
     assertThat(FailoverAddressResolverService.virtualRouterProtocol("00:00:0c:9f:f1:23")).isEqualTo("HSRP");
+    // IPv6 groups have their own virtual MACs (#1357).
+    assertThat(FailoverAddressResolverService.virtualRouterProtocol("00:00:5e:00:02:0a")).isEqualTo("VRRP/CARP");
+    assertThat(FailoverAddressResolverService.virtualRouterProtocol("00:05:73:a0:00:01")).isEqualTo("HSRP");
+    assertThat(FailoverAddressResolverService.virtualRouterProtocol("00:00:5e:00:03:0a")).isNull();
   }
 
   @Test

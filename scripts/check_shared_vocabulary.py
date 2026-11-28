@@ -107,6 +107,17 @@ RULES = [
     },
 ]
 
+RULES.append({
+    "name": "tshark boolean read as \"1\"",
+    "why": "tshark 3.x writes booleans as 1/0 and 4.x as True/False: comparing a field with \"1\""
+    " read every TCP flag as unset on a newer tshark (#1357)",
+    "owner": "backend common/net/TsharkFields.isTrue",
+    # A tshark row cell compared with "1": "1".equals(f[...]) or f[...].equals("1").
+    "pattern": re.compile(r"""["']1["']\.equals\(\s*f\[|\bf\[[^\]]+\]\.equals\(\s*["']1["']"""),
+    "owners": {"backend/src/main/java/com/tracepcap/common/net/TsharkFields.java"},
+    "exempt": set(),
+})
+
 SCAN_DIRS = ["backend/src/main/java", "frontend/src"]
 SCAN_SUFFIXES = {".java", ".ts", ".tsx"}
 

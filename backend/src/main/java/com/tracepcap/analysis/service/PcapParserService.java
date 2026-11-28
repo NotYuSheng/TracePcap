@@ -1,9 +1,10 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.common.net.TsharkFields;
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.common.TsharkHexUtil;
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.TsharkFields;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -62,6 +63,8 @@ public class PcapParserService {
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
     // When each ARP claim (ip, mac) was first and last seen (#918 item 3): [first, last].
     Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
+    // IPv6 link-local NDP claims (#1357): they attribute a MAC, but aren't conflicts (see ndClaim).
+    Map<String, LinkedHashSet<String>> linkLocalClaims = new HashMap<>();
     Map<String, Map<String, TtlWindow>> hostTtlWindows = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
@@ -138,6 +141,8 @@ public class PcapParserService {
             "tcp.flags.reset",
             // IPv6 Neighbor Discovery: who owns an IPv6 address, as ARP says it for IPv4 (#1357).
             "-e",
+            "icmpv6.type",
+            "-e",
             "icmpv6.nd.na.target_address",
             "-e",
             "icmpv6.nd.na.flag.o",
@@ -211,9 +216,9 @@ public class PcapParserService {
           //
           // Tail layout, from the end: tcp.payload, udp.payload, ip.ttl, eth.src,
           // arp.src.proto_ipv4, arp.dst.proto_ipv4, eth.dst, arp.src.hw_mac, frame.number,
-          // tcp.flags.syn, tcp.flags.ack, tcp.flags.reset, icmpv6.nd.na.target_address,
+          // tcp.flags.syn, tcp.flags.ack, tcp.flags.reset, icmpv6.type, icmpv6.nd.na.target_address,
           // icmpv6.nd.na.flag.o, icmpv6.opt.src_linkaddr, icmpv6.opt.target_linkaddr.
-          final int TAIL = 16; // structured fields emitted after _ws.col.Info
+          final int TAIL = 17; // structured fields emitted after _ws.col.Info
           final int n = f.length;
           // 11 head fields + Info (>=1 column) + TAIL fields. A shorter row is malformed/truncated;
           // treat its post-Info fields as absent rather than risk reading a head field as a tail one.
@@ -238,37 +243,42 @@ public class PcapParserService {
             info = f[11];
           }
 
-          String tcpPayloadField = aligned ? f[n - 16] : "";
-          String udpPayloadField = aligned ? f[n - 15] : "";
+          String tcpPayloadField = aligned ? f[n - 17] : "";
+          String udpPayloadField = aligned ? f[n - 16] : "";
 
           // First-seen TTL for the source IP — best-effort, may be absent.
           Integer ttl = null;
-          if (aligned && !f[n - 14].isEmpty()) {
+          if (aligned && !f[n - 15].isEmpty()) {
             try {
-              ttl = Integer.parseInt(firstValue(f[n - 14]));
+              ttl = Integer.parseInt(firstValue(f[n - 15]));
             } catch (NumberFormatException ignored) {
             }
           }
-          String srcMac = aligned && !f[n - 13].isEmpty() ? firstValue(f[n - 13]).toLowerCase() : null;
+          String srcMac = aligned && !f[n - 14].isEmpty() ? firstValue(f[n - 14]).toLowerCase() : null;
 
           // Layer-2 address fallback for non-IP protocols (ARP, STP, LLDP, CDP, etc.).
           // For ARP: use the embedded protocol (IP) addresses from the ARP payload.
           // For other pure L2 frames: use Ethernet MAC addresses as node identifiers.
-          String arpSrcIp = aligned && !f[n - 12].isEmpty() ? firstValue(f[n - 12]) : null;
-          String arpDstIp = aligned && !f[n - 11].isEmpty() ? firstValue(f[n - 11]) : null;
-          String dstMac = aligned && !f[n - 10].isEmpty() ? firstValue(f[n - 10]).toLowerCase() : null;
+          String arpSrcIp = aligned && !f[n - 13].isEmpty() ? firstValue(f[n - 13]) : null;
+          String arpDstIp = aligned && !f[n - 12].isEmpty() ? firstValue(f[n - 12]) : null;
+          String dstMac = aligned && !f[n - 11].isEmpty() ? firstValue(f[n - 11]).toLowerCase() : null;
           // ARP sender hardware address — the "I own this IP at this MAC" claim.
-          String arpSrcMac = aligned && !f[n - 9].isEmpty() ? firstValue(f[n - 9]).toLowerCase() : null;
+          String arpSrcMac = aligned && !f[n - 10].isEmpty() ? firstValue(f[n - 10]).toLowerCase() : null;
           // Belt-and-suspenders: these embedded IPs can become a node id and persist to a
           // varchar(45) column (e.g. ip_mac_observations.ip), so cap them like srcIp/dstIp above.
           if (arpSrcIp != null && arpSrcIp.length() > 45) arpSrcIp = arpSrcIp.substring(0, 45);
           if (arpDstIp != null && arpDstIp.length() > 45) arpDstIp = arpDstIp.substring(0, 45);
           // IPv6 Neighbor Discovery (#1357), read before srcIp falls back to a MAC below.
+          // The outer ICMPv6 message's type: an ICMPv6 error quotes the packet it answers, and tshark
+          // dissects the quoted NDP options too, which belong to the quoted sender, not this one.
+          String ndType = aligned ? firstValue(f[n - 5]) : null;
+          boolean ndSolicitOrAdvert = "133".equals(ndType) || "134".equals(ndType) || "135".equals(ndType);
+          boolean ndNeighborAdvert = "136".equals(ndType);
           String ndTarget = aligned && !f[n - 4].isEmpty() ? firstValue(f[n - 4]) : null;
           boolean ndOverride = aligned && TsharkFields.isTrue(f[n - 3]);
           String ndSrcMac = aligned && !f[n - 2].isEmpty() ? firstValue(f[n - 2]).toLowerCase() : null;
           String ndTargetMac = aligned && !f[n - 1].isEmpty() ? firstValue(f[n - 1]).toLowerCase() : null;
-          String ndSrcIp = srcIp;
+          String ndSrcIp = srcIp != null && srcIp.indexOf(':') >= 0 ? srcIp : null; // IPv6 only
           if (srcIp == null) srcIp = (arpSrcIp != null) ? arpSrcIp : srcMac;
           if (dstIp == null) dstIp = (arpDstIp != null) ? arpDstIp : dstMac;
 
@@ -320,12 +330,14 @@ public class PcapParserService {
           //    Not from :: (a duplicate-address probe owns nothing yet).
           //  - An NA's target link-layer address with the override flag set: "the target is at this
           //    MAC". Override clear is a proxy or anycast answer, not ownership.
-          if (ndSrcMac != null && ndSrcIp != null && ndSrcIp.indexOf(':') >= 0
-              && !com.tracepcap.common.net.IpLocality.isUnspecified(ndSrcIp)) {
-            recordClaim(hostMacObservations, arpClaimWindows, ndSrcIp, ndSrcMac, timestamp);
+          //  - A link-local address (fe80::/10) is unique on its link only: two VLANs' gateways both
+          //    at fe80::1 on a trunk capture are not a conflict. It gives its host a MAC but is not
+          //    a conflict claim (linkLocalClaims, not hostMacObservations).
+          if (ndSolicitOrAdvert && ndSrcMac != null && ndSrcIp != null && !IpLocality.isUnspecified(ndSrcIp)) {
+            ndClaim(ndSrcIp, ndSrcMac, timestamp, hostMacObservations, arpClaimWindows, linkLocalClaims);
           }
-          if (ndTarget != null && ndTargetMac != null && ndOverride && ndTarget.length() <= 45) {
-            recordClaim(hostMacObservations, arpClaimWindows, ndTarget, ndTargetMac, timestamp);
+          if (ndNeighborAdvert && ndOverride && ndTarget != null && ndTargetMac != null && ndTarget.length() <= 45) {
+            ndClaim(ndTarget, ndTargetMac, timestamp, hostMacObservations, arpClaimWindows, linkLocalClaims);
           }
 
           // Track conversations for IP traffic
@@ -417,12 +429,11 @@ public class PcapParserService {
             // Absent for UDP/ICMP/ARP, and for TCP flows the capture joined mid-stream. That stays
             // null. Falling back to "lower port wins" is exactly the guess this replaces — a server
             // on :4434 is a server, whatever its port number says.
-            // SYN without ACK — the two trailing fields, read from the end for the same reason
-            // frame.number is (an Info-column '|' must not shift them). Guarded on length so a row
-            // that somehow lacks the flag columns skips this rather than indexing out of bounds.
-            boolean syn = f.length >= 8 && TsharkFields.isTrue(f[f.length - 7]);
-            boolean ack = f.length >= 8 && TsharkFields.isTrue(f[f.length - 6]);
-            boolean rst = f.length >= 8 && TsharkFields.isTrue(f[f.length - 5]);
+            // SYN without ACK: tcp.flags.syn / .ack / .reset, read from the end of the row (see the tail
+            // layout above) so an Info-column '|' can't shift them. Only on an aligned row.
+            boolean syn = aligned && TsharkFields.isTrue(f[n - 8]);
+            boolean ack = aligned && TsharkFields.isTrue(f[n - 7]);
+            boolean rst = aligned && TsharkFields.isTrue(f[n - 6]);
             if (conv.getInitiatorIp() == null && syn && !ack) {
               conv.setInitiatorIp(fSrcIp);
               conv.setInitiatorPort(fSrcPort);
@@ -440,12 +451,11 @@ public class PcapParserService {
               tsharkPayload = udpPayloadField; // udp.payload
             }
             String payloadHex = TsharkHexUtil.toHex(tsharkPayload, PacketEntity.PAYLOAD_BYTE_LIMIT);
-            // The three trailing fields, in order, are frame.number, tcp.flags.syn, tcp.flags.ack.
-            // Read them from the END, not by fixed index: a '|' inside an earlier column (Info) would
-            // shift every fixed index, and appending syn/ack already moved frame.number off the last
-            // slot once — reading from the tail is what keeps that from silently corrupting data.
+            // frame.number, read from the END (see the tail layout above), not by fixed index: a '|'
+            // inside Info would shift every fixed index, and each field appended to the tail moves it
+            // further from the last slot. Only on an aligned row.
             long frameNumber = packetNumber;
-            String rawFrame = f.length >= 8 ? f[f.length - 8] : null;
+            String rawFrame = aligned ? f[n - 9] : null;
             if (rawFrame != null && !rawFrame.isEmpty()) {
               try {
                 frameNumber = Long.parseLong(rawFrame.trim());
@@ -498,7 +508,9 @@ public class PcapParserService {
     result.setConversations(new ArrayList<>(conversationMap.values()));
     result.setHostTtls(hostTtls);
     result.setHostTtlObservations(hostTtlObservations);
-    result.setHostMacs(attributeMacs(ethMacsByIp, hostMacObservations));
+    Map<String, LinkedHashSet<String>> claims = new HashMap<>(hostMacObservations);
+    linkLocalClaims.forEach((ip, macs) -> claims.computeIfAbsent(ip, k -> new LinkedHashSet<>()).addAll(macs));
+    result.setHostMacs(attributeMacs(ethMacsByIp, claims));
     result.setHostMacObservations(hostMacObservations);
     result.setArpClaimWindows(arpClaimWindows);
     result.setHostTtlWindows(hostTtlWindows);
@@ -545,23 +557,6 @@ public class PcapParserService {
   static final int ROUTER_MAC_MIN_IPS = 3;
 
   /**
-   * One MAC per source IP, for classification and the host's MAC field (#918).
-   *
-   * <p>Until #918 this was simply the first {@code eth.src} seen for the IP. For an off-subnet host
-   * that's the gateway's MAC, because routed frames carry the router's address. On a real 635-host
-   * capture, 149 internet hosts were all recorded with one router's MAC (and its manufacturer,
-   * which also fed the device classifier). Now:
-   *
-   * <ol>
-   *   <li>A MAC that claimed the IP by ARP wins. ARP is the "this address is mine" statement, the
-   *       same source #461/#467 use.
-   *   <li>Otherwise the first {@code eth.src}, unless that MAC is a router: the source for
-   *       {@link #ROUTER_MAC_MIN_IPS} or more IPs it never claimed by ARP.
-   *   <li>Otherwise no MAC. An off-subnet host's real MAC isn't in the capture, and leaving it
-   *       empty is honest, where the router's MAC was wrong.
-   * </ol>
-   */
-  /**
    * An "IP is at MAC" claim, from ARP or IPv6 Neighbor Discovery: the MAC that owns the address,
    * and when the claim was first and last made (#918 item 3). Two MACs claiming one address on one
    * segment is a conflict (#461).
@@ -581,6 +576,41 @@ public class PcapParserService {
     if (at.isAfter(w[1])) w[1] = at;
   }
 
+  /**
+   * An NDP claim (#1357): a global or unique-local address is owned like an ARP-claimed one; a
+   * link-local one only attributes its MAC, since fe80::/10 repeats on every link.
+   */
+  private static void ndClaim(
+      String ip,
+      String mac,
+      LocalDateTime at,
+      Map<String, LinkedHashSet<String>> observations,
+      Map<String, Map<String, LocalDateTime[]>> windows,
+      Map<String, LinkedHashSet<String>> linkLocal) {
+    if (CidrBlock.contains("fe80::/10", ip)) {
+      linkLocal.computeIfAbsent(ip, k -> new LinkedHashSet<>()).add(mac);
+    } else {
+      recordClaim(observations, windows, ip, mac, at);
+    }
+  }
+
+  /**
+   * One MAC per source IP, for classification and the host's MAC field (#918).
+   *
+   * <p>Until #918 this was simply the first {@code eth.src} seen for the IP. For an off-subnet host
+   * that's the gateway's MAC, because routed frames carry the router's address. On a real 635-host
+   * capture, 149 internet hosts were all recorded with one router's MAC (and its manufacturer,
+   * which also fed the device classifier). Now:
+   *
+   * <ol>
+   *   <li>A MAC that claimed the IP by ARP wins. ARP is the "this address is mine" statement, the
+   *       same source #461/#467 use.
+   *   <li>Otherwise the first {@code eth.src}, unless that MAC is a router: the source for
+   *       {@link #ROUTER_MAC_MIN_IPS} or more IPs it never claimed by ARP.
+   *   <li>Otherwise no MAC. An off-subnet host's real MAC isn't in the capture, and leaving it
+   *       empty is honest, where the router's MAC was wrong.
+   * </ol>
+   */
   static Map<String, String> attributeMacs(
       Map<String, LinkedHashSet<String>> ethMacsByIp, Map<String, LinkedHashSet<String>> arpMacsByIp) {
     Map<String, Integer> unclaimedIpsByMac = new HashMap<>();

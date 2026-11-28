@@ -5,7 +5,12 @@
 #   fronts three unclaimed IPs, which reads as a router and leaves the laptop with no MAC at all.
 # - fd00::99 is claimed by two MACs (a same-segment conflict, as two ARP claims would be).
 # - A duplicate-address probe (from ::) and a proxy NA (override flag clear) are not ownership.
-from scapy.all import Ether, IPv6, UDP, wrpcap
+# - Two VLANs' gateways both at fe80::1 (a trunk capture): link-local repeats per link, so it is not
+#   a conflict.
+# - An ICMPv6 error from fd00::1 quoting the laptop's NS: the quoted option is the laptop's, not
+#   fd00::1's.
+from scapy.all import Ether, Dot1Q, IPv6, UDP, wrpcap
+from scapy.layers.inet6 import ICMPv6ND_RA, ICMPv6ParamProblem
 from scapy.layers.inet6 import ICMPv6ND_NS, ICMPv6ND_NA, ICMPv6NDOptSrcLLAddr, ICMPv6NDOptDstLLAddr
 import sys
 T0 = 1730000000.0
@@ -27,5 +32,11 @@ for t, mac in [(10, 'cc:cc:cc:00:00:01'), (11, 'cc:cc:cc:00:00:02')]:
 at(Ether(src='dd:dd:dd:00:00:01', dst='33:33:ff:00:00:77')/IPv6(src='::', dst='ff02::1:ff00:77', hlim=255)/ICMPv6ND_NS(tgt='fd00::77'), 20)
 # proxy NA (override clear): a router answering for fd00::88, not owning it
 at(Ether(src=GW, dst=LAPTOP)/IPv6(src='fe80::1', dst='fe80::10', hlim=255)/ICMPv6ND_NA(tgt='fd00::88', R=1, S=1, O=0)/ICMPv6NDOptDstLLAddr(lladdr=GW), 21)
+# two VLANs' gateways, both fe80::1
+for t, vlan, mac in [(30, 10, 'ee:ee:ee:00:00:0a'), (31, 20, 'ee:ee:ee:00:00:14')]:
+    at(Ether(src=mac, dst='33:33:00:00:00:01')/Dot1Q(vlan=vlan)/IPv6(src='fe80::1', dst='ff02::1', hlim=255)/ICMPv6ND_RA()/ICMPv6NDOptSrcLLAddr(lladdr=mac), t)
+# an ICMPv6 error quoting the laptop's NS (its option says LAPTOP; fd00::1 is not at LAPTOP)
+quoted = IPv6(src='fd00::10', dst='ff02::1:ff00:1', hlim=255)/ICMPv6ND_NS(tgt='fd00::1')/ICMPv6NDOptSrcLLAddr(lladdr=LAPTOP)
+at(Ether(src=GW, dst=LAPTOP)/IPv6(src='fd00::1', dst='fd00::10')/ICMPv6ParamProblem(code=0, ptr=6)/quoted, 40)
 pk.sort(key=lambda p: p.time)
 wrpcap(sys.argv[1], pk)
