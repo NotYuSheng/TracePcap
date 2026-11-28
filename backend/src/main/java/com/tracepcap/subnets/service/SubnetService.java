@@ -275,7 +275,54 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
             .distinct()
             .collect(Collectors.toList());
 
-    return splitBySegment(selectCandidates(ipInts, 1, 1), segmentLookup.segments(fileId), 1, 1);
+    List<SubnetDefinitionDto> out =
+        new ArrayList<>(splitBySegment(selectCandidates(ipInts, 1, 1), segmentLookup.segments(fileId), 1, 1));
+    out.addAll(ipv6Candidates(hostClassificationLookup.hostFacts(fileId), locality, 1, 1));
+    return out;
+  }
+
+  /** The prefix an IPv6 LAN uses: SLAAC needs a /64, so an IPv6 subnet is one by convention. */
+  static final int IPV6_LAN_PREFIX = 64;
+
+  /**
+   * IPv6 candidates (#1357): each local /64 the hosts are on, with at least {@link
+   * #MIN_HOSTS_PER_SUBNET} machines in it. The IPv4 search below scores density, which means
+   * nothing for IPv6 (a /64 holds 2^64 addresses), so this proposes the /64s seen, with no density.
+   * Machines are counted by MAC where one is known: an IPv6 host has several addresses (SLAAC and
+   * temporary ones) on one MAC. Link-local (fe80::/10) is the same /64 on every link, never a
+   * subnet. "Local" is the locality policy, so an organisation's global prefix counts once it's a
+   * custom internal range, as a public IPv4 range does.
+   */
+  static List<SubnetDefinitionDto> ipv6Candidates(
+      List<com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts> hosts,
+      LocalityRules locality,
+      int snapshotsSeen,
+      int totalSnapshots) {
+    Map<String, java.util.Set<String>> machinesByNet = new java.util.TreeMap<>();
+    for (var h : hosts) {
+      String ip = h.ip();
+      if (ip == null || ip.indexOf(':') < 0 || !locality.isLocal(ip)) continue;
+      byte[] b = Cidr.addressBytes(ip);
+      if (b == null || b.length != 16 || CidrBlock.contains("fe80::/10", b)) continue;
+      String net = CidrBlock.parse(ip + "/" + IPV6_LAN_PREFIX).map(CidrBlock::toString).orElse(null);
+      if (net == null) continue;
+      machinesByNet.computeIfAbsent(net, k -> new java.util.LinkedHashSet<>())
+          .add(h.mac() != null && !h.mac().isBlank() ? h.mac().toLowerCase() : ip);
+    }
+    List<SubnetDefinitionDto> out = new ArrayList<>();
+    machinesByNet.forEach((net, machines) -> {
+      if (machines.size() < MIN_HOSTS_PER_SUBNET) return;
+      out.add(
+          SubnetDefinitionDto.builder()
+              .cidr(net)
+              .source("AUTO")
+              .confirmed(false)
+              .hostCount(machines.size())
+              .snapshotsSeen(snapshotsSeen)
+              .totalSnapshots(totalSnapshots)
+              .build());
+    });
+    return out;
   }
 
   /**
@@ -371,7 +418,13 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
             .collect(Collectors.toList());
 
     List<SubnetDefinitionDto> base =
-        splitBySegment(selectCandidates(allIps, 1, 1), new ArrayList<>(segmentsByKey.values()), 1, 1);
+        new ArrayList<>(
+            splitBySegment(selectCandidates(allIps, 1, 1), new ArrayList<>(segmentsByKey.values()), 1, 1));
+    // IPv6 /64s on the union of every snapshot's hosts (#1357).
+    base.addAll(
+        ipv6Candidates(
+            fileIds.stream().flatMap(fid -> hostClassificationLookup.hostFacts(fid).stream()).toList(),
+            locality, 1, 1));
 
     // Merge consistency scores in
     List<SubnetDefinitionDto> result = new ArrayList<>();
