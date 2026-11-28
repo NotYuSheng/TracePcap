@@ -571,11 +571,9 @@ public class HostOccupancyService {
   }
 
   private Set<String> virtualIps(UUID fileId) {
-    Set<String> out = new HashSet<>();
-    for (HostClassificationEntity h : hostClassifications.findByFileId(fileId)) {
-      if (HostIdentityChecks.VIRTUAL_FAILOVER.equals(h.getAddressKind())) out.add(h.getIp());
-    }
-    return out;
+    // The addresses alone: loading every host to test one column held a scan capture's 200k (#1377).
+    return new HashSet<>(
+        hostClassifications.findIpsByAddressKind(fileId, HostIdentityChecks.VIRTUAL_FAILOVER));
   }
 
   private List<LocalDateTime[]> conversationTimes(UUID fileId, String ip) {

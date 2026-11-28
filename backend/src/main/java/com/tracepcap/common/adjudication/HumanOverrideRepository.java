@@ -11,6 +11,9 @@ public interface HumanOverrideRepository extends JpaRepository<HumanOverrideEnti
   /** Every override for one question in one file — an adjudicator loads this to apply precedence. */
   List<HumanOverrideEntity> findByQuestionAndFileId(String question, UUID fileId);
 
+  /** The same, oldest first: where two overrides share an entity, the same one is picked each time. */
+  List<HumanOverrideEntity> findByQuestionAndFileIdOrderByIdAsc(String question, UUID fileId);
+
   /** The override for one entity, if a human has answered this question about it. */
   Optional<HumanOverrideEntity> findByQuestionAndFileIdAndEntityKey(
       String question, UUID fileId, String entityKey);

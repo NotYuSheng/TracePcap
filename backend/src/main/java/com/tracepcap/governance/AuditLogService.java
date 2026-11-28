@@ -33,11 +33,12 @@ public class AuditLogService {
    * Records a change by the current caller. {@code before} and {@code after} are any
    * JSON-serialisable values (usually the DTO); null means "didn't exist" or "removed".
    */
+  /** Returns the row written, for a caller writing many that lets them go as it goes. */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void record(String action, String targetType, String targetId, Object before, Object after) {
+  public Object record(String action, String targetType, String targetId, Object before, Object after) {
     // This request now has its own, richer entry: the automatic one would only repeat it.
     AuditContext.markRecorded();
-    repository.save(
+    return repository.save(
         AuditLogEntity.builder()
             .at(LocalDateTime.now())
             .actor(currentActor.username())
