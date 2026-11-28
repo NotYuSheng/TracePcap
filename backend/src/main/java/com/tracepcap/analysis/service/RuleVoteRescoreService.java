@@ -59,46 +59,68 @@ public class RuleVoteRescoreService implements RuleVoteRescorer {
   private final AuditLogService auditLog;
   private final ApplicationEventPublisher events;
 
+  /** Null in unit tests built without a session. */
+  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public Outcome rescore(UUID fileId, Map<String, List<ClassificationHint>> votes, String actor) {
     List<Change> changes = new ArrayList<>();
-    int stale = 0;
-    boolean anyVotesChanged = false;
-    for (HostClassificationEntity host : hosts.findByFileId(fileId)) {
-      // A failover address's type comes from the protocol, not the vote.
-      if (HostIdentityChecks.VIRTUAL_FAILOVER.equals(host.getAddressKind())) continue;
-      Map<String, String> before = ruleNames(host.getRuleVotes());
-      String fromType = host.getDeviceType();
-      var verdict = host.getTypeScores() == null
-          ? java.util.Optional.<HostClassifier.Verdict>empty()
-          : classifier.rescoreRuleVotes(boardOf(host), votes.getOrDefault(host.getIp(), List.of()));
-      if (verdict.isEmpty()) continue;
-      apply(host, verdict.get());
-      Rescore r = new Rescore(true, fromType, verdict.get().deviceType());
-      anyVotesChanged = true;
-      if (r.typeChanged()) {
-        List<String> rules = changedRules(before, ruleNames(host.getRuleVotes()));
-        host.setRescoredAt(LocalDateTime.now());
-        host.setRescoredFrom(r.fromType());
-        host.setRescoredBy(actor);
-        host.setRescoredRules(String.join(", ", rules));
-        changes.add(new Change(fileId, host.getIp(), r.fromType(), r.toType(), rules));
-        Map<String, Object> was = new LinkedHashMap<>();
-        was.put("deviceType", r.fromType());
-        Map<String, Object> now = new LinkedHashMap<>();
-        now.put("deviceType", r.toType());
-        now.put("rules", rules);
-        auditLog.record("host-classification.rescore", "host-classification", fileId + "/" + host.getIp(), was, now);
-        if (flagLabelIfContradicted(fileId, host.getIp(), r, rules)) stale++;
-      }
-      hosts.save(host);
-    }
+    // A page at a time, each saved and let go before the next: the whole file's hosts, three JSON
+    // maps each, in one session was a scan capture's heap (#1377).
+    int[] staleCount = {0};
+    boolean[] votesChanged = {false};
+    // The file's analyst labels, read once: one lookup per re-typed host was 200k queries.
+    Map<String, HumanOverrideEntity> labels = new java.util.HashMap<>();
+    overrides.findByQuestionAndFileId(HOST_IDENTITY, fileId).forEach(o -> labels.putIfAbsent(o.getEntityKey(), o));
+    com.tracepcap.common.db.InPages.forEach(
+        (UUID after, org.springframework.data.domain.Limit limit) -> after == null
+            ? hosts.findByFileIdOrderByIdAsc(fileId, limit)
+            : hosts.findByFileIdAndIdGreaterThanOrderByIdAsc(fileId, after, limit),
+        HostClassificationEntity::getId,
+        host -> {
+          if (rescoreOne(fileId, host, votes, actor, changes, staleCount, labels)) votesChanged[0] = true;
+        },
+        entityManager);
     if (!changes.isEmpty()) events.publishEvent(new HostClassificationsRescoredEvent(fileId));
-    if (anyVotesChanged) {
-      log.info("Re-scored rule votes on {}: {} device type(s) changed, {} label(s) flagged stale", fileId, changes.size(), stale);
+    if (votesChanged[0]) {
+      log.info("Re-scored rule votes on {}: {} device type(s) changed, {} label(s) flagged stale",
+          fileId, changes.size(), staleCount[0]);
     }
-    return new Outcome(changes, stale);
+    return new Outcome(changes, staleCount[0]);
+  }
+
+  /** Re-scores one host; true when its votes changed. Adds a {@link Change} when its type did. */
+  private boolean rescoreOne(UUID fileId, HostClassificationEntity host,
+      Map<String, List<ClassificationHint>> votes, String actor, List<Change> changes, int[] stale,
+      Map<String, HumanOverrideEntity> labels) {
+    // A failover address's type comes from the protocol, not the vote.
+    if (HostIdentityChecks.VIRTUAL_FAILOVER.equals(host.getAddressKind())) return false;
+    Map<String, String> before = ruleNames(host.getRuleVotes());
+    String fromType = host.getDeviceType();
+    var verdict = host.getTypeScores() == null
+        ? java.util.Optional.<HostClassifier.Verdict>empty()
+        : classifier.rescoreRuleVotes(boardOf(host), votes.getOrDefault(host.getIp(), List.of()));
+    if (verdict.isEmpty()) return false;
+    apply(host, verdict.get());
+    Rescore r = new Rescore(true, fromType, verdict.get().deviceType());
+    if (r.typeChanged()) {
+      List<String> rules = changedRules(before, ruleNames(host.getRuleVotes()));
+      host.setRescoredAt(LocalDateTime.now());
+      host.setRescoredFrom(r.fromType());
+      host.setRescoredBy(actor);
+      host.setRescoredRules(String.join(", ", rules));
+      changes.add(new Change(fileId, host.getIp(), r.fromType(), r.toType(), rules));
+      Map<String, Object> was = new LinkedHashMap<>();
+      was.put("deviceType", r.fromType());
+      Map<String, Object> now = new LinkedHashMap<>();
+      now.put("deviceType", r.toType());
+      now.put("rules", rules);
+      auditLog.record("host-classification.rescore", "host-classification", fileId + "/" + host.getIp(), was, now);
+      if (flagLabelIfContradicted(labels.get(host.getIp()), r, rules)) stale[0]++;
+    }
+    hosts.save(host);
+    return true;
   }
 
   /** A host's stored board, as the classifier reads it. */
@@ -146,8 +168,7 @@ public class RuleVoteRescoreService implements RuleVoteRescorer {
    * An analyst's label is never changed; it's flagged stale when the evidence's top answer moved
    * to something the label doesn't say.
    */
-  private boolean flagLabelIfContradicted(UUID fileId, String ip, Rescore r, List<String> rules) {
-    HumanOverrideEntity o = overrides.findByQuestionAndFileIdAndEntityKey(HOST_IDENTITY, fileId, ip).orElse(null);
+  private boolean flagLabelIfContradicted(HumanOverrideEntity o, Rescore r, List<String> rules) {
     if (o == null || labelMatches(o.getLabel(), r.toType())) return false;
     if (o.getStaleSince() == null) o.setStaleSince(LocalDateTime.now());
     List<String> fields = new ArrayList<>(o.getStaleFields() == null ? List.of() : o.getStaleFields());

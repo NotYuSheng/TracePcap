@@ -19,6 +19,13 @@ public interface HostClassificationRepository
   List<HostClassificationEntity> findByFileIdAndIdGreaterThanOrderByIdAsc(
       UUID fileId, UUID after, org.springframework.data.domain.Limit limit);
 
+  /** The addresses of one kind (a failover address, say), without loading the hosts. */
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT h.ip FROM HostClassificationEntity h WHERE h.file.id = :fileId AND h.addressKind = :kind")
+  java.util.Set<String> findIpsByAddressKind(
+      @org.springframework.data.repository.query.Param("fileId") UUID fileId,
+      @org.springframework.data.repository.query.Param("kind") String kind);
+
   List<HostClassificationEntity> findByFileIdAndIpIn(UUID fileId, java.util.Collection<String> ips);
 
   // findFirst + OrderByIdAsc (LIMIT 1, deterministic): a file can hold >1 classification for the

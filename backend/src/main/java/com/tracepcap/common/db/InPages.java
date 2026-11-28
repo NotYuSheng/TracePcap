@@ -76,6 +76,32 @@ public final class InPages {
   }
 
   /**
+   * Every row of a file, a page at a time, for a caller that changes them: each page is flushed and
+   * then let go before the next is read, so a rewrite of 200k hosts holds one page, not the file.
+   * Needs a transaction (the writes must land in it). The rows are detached afterwards, so the
+   * action must not hand one to anything that outlives its page.
+   */
+  public static <E, K> void forEach(
+      BiFunction<K, Limit, List<E>> page, Function<E, K> id, java.util.function.Consumer<E> action,
+      EntityManager entityManager) {
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new IllegalStateException("InPages.forEach writes, so it needs a transaction");
+    }
+    if (entityManager != null) entityManager.flush();
+    K after = null;
+    while (true) {
+      List<E> rows = page.apply(after, Limit.of(SIZE));
+      rows.forEach(action);
+      if (entityManager != null) {
+        entityManager.flush();
+        rows.forEach(entityManager::detach);
+      }
+      if (rows.size() < SIZE) return;
+      after = id.apply(rows.get(rows.size() - 1));
+    }
+  }
+
+  /**
    * Lets rows read only to be mapped leave the session, when one is open: outside a transaction
    * they're already detached. Pending changes are flushed first, so detaching one a caller had
    * modified loses nothing.
