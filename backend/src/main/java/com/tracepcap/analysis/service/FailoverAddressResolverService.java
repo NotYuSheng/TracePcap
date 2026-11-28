@@ -1,6 +1,6 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.common.net.TsharkAddressFields;
+import com.tracepcap.common.net.TsharkFields;
 import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
@@ -54,15 +54,19 @@ public class FailoverAddressResolverService {
   /** A virtual address: which protocol, and the routers seen advertising it (may be empty). */
   public record VirtualAddress(String ip, String protocol, Set<String> members) {}
 
-  private static final Pattern VRRP_MAC = Pattern.compile("(?i)^00:00:5e:00:01:[0-9a-f]{2}$");
+  // VRRP's virtual MAC: 00:00:5e:00:01:{vrid} for IPv4 groups, 00:00:5e:00:02:{vrid} for IPv6 (RFC 5798).
+  private static final Pattern VRRP_MAC = Pattern.compile("(?i)^00:00:5e:00:0[12]:[0-9a-f]{2}$");
   private static final Pattern HSRP1_MAC = Pattern.compile("(?i)^00:00:0c:07:ac:[0-9a-f]{2}$");
   private static final Pattern HSRP2_MAC = Pattern.compile("(?i)^00:00:0c:9f:f[0-9a-f]:[0-9a-f]{2}$");
+  // HSRP for IPv6: 00:05:73:a0:0{group high nibble}:{group low byte}.
+  private static final Pattern HSRP_V6_MAC = Pattern.compile("(?i)^00:05:73:a0:0[0-9a-f]:[0-9a-f]{2}$");
 
   /** The protocol a virtual-router MAC belongs to, or null if it isn't one. */
   public static String virtualRouterProtocol(String mac) {
     if (mac == null) return null;
     if (VRRP_MAC.matcher(mac).matches()) return "VRRP/CARP";
-    if (HSRP1_MAC.matcher(mac).matches() || HSRP2_MAC.matcher(mac).matches()) return "HSRP";
+    if (HSRP1_MAC.matcher(mac).matches() || HSRP2_MAC.matcher(mac).matches()
+        || HSRP_V6_MAC.matcher(mac).matches()) return "HSRP";
     return null;
   }
 
@@ -76,7 +80,7 @@ public class FailoverAddressResolverService {
     Map<String, Set<String>> membersByIp = new LinkedHashMap<>();
     ProcessBuilder pb =
         new ProcessBuilder(
-            TsharkAddressFields.command(
+            TsharkFields.command(
             FIELDS,
             "tshark",
             "-r",
@@ -123,7 +127,7 @@ public class FailoverAddressResolverService {
                     new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    String[] f = TsharkAddressFields.fold(line.split("\\|", -1), FIELDS);
+                    String[] f = TsharkFields.fold(line.split("\\|", -1), FIELDS);
                     if (f.length < FIELDS.length) continue;
                     String src = f[0].split(",")[0].trim();
                     record(f[1], "VRRP", src, protocolByIp, membersByIp);

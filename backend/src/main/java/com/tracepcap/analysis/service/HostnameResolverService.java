@@ -1,6 +1,6 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.common.net.TsharkAddressFields;
+import com.tracepcap.common.net.TsharkFields;
 import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
@@ -81,7 +81,7 @@ public class HostnameResolverService {
     //   11 ntlmssp.auth.hostname
     ProcessBuilder pb =
         new ProcessBuilder(
-            TsharkAddressFields.command(
+            TsharkFields.command(
                 FIELDS,
             "tshark",
             "-r",
@@ -131,7 +131,7 @@ public class HostnameResolverService {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) parseRow(TsharkAddressFields.fold(line.split("\\|", -1), FIELDS), result);
+                    if (!line.isEmpty()) parseRow(TsharkFields.fold(line.split("\\|", -1), FIELDS), result);
                   }
                 } catch (Exception ignored) {
                   // best-effort

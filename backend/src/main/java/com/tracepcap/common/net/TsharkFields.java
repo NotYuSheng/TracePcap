@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Reading a packet's addresses from tshark for IPv4 and IPv6 alike (#1357). tshark writes an IPv4
+ * Reading tshark field output the same way everywhere (#1357): a packet's addresses for IPv4 and
+ * IPv6 alike, and booleans across tshark versions ({@link #isTrue}).
+ *
+ * <p>Addresses: tshark writes an IPv4
  * packet's source in {@code ip.src} and an IPv6 packet's in {@code ipv6.src}, so a pass that asks
  * only for {@code ip.src} silently drops every IPv6 packet.
  *
@@ -16,9 +19,9 @@ import java.util.Map;
  * on purpose: a parser can then still read fields counted from either end, even past a value that
  * contains the separator (a DNS name, a URI).
  */
-public final class TsharkAddressFields {
+public final class TsharkFields {
 
-  private TsharkAddressFields() {}
+  private TsharkFields() {}
 
   private static final Map<String, String> TWIN =
       Map.of("ip.src", "ipv6.src", "ip.dst", "ipv6.dst");
@@ -86,5 +89,18 @@ public final class TsharkAddressFields {
   private static boolean isAddressChar(char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
         || c == ':' || c == '.' || c == '%' || c == '_' || c == '-';
+  }
+
+  /**
+   * Whether a tshark boolean field is set. tshark 3.x writes {@code 1} / {@code 0}, 4.x writes
+   * {@code True} / {@code False}: comparing with {@code "1"} alone reads every flag as unset on a
+   * newer tshark. The first occurrence counts.
+   */
+  public static boolean isTrue(String value) {
+    if (value == null) return false;
+    String v = value.trim();
+    int comma = v.indexOf(',');
+    if (comma >= 0) v = v.substring(0, comma).trim();
+    return v.equals("1") || v.equalsIgnoreCase("true");
   }
 }

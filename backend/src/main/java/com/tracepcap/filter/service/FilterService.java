@@ -1,6 +1,6 @@
 package com.tracepcap.filter.service;
 
-import com.tracepcap.common.net.TsharkAddressFields;
+import com.tracepcap.common.net.TsharkFields;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -329,7 +329,7 @@ public class FilterService {
     // An IPv6 packet carries its addresses in ipv6.*, folded into the ip.* slots (#1357).
     ProcessBuilder pb =
         new ProcessBuilder(
-            TsharkAddressFields.command(
+            TsharkFields.command(
                 PACKET_FIELDS,
             "tshark",
             "-r",
@@ -352,7 +352,7 @@ public class FilterService {
         String line;
         while ((line = reader.readLine()) != null && packetNumber < maxPackets) {
           if (line.isEmpty()) continue;
-          String[] f = TsharkAddressFields.fold(line.split("\\|", -1), PACKET_FIELDS);
+          String[] f = TsharkFields.fold(line.split("\\|", -1), PACKET_FIELDS);
           if (f.length < 10) continue;
 
           packetNumber++;
@@ -400,7 +400,7 @@ public class FilterService {
       List<String> flags = new ArrayList<>();
       String[] flagNames = {"SYN", "ACK", "FIN", "RST", "PSH", "URG"}; // display names only
       for (int i = 0; i < flagNames.length; i++) {
-        if (f.length > 10 + i && "1".equals(f[10 + i])) flags.add(flagNames[i]);
+        if (f.length > 10 + i && TsharkFields.isTrue(f[10 + i])) flags.add(flagNames[i]);
       }
 
       // Payload as printable ASCII (indices 16 = tcp.payload, 17 = udp.payload)
