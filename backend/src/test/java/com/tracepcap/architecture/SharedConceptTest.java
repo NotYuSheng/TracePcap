@@ -94,4 +94,20 @@ class SharedConceptTest {
           .callMethod(
               com.tracepcap.analysis.service.NetworkSegments.class, "of", java.util.List.class, java.util.List.class)
           .because("read a capture's networks with NetworkSegmentReader.of: leases and router adverts (#1357)");
+
+  /**
+   * The geo cache is read by address through {@code findByIps}, which batches: one IN with a scan
+   * capture's 200k addresses ran the analysis out of heap and past Postgres's bind limit (#1374).
+   */
+  @ArchTest
+  static final ArchRule geo_cache_is_read_in_batches =
+      ArchRuleDefinition.noClasses()
+          .that()
+          .doNotHaveFullyQualifiedName("com.tracepcap.analysis.repository.IpGeoInfoRepository")
+          .should()
+          .callMethod(
+              com.tracepcap.analysis.repository.IpGeoInfoRepository.class,
+              "findAllByIpIn",
+              java.util.Collection.class)
+          .because("read the geo cache with findByIps, which batches the IN (#1374)");
 }

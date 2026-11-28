@@ -25,6 +25,24 @@ public class ConversationLookupAdapter implements ConversationLookup {
 
   private final ConversationRepository repository;
 
+  /** Null in unit tests built without a session. */
+  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+
+  /**
+   * Lets rows read only to be mapped to facts leave the session: file extraction asks for every
+   * conversation of a capture inside the analysis transaction, and 200k entities with their
+   * snapshots held until commit was the heap a scan capture ran out of. Pending changes are flushed
+   * first, so detaching one a caller had modified loses nothing.
+   */
+  private void release(List<?> rows) {
+    if (entityManager == null || rows.isEmpty()) return;
+    if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+        && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+      entityManager.flush();
+    }
+    rows.forEach(entityManager::detach);
+  }
+
   @Override
   public List<ConversationFacts> conversationFacts(UUID fileId) {
     return repository.findByFileId(fileId).stream().map(ConversationLookupAdapter::toFacts).toList();
@@ -95,9 +113,12 @@ public class ConversationLookupAdapter implements ConversationLookup {
   @Override
   public List<ConversationFacts> conversationFactsByIds(Collection<UUID> conversationIds) {
     if (conversationIds == null || conversationIds.isEmpty()) return List.of();
-    return com.tracepcap.common.db.InBatches.of(conversationIds, repository::findAllById).stream()
-        .map(ConversationLookupAdapter::toFacts)
-        .toList();
+    return com.tracepcap.common.db.InBatches.of(conversationIds, batch -> {
+      List<com.tracepcap.analysis.entity.ConversationEntity> rows = repository.findAllById(batch);
+      List<ConversationFacts> facts = rows.stream().map(ConversationLookupAdapter::toFacts).toList();
+      release(rows);
+      return facts;
+    });
   }
 
   @Override

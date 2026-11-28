@@ -191,7 +191,7 @@ public class GeoIpService {
         }
         cachedIps.add(entity.getIp());
       }
-      geoInfoRepository.saveAll(toRefresh);
+      geoInfoRepository.upsertAll(toRefresh);
     }
 
     // Look up cache misses

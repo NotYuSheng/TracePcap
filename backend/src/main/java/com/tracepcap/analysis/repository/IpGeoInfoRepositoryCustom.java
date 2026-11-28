@@ -7,7 +7,7 @@ import java.util.Collection;
 public interface IpGeoInfoRepositoryCustom {
 
   /**
-   * Inserts or refreshes these cache entries as one JDBC batch. Upsert, not insert: two analyses can
+   * Inserts or refreshes these cache entries as one JDBC batch, in a transaction of its own. Upsert, not insert: two analyses can
    * look up the same external IP at once, and a plain insert from the second violated the primary
    * key and, being inside the analysis transaction, aborted that whole analysis. Batched, and
    * outside the session: one modifying query per address flushed the session each time, and a
