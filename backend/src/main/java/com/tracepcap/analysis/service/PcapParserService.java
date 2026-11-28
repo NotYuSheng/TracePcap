@@ -2,7 +2,6 @@ package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.common.TsharkHexUtil;
-import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.common.net.TsharkFields;
 import java.io.BufferedReader;
@@ -587,7 +586,7 @@ public class PcapParserService {
       Map<String, LinkedHashSet<String>> observations,
       Map<String, Map<String, LocalDateTime[]>> windows,
       Map<String, LinkedHashSet<String>> linkLocal) {
-    if (CidrBlock.contains("fe80::/10", ip)) {
+    if (IpLocality.isLinkLocal(ip)) {
       linkLocal.computeIfAbsent(ip, k -> new LinkedHashSet<>()).add(mac);
     } else {
       recordClaim(observations, windows, ip, mac, at);

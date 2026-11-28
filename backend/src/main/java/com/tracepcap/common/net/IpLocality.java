@@ -91,6 +91,19 @@ public final class IpLocality {
   }
 
   /**
+   * Link-local: {@code 169.254.0.0/16} or {@code fe80::/10}. Unique on its own link only, so the
+   * same address on two links is two machines, and it never names a subnet (#1357).
+   */
+  public static boolean isLinkLocal(String ip) {
+    return CidrBlock.contains("fe80::/10", ip) || CidrBlock.contains("169.254.0.0/16", ip);
+  }
+
+  /** Loopback: {@code 127.0.0.0/8} or {@code ::1}. Never a machine on the network. */
+  public static boolean isLoopback(String ip) {
+    return CidrBlock.contains("::1/128", ip) || CidrBlock.contains("127.0.0.0/8", ip);
+  }
+
+  /**
    * The unspecified address, {@code 0.0.0.0} or {@code ::}: what a sender with no address yet (a
    * DHCP client) sends from, and what a protocol writes in an address field it leaves empty. A
    * narrower question than {@link #isHostAddress}: broadcast and multicast are specified, they just

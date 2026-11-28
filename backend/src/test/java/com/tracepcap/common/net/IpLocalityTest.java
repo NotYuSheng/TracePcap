@@ -118,4 +118,15 @@ class IpLocalityTest {
     assertThat(IpLocality.isLocal("::ffff:8.8.8.8")).isFalse();
     assertThat(IpLocality.isLocal("fd00::1")).isTrue();
   }
+
+  @Test
+  void linkLocalAndLoopback() {
+    assertThat(IpLocality.isLinkLocal("fe80::1")).isTrue();
+    assertThat(IpLocality.isLinkLocal("febf::1")).isTrue();
+    assertThat(IpLocality.isLinkLocal("169.254.1.1")).isTrue();
+    assertThat(IpLocality.isLinkLocal("fd00::1")).isFalse();
+    assertThat(IpLocality.isLoopback("::1")).isTrue();
+    assertThat(IpLocality.isLoopback("127.0.0.2")).isTrue();
+    assertThat(IpLocality.isLoopback("::2")).isFalse();
+  }
 }

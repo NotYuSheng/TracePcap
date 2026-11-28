@@ -52,4 +52,31 @@ class Ipv6SubnetCandidatesTest {
             host("10.0.0.1", "c1:00:00:00:00:01"), host("10.0.0.2", "c1:00:00:00:00:02"), host("10.0.0.3", "c1:00:00:00:00:03")))
         .isEmpty();
   }
+
+  @Test
+  void anAddressWithNoMacIsNotAMachine() {
+    // One laptop's claimed address plus two unclaimed temporary ones: one machine, not three.
+    assertThat(candidates(
+            host("fd00:0:0:1::10", "aa:00:00:00:00:01"),
+            host("fd00:0:0:1:5eed::1", null),
+            host("fd00:0:0:1:beef::2", " ")))
+        .isEmpty();
+  }
+
+  @Test
+  void loopbackAndMulticastAreNever() {
+    assertThat(candidates(
+            host("::1", "a1:00:00:00:00:01"), host("::1", "a1:00:00:00:00:02"), host("::1", "a1:00:00:00:00:03"),
+            host("ff02::1", "b1:00:00:00:00:01"), host("ff02::2", "b1:00:00:00:00:02"), host("ff02::3", "b1:00:00:00:00:03")))
+        .isEmpty();
+  }
+
+  @Test
+  void macSpellingsOfOneMachineAreOne() {
+    assertThat(candidates(
+            host("fd00:0:0:1::10", "aa:00:00:00:00:01"),
+            host("fd00:0:0:1::11", "AA-00-00-00-00-01"),
+            host("fd00:0:0:1::12", "aa00.0000.0001")))
+        .isEmpty();
+  }
 }
