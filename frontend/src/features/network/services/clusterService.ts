@@ -1,6 +1,6 @@
 import type { GraphNode, GraphEdge, NodeData } from '@/features/network/types';
 import { formatBytes } from '@/utils/formatters';
-import { networkOf } from '@/utils/ipClassification';
+import { networkOf, parseIp } from '@/utils/ipClassification';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,9 +46,9 @@ function buildClusterKeyMap(nodes: GraphNode[]): Map<string, string> {
     if (!ip || isNeverClustered(ip)) continue;
 
     if (ip.includes(':')) {
-      // Read as an address: splitting on colons put fe80::1 and fe80::2 in different groups.
-      const net = networkOf(ip, 64);
-      if (net) keyMap.set(node.id, `cluster:${net}`);
+      // Read as an address: splitting on colons put fe80::1 and fe80::2 in different groups. An
+      // IPv4-mapped address (4 bytes) or text that isn't an address isn't clustered.
+      if (parseIp(ip)?.length === 16) keyMap.set(node.id, `cluster:${networkOf(ip, 64)}`);
       continue;
     }
 

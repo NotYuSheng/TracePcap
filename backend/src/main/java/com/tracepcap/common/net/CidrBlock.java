@@ -30,13 +30,15 @@ public final class CidrBlock {
     int slash = s.indexOf('/');
     byte[] bytes = Cidr.addressBytes(slash < 0 ? s : s.substring(0, slash));
     if (bytes == null) return Optional.empty();
+    // An IPv4-mapped network (::ffff:0:0/96) reads as IPv4, as its addresses do: /96 is 0.0.0.0/0.
+    boolean mapped = bytes.length == 4 && s.indexOf(':') >= 0 && s.indexOf(':') < (slash < 0 ? s.length() : slash);
     int max = bytes.length * 8;
     int prefix = max;
     if (slash >= 0) {
       String p = s.substring(slash + 1).trim();
       if (!p.matches("\\d{1,3}")) return Optional.empty();
-      prefix = Integer.parseInt(p);
-      if (prefix > max) return Optional.empty();
+      prefix = Integer.parseInt(p) - (mapped ? 96 : 0);
+      if (prefix < 0 || prefix > max) return Optional.empty();
     }
     return Optional.of(new CidrBlock(mask(bytes, prefix), prefix));
   }

@@ -833,15 +833,21 @@ public class NetworkClusterService {
    */
   private String subnetPrefix(String ip, int octets) {
     if (ip == null) return "unknown";
-    if (ip.contains(":")) {
+    byte[] bytes = com.tracepcap.common.net.Cidr.addressBytes(ip);
+    if (bytes != null && bytes.length == 16) {
       return com.tracepcap.common.net.CidrBlock.parse(ip + "/" + (octets >= 3 ? 64 : 48))
           .map(Object::toString)
           .orElse(ip);
     }
-    String[] parts = ip.split("\\.");
+    // An IPv4 address (an IPv4-mapped one too, by its IPv4 address), or text that isn't an
+    // address (a MAC endpoint), grouped by its leading parts as before.
+    String text = bytes != null ? com.tracepcap.common.net.Cidr.formatAddress(bytes) : ip;
+    String sep = bytes == null && text.contains(":") ? ":" : "\\.";
+    String[] parts = text.split(sep);
     int take = Math.min(octets, parts.length);
-    return String.join(".", Arrays.copyOf(parts, take));
+    return String.join(sep.equals(":") ? ":" : ".", Arrays.copyOf(parts, take));
   }
+
 
 
   private List<String> topKeys(Map<String, Long> counts, int n) {

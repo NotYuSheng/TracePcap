@@ -65,4 +65,12 @@ class CidrBlockTest {
     assertThat(CidrBlock.contains(null, "10.0.0.1")).isFalse();
     assertThat(CidrBlock.contains("10.0.0.0/8", (String) null)).isFalse();
   }
+
+  @Test
+  void anIpv4MappedNetworkReadsAsIpv4_asItsAddressesDo() {
+    assertThat(block("::ffff:0:0/96")).hasToString("0.0.0.0/0");
+    assertThat(block("::ffff:10.0.0.0/120")).hasToString("10.0.0.0/24");
+    assertThat(block("::ffff:10.0.0.0/120").contains("::ffff:10.0.0.7")).isTrue();
+    assertThat(CidrBlock.parse("::ffff:10.0.0.0/64")).isEmpty(); // wider than the mapped range
+  }
 }

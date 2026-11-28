@@ -301,7 +301,9 @@ public class HostnameResolverService {
       sb.append(octets[i]);
       if (i > 0) sb.append('.');
     }
-    return com.tracepcap.common.net.Cidr.addressBytes(sb.toString()) != null ? sb.toString() : null;
+    // Written as tshark writes it ("010" is 10), so the claim lands on the same host.
+    byte[] bytes = com.tracepcap.common.net.Cidr.addressBytes(sb.toString());
+    return bytes != null && bytes.length == 4 ? com.tracepcap.common.net.Cidr.formatAddress(bytes) : null;
   }
 
   private static String ip6ArpaToIp(String labels) {

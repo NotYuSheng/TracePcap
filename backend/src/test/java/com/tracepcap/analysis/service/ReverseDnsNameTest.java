@@ -10,6 +10,7 @@ class ReverseDnsNameTest {
   @Test
   void ipv4() {
     assertThat(HostnameResolverService.arpaToIp("4.3.2.1.in-addr.arpa.")).isEqualTo("1.2.3.4");
+    assertThat(HostnameResolverService.arpaToIp("1.0.0.010.in-addr.arpa")).isEqualTo("10.0.0.1"); // as tshark writes it
     assertThat(HostnameResolverService.arpaToIp("3.2.1.in-addr.arpa")).isNull(); // a zone
     assertThat(HostnameResolverService.arpaToIp("x.3.2.1.in-addr.arpa")).isNull();
   }
@@ -19,6 +20,8 @@ class ReverseDnsNameTest {
     String q = "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.IP6.ARPA.";
     assertThat(HostnameResolverService.arpaToIp(q)).isEqualTo("2001:db8::1");
     assertThat(HostnameResolverService.arpaToIp("8.b.d.0.1.0.0.2.ip6.arpa")).isNull(); // a zone
+    String mapped = "1.0.0.0.0.0.a.0.f.f.f.f.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa";
+    assertThat(HostnameResolverService.arpaToIp(mapped)).isEqualTo("::ffff:10.0.0.1");
     assertThat(HostnameResolverService.arpaToIp(q.replace("8.b.d", "8.bb.d"))).isNull();
   }
 

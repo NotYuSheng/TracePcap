@@ -128,8 +128,11 @@ class CidrMigrationIntegrationTest {
     assertThat(inside("fd00::1:0:0:0:9", "fd00:0:0:1::/64")).isTrue();
     assertThat(inside("fe80::1%eth0", "fe80::/10")).isTrue();
     assertThat(inside("10.0.0.1", "::/0")).isFalse(); // never across families
+    // An IPv4-mapped address is its IPv4 address, as CidrBlock reads it.
+    assertThat(inside("::ffff:10.0.0.5", "10.0.0.0/24")).isTrue();
+    assertThat(inside("64:ff9b::192.0.2.1", "64:ff9b::/96")).isTrue(); // a dotted tail, not mapped
     // Not an address: NULL, so never inside, and the query doesn't fail.
-    for (String bad : new String[] {"aa:bb:cc:dd:ee:ff", "1:2", "10.0.0.256", "host.local", ""}) {
+    for (String bad : new String[] {"aa:bb:cc:dd:ee:ff", "1:2", "1::2::3", "1.2.3.4::", "10.0.0.256", "host.local", ""}) {
       assertThat(jdbc.queryForObject("SELECT ip_inet(?) IS NULL", Boolean.class, bad)).as(bad).isTrue();
     }
     assertThat(jdbc.queryForObject("SELECT to_regprocedure('ip_to_int(text)') IS NULL", Boolean.class)).isTrue();

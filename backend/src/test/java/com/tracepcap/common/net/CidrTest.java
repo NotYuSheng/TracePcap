@@ -84,5 +84,11 @@ class CidrTest {
     assertThat(Cidr.formatAddress(Cidr.addressBytes("2001:0db8:0000:0000:0000:0000:0000:0001")))
         .isEqualTo("2001:db8::1");
     assertThat(Cidr.formatAddress(Cidr.addressBytes("10.0.0.01"))).isEqualTo("10.0.0.1");
+    byte[] mapped = new byte[16];
+    mapped[10] = (byte) 0xff;
+    mapped[11] = (byte) 0xff;
+    mapped[12] = 10;
+    mapped[15] = 1;
+    assertThat(Cidr.formatAddress(mapped)).isEqualTo("::ffff:10.0.0.1"); // RFC 5952 §5
   }
 }

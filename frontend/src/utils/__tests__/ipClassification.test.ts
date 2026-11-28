@@ -72,7 +72,7 @@ describe('parseIp / formatIp / networkOf / compareIps', () => {
     expect(parseIp('::')).toEqual(new Array(16).fill(0));
     expect(parseIp('::ffff:10.0.0.1')).toEqual([10, 0, 0, 1]); // mapped reads as IPv4
     expect(parseIp('64:ff9b::192.0.2.1')?.slice(12)).toEqual([192, 0, 2, 1]);
-    for (const bad of ['10.0.0.256', '10.1', '1::2::3', '1:2:3:4:5:6:7:8:9', ':1', 'aa:bb:cc:dd:ee:ff', 'host', '', null]) {
+    for (const bad of ['10.0.0.256', '10.1', '1::2::3', '1:2:3:4:5:6:7:8:9', ':1', '1.2.3.4::', '1.2.3.4:1::', 'aa:bb:cc:dd:ee:ff', 'host', '', null]) {
       expect(parseIp(bad)).toBeNull();
     }
   });
@@ -82,6 +82,7 @@ describe('parseIp / formatIp / networkOf / compareIps', () => {
     expect(formatIp(parseIp('2001:db8:0:1:0:0:0:1')!)).toBe('2001:db8:0:1::1');
     expect(formatIp(parseIp('1:0:0:2:0:0:0:3')!)).toBe('1:0:0:2::3');
     expect(formatIp(parseIp('1:0:2:3:4:5:6:7')!)).toBe('1:0:2:3:4:5:6:7');
+    expect(formatIp([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 10, 0, 0, 1])).toBe('::ffff:10.0.0.1');
   });
 
   it('names the network an address is on', () => {

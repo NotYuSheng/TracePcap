@@ -35,13 +35,14 @@ export function parseIp(ip: string | null | undefined): number[] | null {
   if (!/^[0-9a-f:.]+$/i.test(a)) return null;
   const halves = a.split('::');
   if (halves.length > 2) return null;
-  const groups = (part: string): number[] | null => {
+  // An IPv4 tail is allowed only as the last group of the whole address.
+  const groups = (part: string, last: boolean): number[] | null => {
     if (part === '') return [];
     const out: number[] = [];
     const parts = part.split(':');
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
-      if (i === parts.length - 1 && p.includes('.')) {
+      if (last && i === parts.length - 1 && p.includes('.')) {
         const v4 = parseV4(p);
         if (!v4) return null;
         out.push((v4[0] << 8) | v4[1], (v4[2] << 8) | v4[3]);
@@ -53,8 +54,8 @@ export function parseIp(ip: string | null | undefined): number[] | null {
     }
     return out;
   };
-  const head = groups(halves[0]);
-  const tail = halves.length === 2 ? groups(halves[1]) : [];
+  const head = groups(halves[0], halves.length === 1);
+  const tail = halves.length === 2 ? groups(halves[1], true) : [];
   if (!head || !tail) return null;
   if (halves.length === 1 ? head.length !== 8 : head.length + tail.length > 7) return null;
   const all = [...head, ...new Array(8 - head.length - tail.length).fill(0), ...tail];
@@ -72,6 +73,10 @@ function parseV4(a: string): number[] | null {
 /** `10.0.0.1`, or IPv6 in RFC 5952 form (`fd00::1`). The backend's `Cidr.formatAddress`. */
 export function formatIp(bytes: number[]): string {
   if (bytes.length === 4) return bytes.join('.');
+  // RFC 5952 §5: an IPv4-mapped address keeps its dotted tail. The backend's Cidr.formatAddress.
+  if (bytes.slice(0, 10).every(b => b === 0) && bytes[10] === 0xff && bytes[11] === 0xff) {
+    return `::ffff:${bytes.slice(12).join('.')}`;
+  }
   const g: number[] = [];
   for (let i = 0; i < 16; i += 2) g.push((bytes[i] << 8) | bytes[i + 1]);
   let bestStart = -1;

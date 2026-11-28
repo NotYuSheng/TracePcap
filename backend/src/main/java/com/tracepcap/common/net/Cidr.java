@@ -89,6 +89,12 @@ public final class Cidr {
    * first, on a tie) as {@code ::}. What an operator types ({@code fd00::}), not Java's long form.
    */
   private static String v6(byte[] b) {
+    boolean mapped = true;
+    for (int i = 0; i < 10; i++) mapped &= b[i] == 0;
+    if (mapped && (b[10] & 0xFF) == 0xFF && (b[11] & 0xFF) == 0xFF) {
+      // RFC 5952 §5: an IPv4-mapped address keeps its dotted tail, as tshark writes it.
+      return "::ffff:" + v4(java.util.Arrays.copyOfRange(b, 12, 16));
+    }
     int[] g = new int[8];
     for (int i = 0; i < 8; i++) g[i] = ((b[2 * i] & 0xFF) << 8) | (b[2 * i + 1] & 0xFF);
     int bestStart = -1, bestLen = 0;
