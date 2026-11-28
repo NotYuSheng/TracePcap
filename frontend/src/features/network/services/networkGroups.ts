@@ -1,7 +1,8 @@
 import type { GraphNode } from '../types';
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
+import { segmentAdmits, segmentHolds, segmentRanges } from '@/features/networkSegments/segmentRanges';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
-import { ipInCidr, isHostAddress, isPrivateIp, networkOf, parseIp } from '@/utils/ipClassification';
+import { isHostAddress, isPrivateIp, networkOf, parseIp } from '@/utils/ipClassification';
 import { deviceTypeLabel, nodeIdentityKey } from '@/utils/deviceType';
 import type { DeviceType } from '@/types';
 
@@ -172,7 +173,7 @@ export function familyOf(node: GraphNode): string {
 
 function segmentDetail(s: NetworkSegment): string {
   const parts: string[] = [];
-  if (s.cidr) parts.push(s.cidr);
+  parts.push(...segmentRanges(s));
   if (s.routers.length) parts.push(`gateway ${s.routers.join(', ')}`);
   if (s.serverIds.length) parts.push(`DHCP ${s.serverIds.join(', ')}`);
   return parts.join(' · ');
@@ -192,7 +193,7 @@ function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment
     if (s) return s;
   }
   const ip = addressOf(node.id);
-  const inRange = segments.filter(x => !x.cidr || ipInCidr(ip, x.cidr));
+  const inRange = segments.filter(x => segmentAdmits(x, ip));
   const mac = node.data.mac?.toLowerCase();
   if (mac) {
     const s = inRange.find(x => x.clients.some(c => c.mac.toLowerCase() === mac));
@@ -209,7 +210,7 @@ function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment
   if (holders.length === 1) return holders[0];
   // A statically addressed host (a server, a printer) leased nothing, but sits in its network's
   // range: it belongs there when exactly one network has that range (with overlaps, it's unknown).
-  const ranged = segments.filter(x => x.cidr && ipInCidr(ip, x.cidr));
+  const ranged = segments.filter(x => segmentHolds(x, ip));
   return holders.length === 0 && ranged.length === 1 ? ranged[0] : undefined;
 }
 

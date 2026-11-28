@@ -47,11 +47,12 @@ class ReportFindingsTest {
       List.of(
           new NetworkSegmentsResponse.Segment("vlan:20", "guest.office.example (VLAN 20)", 20, null, List.of(),
               List.of("10.20.20.1"), List.of(), List.of(), "10.20.20.0/24",
-              List.of(new NetworkSegmentsResponse.Client("10.20.20.51", "8c:71:f8:b0:00:01", "Galaxy-A55")), List.of()),
+              List.of(new NetworkSegmentsResponse.Client("10.20.20.51", "8c:71:f8:b0:00:01", "Galaxy-A55")), List.of(), List.of(), List.of()),
           new NetworkSegmentsResponse.Segment("vlan:30", "devices.office.example (VLAN 30)", 30, null, List.of(),
               List.of("10.20.30.1"), List.of(), List.of(), "10.20.30.0/24",
               List.of(new NetworkSegmentsResponse.Client("10.20.30.41", "44:19:b6:c0:00:03", "CAM-ENTRANCE")),
-              List.of(new NetworkSegmentsResponse.UnansweredClient("b8:27:eb:5e:00:01", "raspberrypi", 30, 6)))),
+              List.of(new NetworkSegmentsResponse.UnansweredClient("b8:27:eb:5e:00:01", "raspberrypi", 30, 6)),
+              List.of(), List.of())),
       List.of(), List.of());
 
   private static ReportNames names() {

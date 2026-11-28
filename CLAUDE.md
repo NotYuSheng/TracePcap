@@ -24,14 +24,15 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | Concept | Backend | Frontend |
 |---|---|---|
 | Is this address inside the network | `LocalityRules` from `KnowledgeContext.locality()` / `ScanContext.locality()` / `LocalityPolicy` (custom ranges first). Never `IpLocality.isLocal` directly: only `common/net`, the policy and GeoIP may | `isPrivateIp` (custom ranges) / `isRfc1918` in `utils/ipClassification.ts` |
-| Is this a real host / unspecified / a filled-in address field | `IpLocality.isHostAddress` / `isUnspecified` / `isAssigned` | `isHostAddress` / `isUnspecified` in `utils/ipClassification.ts` |
+| Is this a real host / unspecified / a filled-in address field / link-local | `IpLocality.isHostAddress` / `isUnspecified` / `isAssigned` / `isLinkLocal` (`isIpv6LinkLocal`) | `isHostAddress` / `isUnspecified` / `isLinkLocal` in `utils/ipClassification.ts` |
 | Bytes, lengths of time, counted nouns | `common/text/Humanize` (`bytes`, `span`, `plural`) | `utils/formatters` (`formatBytes`, `formatSpan`, `formatDuration`, `formatNumber`) |
 | A CIDR typed into settings | `common/net/Cidr.normalise` (bare IP → /32, host bits zeroed, literals only) | — (the backend validates) |
 | Is this address inside a CIDR (IPv4 and IPv6) | `common/net/CidrBlock.contains`; in SQL `ip_inet(col) <<= CAST(? AS inet)` | `ipInCidr` in `utils/ipClassification.ts` |
-| Reading, writing, sorting an address | `Cidr.addressBytes` / `Cidr.formatAddress` (RFC 5952) | `parseIp` / `formatIp` / `networkOf` / `compareIps` in `utils/ipClassification.ts` |
+| Reading, writing, sorting an address | `Cidr.addressBytes` / `Cidr.formatAddress` (RFC 5952) / `Cidr.ADDRESS_ORDER` | `parseIp` / `formatIp` / `networkOf` / `compareIps` in `utils/ipClassification.ts` |
 | Reading tshark fields: a packet's addresses (IPv4 and IPv6), booleans | `common/net/TsharkFields`: `command`/`withIpv6` + `fold`, never `ip.src` alone; `isTrue`, never `"1".equals` (tshark 4 writes `True`) | — |
 | An address with a port, for people (`[fd00::1]:443`) | `common/net/Endpoints.of` | `formatIpPort` in `utils/formatters` |
-| MAC addresses | `common/net/MacAddress` | — |
+| MAC addresses (same address, vendor prefix, multicast) | `common/net/MacAddress` | — |
+| A capture's networks (DHCP v4/v6, IPv6 router adverts) | `NetworkSegmentReader.of(fileId)`; outside analysis, `NetworkSegmentLookup` | `segmentRanges` / `segmentHolds` / `segmentAdmits` in `features/networkSegments/segmentRanges.ts` |
 | Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |
 | Severity colours | — | `utils/severityColors.ts` |
 

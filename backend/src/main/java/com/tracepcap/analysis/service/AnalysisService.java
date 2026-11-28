@@ -326,6 +326,7 @@ public class AnalysisService {
     Map<String, FailoverAddressResolverService.VirtualAddress> failoverAddresses = Map.of();
     List<DhcpLeaseResolverService.Lease> dhcpLeases = List.of();
     List<DhcpLeaseResolverService.Unanswered> dhcpUnanswered = List.of();
+    List<DhcpLeaseResolverService.Advert> routerAdverts = List.of();
 
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
@@ -502,10 +503,12 @@ public class AnalysisService {
     // Router failover virtual addresses (VRRP/HSRP, #918): a small filtered pass. Never throws.
     run.failoverAddresses = failoverAddressResolverService.resolve(run.pcap);
     // DHCP leases (#918 item 3): which client MAC held which address when. Never throws.
-    // The same pass finds the clients that asked and were never answered.
+    // The same pass finds the clients that asked and were never answered, and IPv6's networks:
+    // DHCPv6 leases and router advertisements (#1357).
     DhcpLeaseResolverService.Resolution dhcp = dhcpLeaseResolverService.resolveAll(run.pcap);
     run.dhcpLeases = dhcp.leases();
     run.dhcpUnanswered = dhcp.unanswered();
+    run.routerAdverts = dhcp.adverts();
     log.info(
         "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
         run.fileId,
@@ -605,6 +608,7 @@ public class AnalysisService {
     try {
       hostOccupancyService.saveLeases(fileId, run.dhcpLeases);
       hostOccupancyService.saveUnanswered(fileId, run.dhcpUnanswered);
+      hostOccupancyService.saveAdverts(fileId, run.routerAdverts);
       occupancyCounts = hostOccupancyService.recompute(fileId, run.failoverAddresses.keySet());
       severalNetworks = hostOccupancyService.severalNetworks(fileId);
     } catch (Exception e) {

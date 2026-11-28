@@ -69,6 +69,15 @@ public final class MacAddress {
     return hex.substring(0, 2) + ":" + hex.substring(2, 4) + ":" + hex.substring(4, 6);
   }
 
+  /**
+   * Whether this is a group (multicast or broadcast) address: the low bit of its first octet is
+   * set ({@code 33:33:…}, {@code 01:00:5e:…}, {@code ff:ff:…}). No machine owns one.
+   */
+  public static boolean isGroup(String mac) {
+    String oui = oui(mac);
+    return oui != null && (Integer.parseInt(oui.substring(0, 2), 16) & 1) == 1;
+  }
+
   private static boolean isHex(String s) {
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);

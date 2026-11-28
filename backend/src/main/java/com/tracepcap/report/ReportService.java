@@ -352,14 +352,17 @@ public class ReportService {
     if (f.networks() != null) {
       for (var s : f.networks().segments()) {
         groups.put(s.label(), new ArrayList<>());
-        groupTitles.put(s.label(), s.label() + (s.cidr() != null ? " · " + s.cidr() : ""));
+        List<String> ranges = new ArrayList<>();
+        if (s.cidr() != null) ranges.add(s.cidr());
+        if (s.prefixes() != null) ranges.addAll(s.prefixes());
+        groupTitles.put(s.label(), s.label() + (ranges.isEmpty() ? "" : " · " + String.join(", ", ranges)));
       }
     }
     String other = "Other local addresses";
 
     List<HostFacts> local = f.hosts().stream()
         .filter(h -> h.ip() != null && !f.internet().contains(h.ip()))
-        .sorted(Comparator.comparing(h -> ipSortKey(h.ip())))
+        .sorted(Comparator.comparing(HostFacts::ip, com.tracepcap.common.net.Cidr.ADDRESS_ORDER))
         .toList();
     for (HostFacts h : local) {
       if (movedFrom.contains(h.ip() + "|" + h.mac())) continue;
@@ -434,7 +437,7 @@ public class ReportService {
       ReportPdf.groupRow(t, "Internet · " + f.internet().size() + " hosts, " + orgs.size() + " organisations");
       for (ClusterNodeDto n : orgs) {
         List<String> ips = new ArrayList<>(realHosts(n).keySet());
-        ips.sort(Comparator.comparing(ReportService::ipSortKey));
+        ips.sort(com.tracepcap.common.net.Cidr.ADDRESS_ORDER);
         t.addCell(cell(n.getLabel(), small));
         // A big organisation's addresses would fill pages; the Conversations part lists them all.
         String shown = ips.size() <= INTERNET_ADDRESSES_SHOWN ? String.join(", ", ips)
@@ -685,7 +688,7 @@ public class ReportService {
     doc.newPage();
     heading(doc, "How each device was classified", "from its MAC vendor, TTL and traffic");
     PdfPTable t = table(new float[] {2.6f, 2.4f, 1.6f, 1, 5}, "Device", "Address", "Type", "Conf.", "Evidence");
-    for (HostFacts h : f.hosts().stream().sorted(Comparator.comparing(h -> ipSortKey(h.ip()))).toList()) {
+    for (HostFacts h : f.hosts().stream().sorted(Comparator.comparing(HostFacts::ip, com.tracepcap.common.net.Cidr.ADDRESS_ORDER)).toList()) {
       t.addCell(cell(h.hostname() != null ? h.hostname() : f.names().isGateway(h.ip()) ? "Gateway" : "—", ReportPdf.small()));
       t.addCell(cell(h.ip(), ReportPdf.mono()));
       t.addCell(cell(device(h.deviceType(), false), ReportPdf.small()));
@@ -753,16 +756,6 @@ public class ReportService {
     int dot = from.lastIndexOf('.');
     if (dot > 0 && to.startsWith(from.substring(0, dot + 1))) return from + " → ." + to.substring(dot + 1);
     return from + " → " + to;
-  }
-
-  /** IPv4 by value, then IPv6 by value, then anything else as text (#1357). */
-  static String ipSortKey(String ip) {
-    if (ip == null) return "";
-    byte[] b = com.tracepcap.common.net.Cidr.addressBytes(ip);
-    if (b == null) return "~" + ip;
-    StringBuilder sb = new StringBuilder(b.length == 4 ? "4" : "6");
-    for (byte x : b) sb.append(String.format("%02x", x & 0xFF));
-    return sb.toString();
   }
 
 

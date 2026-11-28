@@ -86,7 +86,31 @@ public final class DeviceMoves {
     return of(arp, leases, List.of());
   }
 
+  /**
+   * As {@link #of(List, List)}, with the conversations seen on each address. Each address family is
+   * read on its own (#1357): a dual-stack machine's IPv4 and IPv6 addresses are held side by side,
+   * so its DHCPv4 lease followed by its DHCPv6 one is not a move from one to the other.
+   */
   public static List<Move> of(
+      List<IpMacObservationEntity> arp, List<DhcpLeaseEntity> leases, List<Sighting> sightings) {
+    List<Move> out = new ArrayList<>();
+    for (boolean v6 : new boolean[] {false, true}) {
+      out.addAll(
+          ofFamily(
+              arp.stream().filter(o -> isV6(o.getIp()) == v6).toList(),
+              leases.stream().filter(l -> isV6(l.getIp()) == v6).toList(),
+              sightings.stream().filter(x -> isV6(x.ip()) == v6).toList()));
+    }
+    out.sort(Comparator.comparing(Move::arrived));
+    return out;
+  }
+
+  private static boolean isV6(String ip) {
+    byte[] b = com.tracepcap.common.net.Cidr.addressBytes(ip);
+    return b != null && b.length == 16;
+  }
+
+  private static List<Move> ofFamily(
       List<IpMacObservationEntity> arp, List<DhcpLeaseEntity> leases, List<Sighting> sightings) {
     Map<String, Map<String, Stay>> byMac = new LinkedHashMap<>();
     for (IpMacObservationEntity o : arp) {

@@ -3,7 +3,8 @@ package com.tracepcap.analysis.dto.segments;
 import java.util.List;
 
 /**
- * The networks a capture holds, told apart by their DHCP leases (#462 phase 1), and the ones that
+ * The networks a capture holds, told apart by their DHCP leases and IPv6 router advertisements
+ * (#462 phase 1, #1357), and the ones that
  * use the same range. {@code unanswered} holds the clients nobody answered that no network could be
  * found for (no VLAN, or a VLAN no lease was handed out on).
  */
@@ -15,7 +16,10 @@ public record NetworkSegmentsResponse(
    *
    * @param key how it was told apart: vlan:N, server:MAC or id:IP|domain
    * @param label its domain, VLAN or DHCP server, for display
+   * @param cidr its IPv4 range, from DHCPv4; null for an IPv6-only network
    * @param unanswered clients that asked for an address on this network (its VLAN) and got none
+   * @param prefixes the IPv6 prefixes its routers advertised (#1357)
+   * @param routerMacs the MACs of the IPv6 routers that advertised on it
    */
   public record Segment(
       String key,
@@ -28,7 +32,9 @@ public record NetworkSegmentsResponse(
       List<Long> leaseSeconds,
       String cidr,
       List<Client> clients,
-      List<UnansweredClient> unanswered) {}
+      List<UnansweredClient> unanswered,
+      List<String> prefixes,
+      List<String> routerMacs) {}
 
   public record Client(String ip, String mac, String hostname) {}
 

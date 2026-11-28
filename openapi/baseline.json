@@ -5622,6 +5622,18 @@
             },
             "type": "array"
           },
+          "prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "routerMacs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "routers": {
             "items": {
               "type": "string"

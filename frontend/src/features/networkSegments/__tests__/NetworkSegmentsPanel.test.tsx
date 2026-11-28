@@ -33,6 +33,23 @@ describe('NetworkSegmentsPanel (#462)', () => {
     expect(screen.getByTestId('network-segments-shared')).toHaveTextContent('192.168.1.1, 192.168.1.10')
   })
 
+  it('two IPv6 links reusing fe80::1 are worded as link-local, with each prefix and router (#1357)', async () => {
+    const v6 = (key: string, vlanId: number, prefix: string, mac: string) => ({
+      key, label: `VLAN ${vlanId}`, vlanId, serverIds: [], routers: ['fe80::1'], domains: [], leaseSeconds: [],
+      clients: [], prefixes: [prefix], routerMacs: [mac],
+    })
+    server.use(http.get('*/files/f3/network-segments', () => HttpResponse.json({
+      segments: [v6('vlan:10', 10, 'fd00:10::/64', 'aa:00:00:00:00:0a'), v6('vlan:20', 20, 'fd00:20::/64', 'aa:00:00:00:00:14')],
+      overlaps: [{ cidr: 'fe80::/64', segmentKeys: ['vlan:10', 'vlan:20'], sharedAddresses: ['fe80::1'] }],
+    })))
+    render(<NetworkSegmentsPanel fileId="f3" />)
+    expect(await screen.findByText('2 networks reuse IPv6 link-local addresses')).toBeInTheDocument()
+    const cards = screen.getAllByTestId('network-segment')
+    expect(cards[0]).toHaveTextContent('fd00:10::/64')
+    expect(cards[1]).toHaveTextContent('aa:00:00:00:00:14')
+    expect(screen.getByTestId('network-segments-shared')).toHaveTextContent('fe80::1')
+  })
+
   it('shows nothing for a capture with one network per range', async () => {
     let called = false
     server.use(http.get('*/files/f2/network-segments', () => {

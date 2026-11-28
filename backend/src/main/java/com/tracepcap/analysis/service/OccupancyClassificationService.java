@@ -62,7 +62,7 @@ public class OccupancyClassificationService {
   private final HostClassificationRepository hostClassifications;
   private final FileRepository files;
   private final HostClassifier classifier;
-  private final com.tracepcap.analysis.repository.DhcpLeaseRepository leases;
+  private final NetworkSegmentReader networks;
 
   /** Classifies every occupancy in the capture. Never throws: a failure leaves them unclassified. */
   @Transactional(noRollbackFor = RuntimeException.class)
@@ -104,7 +104,7 @@ public class OccupancyClassificationService {
     // on is told by that side's MAC, so each network's MACs decide what's whose.
     boolean byNetwork = occ.stream().anyMatch(o -> o.getSegmentKey() != null);
     Map<String, Set<String>> macsBySegment =
-        byNetwork ? NetworkSegments.of(leases.findByFileId(fileId)).macsBySegment() : Map.of();
+        byNetwork ? networks.of(fileId).macsBySegment() : Map.of();
     List<ClassificationHint> addressVotes = RuleVoteRescoreService.boardOf(address == null ? new HostClassificationEntity() : address).ruleVotes();
 
     for (IpOccupancyEntity o : occ) {

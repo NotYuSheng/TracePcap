@@ -157,6 +157,20 @@ export function isPrivateIp(ip: string, customRanges: CustomPrivateRange[] = [])
 }
 
 /**
+ * Link-local: 169.254.0.0/16 or fe80::/10. Unique on its own link only, so the same address on two
+ * links is two machines. The backend's `IpLocality.isLinkLocal`.
+ */
+export function isLinkLocal(ip: string | null | undefined): boolean {
+  return ipInCidr(ip ?? '', 'fe80::/10') || ipInCidr(ip ?? '', '169.254.0.0/16');
+}
+
+/**
+ * The IPv6 link-local network every link has: what two networks share when they reuse a link-local
+ * address. The backend's `IpLocality.IPV6_LINK_LOCAL_NETWORK`.
+ */
+export const IPV6_LINK_LOCAL_NETWORK = 'fe80::/64';
+
+/**
  * The unspecified address, `0.0.0.0` or `::`: what a client sends from before it has an address (a
  * DHCP request). The backend's `IpLocality.isUnspecified`.
  */

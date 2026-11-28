@@ -4,6 +4,7 @@ import com.tracepcap.analysis.dto.occupancy.HostOccupancyResponse;
 import com.tracepcap.analysis.dto.segments.NetworkSegmentsResponse;
 import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.common.net.CidrBlock;
+import com.tracepcap.common.net.IpLocality;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +37,10 @@ final class ReportNames {
     this.segments = networks == null ? List.of() : networks.segments();
     for (var s : segments) {
       if (s.routers() != null) gateways.addAll(s.routers());
-      if (s.routers() != null) s.routers().forEach(ip -> networkOf.put(ip, s.label()));
+      // Not a link-local router address: fe80::1 is on every VLAN, so it names no one network.
+      if (s.routers() != null) {
+        s.routers().stream().filter(ip -> !IpLocality.isLinkLocal(ip)).forEach(ip -> networkOf.put(ip, s.label()));
+      }
       for (var c : s.clients()) networkOf.put(c.ip(), s.label());
     }
     this.orgs = orgByIp == null ? Map.of() : orgByIp;
@@ -88,11 +92,14 @@ final class ReportNames {
     return sb.toString();
   }
 
-  /** The network an address is on, from DHCP, or null. */
+  /** The network an address is on, from DHCP or its router's advertised prefixes, or null. */
   String networkOf(String ip) {
     String known = networkOf.get(ip);
     if (known != null) return known;
-    for (var s : segments) if (s.cidr() != null && CidrBlock.contains(s.cidr(), ip)) return s.label();
+    for (var s : segments) {
+      if (s.cidr() != null && CidrBlock.contains(s.cidr(), ip)) return s.label();
+      if (s.prefixes() != null && s.prefixes().stream().anyMatch(p -> CidrBlock.contains(p, ip))) return s.label();
+    }
     return null;
   }
 

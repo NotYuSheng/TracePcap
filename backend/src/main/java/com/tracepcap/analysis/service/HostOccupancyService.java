@@ -56,6 +56,8 @@ public class HostOccupancyService {
   private final IpMacObservationRepository observations;
   private final DhcpLeaseRepository leases;
   private final com.tracepcap.analysis.repository.DhcpUnansweredClientRepository unanswered;
+  private final com.tracepcap.analysis.repository.RouterAdvertRepository adverts;
+  private final NetworkSegmentReader networks;
   private final OccupancyDecisionRepository decisions;
   private final IpOccupancyRepository occupancies;
   private final ConversationRepository conversations;
@@ -99,6 +101,28 @@ public class HostOccupancyService {
               .build());
     }
     leases.saveAll(rows);
+  }
+
+  /** Stores the capture's IPv6 router advertisements (#1357). Like {@link #saveLeases}. */
+  @Transactional(noRollbackFor = RuntimeException.class)
+  public void saveAdverts(UUID fileId, List<DhcpLeaseResolverService.Advert> found) {
+    adverts.deleteAll(adverts.findByFileId(fileId));
+    if (found == null || found.isEmpty()) return;
+    adverts.saveAll(
+        found.stream()
+            .map(
+                a ->
+                    com.tracepcap.analysis.entity.RouterAdvertEntity.builder()
+                        .fileId(fileId)
+                        .routerMac(a.routerMac())
+                        .routerIp(a.routerIp())
+                        .vlanId(a.vlanId())
+                        .prefixes(a.prefixes().toArray(String[]::new))
+                        .domain(a.domain())
+                        .firstSeen(a.firstSeen())
+                        .lastSeen(a.lastSeen())
+                        .build())
+            .toList());
   }
 
   /** Stores the clients that asked for an address and were never answered. Like {@link #saveLeases}. */
@@ -531,9 +555,9 @@ public class HostOccupancyService {
     return rows.size();
   }
 
-  /** The capture's networks, from its DHCP leases (#462). */
+  /** The capture's networks, from its DHCP leases and router advertisements (#462, #1357). */
   private NetworkSegments.Result segments(UUID fileId) {
-    return NetworkSegments.of(leases.findByFileId(fileId));
+    return networks.of(fileId);
   }
 
   /** Not a failover address, and not used on several networks at once (#462). */

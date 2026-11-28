@@ -75,4 +75,23 @@ class SharedConceptTest {
           .because(
               "read an address with Cidr.addressBytes and match it with CidrBlock.contains: never a"
                   + " DNS lookup (#1354)");
+
+  /**
+   * A capture's networks are read by {@code NetworkSegmentReader} (#1357): from its DHCP leases and
+   * its IPv6 router advertisements. Five readers each called {@code NetworkSegments.of} on the
+   * leases alone, and any one left on that path would see a dual-stack VLAN without its IPv6 half.
+   */
+  @ArchTest
+  static final ArchRule networks_are_read_whole =
+      ArchRuleDefinition.noClasses()
+          .that()
+          .doNotHaveFullyQualifiedName("com.tracepcap.analysis.service.NetworkSegmentReader")
+          .and()
+          .doNotHaveFullyQualifiedName("com.tracepcap.analysis.service.NetworkSegments")
+          .should()
+          .callMethod(com.tracepcap.analysis.service.NetworkSegments.class, "of", java.util.List.class)
+          .orShould()
+          .callMethod(
+              com.tracepcap.analysis.service.NetworkSegments.class, "of", java.util.List.class, java.util.List.class)
+          .because("read a capture's networks with NetworkSegmentReader.of: leases and router adverts (#1357)");
 }

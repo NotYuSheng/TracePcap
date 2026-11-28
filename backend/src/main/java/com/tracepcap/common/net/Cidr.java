@@ -158,6 +158,32 @@ public final class Cidr {
     return b.length == 4 ? v4(b) : v6(b);
   }
 
+  /**
+   * Addresses in order of value: IPv4, then IPv6, then anything else (a name, a MAC) as text. How
+   * tables and lists of addresses sort.
+   */
+  public static final java.util.Comparator<String> ADDRESS_ORDER = Cidr::compareAddresses;
+
+  private static int compareAddresses(String x, String y) {
+    byte[] a = x == null ? null : addressBytes(x);
+    byte[] b = y == null ? null : addressBytes(y);
+    if (a != null && b != null) {
+      if (a.length != b.length) return Integer.compare(a.length, b.length);
+      return java.util.Arrays.compareUnsigned(a, b);
+    }
+    return sortKey(x).compareTo(sortKey(y));
+  }
+
+  /** The key {@link #ADDRESS_ORDER} sorts by. */
+  public static String sortKey(String ip) {
+    if (ip == null) return "";
+    byte[] b = addressBytes(ip);
+    if (b == null) return "~" + ip;
+    StringBuilder sb = new StringBuilder(b.length == 4 ? "4" : "6");
+    for (byte x : b) sb.append(String.format("%02x", x & 0xFF));
+    return sb.toString();
+  }
+
   private static IllegalArgumentException invalid(String raw) {
     return new IllegalArgumentException("Invalid CIDR: " + raw.trim());
   }

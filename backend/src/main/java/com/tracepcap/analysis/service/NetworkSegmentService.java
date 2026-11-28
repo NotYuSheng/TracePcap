@@ -1,7 +1,6 @@
 package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.dto.segments.NetworkSegmentsResponse;
-import com.tracepcap.analysis.repository.DhcpLeaseRepository;
 import com.tracepcap.analysis.repository.DhcpUnansweredClientRepository;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.repository.FileRepository;
@@ -11,19 +10,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The networks a capture holds, from its DHCP leases (#462), for the API and the report. */
+/**
+ * The networks a capture holds, from its DHCP leases and IPv6 router advertisements (#462, #1357),
+ * for the API and the report.
+ */
 @Service
 @RequiredArgsConstructor
 public class NetworkSegmentService {
 
-  private final DhcpLeaseRepository leases;
+  private final NetworkSegmentReader networks;
   private final DhcpUnansweredClientRepository unansweredClients;
   private final FileRepository files;
 
   @Transactional(readOnly = true)
   public NetworkSegmentsResponse segments(UUID fileId) {
     if (!files.existsById(fileId)) throw new ResourceNotFoundException("File not found: " + fileId);
-    var r = NetworkSegments.of(leases.findByFileId(fileId));
+    var r = networks.of(fileId);
     // Clients nobody answered go with the network on the VLAN they asked on, when there is one.
     var unplaced = new ArrayList<NetworkSegmentsResponse.UnansweredClient>();
     var byVlan = new java.util.HashMap<Integer, java.util.List<NetworkSegmentsResponse.UnansweredClient>>();
@@ -45,7 +47,9 @@ public class NetworkSegmentService {
               s.key(), s.label(), s.vlanId(), s.serverMac(), new ArrayList<>(s.serverIds()),
               new ArrayList<>(s.routers()), new ArrayList<>(s.domains()), new ArrayList<>(s.leaseSeconds()),
               s.cidr(), clients,
-              s.vlanId() == null ? java.util.List.of() : byVlan.getOrDefault(s.vlanId(), java.util.List.of())));
+              s.vlanId() == null ? java.util.List.of() : byVlan.getOrDefault(s.vlanId(), java.util.List.of()),
+              new ArrayList<>(s.prefixes()),
+              new ArrayList<>(new java.util.TreeSet<>(s.routerMacs().values()))));
     }
     var overlaps =
         r.overlaps().stream()
