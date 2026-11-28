@@ -50,4 +50,10 @@ class TsharkFieldsTest {
     assertThat(TsharkFields.firstAddress("fe80::1%eth0,fd00::1")).isEqualTo("fe80::1%eth0");
     assertThat(TsharkFields.firstAddress(" ")).isNull();
   }
+
+  @Test
+  void readsABooleanAsEitherTsharkWritesIt() {
+    for (String yes : new String[] {"1", "True", "true", " True ", "1,0"}) assertThat(TsharkFields.isTrue(yes)).as(yes).isTrue();
+    for (String no : new String[] {"0", "False", "", " ", null, "0,1"}) assertThat(TsharkFields.isTrue(no)).as(String.valueOf(no)).isFalse();
+  }
 }
