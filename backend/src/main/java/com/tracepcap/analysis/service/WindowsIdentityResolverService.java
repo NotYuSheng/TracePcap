@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.TsharkAddressFields;
 import com.tracepcap.common.net.IpLocality;
 import java.time.LocalDateTime;
 import java.io.BufferedReader;
@@ -163,6 +164,11 @@ public class WindowsIdentityResolverService {
     }
   }
 
+  /** The row layout the parser reads; an IPv6 packet's addresses are folded into ip.src / ip.dst. */
+  static final String[] FIELDS = {
+    "frame.number", "ip.src", "ip.dst", "ldap.baseObject", "kerberos.msg_type", "kerberos.CNameString", "frame.time_epoch", "ntlmssp.messagetype", "ntlmssp.auth.username", "ntlmssp.auth.domain", "samr.samr_UserInfo21.account_name", "samr.samr_UserInfo21.full_name"
+  };
+
   /**
    * Every Windows-identity claim, deduplicated, for classification. The same set as before #812:
    * Kerberos logins, plus LDAP lookups of accounts in the default Users folder. Custom-folder
@@ -210,6 +216,8 @@ public class WindowsIdentityResolverService {
     // person objects from infrastructure, not the presence of an attribute list.
     ProcessBuilder pb =
         new ProcessBuilder(
+            TsharkAddressFields.command(
+                FIELDS,
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
@@ -224,31 +232,7 @@ public class WindowsIdentityResolverService {
             "-E",
             "occurrence=a",
             "-E",
-            "aggregator=" + AGGREGATOR,
-            "-e",
-            "frame.number",
-            "-e",
-            "ip.src",
-            "-e",
-            "ip.dst",
-            "-e",
-            "ldap.baseObject",
-            "-e",
-            "kerberos.msg_type",
-            "-e",
-            "kerberos.CNameString",
-            "-e",
-            "frame.time_epoch",
-            "-e",
-            "ntlmssp.messagetype",
-            "-e",
-            "ntlmssp.auth.username",
-            "-e",
-            "ntlmssp.auth.domain",
-            "-e",
-            "samr.samr_UserInfo21.account_name",
-            "-e",
-            "samr.samr_UserInfo21.full_name");
+            "aggregator=" + AGGREGATOR));
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -285,7 +269,7 @@ public class WindowsIdentityResolverService {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) parseRow(line.split("\\|", -1), result);
+                    if (!line.isEmpty()) parseRow(TsharkAddressFields.fold(line.split("\\|", -1), FIELDS), result);
                   }
                 } catch (Exception ignored) {
                   // best-effort
@@ -340,7 +324,7 @@ public class WindowsIdentityResolverService {
   /** For tests: tshark output rows (fields as {@link #resolveLogons} requests them) to logins. */
   List<Logon> logonsFromRows(List<String> rows) {
     Map<LogonKey, LogonAgg> result = new java.util.LinkedHashMap<>();
-    for (String row : rows) parseRow(row.split("\\|", -1), result);
+    for (String row : rows) parseRow(TsharkAddressFields.fold(row.split("\\|", -1), FIELDS), result);
     return result.values().stream().map(LogonAgg::toLogon).toList();
   }
 

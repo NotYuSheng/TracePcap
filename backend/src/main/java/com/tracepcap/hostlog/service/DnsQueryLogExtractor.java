@@ -1,5 +1,6 @@
 package com.tracepcap.hostlog.service;
 
+import com.tracepcap.common.net.TsharkAddressFields;
 import com.tracepcap.analysis.spi.HostServiceLogExtractor;
 import com.tracepcap.analysis.spi.HostServiceLogResult;
 import com.tracepcap.analysis.spi.HostServiceSuspicion;
@@ -183,33 +184,12 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     // frame.number leads (numeric, no '|') and the five answer-related fields trail, so a '|' in the
     // query name still parses via right-anchoring. dns.count.answers (ANCOUNT) lets us treat any
     // successfully-answered query as resolved — including non-address types (MX/TXT/CNAME/PTR/SRV).
+    // A resolver answering over IPv6 writes its address in ipv6.src (#1357).
     ProcessBuilder pb =
         new ProcessBuilder(
-            "tshark",
-            "-r",
-            pcap.getAbsolutePath(),
-            "-Y",
-            "dns.flags.response==1",
-            "-T",
-            "fields",
-            "-E",
-            "separator=|",
-            "-e",
-            "frame.number",
-            "-e",
-            "ip.src",
-            "-e",
-            "dns.qry.name",
-            "-e",
-            "dns.qry.type",
-            "-e",
-            "dns.flags.rcode",
-            "-e",
-            "dns.a",
-            "-e",
-            "dns.aaaa",
-            "-e",
-            "dns.count.answers");
+            TsharkAddressFields.command(
+                FIELDS, "tshark", "-r", pcap.getAbsolutePath(), "-Y", "dns.flags.response==1",
+                "-T", "fields", "-E", "separator=|"));
     // Discard stderr natively (no drain thread needed); we only consume stdout.
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
@@ -228,7 +208,10 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) parseRow(line, groups, serverStats);
+                    if (!line.isEmpty()) {
+                      String[] row = TsharkAddressFields.fold(line.split("\\|", -1), FIELDS);
+                      parseRow(String.join("|", row), groups, serverStats);
+                    }
                   }
                 } catch (Exception ignored) {
                   // best-effort
@@ -261,6 +244,12 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
       if (ioExecutor != null) ioExecutor.shutdownNow();
     }
   }
+
+  /** The row layout {@link #parseRow} reads (the query name may itself contain '|'). */
+  static final String[] FIELDS = {
+    "frame.number", "ip.src", "dns.qry.name", "dns.qry.type", "dns.flags.rcode", "dns.a", "dns.aaaa",
+    "dns.count.answers"
+  };
 
   // ── Row parsing ─────────────────────────────────────────────────────────────
 

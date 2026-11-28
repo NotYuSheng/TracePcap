@@ -1,5 +1,6 @@
 package com.tracepcap.filter.service;
 
+import com.tracepcap.common.net.TsharkAddressFields;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -103,7 +104,9 @@ public class FilterService {
 
                     Display Filter Syntax Reference:
                     - Protocols: tcp, udp, icmp, dns, http, tls, arp, ip, ipv6
-                    - Fields: ip.src, ip.dst, tcp.srcport, tcp.dstport, udp.srcport, udp.dstport
+                    - Fields: ip.src, ip.dst (IPv4), ipv6.src, ipv6.dst (IPv6), tcp.srcport, tcp.dstport, udp.srcport, udp.dstport
+                    - An IPv4 field never matches an IPv6 packet: for an IPv6 address use ipv6.*, and when
+                      the family isn't known use both, e.g. "ip.addr == X || ipv6.addr == X"
                     - Comparisons: ==, !=, >, <, >=, <=, contains, matches
                     - Logical operators: &&, ||, !
                     - Membership: ip.src in {192.168.0.0/16 10.0.0.0/8}
@@ -115,6 +118,7 @@ public class FilterService {
                     - Traffic from specific IP: "ip.src == 192.168.1.1"
                     - SSH connections: "tcp.port == 22"
                     - All traffic to/from IP: "ip.addr == 192.168.1.1"
+                    - All traffic to/from an IPv6 address: "ipv6.addr == fd00::10"
                     - Large packets: "frame.len > 1000"
                     - TCP SYN packets: "tcp.flags.syn == 1 && tcp.flags.ack == 0"
 
@@ -293,6 +297,28 @@ public class FilterService {
     }
   }
 
+  /** The row layout {@link #parsePacketLine} reads. */
+  private static final String[] PACKET_FIELDS = {
+    "frame.time_epoch",
+    "frame.len",
+    "ip.src",
+    "ip.dst",
+    "tcp.srcport",
+    "tcp.dstport",
+    "udp.srcport",
+    "udp.dstport",
+    "_ws.col.Protocol",
+    "_ws.col.Info",
+    "tcp.flags.syn",
+    "tcp.flags.ack",
+    "tcp.flags.fin",
+    "tcp.flags.reset",
+    "tcp.flags.push",
+    "tcp.flags.urg",
+    "tcp.payload",
+    "udp.payload"
+  };
+
   /** Run tshark with a display filter and collect matching packets up to maxPackets. */
   private List<PacketDto> filterPackets(File pcapFile, String displayFilter, int maxPackets) {
     List<PacketDto> matchedPackets = new ArrayList<>();
@@ -300,8 +326,11 @@ public class FilterService {
     // Fields: epoch | len | ip.src | ip.dst | tcp.sport | tcp.dport | udp.sport | udp.dport |
     //         protocol | info | tcp.flags.syn | tcp.flags.ack | tcp.flags.fin |
     //         tcp.flags.rst | tcp.flags.psh | tcp.flags.urg | tcp.payload | udp.payload
+    // An IPv6 packet carries its addresses in ipv6.*, folded into the ip.* slots (#1357).
     ProcessBuilder pb =
         new ProcessBuilder(
+            TsharkAddressFields.command(
+                PACKET_FIELDS,
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
@@ -311,43 +340,7 @@ public class FilterService {
             "-T",
             "fields",
             "-E",
-            "separator=|",
-            "-e",
-            "frame.time_epoch",
-            "-e",
-            "frame.len",
-            "-e",
-            "ip.src",
-            "-e",
-            "ip.dst",
-            "-e",
-            "tcp.srcport",
-            "-e",
-            "tcp.dstport",
-            "-e",
-            "udp.srcport",
-            "-e",
-            "udp.dstport",
-            "-e",
-            "_ws.col.Protocol",
-            "-e",
-            "_ws.col.Info",
-            "-e",
-            "tcp.flags.syn",
-            "-e",
-            "tcp.flags.ack",
-            "-e",
-            "tcp.flags.fin",
-            "-e",
-            "tcp.flags.reset",
-            "-e",
-            "tcp.flags.push",
-            "-e",
-            "tcp.flags.urg",
-            "-e",
-            "tcp.payload",
-            "-e",
-            "udp.payload");
+            "separator=|"));
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     try {
@@ -359,7 +352,7 @@ public class FilterService {
         String line;
         while ((line = reader.readLine()) != null && packetNumber < maxPackets) {
           if (line.isEmpty()) continue;
-          String[] f = line.split("\\|", -1);
+          String[] f = TsharkAddressFields.fold(line.split("\\|", -1), PACKET_FIELDS);
           if (f.length < 10) continue;
 
           packetNumber++;
