@@ -39,7 +39,8 @@ CONCEPT = re.compile(
         format[A-Z]\w* | humani[sz]e\w* | human | plural\w* | pct | percent\w* |
         bytes | megabytes | fmtBytes | duration | span |
         is(?:Private|Internal|Local|Rfc1918|Public|External|HostAddress|Unspecified|Broadcast|Multicast|Special)\w* |
-        (?:normali[sz]e|valid|validate|parse|canonical)Cidr\w* | severity\w*
+        (?:normali[sz]e|valid|validate|parse|canonical)Cidr\w* | (?:ip)?[iI]nCidr\w* |
+        ipTo(?:Int|Long)\w* | compareIps? | severity\w*
     )$"""
 )
 
@@ -68,6 +69,8 @@ TS_KEYWORDS = {"if", "for", "while", "switch", "catch", "return", "function", "c
 OWNERS = {
     "backend/src/main/java/com/tracepcap/common/text/Humanize.java",
     "backend/src/main/java/com/tracepcap/common/net/IpLocality.java",
+    "backend/src/main/java/com/tracepcap/common/net/Cidr.java",
+    "backend/src/main/java/com/tracepcap/common/net/CidrBlock.java",
     "backend/src/main/java/com/tracepcap/common/net/LocalityRules.java",
     "backend/src/main/java/com/tracepcap/common/net/LocalityPolicy.java",
     "frontend/src/utils/formatters/index.ts",

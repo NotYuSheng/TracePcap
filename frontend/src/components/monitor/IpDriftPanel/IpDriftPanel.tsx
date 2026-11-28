@@ -10,7 +10,7 @@ import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import { networkAddressService, type AddressEntry } from '@/features/networkAddress/networkAddressService';
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
 import type { CustomPrivateRange, IpClassification } from '@/features/cluster/types/customPrivateRange.types';
-import { isPrivateIp, ipInCidr, ipToInt } from '@/utils/ipClassification';
+import { isPrivateIp, ipInCidr, compareIps } from '@/utils/ipClassification';
 import { HostDetailModal } from '@components/common/EntityDetailModal/HostDetailModal';
 import { Pagination } from '@components/common/Pagination/Pagination';
 
@@ -355,11 +355,7 @@ export const IpDriftPanel = ({ networkId, snapshots, subnets = [], settings }: I
         for (const ip of ips) lastSeen.set(ip, snap);
       }
 
-      const sortIps = (ips: string[]) =>
-        ips.sort((a, b) => {
-          const ai = ipToInt(a), bi = ipToInt(b);
-          return ai < bi ? -1 : ai > bi ? 1 : 0;
-        });
+      const sortIps = (ips: string[]) => ips.sort(compareIps);
 
       const buildGroup = (filter: (ip: string) => boolean): EntityGroup => {
         const active = sortIps(Array.from(latestIps).filter(filter));
@@ -376,10 +372,7 @@ export const IpDriftPanel = ({ networkId, snapshots, subnets = [], settings }: I
             });
           }
         }
-        absent.sort((a, b) => {
-          const ai = ipToInt(a.key), bi = ipToInt(b.key);
-          return ai < bi ? -1 : ai > bi ? 1 : 0;
-        });
+        absent.sort((a, b) => compareIps(a.key, b.key));
         return { active, absent };
       };
 

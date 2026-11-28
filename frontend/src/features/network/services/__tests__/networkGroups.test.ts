@@ -138,6 +138,9 @@ describe('networkGroups', () => {
   it('subnets and domains', () => {
     expect(subnetOf('10.1.2.3')).toBe('10.1.2.0/24')
     expect(subnetOf('2001:db8:1:2::5')).toBe('2001:db8:1:2::/64')
+    // compressed forms: the address is read, not split on colons (#1354)
+    expect(subnetOf('fe80::1')).toBe('fe80::/64')
+    expect(subnetOf('2001:db8::1:2')).toBe('2001:db8::/64')
     expect(domainOf('cdn.example.co.uk')).toBe('example.co.uk')
     expect(domainOf('www.google.com')).toBe('google.com')
   })

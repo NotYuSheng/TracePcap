@@ -1,5 +1,6 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.common.net.CidrBlock;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -76,12 +77,15 @@ public class SubnetLabelSuggestionService {
             .findById(subnetId)
             .orElseThrow(() -> new ResourceNotFoundException("Subnet not found: " + subnetId));
 
-    long[] range = CidrRange.of(subnet.getCidr());
+    String block =
+        CidrBlock.parse(subnet.getCidr())
+            .map(CidrBlock::toString)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid CIDR: " + subnet.getCidr()));
     // A specific fileId scopes the suggestion to that one snapshot's traffic (per-snapshot AI);
     // otherwise fall back to the network's recent snapshots.
     List<UUID> fileIds = fileId != null ? List.of(fileId) : resolveFileIds(networkId);
 
-    List<MemberNode> members = collectMembers(fileIds, range[0], range[1]);
+    List<MemberNode> members = collectMembers(fileIds, block);
     if (members.isEmpty()) {
       throw new InsufficientEvidenceException(
           "No member nodes were observed in " + subnet.getCidr() + " across the scanned captures.");
@@ -133,7 +137,7 @@ public class SubnetLabelSuggestionService {
       List<String> protocols,
       List<String> externalOrgs) {}
 
-  private List<MemberNode> collectMembers(List<UUID> fileIds, long lo, long hi) {
+  private List<MemberNode> collectMembers(List<UUID> fileIds, String cidr) {
     if (fileIds.isEmpty()) return List.of();
 
     // IPs inside the CIDR, with their best host classification across the scanned files.
@@ -142,7 +146,7 @@ public class SubnetLabelSuggestionService {
         SELECT DISTINCT ON (hc.ip) hc.ip, hc.device_type, hc.confidence, hc.manufacturer
         FROM host_classifications hc
         WHERE hc.file_id = ANY(?)
-          AND ip_to_int(hc.ip) BETWEEN ? AND ?
+          AND ip_inet(hc.ip) <<= CAST(? AS inet)
         ORDER BY hc.ip, hc.confidence DESC
         """;
 
@@ -155,8 +159,7 @@ public class SubnetLabelSuggestionService {
               con -> {
                 var ps = con.prepareStatement(hostSql);
                 ps.setArray(1, con.createArrayOf("uuid", fileIdArray));
-                ps.setLong(2, lo);
-                ps.setLong(3, hi);
+                ps.setString(2, cidr);
                 return ps;
               },
               (rs, i) ->
@@ -182,7 +185,7 @@ public class SubnetLabelSuggestionService {
               (String) row[3],
               lookupRoleLabel(fileIds, ip),
               lookupProtocols(fileIds, ip),
-              lookupExternalOrgs(fileIds, ip, lo, hi)));
+              lookupExternalOrgs(fileIds, ip, cidr)));
     }
     return members;
   }
@@ -237,7 +240,7 @@ public class SubnetLabelSuggestionService {
   }
 
   /** Top external orgs this member talked to (dst outside the subnet, joined to geo cache). */
-  private List<String> lookupExternalOrgs(List<UUID> fileIds, String ip, long lo, long hi) {
+  private List<String> lookupExternalOrgs(List<UUID> fileIds, String ip, String cidr) {
     try {
       return jdbc.query(
           con -> {
@@ -248,14 +251,13 @@ public class SubnetLabelSuggestionService {
                     JOIN ip_geo_cache g ON g.ip = c.dst_ip
                     WHERE c.file_id = ANY(?) AND c.src_ip = ?
                       AND g.org IS NOT NULL
-                      AND (ip_to_int(c.dst_ip) IS NULL
-                           OR ip_to_int(c.dst_ip) NOT BETWEEN ? AND ?)
+                      AND (ip_inet(c.dst_ip) IS NULL
+                           OR NOT (ip_inet(c.dst_ip) <<= CAST(? AS inet)))
                     GROUP BY g.org ORDER BY COUNT(*) DESC LIMIT 4
                     """);
             ps.setArray(1, con.createArrayOf("uuid", fileIds.toArray(new UUID[0])));
             ps.setString(2, ip);
-            ps.setLong(3, lo);
-            ps.setLong(4, hi);
+            ps.setString(3, cidr);
             return ps;
           },
           (rs, i) -> rs.getString("org"));

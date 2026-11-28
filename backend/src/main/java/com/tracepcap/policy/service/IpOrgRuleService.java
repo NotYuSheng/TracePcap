@@ -1,15 +1,13 @@
 package com.tracepcap.policy.service;
 
 import com.tracepcap.common.net.Cidr;
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.policy.dto.IpOrgRuleDto;
 import com.tracepcap.policy.entity.IpOrgRuleEntity;
 import com.tracepcap.policy.repository.IpOrgRuleRepository;
-import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,10 +22,6 @@ public class IpOrgRuleService {
   private final com.tracepcap.governance.PermissionService permissionService;
   private final com.tracepcap.governance.AuditLogService auditLog;
 
-  /** Pre-parsed CIDR cache: avoids repeated string splitting and InetAddress construction. */
-  private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
-  private static final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
-      new ConcurrentHashMap<>();
 
   /** The shared default. */
   public List<IpOrgRuleDto> list() {
@@ -193,7 +187,7 @@ public class IpOrgRuleService {
    */
   public String matchIp(String ip, List<IpOrgRuleEntity> rules) {
     for (IpOrgRuleEntity rule : rules) {
-      if (inCidr(ip, rule.getCidr())) {
+      if (CidrBlock.contains(rule.getCidr(), ip)) {
         return rule.getLabel();
       }
     }
@@ -213,49 +207,5 @@ public class IpOrgRuleService {
     } catch (NumberFormatException ignored) {
     }
     throw new IllegalArgumentException("Invalid CIDR: " + cidr);
-  }
-
-  private boolean inCidr(String ip, String cidr) {
-    if (ip == null || cidr == null) return false;
-    try {
-      Optional<ParsedCidr> opt = cidrCache.computeIfAbsent(cidr, this::parseCidr);
-      if (opt.isEmpty()) return false;
-      ParsedCidr parsed = opt.get();
-      if (!Cidr.isNumericLiteral(ip)) return false; // never a DNS lookup for an endpoint string
-      byte[] addrBytes = InetAddress.getByName(ip).getAddress();
-      byte[] netBytes = parsed.networkBytes();
-      int prefixLen = parsed.prefixLen();
-      if (netBytes.length != addrBytes.length) return false;
-      int fullBytes = prefixLen / 8;
-      int remainingBits = prefixLen % 8;
-      for (int i = 0; i < fullBytes; i++) {
-        if (netBytes[i] != addrBytes[i]) return false;
-      }
-      if (remainingBits > 0 && fullBytes < netBytes.length) {
-        int mask = 0xFF & (0xFF << (8 - remainingBits));
-        if ((netBytes[fullBytes] & mask) != (addrBytes[fullBytes] & mask)) return false;
-      }
-      return true;
-    } catch (Exception e) {
-      log.warn("CIDR match error ip={} cidr={}: {}", ip, cidr, e.getMessage());
-      return false;
-    }
-  }
-
-  /** Pre-parses a CIDR string into network bytes + prefix length, cached by the caller. */
-  private Optional<ParsedCidr> parseCidr(String cidr) {
-    try {
-      String[] parts = cidr.split("/");
-      if (parts.length != 2) return Optional.empty();
-      // A numeric literal only: getByName on anything else (free text an older validator let
-      // through, such as "gw.corp/24") is a DNS lookup, which offline blocks until it times out.
-      if (!Cidr.isNumericLiteral(parts[0])) return Optional.empty();
-      byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
-      int prefixLen = Integer.parseInt(parts[1].trim());
-      return Optional.of(new ParsedCidr(networkBytes, prefixLen));
-    } catch (Exception e) {
-      log.warn("Failed to pre-parse CIDR {}: {}", cidr, e.getMessage());
-      return Optional.empty();
-    }
   }
 }

@@ -3,6 +3,7 @@ package com.tracepcap.report;
 import com.tracepcap.analysis.dto.occupancy.HostOccupancyResponse;
 import com.tracepcap.analysis.dto.segments.NetworkSegmentsResponse;
 import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
+import com.tracepcap.common.net.CidrBlock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,7 +92,7 @@ final class ReportNames {
   String networkOf(String ip) {
     String known = networkOf.get(ip);
     if (known != null) return known;
-    for (var s : segments) if (s.cidr() != null && inCidr(ip, s.cidr())) return s.label();
+    for (var s : segments) if (s.cidr() != null && CidrBlock.contains(s.cidr(), ip)) return s.label();
     return null;
   }
 
@@ -117,25 +118,5 @@ final class ReportNames {
       if (started && notEnded) return h;
     }
     return holders.get(holders.size() - 1);
-  }
-
-  /** Whether an IPv4 address falls in a CIDR range; false for anything it can't read. */
-  static boolean inCidr(String ip, String cidr) {
-    try {
-      String[] parts = cidr.split("/");
-      int bits = parts.length > 1 ? Integer.parseInt(parts[1]) : 32;
-      long mask = bits == 0 ? 0 : (0xFFFFFFFFL << (32 - bits)) & 0xFFFFFFFFL;
-      return (v4(ip) & mask) == (v4(parts[0]) & mask);
-    } catch (RuntimeException e) {
-      return false;
-    }
-  }
-
-  private static long v4(String ip) {
-    String[] o = ip.split("\\.");
-    if (o.length != 4) throw new IllegalArgumentException(ip);
-    long v = 0;
-    for (String s : o) v = (v << 8) | Integer.parseInt(s);
-    return v;
   }
 }

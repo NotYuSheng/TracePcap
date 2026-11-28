@@ -1,5 +1,6 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.subnets.dto.SubnetOverlapWarningDto;
@@ -54,17 +55,13 @@ public class SubnetOverlapDetectionService {
             SubnetDefinitionEntity::isHidden);
     if (subnets.isEmpty()) return List.of();
 
-    // Precompute CIDR integer ranges once.
-    Map<SubnetDefinitionEntity, long[]> ranges = new LinkedHashMap<>();
+    // Read each CIDR once.
+    Map<SubnetDefinitionEntity, CidrBlock> ranges = new LinkedHashMap<>();
     for (SubnetDefinitionEntity s : subnets) {
       // A subnet for one of several networks sharing the range (#462) is the answer to this
       // warning, not a case of it.
       if (s.getSegmentKey() != null) continue;
-      try {
-        ranges.put(s, CidrRange.of(s.getCidr()));
-      } catch (Exception ignored) {
-        // skip malformed CIDR
-      }
+      CidrBlock.parse(s.getCidr()).ifPresent(b -> ranges.put(s, b)); // a malformed CIDR is skipped
     }
 
     Map<Long, SubnetOverlapWarningDto> bySubnet = new LinkedHashMap<>();
@@ -85,13 +82,12 @@ public class SubnetOverlapDetectionService {
           conflictsByFile.getOrDefault(snap.getFile().getId(), Map.of());
       if (conflicts.isEmpty()) continue;
 
-      for (Map.Entry<SubnetDefinitionEntity, long[]> re : ranges.entrySet()) {
+      for (Map.Entry<SubnetDefinitionEntity, CidrBlock> re : ranges.entrySet()) {
         SubnetDefinitionEntity subnet = re.getKey();
         if (bySubnet.containsKey(subnet.getId())) continue; // already flagged from an earlier snapshot
-        long[] range = re.getValue();
+        CidrBlock range = re.getValue();
         for (Map.Entry<String, List<String>> c : conflicts.entrySet()) {
-          Long ipInt = ipToLongOrNull(c.getKey());
-          if (ipInt == null || ipInt < range[0] || ipInt > range[1]) continue;
+          if (!range.contains(c.getKey())) continue;
           bySubnet.put(
               subnet.getId(),
               SubnetOverlapWarningDto.builder()
@@ -145,23 +141,5 @@ public class SubnetOverlapDetectionService {
       return Map.of();
     }
     return byFile;
-  }
-
-  // ── helpers ───────────────────────────────────────────────────────────────
-
-  private static Long ipToLongOrNull(String ip) {
-    try {
-      String[] o = ip.split("\\.");
-      if (o.length != 4) return null;
-      long v = 0;
-      for (String part : o) {
-        int oct = Integer.parseInt(part);
-        if (oct < 0 || oct > 255) return null;
-        v = (v << 8) | oct;
-      }
-      return v;
-    } catch (NumberFormatException e) {
-      return null;
-    }
   }
 }

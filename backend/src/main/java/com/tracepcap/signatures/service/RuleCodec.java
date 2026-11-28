@@ -1,11 +1,12 @@
 package com.tracepcap.signatures.service;
 
+import com.tracepcap.common.net.Cidr;
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.common.exception.FieldValidationException;
 import com.tracepcap.signatures.dto.DetectionRuleRequest;
 import com.tracepcap.signatures.dto.DetectionRuleRequest.Match;
 import com.tracepcap.signatures.dto.DetectionRuleRequest.PayloadPattern;
 import com.tracepcap.signatures.dto.DetectionRuleRequest.RegexPattern;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,7 +29,6 @@ public final class RuleCodec {
   private static final Set<String> SEVERITIES = Set.of("low", "medium", "high", "critical");
   private static final Pattern HEX = Pattern.compile("[0-9a-f]*");
   private static final Pattern JA3 = Pattern.compile("[0-9a-fA-F]{32}");
-  private static final Pattern IP_LITERAL = Pattern.compile("[0-9a-fA-F:.]+");
 
   /** A rule read from a file: the editable fields plus the legacy device_type, if any. */
   public record ParsedRule(DetectionRuleRequest rule, String deviceType) {}
@@ -280,27 +280,14 @@ public final class RuleCodec {
     return s.replaceAll("[\\s:\\-]", "");
   }
 
+  /** An address literal, IPv4 or IPv6; never a DNS lookup ({@link Cidr#addressBytes}). */
   private static boolean isIp(String s) {
-    // Literal check first: InetAddress.getByName would otherwise do a DNS lookup on a hostname.
-    if (!IP_LITERAL.matcher(s).matches()) return false;
-    try {
-      InetAddress.getByName(s);
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
+    return Cidr.addressBytes(s) != null;
   }
 
+  /** A literal CIDR with a prefix, as the matcher reads it ({@link CidrBlock}). */
   private static boolean isCidr(String s) {
-    String[] parts = s.split("/");
-    if (parts.length != 2 || !isIp(parts[0])) return false;
-    try {
-      int len = Integer.parseInt(parts[1]);
-      int max = parts[0].contains(":") ? 128 : 32;
-      return len >= 0 && len <= max;
-    } catch (NumberFormatException e) {
-      return false;
-    }
+    return s.contains("/") && CidrBlock.parse(s).isPresent();
   }
 
   private static boolean notBlank(String s) {

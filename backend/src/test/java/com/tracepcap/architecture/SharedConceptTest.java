@@ -56,4 +56,23 @@ class SharedConceptTest {
           .accessField(LocalityRules.class, "RFC_ONLY")
           .because("production code takes LocalityRules from the policy, custom ranges included"
               + " (#1338)");
+
+  /**
+   * An address string is read by {@code Cidr.addressBytes} and matched by {@code CidrBlock}
+   * (#1354). {@code InetAddress.getByName} on anything that isn't a literal (a MAC endpoint, free
+   * text) is a DNS lookup, which offline hangs until it times out, and five hand-rolled CIDR
+   * matchers each guarded that differently, or not at all.
+   */
+  @ArchTest
+  static final ArchRule addresses_are_read_by_cidr =
+      ArchRuleDefinition.noClasses()
+          .that()
+          .resideOutsideOfPackage("com.tracepcap.common.net..")
+          .should()
+          .callMethod(java.net.InetAddress.class, "getByName", String.class)
+          .orShould()
+          .callMethod(java.net.InetAddress.class, "getAllByName", String.class)
+          .because(
+              "read an address with Cidr.addressBytes and match it with CidrBlock.contains: never a"
+                  + " DNS lookup (#1354)");
 }

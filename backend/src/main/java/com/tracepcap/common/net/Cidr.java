@@ -4,8 +4,9 @@ import java.net.InetAddress;
 import java.util.regex.Pattern;
 
 /**
- * A CIDR an operator types into a settings list (subnet labels, internal/external ranges), checked
- * and written one way (#1351). Two services used to do this differently: one kept {@code
+ * A CIDR an operator types into a settings list (subnet labels, internal/external ranges,
+ * organisation rules), checked and written one way (#1351). {@link CidrBlock} reads a saved one
+ * and answers what is inside it (#1354). Two services used to do this differently: one kept {@code
  * 10.1.2.3/8} as typed and refused IPv6 and bare addresses, the other turned a bare address into
  * {@code /32} and kept host bits, so the same input meant different things in two lists.
  */
@@ -15,6 +16,8 @@ public final class Cidr {
 
   private static final Pattern IPV4 =
       Pattern.compile("^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$");
+
+  private static final Pattern LOOSE_IPV4 = Pattern.compile("^\\d{1,3}(\\.\\d{1,3}){3}$");
 
   /** Hex, colons and an optional dotted tail: an IPv6 literal, never a name to resolve. */
   private static final Pattern IPV6 = Pattern.compile("^[0-9a-fA-F:]*:[0-9a-fA-F:.]*$");
@@ -34,12 +37,8 @@ public final class Cidr {
     String address = (slash < 0 ? cidr : cidr.substring(0, slash)).trim();
     boolean v4 = IPV4.matcher(address).matches();
     if (!v4 && !IPV6.matcher(address).matches()) throw invalid(raw);
-    byte[] bytes;
-    try {
-      bytes = InetAddress.getByName(address).getAddress();
-    } catch (Exception e) {
-      throw invalid(raw);
-    }
+    byte[] bytes = addressBytes(address);
+    if (bytes == null) throw invalid(raw);
     if (v4 != (bytes.length == 4)) throw invalid(raw); // an IPv4-mapped IPv6 literal, say
     int max = bytes.length * 8;
     int prefix;
@@ -51,22 +50,7 @@ public final class Cidr {
       prefix = Integer.parseInt(p);
       if (prefix > max) throw invalid(raw);
     }
-    for (int i = 0; i < bytes.length; i++) {
-      int keep = Math.max(0, Math.min(8, prefix - i * 8));
-      bytes[i] &= (byte) (0xFF << (8 - keep));
-    }
-    return (bytes.length == 4 ? v4(bytes) : v6(bytes)) + "/" + prefix;
-  }
-
-  /**
-   * {@link #normalise}, for a list that is IPv4 only for now: subnet labels and their per-snapshot
-   * overrides. Subnet matching (subnets' CidrRange, the frontend's ipInCidr) is IPv4 arithmetic, so
-   * an IPv6 entry would save and never match (#1354).
-   */
-  public static String normaliseIpv4(String raw) {
-    String cidr = normalise(raw);
-    if (!isIpv4(cidr)) throw new IllegalArgumentException("Subnet labels are IPv4 for now: " + raw.trim());
-    return cidr;
+    return formatAddress(CidrBlock.mask(bytes, prefix)) + "/" + prefix;
   }
 
   /**
@@ -130,19 +114,42 @@ public final class Cidr {
   }
 
   /**
-   * Digits and dots, or an IPv6 literal (hex and colons): text {@code InetAddress.getByName} reads
-   * without a DNS lookup. Looser than {@link #normalise} on purpose ("10.0.0.01" passes), for
-   * matchers reading rows saved before it.
+   * The bytes of an address literal (4 for IPv4, 16 for IPv6), or null for anything else: a name, a
+   * MAC endpoint, a CIDR. Never a DNS lookup. A scope id ({@code fe80::1%eth0}) is dropped, and
+   * an older spelling with leading zeros ({@code 10.0.0.01}) still reads, for rows saved before
+   * {@link #normalise}. An IPv4-mapped IPv6 address reads as its IPv4 address, as {@code
+   * InetAddress} reads it.
    */
-  public static boolean isNumericLiteral(String address) {
-    if (address == null) return false;
-    String a = address.trim();
-    return !a.isEmpty() && (a.matches("[0-9.]+") || IPV6.matcher(a).matches());
+  public static byte[] addressBytes(String ip) {
+    if (ip == null) return null;
+    String a = ip.trim();
+    int zone = a.indexOf('%');
+    if (zone >= 0) a = a.substring(0, zone);
+    if (a.isEmpty()) return null;
+    if (a.indexOf(':') < 0) {
+      // Four dotted parts only: InetAddress also reads "10.1" (as 10.0.0.1), which isn't an address
+      // anyone wrote.
+      if (!LOOSE_IPV4.matcher(a).matches()) return null;
+      String[] o = a.split("\\.");
+      byte[] b = new byte[4];
+      for (int i = 0; i < 4; i++) {
+        int v = Integer.parseInt(o[i]);
+        if (v > 255) return null;
+        b[i] = (byte) v;
+      }
+      return b;
+    }
+    if (!IPV6.matcher(a).matches()) return null;
+    try {
+      return InetAddress.getByName(a).getAddress(); // a literal by the check above, so no lookup
+    } catch (Exception e) {
+      return null;
+    }
   }
 
-  /** Whether a CIDR {@link #normalise} wrote is IPv4. */
-  public static boolean isIpv4(String normalised) {
-    return normalised != null && normalised.indexOf(':') < 0;
+  /** {@code 10.0.0.1}, or IPv6 in RFC 5952 form ({@code fd00::1}): how an address is written. */
+  public static String formatAddress(byte[] b) {
+    return b.length == 4 ? v4(b) : v6(b);
   }
 
   private static IllegalArgumentException invalid(String raw) {

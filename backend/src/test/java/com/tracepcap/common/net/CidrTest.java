@@ -46,12 +46,6 @@ class CidrTest {
   }
 
   @Test
-  void tellsIpv4FromIpv6() {
-    assertThat(Cidr.isIpv4(Cidr.normalise("10.0.0.0/8"))).isTrue();
-    assertThat(Cidr.isIpv4(Cidr.normalise("fd00::/8"))).isFalse();
-  }
-
-  @Test
   void aStoredCidrIsWrittenAsASaveWouldWriteIt() {
     assertThat(Cidr.key("10.1.2.3/24")).isEqualTo("10.1.2.0/24");
     assertThat(Cidr.key("fd00:0:0:0:0:0:0:0/8")).isEqualTo("fd00::/8");
@@ -60,28 +54,35 @@ class CidrTest {
   }
 
   @Test
-  void subnetListsAreIpv4ForNow() {
-    assertThat(Cidr.normaliseIpv4("10.1.2.3/24")).isEqualTo("10.1.2.0/24");
-    assertThatThrownBy(() -> Cidr.normaliseIpv4("fd00::/64")).hasMessageContaining("IPv4 for now");
-  }
-
-  @Test
   void aSpellingSentBackExactlyAsSavedIsKept_anythingNewIsNormalised() {
     java.util.Set<String> saved = java.util.Set.of("10.62.0.9/24", "10.0.0.01/24");
     // A row V86 left in its old spelling: still the same entry when the list sends it back.
-    assertThat(Cidr.asSaved(" 10.62.0.9/24 ", saved, Cidr::normaliseIpv4)).isEqualTo("10.62.0.9/24");
-    assertThat(Cidr.asSaved("10.0.0.01/24", saved, Cidr::normaliseIpv4)).isEqualTo("10.0.0.01/24");
-    assertThat(Cidr.asSaved("10.63.0.9/24", saved, Cidr::normaliseIpv4)).isEqualTo("10.63.0.0/24");
-    assertThatThrownBy(() -> Cidr.asSaved("10.0.0.02/24", saved, Cidr::normaliseIpv4))
+    assertThat(Cidr.asSaved(" 10.62.0.9/24 ", saved, Cidr::normalise)).isEqualTo("10.62.0.9/24");
+    assertThat(Cidr.asSaved("10.0.0.01/24", saved, Cidr::normalise)).isEqualTo("10.0.0.01/24");
+    assertThat(Cidr.asSaved("10.63.0.9/24", saved, Cidr::normalise)).isEqualTo("10.63.0.0/24");
+    assertThatThrownBy(() -> Cidr.asSaved("10.0.0.02/24", saved, Cidr::normalise))
         .hasMessageStartingWith("Invalid CIDR");
   }
 
   @Test
-  void aNumericLiteralNeverNeedsADnsLookup() {
-    assertThat(Cidr.isNumericLiteral("10.0.0.01")).isTrue(); // an old row the matchers still read
-    assertThat(Cidr.isNumericLiteral("fd00::1")).isTrue();
-    assertThat(Cidr.isNumericLiteral("gw.corp")).isFalse();
-    assertThat(Cidr.isNumericLiteral("dead.beef")).isFalse(); // hex letters, but a name to InetAddress
-    assertThat(Cidr.isNumericLiteral(" ")).isFalse();
+  void readsAddressLiteralsOnly_neverADnsLookup() {
+    assertThat(Cidr.addressBytes("10.0.0.01")).containsExactly(10, 0, 0, 1); // an old row still reads
+    assertThat(Cidr.addressBytes("fe80::1%eth0")).hasSize(16); // the scope id is dropped
+    assertThat(Cidr.addressBytes(" FD00::1 ")).hasSize(16);
+    assertThat(Cidr.addressBytes("gw.corp")).isNull();
+    assertThat(Cidr.addressBytes("dead.beef")).isNull(); // hex letters, but a name to InetAddress
+    assertThat(Cidr.addressBytes("10.1")).isNull(); // InetAddress reads this as 10.0.0.1
+    assertThat(Cidr.addressBytes("10.0.0.256")).isNull();
+    assertThat(Cidr.addressBytes("aa:bb:cc:dd:ee:ff:00")).isNull(); // not an address
+    assertThat(Cidr.addressBytes("1::2::3")).isNull();
+    assertThat(Cidr.addressBytes(" ")).isNull();
+    assertThat(Cidr.addressBytes(null)).isNull();
+  }
+
+  @Test
+  void writesAnAddressAsItIsTyped() {
+    assertThat(Cidr.formatAddress(Cidr.addressBytes("2001:0db8:0000:0000:0000:0000:0000:0001")))
+        .isEqualTo("2001:db8::1");
+    assertThat(Cidr.formatAddress(Cidr.addressBytes("10.0.0.01"))).isEqualTo("10.0.0.1");
   }
 }

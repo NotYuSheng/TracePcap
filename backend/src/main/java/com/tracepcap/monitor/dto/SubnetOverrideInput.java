@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class SubnetOverrideInput {
-  /** Checked and written by Cidr.normaliseIpv4 in SnapshotService: one CIDR rule (#1351). */
+  /** Checked and written by Cidr.normalise in SnapshotService: one CIDR rule (#1351). */
   @NotBlank
   private String cidr;
   private String label;

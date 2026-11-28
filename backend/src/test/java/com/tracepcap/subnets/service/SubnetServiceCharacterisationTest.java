@@ -132,11 +132,9 @@ class SubnetServiceCharacterisationTest {
   }
 
   @Test
-  void subnetCidr_saysIpv6IsNotYetASubnet() {
-    // Matching is IPv4 arithmetic: an IPv6 label would save and never match.
-    assertThatThrownBy(() -> SubnetService.subnetCidr("fd00::/64"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("IPv4 for now");
+  void subnetCidr_takesIpv6() {
+    // Matching reads bytes and inet now (#1354), so an IPv6 label matches its hosts.
+    assertThat(SubnetService.subnetCidr("FD00:0:0:1::5/64")).isEqualTo("fd00:0:0:1::/64");
   }
 
   @ParameterizedTest

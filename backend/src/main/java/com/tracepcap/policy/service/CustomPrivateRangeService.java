@@ -1,17 +1,14 @@
 package com.tracepcap.policy.service;
 
 import com.tracepcap.common.net.Cidr;
+import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.policy.dto.CustomPrivateRangeDto;
 import com.tracepcap.policy.entity.CustomPrivateRangeEntity;
 import com.tracepcap.policy.entity.IpClassification;
 import com.tracepcap.policy.repository.CustomPrivateRangeRepository;
-import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,13 +23,6 @@ public class CustomPrivateRangeService {
   private final com.tracepcap.governance.PermissionService permissionService;
   private final com.tracepcap.governance.AuditLogService auditLog;
 
-  private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
-  private final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
-      new ConcurrentHashMap<>();
-
-  // Matches dotted-decimal IPv4 or hex-colon IPv6 — rejects hostnames before DNS lookup
-  private static final Pattern NUMERIC_IP =
-      Pattern.compile("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F]*:[0-9a-fA-F:.]*$");
 
   /** The shared default. */
   public List<CustomPrivateRangeDto> list() {
@@ -71,7 +61,6 @@ public class CustomPrivateRangeService {
     entity.setClassification(classification);
     entity.setCreatedAt(LocalDateTime.now());
     entity = repository.save(entity);
-    cidrCache.clear();
     CustomPrivateRangeDto after = toDto(entity);
     auditLog.record("private-range.default.set", "private-range", cidr, before, after);
     return after;
@@ -101,7 +90,6 @@ public class CustomPrivateRangeService {
           repository.delete(e);
           auditLog.record("private-range.default.delete", "private-range", e.getCidr(), toDto(e), null);
         });
-    cidrCache.clear();
   }
 
   /** The shared default, for batch classification. */
@@ -181,7 +169,6 @@ public class CustomPrivateRangeService {
     e.setHidden(hidden);
     e.setCreatedAt(LocalDateTime.now());
     e = repository.save(e);
-    cidrCache.clear();
     CustomPrivateRangeDto after = toDto(e);
     after.setScope("network");
     after.setHidden(hidden);
@@ -201,7 +188,6 @@ public class CustomPrivateRangeService {
             .filter(r -> networkId.equals(r.getNetworkId()))
             .orElseThrow(() -> new com.tracepcap.common.exception.ResourceNotFoundException("Entry not found: " + id));
     repository.delete(e);
-    cidrCache.clear();
     auditLog.record("private-range.network.revert", "network-private-range", networkId + "/" + e.getCidr(), toDto(e), null);
   }
 
@@ -211,10 +197,10 @@ public class CustomPrivateRangeService {
    */
   public boolean isOverriddenPrivate(String ip, List<CustomPrivateRangeEntity> ranges) {
     if (ip == null || ranges.isEmpty()) return false;
-    byte[] addrBytes = resolveAddress(ip);
+    byte[] addrBytes = Cidr.addressBytes(ip);
     if (addrBytes == null) return false;
     for (CustomPrivateRangeEntity range : ranges) {
-      if (inCidrBytes(addrBytes, range.getCidr())) return true;
+      if (CidrBlock.contains(range.getCidr(), addrBytes)) return true;
     }
     return false;
   }
@@ -233,10 +219,10 @@ public class CustomPrivateRangeService {
    */
   public Override overrideFor(String ip, List<CustomPrivateRangeEntity> ranges) {
     if (ip == null || ranges == null || ranges.isEmpty()) return Override.NONE;
-    byte[] addrBytes = resolveAddress(ip);
+    byte[] addrBytes = Cidr.addressBytes(ip);
     if (addrBytes == null) return Override.NONE;
     for (CustomPrivateRangeEntity range : ranges) {
-      if (inCidrBytes(addrBytes, range.getCidr())) {
+      if (CidrBlock.contains(range.getCidr(), addrBytes)) {
         return range.getClassification() == IpClassification.PUBLIC
             ? Override.FORCE_PUBLIC
             : Override.FORCE_PRIVATE;
@@ -251,64 +237,11 @@ public class CustomPrivateRangeService {
    */
   public boolean isInCidrs(String ip, List<String> cidrs) {
     if (ip == null || cidrs.isEmpty()) return false;
-    byte[] addrBytes = resolveAddress(ip);
+    byte[] addrBytes = Cidr.addressBytes(ip);
     if (addrBytes == null) return false;
     for (String cidr : cidrs) {
-      if (inCidrBytes(addrBytes, cidr)) return true;
+      if (CidrBlock.contains(cidr, addrBytes)) return true;
     }
     return false;
-  }
-
-  private byte[] resolveAddress(String ip) {
-    // A literal only: getByName on anything else (a MAC endpoint, a name) is a DNS lookup, which
-    // offline blocks until it times out.
-    if (ip == null || !NUMERIC_IP.matcher(ip.trim()).matches()) return null;
-    try {
-      return InetAddress.getByName(ip).getAddress();
-    } catch (Exception e) {
-      log.warn("Failed to resolve IP address {}: {}", ip, e.getMessage());
-      return null;
-    }
-  }
-
-  private boolean inCidrBytes(byte[] addrBytes, String cidr) {
-    if (cidr == null) return false;
-    Optional<ParsedCidr> opt = cidrCache.computeIfAbsent(cidr, this::parseCidr);
-    if (opt.isEmpty()) return false;
-    ParsedCidr parsed = opt.get();
-    byte[] netBytes = parsed.networkBytes();
-    int prefixLen = parsed.prefixLen();
-    if (netBytes.length != addrBytes.length) return false;
-    int fullBytes = prefixLen / 8;
-    int remainingBits = prefixLen % 8;
-    for (int i = 0; i < fullBytes; i++) {
-      if (netBytes[i] != addrBytes[i]) return false;
-    }
-    if (remainingBits > 0 && fullBytes < netBytes.length) {
-      int mask = 0xFF & (0xFF << (8 - remainingBits));
-      if ((netBytes[fullBytes] & mask) != (addrBytes[fullBytes] & mask)) return false;
-    }
-    return true;
-  }
-
-  private Optional<ParsedCidr> parseCidr(String cidr) {
-    try {
-      String[] parts = cidr.split("/");
-      if (parts.length != 2) return Optional.empty();
-      // A numeric literal only: getByName on anything else (free text an older validator let
-      // through, such as "gw.corp/24") is a DNS lookup, which offline blocks until it times out.
-      if (!Cidr.isNumericLiteral(parts[0])) return Optional.empty();
-      byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
-      int prefixLen = Integer.parseInt(parts[1].trim());
-      int maxPrefix = networkBytes.length * 8;
-      if (prefixLen < 0 || prefixLen > maxPrefix) {
-        log.warn("CIDR prefix out of range for {}: {}", cidr, prefixLen);
-        return Optional.empty();
-      }
-      return Optional.of(new ParsedCidr(networkBytes, prefixLen));
-    } catch (Exception e) {
-      log.warn("Failed to pre-parse CIDR {}: {}", cidr, e.getMessage());
-      return Optional.empty();
-    }
   }
 }

@@ -251,7 +251,10 @@ public class GeoIpService {
   private GeoResult lookupFromMmdb(String ip) {
     if (dbReader == null) return null;
     try {
-      InetAddress addr = InetAddress.getByName(ip);
+      // From the literal's bytes: getByName on anything else (a MAC endpoint) is a DNS lookup.
+      byte[] bytes = com.tracepcap.common.net.Cidr.addressBytes(ip);
+      if (bytes == null) return null;
+      InetAddress addr = InetAddress.getByAddress(bytes);
       CityResponse resp = dbReader.city(addr);
 
       String countryCode = resp.getCountry() != null ? resp.getCountry().getIsoCode() : null;
