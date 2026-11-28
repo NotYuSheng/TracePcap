@@ -3,7 +3,9 @@ package com.tracepcap.subnets.service;
 import com.tracepcap.common.net.CidrBlock;
 import com.tracepcap.common.net.Cidr;
 import com.tracepcap.common.net.LocalityPolicy;
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.common.net.LocalityRules;
+import com.tracepcap.common.net.MacAddress;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.subnets.dto.SubnetDefinitionDto;
@@ -266,16 +268,76 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
    */
   public List<SubnetDefinitionDto> detectFromFile(UUID fileId) {
     LocalityRules locality = localityPolicy.currentRules();
-    List<Long> ipInts =
-        hostClassificationLookup.classifiedHosts(fileId).stream()
-            .map(h -> h.ip())
-            .filter(locality::isLocal)
-            .map(ip -> parseIp(ip))
-            .filter(v -> v != null && v >= 0)
-            .distinct()
-            .collect(Collectors.toList());
+    return detectFromFile(fileId, ipv4Ints(fileId, locality), hostClassificationLookup.hostFacts(fileId), locality);
+  }
 
-    return splitBySegment(selectCandidates(ipInts, 1, 1), segmentLookup.segments(fileId), 1, 1);
+  /** The file's local IPv4 hosts, as the density search reads them. */
+  private List<Long> ipv4Ints(UUID fileId, LocalityRules locality) {
+    return hostClassificationLookup.classifiedHosts(fileId).stream()
+        .map(h -> h.ip())
+        .filter(locality::isLocal)
+        .map(ip -> parseIp(ip))
+        .filter(v -> v != null && v >= 0)
+        .distinct()
+        .collect(Collectors.toList());
+  }
+
+  /** Both families' candidates for one file, split per network where several share a range (#462). */
+  private List<SubnetDefinitionDto> detectFromFile(
+      UUID fileId,
+      List<Long> ipInts,
+      List<com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts> hosts,
+      LocalityRules locality) {
+    List<SubnetDefinitionDto> found = new ArrayList<>(selectCandidates(ipInts, 1, 1));
+    found.addAll(ipv6Candidates(hosts, locality, 1, 1));
+    return splitBySegment(found, segmentLookup.segments(fileId), 1, 1);
+  }
+
+  /** The prefix an IPv6 LAN uses: SLAAC needs a /64, so an IPv6 subnet is one by convention. */
+  static final int IPV6_LAN_PREFIX = 64;
+
+  /**
+   * IPv6 candidates (#1357): each local /64 the hosts are on, with at least {@link
+   * #MIN_HOSTS_PER_SUBNET} machines in it. The IPv4 search below scores density, which means
+   * nothing for IPv6 (a /64 holds 2^64 addresses), so this proposes the /64s seen, with no density.
+   * Machines are counted by MAC, and an address with no MAC isn't counted: an IPv6 host has several
+   * addresses (SLAAC and temporary ones), and those without a claim would each read as a machine.
+   * Link-local is the same /64 on every link, and loopback and multicast aren't machines: none of
+   * them names a subnet. "Local" is the locality policy, so an organisation's global prefix counts once it's a
+   * custom internal range, as a public IPv4 range does.
+   */
+  static List<SubnetDefinitionDto> ipv6Candidates(
+      List<com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts> hosts,
+      LocalityRules locality,
+      int snapshotsSeen,
+      int totalSnapshots) {
+    Map<String, java.util.Set<String>> machinesByNet = new java.util.TreeMap<>();
+    for (var h : hosts) {
+      String ip = h.ip();
+      if (ip == null || ip.indexOf(':') < 0 || !locality.isLocal(ip)) continue;
+      byte[] b = Cidr.addressBytes(ip);
+      if (b == null || b.length != 16) continue;
+      if (IpLocality.isLinkLocal(ip) || IpLocality.isLoopback(ip) || !IpLocality.isHostAddress(ip)) continue;
+      String mac = MacAddress.normalise(h.mac());
+      if (mac == null) continue;
+      String net = CidrBlock.parse(ip + "/" + IPV6_LAN_PREFIX).map(CidrBlock::toString).orElse(null);
+      if (net == null) continue;
+      machinesByNet.computeIfAbsent(net, k -> new java.util.LinkedHashSet<>()).add(mac);
+    }
+    List<SubnetDefinitionDto> out = new ArrayList<>();
+    machinesByNet.forEach((net, machines) -> {
+      if (machines.size() < MIN_HOSTS_PER_SUBNET) return;
+      out.add(
+          SubnetDefinitionDto.builder()
+              .cidr(net)
+              .source("AUTO")
+              .confirmed(false)
+              .hostCount(machines.size())
+              .snapshotsSeen(snapshotsSeen)
+              .totalSnapshots(totalSnapshots)
+              .build());
+    });
+    return out;
   }
 
   /**
@@ -341,8 +403,16 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
     // The networks across all snapshots (#462), merged by key: the same VLAN or DHCP server in
     // every weekly capture is one network.
     Map<String, com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment> segmentsByKey = new LinkedHashMap<>();
+    LocalityRules locality = localityPolicy.currentRules();
+    // Each snapshot's hosts read once, for its own candidates and for the union below.
+    List<Long> allIps = new ArrayList<>();
+    List<com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts> allHosts = new ArrayList<>();
     for (UUID fileId : fileIds) {
-      List<SubnetDefinitionDto> snapCandidates = detectFromFile(fileId);
+      List<Long> ints = ipv4Ints(fileId, locality);
+      var hosts = hostClassificationLookup.hostFacts(fileId);
+      allIps.addAll(ints);
+      allHosts.addAll(hosts);
+      List<SubnetDefinitionDto> snapCandidates = detectFromFile(fileId, ints, hosts, locality);
       for (SubnetDefinitionDto c : snapCandidates) {
         cidrSnapshotCount.merge(candidateKey(c), 1, Integer::sum);
       }
@@ -358,20 +428,12 @@ public class SubnetService implements com.tracepcap.common.net.SavedSubnetCidrs 
       }
     }
 
-    // Re-run density scoring on the union of all IPs for final hostCount/densityScore
-    LocalityRules locality = localityPolicy.currentRules();
-    List<Long> allIps =
-        fileIds.stream()
-            .flatMap(fid -> hostClassificationLookup.classifiedHosts(fid).stream())
-            .map(h -> h.ip())
-            .filter(locality::isLocal)
-            .map(ip -> parseIp(ip))
-            .filter(v -> v != null && v >= 0)
-            .distinct()
-            .collect(Collectors.toList());
-
-    List<SubnetDefinitionDto> base =
-        splitBySegment(selectCandidates(allIps, 1, 1), new ArrayList<>(segmentsByKey.values()), 1, 1);
+    // Re-run scoring on the union of every snapshot's hosts for the final hostCount/densityScore,
+    // IPv4 by density and IPv6 by /64 (#1357), then split per network (#462).
+    List<SubnetDefinitionDto> found =
+        new ArrayList<>(selectCandidates(allIps.stream().distinct().collect(Collectors.toList()), 1, 1));
+    found.addAll(ipv6Candidates(allHosts, locality, 1, 1));
+    List<SubnetDefinitionDto> base = splitBySegment(found, new ArrayList<>(segmentsByKey.values()), 1, 1);
 
     // Merge consistency scores in
     List<SubnetDefinitionDto> result = new ArrayList<>();
