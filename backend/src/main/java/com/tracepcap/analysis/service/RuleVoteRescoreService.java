@@ -59,7 +59,7 @@ public class RuleVoteRescoreService implements RuleVoteRescorer {
   private final AuditLogService auditLog;
   private final ApplicationEventPublisher events;
 
-  /** Null in unit tests built without a session. */
+  /** The session the pages are let go from. {@link #rescore} needs a transaction either way. */
   @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
   @Override
@@ -69,31 +69,36 @@ public class RuleVoteRescoreService implements RuleVoteRescorer {
     // A page at a time, each saved and let go before the next: the whole file's hosts, three JSON
     // maps each, in one session was a scan capture's heap (#1377).
     int[] staleCount = {0};
+    int[] changedCount = {0};
     boolean[] votesChanged = {false};
+    List<Object> written = new ArrayList<>();
     // The file's analyst labels, read once: one lookup per re-typed host was 200k queries.
     Map<String, HumanOverrideEntity> labels = new java.util.HashMap<>();
-    overrides.findByQuestionAndFileId(HOST_IDENTITY, fileId).forEach(o -> labels.putIfAbsent(o.getEntityKey(), o));
+    overrides.findByQuestionAndFileIdOrderByIdAsc(HOST_IDENTITY, fileId)
+        .forEach(o -> labels.putIfAbsent(o.getEntityKey(), o));
     com.tracepcap.common.db.InPages.forEach(
         (UUID after, org.springframework.data.domain.Limit limit) -> after == null
             ? hosts.findByFileIdOrderByIdAsc(fileId, limit)
             : hosts.findByFileIdAndIdGreaterThanOrderByIdAsc(fileId, after, limit),
         HostClassificationEntity::getId,
         host -> {
-          if (rescoreOne(fileId, host, votes, actor, changes, staleCount, labels)) votesChanged[0] = true;
+          if (rescoreOne(fileId, host, votes, actor, changes, changedCount, staleCount, labels, written)) {
+            votesChanged[0] = true;
+          }
         },
-        entityManager);
-    if (!changes.isEmpty()) events.publishEvent(new HostClassificationsRescoredEvent(fileId));
+        entityManager, written);
+    if (changedCount[0] > 0) events.publishEvent(new HostClassificationsRescoredEvent(fileId));
     if (votesChanged[0]) {
       log.info("Re-scored rule votes on {}: {} device type(s) changed, {} label(s) flagged stale",
-          fileId, changes.size(), staleCount[0]);
+          fileId, changedCount[0], staleCount[0]);
     }
-    return new Outcome(changes, staleCount[0]);
+    return new Outcome(changes, staleCount[0], changedCount[0]);
   }
 
   /** Re-scores one host; true when its votes changed. Adds a {@link Change} when its type did. */
   private boolean rescoreOne(UUID fileId, HostClassificationEntity host,
-      Map<String, List<ClassificationHint>> votes, String actor, List<Change> changes, int[] stale,
-      Map<String, HumanOverrideEntity> labels) {
+      Map<String, List<ClassificationHint>> votes, String actor, List<Change> changes, int[] changed,
+      int[] stale, Map<String, HumanOverrideEntity> labels, List<Object> written) {
     // A failover address's type comes from the protocol, not the vote.
     if (HostIdentityChecks.VIRTUAL_FAILOVER.equals(host.getAddressKind())) return false;
     Map<String, String> before = ruleNames(host.getRuleVotes());
@@ -110,13 +115,18 @@ public class RuleVoteRescoreService implements RuleVoteRescorer {
       host.setRescoredFrom(r.fromType());
       host.setRescoredBy(actor);
       host.setRescoredRules(String.join(", ", rules));
-      changes.add(new Change(fileId, host.getIp(), r.fromType(), r.toType(), rules));
+      changed[0]++;
+      // The first few, to read: the count stays exact (LISTED_CHANGES).
+      if (changes.size() < LISTED_CHANGES) {
+        changes.add(new Change(fileId, host.getIp(), r.fromType(), r.toType(), rules));
+      }
       Map<String, Object> was = new LinkedHashMap<>();
       was.put("deviceType", r.fromType());
       Map<String, Object> now = new LinkedHashMap<>();
       now.put("deviceType", r.toType());
       now.put("rules", rules);
-      auditLog.record("host-classification.rescore", "host-classification", fileId + "/" + host.getIp(), was, now);
+      written.add(auditLog.record(
+          "host-classification.rescore", "host-classification", fileId + "/" + host.getIp(), was, now));
       if (flagLabelIfContradicted(labels.get(host.getIp()), r, rules)) stale[0]++;
     }
     hosts.save(host);

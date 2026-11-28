@@ -80,10 +80,13 @@ public final class InPages {
    * then let go before the next is read, so a rewrite of 200k hosts holds one page, not the file.
    * Needs a transaction (the writes must land in it). The rows are detached afterwards, so the
    * action must not hand one to anything that outlives its page.
+   *
+   * @param written rows the action saved alongside (audit entries, say), to let go with the page;
+   *     the action adds to it, and it's emptied after each page. Null: none.
    */
   public static <E, K> void forEach(
       BiFunction<K, Limit, List<E>> page, Function<E, K> id, java.util.function.Consumer<E> action,
-      EntityManager entityManager) {
+      EntityManager entityManager, java.util.Collection<Object> written) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new IllegalStateException("InPages.forEach writes, so it needs a transaction");
     }
@@ -93,9 +96,12 @@ public final class InPages {
       List<E> rows = page.apply(after, Limit.of(SIZE));
       rows.forEach(action);
       if (entityManager != null) {
+        // Only this page's rows and what was written with them are in the session to check.
         entityManager.flush();
         rows.forEach(entityManager::detach);
+        if (written != null) written.forEach(w -> { if (w != null) entityManager.detach(w); });
       }
+      if (written != null) written.clear();
       if (rows.size() < SIZE) return;
       after = id.apply(rows.get(rows.size() - 1));
     }

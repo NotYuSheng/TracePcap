@@ -122,7 +122,7 @@ public class RuleReapplyJobService {
         RuleSyncService.ReapplyOutcome outcome = sync.reapply(fileId, actor);
         done++;
         // Device types re-scored from the rules' votes (#925): listed in the job's result.
-        reclassified += outcome.rescore().changes().size();
+        reclassified += outcome.rescore().changed();
         staleLabels += outcome.rescore().staleLabels();
         for (var c : outcome.rescore().changes()) {
           if (changes.size() >= MAX_LISTED_CHANGES) break;
