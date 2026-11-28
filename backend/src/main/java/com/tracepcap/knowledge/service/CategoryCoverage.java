@@ -53,10 +53,13 @@ public class CategoryCoverage {
   public List<CategoryStatus> coverage(
       UUID fileId, InvestigationReport report, CaptureContextService.CaptureContext context,
       HoneypotRoleService.HoneypotReport honeypots) {
-    ConversationLookup.FacetCounts facets = conversations.facetCounts(fileId);
+    // Only which protocols and apps are present: two DISTINCTs, not every facet's counts (#1327).
+    Set<String> l7 = new HashSet<>(
+        conversations.distinctValues(fileId, ConversationLookup.Facet.PROTOCOL));
+    Set<String> apps = new HashSet<>(
+        conversations.distinctValues(fileId, ConversationLookup.Facet.APP_NAME));
     return withHoneypots(withContext(compute(catalogue.entries(), answeredQuestions(report),
-        ruledOutQuestions(report), facets.l7Protocols().keySet(), facets.apps().keySet()), context),
-        honeypots, context);
+        ruledOutQuestions(report), l7, apps), context), honeypots, context);
   }
 
   /**

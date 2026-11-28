@@ -394,10 +394,34 @@ public class TsharkEnrichmentService implements Extractor {
   static String extractAppLayerProto(String frameProtocols, String l4proto) {
     if (frameProtocols.isEmpty()) return null;
     String[] stack = frameProtocols.split(":");
-    String top = stack[stack.length - 1].toUpperCase();
-    if (top.equalsIgnoreCase(l4proto) || NON_APP_PROTOCOLS.contains(top)) return null;
+    int i = stack.length - 1;
+    // A body (an HTTP response's text, a mail's message, a certificate) is not the protocol that
+    // carried it: "tcp:http:data-text-lines" is HTTP. Counting the body split one HTTP flow into
+    // HTTP and DATA-TEXT-LINES, and the stored label missed the HTTP filter (#1327). Only above an
+    // application protocol: "udp:xml" (WS-Discovery) has nothing else to call it.
+    while (i > 0 && PAYLOAD_FORMATS.contains(stack[i].toUpperCase())
+        && !isTransport(stack[i - 1], l4proto)) {
+      i--;
+    }
+    String top = stack[i].toUpperCase();
+    if (isTransport(top, l4proto)) return null;
     return top;
   }
+
+  private static boolean isTransport(String proto, String l4proto) {
+    return proto.equalsIgnoreCase(l4proto) || NON_APP_PROTOCOLS.contains(proto.toUpperCase());
+  }
+
+  /**
+   * Dissectors for what a protocol carries rather than for a protocol: bodies (HTTP's media types,
+   * IMF for mail) and certificates (TLS's X.509 and PKIX). Seen on real captures as the deepest
+   * entry of most HTTP response packets.
+   */
+  private static final Set<String> PAYLOAD_FORMATS =
+      Set.of(
+          "DATA", "DATA-TEXT-LINES", "URLENCODED-FORM", "MEDIA", "JSON", "XML", "PNG",
+          "IMAGE-JFIF", "IMAGE-GIF", "MIME_MULTIPART", "IMF", "X509SAT", "X509AF", "X509CE",
+          "X509IF", "PKIX1EXPLICIT", "PKIX1IMPLICIT", "PKCS-1");
 
   /** Uppercase and strip a leading "The " article (e.g. "The Netherlands" → "NETHERLANDS"). */
   static String normalizeL7Protocol(String proto) {
