@@ -139,6 +139,17 @@ RULES.append({
     },
 })
 
+RULES.append({
+    "name": "a key list split into batches by hand",
+    "why": "a 200k-address IN ran the analysis out of heap and past Postgres's 65,535 bind"
+    " parameters; the batching lives in one place so the limit is set once (#1371)",
+    "owner": "backend common/db/InBatches.of",
+    # The loop's slice: subList(i, Math.min(...)). A top-N cut, subList(0, Math.min(...)), isn't one.
+    "pattern": re.compile(r"""subList\(\s*[A-Za-z_]\w*\s*,\s*Math\.min\("""),
+    "owners": {"backend/src/main/java/com/tracepcap/common/db/InBatches.java"},
+    "exempt": set(),
+})
+
 SCAN_DIRS = ["backend/src/main/java", "frontend/src"]
 SCAN_SUFFIXES = {".java", ".ts", ".tsx"}
 

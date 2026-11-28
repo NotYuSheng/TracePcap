@@ -48,7 +48,8 @@ public class PacketLookupAdapter implements PacketLookup {
   @Override
   public Map<UUID, List<String>> detectedFileTypesByConversation(Collection<UUID> conversationIds) {
     if (conversationIds == null || conversationIds.isEmpty()) return Map.of();
-    return repository.findFileTypesByConversationIds(List.copyOf(conversationIds)).stream()
+    return com.tracepcap.common.db.InBatches.of(conversationIds, repository::findFileTypesByConversationIds)
+        .stream()
         .collect(
             Collectors.groupingBy(
                 row -> (UUID) row[0],
@@ -62,7 +63,8 @@ public class PacketLookupAdapter implements PacketLookup {
     if (conversationIds == null || conversationIds.isEmpty()) return Set.of();
     // The query projects (conversationId, detectedFileType); only the id is part of the question
     // the port answers, so the type is dropped here rather than leaking an Object[] to callers.
-    return repository.findFileTypesByConversationIds(List.copyOf(conversationIds)).stream()
+    return com.tracepcap.common.db.InBatches.of(conversationIds, repository::findFileTypesByConversationIds)
+        .stream()
         .map(row -> (UUID) row[0])
         .collect(Collectors.toUnmodifiableSet());
   }

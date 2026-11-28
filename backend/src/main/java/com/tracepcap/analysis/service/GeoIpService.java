@@ -120,6 +120,38 @@ public class GeoIpService {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /**
+   * Caches every external address here that isn't cached and fresh already, and returns nothing:
+   * for callers that read the cache afterwards ({@code GeoOrgLookup}). Reads only which addresses
+   * are fresh, not their entries, and writes a batch at a time, so a scan capture's 200k addresses
+   * hold no entities in the session ({@link #lookupExternal} returns them all).
+   */
+  public void warm(java.util.Collection<String> ips) {
+    if (!geoEnabled || ips == null || ips.isEmpty()) return;
+    List<String> external = ips.stream().filter(ip -> !shouldSkipLookup(ip)).distinct().toList();
+    if (external.isEmpty()) return;
+    LocalDateTime since = LocalDateTime.now().minusDays(CACHE_TTL_DAYS);
+    Set<String> fresh = new HashSet<>(com.tracepcap.common.db.InBatches.of(
+        external, batch -> geoInfoRepository.findFreshIps(batch, since)));
+    Boolean online = null;
+    List<IpGeoInfoEntity> toSave = new ArrayList<>();
+    for (String ip : external) {
+      if (fresh.contains(ip)) continue;
+      if (online == null) online = isOnline();
+      GeoResult r = online ? lookupFromIpInfo(ip) : null;
+      if (r == null) r = lookupFromMmdb(ip);
+      if (r == null) continue;
+      toSave.add(buildEntity(ip, r));
+      if (toSave.size() == WARM_BATCH) {
+        geoInfoRepository.upsertAll(toSave);
+        toSave.clear();
+      }
+    }
+    geoInfoRepository.upsertAll(toSave);
+  }
+
+  private static final int WARM_BATCH = 1_000;
+
+  /**
    * Returns geo results for all external IPs in the given set.
    * Private/loopback/link-local addresses are silently skipped.
    */
@@ -134,7 +166,7 @@ public class GeoIpService {
     List<IpGeoInfoEntity> toRefresh = new ArrayList<>();
 
     LocalDateTime staleThreshold = LocalDateTime.now().minusDays(CACHE_TTL_DAYS);
-    for (IpGeoInfoEntity e : geoInfoRepository.findAllByIpIn(external)) {
+    for (IpGeoInfoEntity e : geoInfoRepository.findByIps(external)) {
       boolean incomplete = e.getLat() == null && e.getCountryCode() != null;
       boolean stale = e.getLookedUpAt() != null && e.getLookedUpAt().isBefore(staleThreshold);
       if (incomplete || stale) {
@@ -177,8 +209,8 @@ public class GeoIpService {
           toSave.add(buildEntity(ip, r));
         }
       }
-      // Upsert, not insert: another analysis may cache the same IP at the same time (see upsert).
-      for (IpGeoInfoEntity e : toSave) geoInfoRepository.upsert(e);
+      // Upsert, not insert: another analysis may cache the same IP at the same time (see upsertAll).
+      geoInfoRepository.upsertAll(toSave);
     }
 
     return result;

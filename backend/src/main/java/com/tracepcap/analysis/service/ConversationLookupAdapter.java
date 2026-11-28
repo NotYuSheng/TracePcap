@@ -95,7 +95,7 @@ public class ConversationLookupAdapter implements ConversationLookup {
   @Override
   public List<ConversationFacts> conversationFactsByIds(Collection<UUID> conversationIds) {
     if (conversationIds == null || conversationIds.isEmpty()) return List.of();
-    return repository.findAllById(conversationIds).stream()
+    return com.tracepcap.common.db.InBatches.of(conversationIds, repository::findAllById).stream()
         .map(ConversationLookupAdapter::toFacts)
         .toList();
   }

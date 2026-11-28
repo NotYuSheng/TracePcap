@@ -126,9 +126,8 @@ public class NetworkClusterService {
     Map<String, String> clusterLabels = new HashMap<>();
 
     if ("asn".equals(groupBy) || "country".equals(groupBy) || "city".equals(groupBy)) {
-      // Ensure all IPs are enriched and cached (handles misses and incomplete entries).
-      // lookupExternal is idempotent: it reads the cache first and only queries the MMDB for misses.
-      geoIpService.lookupExternal(allIps);
+      // Every IP cached (misses and incomplete entries looked up), then read from the cache.
+      geoIpService.warm(allIps);
       geoByIp.putAll(geoOrgLookup.placesFor(allIps));
     }
     if ("deviceType".equals(groupBy)) {

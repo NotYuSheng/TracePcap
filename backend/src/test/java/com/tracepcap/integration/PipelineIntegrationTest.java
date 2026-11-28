@@ -126,6 +126,25 @@ class PipelineIntegrationTest {
         .isEqualTo("JP");
   }
 
+  /**
+   * The pre-warm writes a batch of entries in one go and asks only which addresses are fresh: not an
+   * entry past the TTL, and not a country-only one missing its coordinates.
+   */
+  @Test
+  void geoCache_batchWriteAndFreshness() {
+    var now = java.time.LocalDateTime.now();
+    var b = com.tracepcap.analysis.entity.IpGeoInfoEntity.builder().geoSource("mmdb");
+    geoCache.upsertAll(java.util.List.of(
+        b.ip("203.0.113.81").countryCode("SG").lat(1.3).lon(103.8).lookedUpAt(now).build(),
+        b.ip("203.0.113.82").countryCode("SG").lat(1.3).lon(103.8).lookedUpAt(now.minusDays(90)).build(),
+        b.ip("203.0.113.83").countryCode("SG").lat(null).lon(null).lookedUpAt(now).build()));
+
+    assertThat(geoCache.findFreshIps(
+            java.util.List.of("203.0.113.81", "203.0.113.82", "203.0.113.83", "203.0.113.84"),
+            now.minusDays(30)))
+        .containsExactly("203.0.113.81");
+  }
+
   @Test
   void filesList_returnsPagedResponseEnvelope() {
     ResponseEntity<JsonNode> res =
