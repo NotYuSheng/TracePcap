@@ -92,6 +92,48 @@ class TsharkEnrichmentServiceTest {
         .isNull();
   }
 
+  @Test
+  void extractAppLayerProto_httpBody_isHttp() {
+    // An HTTP response's body is HTTP's: one flow reads as one protocol (#1327).
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ip:tcp:http:data-text-lines", "TCP")).isEqualTo("HTTP");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ip:tcp:http:media:json", "TCP")).isEqualTo("HTTP");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:http:data", "TCP"))
+        .isEqualTo("HTTP");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:smtp:imf", "TCP"))
+        .isEqualTo("SMTP");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ip:tcp:tls:x509sat:x509sat:pkix1explicit", "TCP")).isEqualTo("TLS");
+  }
+
+  @Test
+  void extractAppLayerProto_protocolOverHttp_keepsIt() {
+    // OCSP over HTTP is a protocol of its own, not a body format.
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:http:ocsp", "TCP"))
+        .isEqualTo("OCSP");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ip:tcp:ftp-data:data-text-lines", "TCP")).isEqualTo("FTP-DATA");
+  }
+
+  @Test
+  void extractAppLayerProto_bodyStraightOnTransport_isKept() {
+    // WS-Discovery: XML straight on UDP, nothing else to call it.
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ipv6:udp:xml", "UDP"))
+        .isEqualTo("XML");
+  }
+
+  @Test
+  void extractAppLayerProto_quotedOrTunnelledTransport_isNeverTheProtocol() {
+    // ip.proto lists every occurrence: an ICMP error quoting UDP reads "1,17".
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ip:icmp:ip:udp:data", "1,17")).isNull();
+    assertThat(TsharkEnrichmentService.extractAppLayerProto(
+            "eth:ethertype:ipv6:ipv6.hopopts:udp:xml", "HOPOPT")).isEqualTo("XML");
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:udp:sip:sdp", "UDP"))
+        .isEqualTo("SIP");
+  }
+
   // --- resolveProtoNumber ---
 
   @Test

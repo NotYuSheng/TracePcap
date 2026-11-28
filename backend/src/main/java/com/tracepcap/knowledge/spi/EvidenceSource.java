@@ -37,7 +37,7 @@ public record EvidenceSource(
   public static final EvidenceSource SMB =
       of("SMB", List.of("SMB", "SMB2"), List.of("SMBv1", "SMBv23"));
   public static final EvidenceSource DCERPC = of("DCE-RPC", List.of("DCERPC"), List.of("DCERPC"));
-  public static final EvidenceSource RDP = of("RDP", List.of("RDP"), List.of("RDP"));
+  public static final EvidenceSource RDP = of("RDP", List.of("RDP", "RDPUDP"), List.of("RDP"));
   public static final EvidenceSource DNS = of("DNS", List.of("DNS"), List.of("DNS"));
   public static final EvidenceSource TLS =
       new EvidenceSource("TLS", List.of("TLS"), List.of("TLS"), null, true);
@@ -47,7 +47,7 @@ public record EvidenceSource(
       of("Mail", List.of("SMTP", "IMAP", "POP"),
           List.of("SMTP", "SMTPS", "IMAP", "IMAPS", "POP3", "POPS"));
   public static final EvidenceSource DHCP =
-      of("DHCP", List.of("DHCP", "BOOTP"), List.of("DHCP"));
+      of("DHCP", List.of("DHCP", "BOOTP", "DHCPV6"), List.of("DHCP", "DHCPV6"));
   public static final EvidenceSource NETBIOS =
       of("NetBIOS", List.of("NBNS", "BROWSER", "NBSS"), List.of("NetBIOS"));
   public static final EvidenceSource LOCAL_NAMES =

@@ -619,7 +619,10 @@ public interface ConversationLookup {
     APP_NAME,
     /** Every IP seen as either endpoint. MEASURED. */
     IP,
-    /** Transport protocols observed. MEASURED. */
+    /**
+     * tshark's application-layer protocol names ({@code TLS}, {@code SMB2}), upper case, as the
+     * Conversations L7 filter takes them. MEASURED.
+     */
     PROTOCOL,
     /** HTTP User-Agent strings clients sent. REPORTED — a client says what it likes. */
     HTTP_USER_AGENT
