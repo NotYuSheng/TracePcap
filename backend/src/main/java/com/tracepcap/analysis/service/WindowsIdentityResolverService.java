@@ -324,7 +324,7 @@ public class WindowsIdentityResolverService {
   /** For tests: tshark output rows (fields as {@link #resolveLogons} requests them) to logins. */
   List<Logon> logonsFromRows(List<String> rows) {
     Map<LogonKey, LogonAgg> result = new java.util.LinkedHashMap<>();
-    for (String row : rows) parseRow(row.split("\\|", -1), result);
+    for (String row : rows) parseRow(TsharkAddressFields.fold(row.split("\\|", -1), FIELDS), result);
     return result.values().stream().map(LogonAgg::toLogon).toList();
   }
 

@@ -63,9 +63,28 @@ public final class TsharkAddressFields {
     String[] out = Arrays.copyOf(row, row.length - n);
     for (int k = 0; k < n; k++) {
       int slot = slots.get(k);
-      String twin = row[row.length - n + k];
-      if ((out[slot] == null || out[slot].isBlank()) && twin != null && !twin.isBlank()) out[slot] = twin;
+      String twin = firstAddress(row[row.length - n + k]);
+      if ((out[slot] == null || out[slot].isBlank()) && twin != null) out[slot] = twin;
     }
     return out;
+  }
+
+  /**
+   * The first address in a twin's value. With every occurrence asked for, an ICMPv6 error quoting
+   * the packet it answers, or IPv6 in IPv6, gives two ("fe80::1,fd00::53", or joined by whatever
+   * aggregator the pass set): the outer header's comes first, and is the packet's own.
+   */
+  static String firstAddress(String value) {
+    if (value == null) return null;
+    String v = value.trim();
+    int end = 0;
+    while (end < v.length() && isAddressChar(v.charAt(end))) end++;
+    return end == 0 ? null : v.substring(0, end);
+  }
+
+  /** Hex, ':' and '.', and a scope id ({@code %eth0}). An aggregator is none of these. */
+  private static boolean isAddressChar(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+        || c == ':' || c == '.' || c == '%' || c == '_' || c == '-';
   }
 }

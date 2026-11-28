@@ -41,4 +41,13 @@ class TsharkAddressFieldsTest {
     String[] row = {"7", "10.0.0.1"};
     assertThat(TsharkAddressFields.fold(row, FIELDS)).isSameAs(row);
   }
+
+  @Test
+  void aQuotedOrTunnelledPacketTakesItsOwnOuterAddress() {
+    // An ICMPv6 error quoting the packet it answers carries two IPv6 headers: the outer one first.
+    String[] row = {"7", "", "", "a.example", "fe80::1,fd00::53", "fd00::10\u001ffd00::99"};
+    assertThat(TsharkAddressFields.fold(row, FIELDS)).containsExactly("7", "fe80::1", "fd00::10", "a.example");
+    assertThat(TsharkAddressFields.firstAddress("fe80::1%eth0,fd00::1")).isEqualTo("fe80::1%eth0");
+    assertThat(TsharkAddressFields.firstAddress(" ")).isNull();
+  }
 }

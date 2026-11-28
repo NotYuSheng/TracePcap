@@ -104,7 +104,9 @@ public class FilterService {
 
                     Display Filter Syntax Reference:
                     - Protocols: tcp, udp, icmp, dns, http, tls, arp, ip, ipv6
-                    - Fields: ip.src, ip.dst, tcp.srcport, tcp.dstport, udp.srcport, udp.dstport
+                    - Fields: ip.src, ip.dst (IPv4), ipv6.src, ipv6.dst (IPv6), tcp.srcport, tcp.dstport, udp.srcport, udp.dstport
+                    - An IPv4 field never matches an IPv6 packet: for an IPv6 address use ipv6.*, and when
+                      the family isn't known use both, e.g. "ip.addr == X || ipv6.addr == X"
                     - Comparisons: ==, !=, >, <, >=, <=, contains, matches
                     - Logical operators: &&, ||, !
                     - Membership: ip.src in {192.168.0.0/16 10.0.0.0/8}
@@ -116,6 +118,7 @@ public class FilterService {
                     - Traffic from specific IP: "ip.src == 192.168.1.1"
                     - SSH connections: "tcp.port == 22"
                     - All traffic to/from IP: "ip.addr == 192.168.1.1"
+                    - All traffic to/from an IPv6 address: "ipv6.addr == fd00::10"
                     - Large packets: "frame.len > 1000"
                     - TCP SYN packets: "tcp.flags.syn == 1 && tcp.flags.ack == 0"
 

@@ -146,26 +146,51 @@ def scan(root: Path) -> list[str]:
 
 
 # A tshark pass that asks for an IPv4 address field and not its IPv6 twin drops every IPv6
-# packet silently: five extractors did (#1357). A file naming "ip.src" / "ip.dst" must name
-# "ipv6.src" / "ipv6.dst" too, or go through common/net/TsharkAddressFields, which adds them.
+# packet silently: six passes did (#1357). A file naming "ip.src" / "ip.dst" must name its twin
+# "ipv6.src" / "ipv6.dst" too, or build every tshark command it runs with
+# common/net/TsharkAddressFields (command / withIpv6), which adds the twins.
 IPV4_FIELD = re.compile(r"""["']ip\.(src|dst)["']""")
+TSHARK = re.compile(r"""["']tshark["']""")
+WITH_TWINS = re.compile(r"""TsharkAddressFields\.(?:command|withIpv6)\(""")
 
 
 def scan_ipv4_only_fields(root: Path) -> list[str]:
     failures = []
     base = root / "backend/src/main/java"
     for path in sorted(base.rglob("*.java")) if base.exists() else []:
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if "TsharkAddressFields" in text or path.name == "TsharkAddressFields.java":
+        if path.name == "TsharkAddressFields.java":
             continue
-        for m in sorted(set(IPV4_FIELD.findall(text))):
-            if f'"ipv6.{m}"' not in text:
-                rel = path.relative_to(root).as_posix()
-                failures.append(
-                    f"{rel}: asks tshark for ip.{m} but not ipv6.{m}\n"
-                    f"    use common/net/TsharkAddressFields (withIpv6/command + fold), or read both\n"
-                    f"    why this is gated: five extractors silently dropped every IPv6 packet (#1357)"
-                )
+        text = "\n".join(
+            l for l in path.read_text(encoding="utf-8", errors="replace").splitlines() if not COMMENT.match(l)
+        )
+        def lacks_twin(chunk: str) -> list[str]:
+            return [m for m in sorted(set(IPV4_FIELD.findall(chunk)))
+                    if not re.search(rf"""["']ipv6\.{m}["']""", chunk)]
+
+        missing = set()
+        # (a) a tshark command naming ip.src inline, without its twin, not built by the helper
+        for t in TSHARK.finditer(text):
+            end = text.find(";", t.end())
+            statement = text[t.start(): end if end >= 0 else len(text)]
+            # Built by the helper: TsharkAddressFields.command(FIELDS, "tshark", ...) in this statement.
+            start = max(text.rfind(";", 0, t.start()), text.rfind("{", 0, t.start()), text.rfind("}", 0, t.start()))
+            if WITH_TWINS.search(text[start + 1: t.start()]):
+                continue
+            missing.update(lacks_twin(statement))
+        # (b) a file naming ip.src (say, in a field-list constant) that never adds the twins
+        if not WITH_TWINS.search(text):
+            missing.update(lacks_twin(text))
+        missing = sorted(missing)
+        if not missing:
+            continue
+        rel = path.relative_to(root).as_posix()
+        for m in missing:
+            failures.append(
+                f"{rel}: asks tshark for ip.{m} but not ipv6.{m}\n"
+                f"    build the command with common/net/TsharkAddressFields (command/withIpv6, then fold),\n"
+                f"    or read ipv6.{m} yourself\n"
+                f"    why this is gated: six tshark passes silently dropped every IPv6 packet (#1357)"
+            )
     return failures
 
 
@@ -175,7 +200,14 @@ def main() -> int:
     args = ap.parse_args()
     root = Path(args.root).resolve()
 
-    failures = scan(root) + scan_ipv4_only_fields(root)
+    failures = scan(root)
+    ipv4_only = scan_ipv4_only_fields(root)
+    if ipv4_only:
+        print("tshark passes that read IPv4 addresses only:\n")
+        for f in ipv4_only:
+            print(f"  {f}\n")
+        if not failures:
+            return 1
     if failures:
         print("Shared vocabulary defined outside its owning module:\n")
         for f in failures:

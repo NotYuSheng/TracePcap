@@ -43,7 +43,9 @@ public class FailoverAddressResolverService {
 
   /**
    * The row layout read below. The router's own address comes from ip.src, or ipv6.src for an
-   * IPv6 group (folded, #1357); IPv6 virtual addresses have their own fields.
+   * IPv6 group (folded, #1357); IPv6 virtual addresses have their own fields. VRRPv3 and HSRPv2
+   * advertise over IPv6 from the router's link-local address (fe80::/10), so that is the member an
+   * IPv6 group lists: the same address the router's Router Advertisements come from.
    */
   static final String[] FIELDS = {
     "ip.src", "vrrp.ip_addr", "hsrp.virt_ip", "hsrp2.virt_ip", "vrrp.ipv6_addr", "hsrp2.virt_ip_v6"
