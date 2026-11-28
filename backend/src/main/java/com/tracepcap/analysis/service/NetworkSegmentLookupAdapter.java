@@ -1,6 +1,5 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.analysis.repository.DhcpLeaseRepository;
 import com.tracepcap.analysis.spi.NetworkSegmentLookup;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,17 +11,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Serves {@link NetworkSegmentLookup} from the capture's DHCP leases. */
+/** Serves {@link NetworkSegmentLookup} from the capture's DHCP leases and router advertisements. */
 @Component
 @RequiredArgsConstructor
 public class NetworkSegmentLookupAdapter implements NetworkSegmentLookup {
 
-  private final DhcpLeaseRepository leases;
+  private final NetworkSegmentReader networks;
 
   @Override
   @Transactional(readOnly = true)
   public List<Segment> segments(UUID fileId) {
-    var r = NetworkSegments.of(leases.findByFileId(fileId));
+    var r = networks.of(fileId);
     Set<String> sharing = new HashSet<>();
     r.overlaps().forEach(o -> sharing.addAll(o.segmentKeys()));
     var macs = r.macsBySegment();

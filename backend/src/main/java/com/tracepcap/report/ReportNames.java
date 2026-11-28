@@ -88,11 +88,14 @@ final class ReportNames {
     return sb.toString();
   }
 
-  /** The network an address is on, from DHCP, or null. */
+  /** The network an address is on, from DHCP or its router's advertised prefixes, or null. */
   String networkOf(String ip) {
     String known = networkOf.get(ip);
     if (known != null) return known;
-    for (var s : segments) if (s.cidr() != null && CidrBlock.contains(s.cidr(), ip)) return s.label();
+    for (var s : segments) {
+      if (s.cidr() != null && CidrBlock.contains(s.cidr(), ip)) return s.label();
+      if (s.prefixes() != null && s.prefixes().stream().anyMatch(p -> CidrBlock.contains(p, ip))) return s.label();
+    }
     return null;
   }
 

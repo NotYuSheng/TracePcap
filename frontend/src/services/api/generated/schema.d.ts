@@ -5165,6 +5165,8 @@ export interface components {
             key?: string;
             label?: string;
             leaseSeconds?: number[];
+            prefixes?: string[];
+            routerMacs?: string[];
             routers?: string[];
             serverIds?: string[];
             serverMac?: string;

@@ -1,7 +1,7 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 
-/** Mirrors NetworkSegmentsResponse.Segment (#462). */
+/** Mirrors NetworkSegmentsResponse.Segment (#462, IPv6 #1357). */
 export interface NetworkSegment {
   key: string;
   label: string;
@@ -11,7 +11,12 @@ export interface NetworkSegment {
   routers: string[];
   domains: string[];
   leaseSeconds: number[];
+  /** Its IPv4 range, from DHCPv4; none on an IPv6-only network. */
   cidr?: string | null;
+  /** The IPv6 prefixes its routers advertised. */
+  prefixes?: string[];
+  /** The MACs of the IPv6 routers that advertised on it. */
+  routerMacs?: string[];
   clients: { ip: string; mac: string; hostname?: string | null }[];
   /** Clients that asked for an address on this network (its VLAN) and got none. */
   unanswered?: UnansweredClient[];

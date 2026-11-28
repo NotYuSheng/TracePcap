@@ -28,7 +28,7 @@ class HostClassificationLookupAdapterTest {
       mock(com.tracepcap.analysis.repository.IpOccupancyRepository.class);
   private final HostClassificationLookupAdapter adapter =
       new HostClassificationLookupAdapter(
-          repository, occupancies, mock(com.tracepcap.analysis.repository.DhcpLeaseRepository.class));
+          repository, occupancies, mock(NetworkSegmentReader.class));
 
   private static HostClassificationEntity host(String ip, String serviceRoles) {
     return HostClassificationEntity.builder()

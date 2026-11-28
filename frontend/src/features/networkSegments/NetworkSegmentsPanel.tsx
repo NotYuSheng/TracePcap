@@ -19,7 +19,7 @@ export function leaseText(seconds: number): string {
 
 /**
  * Two or more networks using the same range in one capture (#462): two sites or two VLANs both on
- * 192.168.1.0/24. Shown only then. Says what told them apart and which addresses are on both,
+ * 192.168.1.0/24, or two IPv6 links reusing a link-local address (#1357). Shown only then. Says what told them apart and which addresses are on both,
  * since each of those is a different machine per network.
  */
 export function NetworkSegmentsPanel({ fileId }: { fileId: string }) {
@@ -52,18 +52,25 @@ export function NetworkSegmentsPanel({ fileId }: { fileId: string }) {
   );
 }
 
+/** Every link has fe80::/64: networks that only share it reuse link-local addresses (#1357). */
+const LINK_LOCAL = 'fe80::/64';
+
 function Overlap({ overlap, segments }: { overlap: NetworkSegmentOverlap; segments: NetworkSegment[] }) {
   const byVlan = segments.every(s => s.vlanId != null);
+  const linkLocal = overlap.cidr === LINK_LOCAL;
   return (
     <div className="card">
       <div className="card-body">
         <h5 className="card-title mb-1">
-          {segments.length} networks share {overlap.cidr ?? 'one range'}
+          {linkLocal
+            ? `${segments.length} networks reuse IPv6 link-local addresses`
+            : `${segments.length} networks share ${overlap.cidr ?? 'one range'}`}
         </h5>
         <p className="text-muted small mb-3">
-          This capture holds {segments.length} separate networks that use the same addresses, as two sites or
-          two VLANs can. They were told apart by{' '}
-          {byVlan ? 'their VLAN tags and ' : ''}the DHCP server that leased each address.
+          {linkLocal
+            ? `This capture holds ${segments.length} separate networks. Every IPv6 link has its own link-local addresses (fe80::/10), so the same one on two links, as two routers both at fe80::1, is two machines.`
+            : `This capture holds ${segments.length} separate networks that use the same addresses, as two sites or two VLANs can.`}{' '}
+          They were told apart by {byVlan ? 'their VLAN tags and ' : ''}the DHCP server or IPv6 router on each.
         </p>
 
         <div className="row g-3 mb-3">
@@ -82,6 +89,18 @@ function Overlap({ overlap, segments }: { overlap: NetworkSegmentOverlap; segmen
                     <>
                       <dt className="col-5 text-muted fw-normal">Router</dt>
                       <dd className="col-7 mb-0 font-monospace">{s.routers.join(', ')}</dd>
+                    </>
+                  )}
+                  {s.prefixes && s.prefixes.length > 0 && (
+                    <>
+                      <dt className="col-5 text-muted fw-normal">IPv6 prefix</dt>
+                      <dd className="col-7 mb-0 font-monospace">{s.prefixes.join(', ')}</dd>
+                    </>
+                  )}
+                  {s.routerMacs && s.routerMacs.length > 0 && (
+                    <>
+                      <dt className="col-5 text-muted fw-normal">IPv6 router MAC</dt>
+                      <dd className="col-7 mb-0 font-monospace">{s.routerMacs.join(', ')}</dd>
                     </>
                   )}
                   {s.serverMac && (

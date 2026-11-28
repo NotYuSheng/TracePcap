@@ -156,6 +156,12 @@ export function isPrivateIp(ip: string, customRanges: CustomPrivateRange[] = [])
   return isRfc1918(ip);
 }
 
+/** IPv6 link-local (fe80::/10): on every link, so the same address on two links is two machines. */
+export function isLinkLocal(ip: string | null | undefined): boolean {
+  const b = parseIp(ip);
+  return b != null && b.length === 16 && b[0] === 0xfe && (b[1] & 0xc0) === 0x80;
+}
+
 /**
  * The unspecified address, `0.0.0.0` or `::`: what a client sends from before it has an address (a
  * DHCP request). The backend's `IpLocality.isUnspecified`.

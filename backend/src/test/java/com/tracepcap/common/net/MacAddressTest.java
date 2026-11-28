@@ -87,4 +87,14 @@ class MacAddressTest {
     assertThat(MacAddress.oui("aa:bb")).isNull();
     assertThat(MacAddress.oui(null)).isNull();
   }
+
+  @Test
+  void groupAddressesHaveTheLowBitOfTheirFirstOctetSet() {
+    assertThat(MacAddress.isGroup("33:33:00:00:00:01")).isTrue();
+    assertThat(MacAddress.isGroup("01:00:5E:00:00:FB")).isTrue();
+    assertThat(MacAddress.isGroup("ff:ff:ff:ff:ff:ff")).isTrue();
+    assertThat(MacAddress.isGroup("10:00:00:00:00:01")).isFalse();
+    assertThat(MacAddress.isGroup("aa:00:00:00:00:0a")).isFalse();
+    assertThat(MacAddress.isGroup(null)).isFalse();
+  }
 }

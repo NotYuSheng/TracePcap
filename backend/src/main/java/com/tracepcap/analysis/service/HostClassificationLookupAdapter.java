@@ -17,7 +17,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
 
   private final HostClassificationRepository repository;
   private final com.tracepcap.analysis.repository.IpOccupancyRepository occupancies;
-  private final com.tracepcap.analysis.repository.DhcpLeaseRepository leases;
+  private final NetworkSegmentReader networks;
 
   @Override
   public List<ClassifiedHost> classifiedHosts(UUID fileId) {
@@ -63,7 +63,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
       java.util.Set<String> macs =
           o.getSegmentKey() == null
               ? null
-              : NetworkSegments.of(leases.findByFileId(fileId)).macsBySegment().getOrDefault(o.getSegmentKey(), java.util.Set.of());
+              : networks.of(fileId).macsBySegment().getOrDefault(o.getSegmentKey(), java.util.Set.of());
       return new DeviceSpan(o.getIp(), key, o.getIdx(), found.of(), o.getStartsAt(), o.getEndsAt(), macs);
     });
   }

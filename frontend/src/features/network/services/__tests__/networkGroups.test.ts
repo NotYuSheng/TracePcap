@@ -179,6 +179,16 @@ describe('networkGroups', () => {
     expect(buildGroupTree([node('192.168.1.10')], { segments: two })[0].children[0].label).toBe('Other local addresses')
   })
 
+  it('a dual-stack network holds its IPv6 hosts too, and link-local never rules one out (#1357)', () => {
+    const hq = { ...seg('vlan:10', 'HQ', [['192.168.10.21', 'aa:00:00:00:00:01'], ['fd00:10::21', 'aa:00:00:00:00:01']], '192.168.10'), prefixes: ['fd00:10::/64'] }
+    // A static IPv6 host in the advertised prefix, and the laptop's DHCPv6 address, join HQ.
+    const tree = buildGroupTree([node('fd00:10::99'), node('fd00:10::21', { mac: 'aa:00:00:00:00:01' })], { segments: [hq] })
+    expect(allNodeIds(find(tree, 'network:vlan:10')!)).toEqual(expect.arrayContaining(['fd00:10::99', 'fd00:10::21']))
+    // Its link-local address is on the link, whatever the range.
+    const ll = buildGroupTree([node('fe80::21', { mac: 'aa:00:00:00:00:01' })], { segments: [hq] })
+    expect(find(ll, 'network:vlan:10')).toBeDefined()
+  })
+
   it('groups device types by family: a DNS server and a server are both servers', () => {
     const tree = buildGroupTree([
       node('10.0.0.53', { deviceType: 'DNS_SERVER' }),

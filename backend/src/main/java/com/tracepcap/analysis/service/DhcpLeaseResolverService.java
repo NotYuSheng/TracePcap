@@ -31,6 +31,12 @@ import org.springframework.stereotype.Service;
  *       renewing) and usually names itself (option 12).
  * </ul>
  *
+ * <p>IPv6 (#1357) in the same pass: a DHCPv6 <b>Reply</b> (type 7) hands the client its addresses
+ * (IA Address, option 5) and is a lease like an ACK, with the client's MAC from the frame it was
+ * sent to. A <b>Router Advertisement</b> (ICMPv6 134) is how most IPv6 networks give out addresses
+ * (SLAAC): it names the router (its MAC and link-local address), the network's prefixes and
+ * often its DNS search domain, and is an {@link Advert}.
+ *
  * Reads only the capture, so it runs in the tool stage with no database connection. Never throws.
  */
 @Slf4j
@@ -75,8 +81,21 @@ public class DhcpLeaseResolverService {
       String mac, String hostname, String vendorClass, Integer vlanId, int requests,
       LocalDateTime firstSeen, LocalDateTime lastSeen) {}
 
-  /** Everything one pass over the capture's DHCP finds. */
-  public record Resolution(List<Lease> leases, List<Unanswered> unanswered) {}
+  /**
+   * One router's advertisements (#1357): its MAC, its (link-local) address, the VLAN they were
+   * tagged with, the prefixes it advertised (normalised CIDRs) and its DNS search domain.
+   */
+  public record Advert(
+      String routerMac, String routerIp, Integer vlanId, List<String> prefixes, String domain,
+      LocalDateTime firstSeen, LocalDateTime lastSeen) {}
+
+  /** Everything one pass over the capture's DHCP and router advertisements finds. */
+  public record Resolution(List<Lease> leases, List<Unanswered> unanswered, List<Advert> adverts) {
+
+    public Resolution(List<Lease> leases, List<Unanswered> unanswered) {
+      this(leases, unanswered, List.of());
+    }
+  }
 
   /** What one MAC's requests have shown so far, while the pass runs. */
   static final class Asking {
@@ -96,6 +115,7 @@ public class DhcpLeaseResolverService {
     Map<String, Lease> leases = new LinkedHashMap<>();
     Map<String, Asking> asking = new LinkedHashMap<>();
     java.util.Set<String> acked = new java.util.HashSet<>();
+    Map<String, Advert> adverts = new LinkedHashMap<>();
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -103,7 +123,9 @@ public class DhcpLeaseResolverService {
             pcapFile.getAbsolutePath(),
             "-Y",
             // DISCOVER too: a client nobody answers may never get past it.
-            "dhcp.option.dhcp == 1 || dhcp.option.dhcp == 3 || dhcp.option.dhcp == 5",
+            "dhcp.option.dhcp == 1 || dhcp.option.dhcp == 3 || dhcp.option.dhcp == 5"
+                // IPv6 (#1357): router advertisements and DHCPv6 replies.
+                + " || icmpv6.type == 134 || dhcpv6.msgtype == 7",
             "-T",
             "fields",
             "-E",
@@ -145,7 +167,30 @@ public class DhcpLeaseResolverService {
             "-e",
             "dhcp.option.subnet_mask",
             "-e",
-            "vlan.id");
+            "vlan.id",
+            // 16–26: IPv6, read by parseIpv6Row.
+            "-e",
+            "icmpv6.type",
+            "-e",
+            "ipv6.src",
+            "-e",
+            "eth.dst",
+            "-e",
+            "icmpv6.opt.prefix",
+            "-e",
+            "icmpv6.opt.prefix.length",
+            "-e",
+            "icmpv6.opt.dnssl",
+            "-e",
+            "dhcpv6.msgtype",
+            "-e",
+            "dhcpv6.iaaddr.ip",
+            "-e",
+            "dhcpv6.iaaddr.valid_lifetime",
+            "-e",
+            "dhcpv6.client_domain",
+            "-e",
+            "dhcpv6.search_list_entry");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -177,7 +222,8 @@ public class DhcpLeaseResolverService {
                   String line;
                   while ((line = reader.readLine()) != null) {
                     synchronized (leases) {
-                      parseRow(line.split("\\|", -1), leases, asking, acked);
+                      String[] f = line.split("\\|", -1);
+                      if (!parseIpv6Row(f, leases, adverts)) parseRow(f, leases, asking, acked);
                     }
                   }
                 } catch (Exception ignored) {
@@ -206,7 +252,8 @@ public class DhcpLeaseResolverService {
       if (!leases.isEmpty()) log.info("Found {} DHCP lease(s)", leases.size());
       List<Unanswered> unanswered = unanswered(asking, acked, leases);
       if (!unanswered.isEmpty()) log.info("Found {} unanswered DHCP client(s)", unanswered.size());
-      return new Resolution(new ArrayList<>(leases.values()), unanswered);
+      if (!adverts.isEmpty()) log.info("Found {} IPv6 router(s) advertising", adverts.size());
+      return new Resolution(new ArrayList<>(leases.values()), unanswered, new ArrayList<>(adverts.values()));
     }
   }
 
@@ -287,6 +334,106 @@ public class DhcpLeaseResolverService {
               vendorClass != null ? vendorClass : prev.vendorClass(),
               network != null ? network : prev.network()));
     }
+  }
+
+  /**
+   * Folds one row into {@code leases} or {@code adverts} when it is a DHCPv6 Reply or a Router
+   * Advertisement (fields 16–26), and says whether it was. The outer message decides: an ICMPv6
+   * error quoting an RA, or a relay's Relay-Reply carrying a Reply, is not one.
+   */
+  static boolean parseIpv6Row(String[] f, Map<String, Lease> leases, Map<String, Advert> adverts) {
+    if (f.length < 27) return false;
+    boolean ra = "134".equals(first(f[16]));
+    boolean reply = "7".equals(first(f[22]));
+    if (!ra && !reply) return false;
+    LocalDateTime at;
+    try {
+      double epoch = Double.parseDouble(first(f[0]));
+      at = LocalDateTime.ofInstant(Instant.ofEpochMilli((long) (epoch * 1000)), ZoneId.systemDefault());
+    } catch (NumberFormatException e) {
+      return true;
+    }
+    String from = first(f[9]).toLowerCase();
+    String fromIp = cut(first(f[17]), 45);
+    Integer vlan = null;
+    try {
+      if (!blank(first(f[15]))) vlan = Integer.parseInt(first(f[15]));
+    } catch (NumberFormatException ignored) {
+      // not a VLAN id
+    }
+    if (from.isEmpty() || from.length() > 50) return true;
+    if (ra) {
+      List<String> prefixes = new ArrayList<>();
+      String[] ps = all(f[19]);
+      String[] lens = all(f[20]);
+      for (int i = 0; i < ps.length && i < lens.length; i++) {
+        var block = com.tracepcap.common.net.CidrBlock.parse(ps[i] + "/" + lens[i]);
+        // A network's own prefix: not link-local (every link has fe80::/64) and not a whole family.
+        if (block.isEmpty() || block.get().isIpv4() || block.get().prefix() == 0) continue;
+        if (IpLocality.isLinkLocal(ps[i])) continue;
+        prefixes.add(block.get().toString());
+      }
+      String domain = domain(first(f[21]));
+      String key = from + "|" + fromIp + "|" + vlan;
+      Advert prev = adverts.get(key);
+      if (prev == null) {
+        adverts.put(key, new Advert(from, fromIp, vlan, prefixes, domain, at, at));
+      } else {
+        java.util.Set<String> merged = new java.util.LinkedHashSet<>(prev.prefixes());
+        merged.addAll(prefixes);
+        adverts.put(
+            key,
+            new Advert(from, fromIp, vlan, new ArrayList<>(merged), prev.domain() != null ? prev.domain() : domain,
+                at.isBefore(prev.firstSeen()) ? at : prev.firstSeen(),
+                at.isAfter(prev.lastSeen()) ? at : prev.lastSeen()));
+      }
+      return true;
+    }
+    // A Reply goes to the client: the frame's destination is its MAC (never a group address).
+    String mac = first(f[18]).toLowerCase();
+    if (mac.isEmpty() || mac.length() > 50 || com.tracepcap.common.net.MacAddress.isGroup(mac)) return true;
+    String fqdn = domain(first(f[25]));
+    String hostname = fqdn == null ? null : cut(fqdn.contains(".") ? fqdn.substring(0, fqdn.indexOf('.')) : fqdn, 255);
+    String domain = domain(first(f[26]));
+    if (domain == null && fqdn != null && fqdn.contains(".")) domain = domain(fqdn.substring(fqdn.indexOf('.') + 1));
+    String[] ips = all(f[23]);
+    String[] lifetimes = all(f[24]);
+    for (int i = 0; i < ips.length; i++) {
+      String ip = ips[i];
+      byte[] b = com.tracepcap.common.net.Cidr.addressBytes(ip);
+      if (b == null || b.length != 16 || !IpLocality.isAssigned(ip) || ip.length() > 45) continue;
+      Long lease = null;
+      try {
+        if (i < lifetimes.length) lease = Long.parseLong(lifetimes[i]);
+      } catch (NumberFormatException ignored) {
+        // leave it unknown
+      }
+      Network network = new Network(from, fromIp, null, domain, lease, null, vlan);
+      String key = ip + "|" + mac;
+      Lease prev = leases.get(key);
+      leases.put(
+          key,
+          prev == null
+              ? new Lease(ip, mac, hostname, at, at, null, null, network)
+              : new Lease(ip, mac, hostname != null ? hostname : prev.hostname(),
+                  at.isBefore(prev.firstSeen()) ? at : prev.firstSeen(),
+                  at.isAfter(prev.lastSeen()) ? at : prev.lastSeen(), null, null, network));
+    }
+    return true;
+  }
+
+  /** A domain as written in DNS (trailing dot dropped), or null. */
+  private static String domain(String s) {
+    if (blank(s)) return null;
+    String d = s.trim();
+    if (d.endsWith(".")) d = d.substring(0, d.length() - 1);
+    return d.isEmpty() ? null : cut(d, 255);
+  }
+
+  /** Every value of an aggregated field. */
+  private static String[] all(String field) {
+    if (blank(field)) return new String[0];
+    return java.util.Arrays.stream(field.split(";")).map(String::trim).filter(x -> !x.isEmpty()).toArray(String[]::new);
   }
 
   private static void noteAsking(
