@@ -22,13 +22,17 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
   /** Null in unit tests built without a session. */
   @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
+  /** Null in unit tests built without a session. */
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private org.springframework.transaction.PlatformTransactionManager transactions;
+
   /** Every host of a file, mapped a page at a time (#1373). */
   private <R> List<R> allHosts(UUID fileId, java.util.function.Function<HostClassificationEntity, R> map) {
     return com.tracepcap.common.db.InPages.of(
         (UUID after, org.springframework.data.domain.Limit limit) -> after == null
             ? repository.findByFileIdOrderByIdAsc(fileId, limit)
             : repository.findByFileIdAndIdGreaterThanOrderByIdAsc(fileId, after, limit),
-        HostClassificationEntity::getId, map, entityManager);
+        HostClassificationEntity::getId, map, entityManager, transactions);
   }
 
   @Override

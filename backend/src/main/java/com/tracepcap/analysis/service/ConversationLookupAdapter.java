@@ -28,6 +28,10 @@ public class ConversationLookupAdapter implements ConversationLookup {
   /** Null in unit tests built without a session. */
   @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
+  /** Null in unit tests built without a session. */
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private org.springframework.transaction.PlatformTransactionManager transactions;
+
 
   @Override
   public List<ConversationFacts> conversationFacts(UUID fileId) {
@@ -36,17 +40,17 @@ public class ConversationLookupAdapter implements ConversationLookup {
         (UUID after, org.springframework.data.domain.Limit limit) -> after == null
             ? repository.findByFileIdOrderByIdAsc(fileId, limit)
             : repository.findByFileIdAndIdGreaterThanOrderByIdAsc(fileId, after, limit),
-        ConversationEntity::getId, ConversationLookupAdapter::toFacts, entityManager);
+        ConversationEntity::getId, ConversationLookupAdapter::toFacts, entityManager, transactions);
   }
 
   @Override
   public List<ConversationFacts> conversationFacts(UUID fileId, ConversationFilterParams filter) {
     // The Specification stays on this side of the seam: returning it would put ConversationEntity
     // in the caller's signature, which is how the filtered paths bypassed the port before.
+    // No filter is the whole file: paged, as the unfiltered graph of a scan capture needs (#1373).
+    if (filter == null) return conversationFacts(fileId);
     List<ConversationEntity> rows =
-        filter == null
-            ? repository.findByFileId(fileId)
-            : repository.findAll(ConversationRepository.buildSpec(fileId, filter), sortOf(filter));
+        repository.findAll(ConversationRepository.buildSpec(fileId, filter), sortOf(filter));
     return rows.stream().map(ConversationLookupAdapter::toFacts).toList();
   }
 

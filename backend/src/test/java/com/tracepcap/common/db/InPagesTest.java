@@ -21,7 +21,7 @@ class InPagesTest {
           int from = after == null ? 0 : after + 1;
           return rows.subList(from, Math.min(rows.size(), from + limit.max()));
         },
-        r -> r, r -> "row" + r, null);
+        r -> r, r -> "row" + r, null, null);
 
     assertThat(out).hasSize(rows.size()).startsWith("row0").endsWith("row" + (rows.size() - 1));
     assertThat(afters).containsExactly(null, InPages.SIZE - 1, 2 * InPages.SIZE - 1);
@@ -37,7 +37,7 @@ class InPagesTest {
           afters.add(after);
           return after == null ? rows : List.of();
         },
-        r -> r, r -> r, null);
+        r -> r, r -> r, null, null);
 
     assertThat(out).hasSize(InPages.SIZE);
     assertThat(afters).containsExactly(null, InPages.SIZE - 1);

@@ -14,7 +14,7 @@ import lombok.ToString;
 @Entity
 @Table(
     name = "host_classifications",
-    indexes = {@Index(name = "idx_host_class_file_id", columnList = "file_id")})
+    indexes = {@Index(name = "idx_host_class_file_id_id", columnList = "file_id, id")})
 @Getter
 @Setter
 @ToString
