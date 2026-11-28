@@ -38,7 +38,8 @@ CONCEPT = re.compile(
     r"""(?x)^(
         format[A-Z]\w* | humani[sz]e\w* | human | plural\w* | pct | percent\w* |
         bytes | megabytes | fmtBytes | duration | span |
-        is(?:Private|Internal|Local|Rfc1918|Public|External|HostAddress|Unspecified|Broadcast|Multicast|Special)\w* |
+        is(?:Private|Internal|Local|Rfc1918|Public|External|HostAddress|Unspecified|Broadcast|Multicast|Special|LinkLocal|Ipv6LinkLocal)\w* |
+        segment(?:Ranges|Holds|Admits) |
         (?:normali[sz]e|valid|validate|parse|canonical)Cidr\w* | (?:ip)?[iI]nCidr\w* |
         ipTo(?:Int|Long)\w* | compareIps? | severity\w*
     )$"""

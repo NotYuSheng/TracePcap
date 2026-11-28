@@ -116,4 +116,35 @@ class NetworkSegmentsTest {
     assertThat(NetworkSegments.intersects("fd00:1::/64", "fd00:2::/64")).isFalse();
     assertThat(NetworkSegments.intersects("10.0.0.0/8", "fd00::/8")).isFalse();
   }
+
+  @Test
+  void oneRouterOnSeveralVlans_withOneLinkLocal_isOneMachine() {
+    // Router-on-a-stick: one MAC, one EUI-64 link-local on every VLAN.
+    var r = NetworkSegments.of(List.of(),
+        List.of(ra("00:1b:21:cc:00:01", "fe80::21b:21ff:fecc:1", 10, "fd00:a::/64"),
+            ra("00:1b:21:cc:00:01", "fe80::21b:21ff:fecc:1", 20, "fd00:b::/64")));
+    assertThat(r.overlaps()).isEmpty();
+    assertThat(r.devicesOnSeveralNetworks()).isEmpty();
+  }
+
+  @Test
+  void anUntaggedRouterThatIsntTheDhcpServer_joinsItsLinksIpv4Network() {
+    // A Windows DHCP server leases IPv4; the router advertises IPv6. No VLAN: one link.
+    var r = NetworkSegments.of(
+        List.of(ack("10.0.0.10", "aa:00:00:00:00:10", "00:15:5d:00:00:01", "corp", null)),
+        List.of(ra("00:1b:21:aa:00:01", "fe80::1", null, "fd00::/64")));
+    assertThat(r.segments()).singleElement().satisfies(s -> {
+      assertThat(s.key()).isEqualTo("server:00:15:5d:00:00:01");
+      assertThat(s.ranges()).containsExactly("10.0.0.0/24", "fd00::/64");
+      assertThat(s.routerMacs()).containsEntry("fe80::1", "00:1b:21:aa:00:01");
+    });
+  }
+
+  @Test
+  void anApipaAddressIsNotAnIpv6LinkLocalOverlap() {
+    var r = NetworkSegments.of(List.of(
+        DhcpLeaseEntity.builder().ip("10.1.0.5").mac("aa:00:00:00:00:05").serverMac("00:1b:21:aa:00:01").router("169.254.1.1").subnetMask("255.255.255.0").build(),
+        DhcpLeaseEntity.builder().ip("10.2.0.5").mac("bb:00:00:00:00:05").serverMac("00:1b:21:bb:00:01").router("169.254.1.1").subnetMask("255.255.255.0").build()));
+    assertThat(r.overlaps()).isEmpty();
+  }
 }

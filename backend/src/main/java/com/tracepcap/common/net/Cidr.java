@@ -162,8 +162,17 @@ public final class Cidr {
    * Addresses in order of value: IPv4, then IPv6, then anything else (a name, a MAC) as text. How
    * tables and lists of addresses sort.
    */
-  public static final java.util.Comparator<String> ADDRESS_ORDER =
-      java.util.Comparator.comparing(Cidr::sortKey);
+  public static final java.util.Comparator<String> ADDRESS_ORDER = Cidr::compareAddresses;
+
+  private static int compareAddresses(String x, String y) {
+    byte[] a = x == null ? null : addressBytes(x);
+    byte[] b = y == null ? null : addressBytes(y);
+    if (a != null && b != null) {
+      if (a.length != b.length) return Integer.compare(a.length, b.length);
+      return java.util.Arrays.compareUnsigned(a, b);
+    }
+    return sortKey(x).compareTo(sortKey(y));
+  }
 
   /** The key {@link #ADDRESS_ORDER} sorts by. */
   public static String sortKey(String ip) {

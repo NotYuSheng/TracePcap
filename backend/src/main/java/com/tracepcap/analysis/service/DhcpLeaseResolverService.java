@@ -168,7 +168,7 @@ public class DhcpLeaseResolverService {
             "dhcp.option.subnet_mask",
             "-e",
             "vlan.id",
-            // 16–26: IPv6, read by parseIpv6Row.
+            // 16–27: IPv6, read by parseIpv6Row.
             "-e",
             "icmpv6.type",
             "-e",
@@ -190,7 +190,9 @@ public class DhcpLeaseResolverService {
             "-e",
             "dhcpv6.client_domain",
             "-e",
-            "dhcpv6.search_list_entry");
+            "dhcpv6.search_list_entry",
+            "-e",
+            "icmpv6.opt.type");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -261,7 +263,11 @@ public class DhcpLeaseResolverService {
   static List<Unanswered> unanswered(
       Map<String, Asking> asking, java.util.Set<String> acked, Map<String, Lease> leases) {
     java.util.Set<String> leased = new java.util.HashSet<>();
-    for (Lease l : leases.values()) leased.add(l.mac());
+    // DHCPv4's: a DHCPv6 lease doesn't answer a client's DHCPv4 requests.
+    for (Lease l : leases.values()) {
+      byte[] b = com.tracepcap.common.net.Cidr.addressBytes(l.ip());
+      if (b != null && b.length == 4) leased.add(l.mac());
+    }
     List<Unanswered> out = new ArrayList<>();
     asking.forEach(
         (mac, a) -> {
@@ -338,13 +344,15 @@ public class DhcpLeaseResolverService {
 
   /**
    * Folds one row into {@code leases} or {@code adverts} when it is a DHCPv6 Reply or a Router
-   * Advertisement (fields 16–26), and says whether it was. The outer message decides: an ICMPv6
+   * Advertisement (fields 16–27), and says whether it was. The outer message decides: an ICMPv6
    * error quoting an RA, or a relay's Relay-Reply carrying a Reply, is not one.
    */
   static boolean parseIpv6Row(String[] f, Map<String, Lease> leases, Map<String, Advert> adverts) {
-    if (f.length < 27) return false;
+    if (f.length < 28) return false;
     boolean ra = "134".equals(first(f[16]));
-    boolean reply = "7".equals(first(f[22]));
+    // A Reply only as the packet itself: an ICMPv6 error quoting one (sent back to the server) has
+    // an outer ICMPv6 type, and its destination is the server, not the client.
+    boolean reply = "7".equals(first(f[22])) && blank(f[16]);
     if (!ra && !reply) return false;
     LocalDateTime at;
     try {
@@ -366,7 +374,13 @@ public class DhcpLeaseResolverService {
       List<String> prefixes = new ArrayList<>();
       String[] ps = all(f[19]);
       String[] lens = all(f[20]);
-      for (int i = 0; i < ps.length && i < lens.length; i++) {
+      // Prefix Information (3) and Route Information (24) options both write these fields, in
+      // option order; only a PIO is this link's prefix (an RIO is a route to somewhere else).
+      List<String> carriers =
+          java.util.Arrays.stream(all(f[27])).filter(t -> t.equals("3") || t.equals("24")).toList();
+      boolean aligned = carriers.size() == ps.length && ps.length == lens.length;
+      for (int i = 0; aligned && i < ps.length; i++) {
+        if (!carriers.get(i).equals("3")) continue;
         var block = com.tracepcap.common.net.CidrBlock.parse(ps[i] + "/" + lens[i]);
         // A network's own prefix: not link-local (every link has fe80::/64) and not a whole family.
         if (block.isEmpty() || block.get().isIpv4() || block.get().prefix() == 0) continue;

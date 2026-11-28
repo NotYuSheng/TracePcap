@@ -200,6 +200,7 @@ public final class NetworkSegments {
       if (ra.getDomain() != null) a.domains.add(ra.getDomain());
       noteFirst(a, ra.getFirstSeen());
     }
+    joinUntaggedRouters(byKey, keyByMac);
     for (DhcpLeaseEntity l : unacked) {
       String key = keyByMac.get(l.getMac());
       if (key == null) continue;
@@ -228,6 +229,41 @@ public final class NetworkSegments {
               clients, a.prefixes, a.routerMacs));
     }
     return new Result(segments, overlaps(segments));
+  }
+
+  /**
+   * With no VLAN tags, an IPv6 router that isn't also the DHCPv4 server is keyed by its own MAC, so
+   * one dual-stack link would be two networks. Its network joins the untagged IPv4 network that
+   * leased to one of its DHCPv6 clients; else, when the capture has just one of each, they are the
+   * same link.
+   */
+  private static void joinUntaggedRouters(Map<String, Acc> byKey, Map<String, String> keyByMac) {
+    List<Acc> v4 = new ArrayList<>();
+    List<Acc> v6 = new ArrayList<>();
+    for (Acc a : byKey.values()) {
+      if (a.vlanId != null) continue;
+      boolean hasV4 = a.mask != null || a.clients.keySet().stream().anyMatch(k -> k.endsWith("|4"));
+      if (hasV4 && a.routerMacs.isEmpty()) v4.add(a);
+      else if (!hasV4 && !a.routerMacs.isEmpty()) v6.add(a);
+    }
+    for (Acc r : v6) {
+      Set<String> macs = new LinkedHashSet<>();
+      r.clients.values().forEach(c -> macs.add(c.mac()));
+      Acc into = v4.stream()
+          .filter(a -> a.clients.values().stream().anyMatch(c -> macs.contains(c.mac())))
+          .findFirst()
+          .orElse(v4.size() == 1 && v6.size() == 1 ? v4.get(0) : null);
+      if (into == null) continue;
+      into.routers.addAll(r.routers);
+      into.routerMacs.putAll(r.routerMacs);
+      into.prefixes.addAll(r.prefixes);
+      into.domains.addAll(r.domains);
+      into.leaseSeconds.addAll(r.leaseSeconds);
+      into.clients.putAll(r.clients);
+      noteFirst(into, r.firstLease);
+      byKey.remove(r.key);
+      keyByMac.replaceAll((mac, key) -> key.equals(r.key) ? into.key : key);
+    }
   }
 
   private static void noteFirst(Acc a, java.time.LocalDateTime at) {
@@ -281,14 +317,22 @@ public final class NetworkSegments {
     for (List<Segment> g : groups) {
       if (g.size() < 2) continue;
       Map<String, Integer> uses = new LinkedHashMap<>();
+      Map<String, List<Set<String>>> linkLocalMacs = new LinkedHashMap<>();
       for (Segment s : g) {
         // The clients it leased to, and its router: two sites' routers are often both .1.
         Set<String> ips = new LinkedHashSet<>(s.routers());
         s.clients().forEach(c -> ips.add(c.ip()));
         ips.forEach(ip -> uses.merge(ip, 1, Integer::sum));
+        linkLocal(s).forEach((ip, macs) -> linkLocalMacs.computeIfAbsent(ip, k -> new ArrayList<>()).add(macs));
       }
       List<String> shared = new ArrayList<>();
-      uses.forEach((ip, n) -> { if (n > 1) shared.add(ip); });
+      uses.forEach((ip, n) -> {
+        if (n < 2) return;
+        // A link-local address is shared only by different machines; one router's own on two VLANs is not.
+        List<Set<String>> macs = linkLocalMacs.get(ip);
+        if (macs != null && !severalMachines(macs)) return;
+        shared.add(ip);
+      });
       shared.sort(Cidr.ADDRESS_ORDER);
       out.add(new Overlap(sharedRange(g), g.stream().map(Segment::key).toList(), shared));
     }
@@ -301,16 +345,41 @@ public final class NetworkSegments {
    */
   static boolean overlap(Segment a, Segment b) {
     for (String x : a.ranges()) for (String y : b.ranges()) if (intersects(x, y)) return true;
-    Set<String> linkLocal = linkLocal(a);
-    linkLocal.retainAll(linkLocal(b));
-    return !linkLocal.isEmpty();
+    Map<String, Set<String>> la = linkLocal(a);
+    Map<String, Set<String>> lb = linkLocal(b);
+    return la.keySet().stream().anyMatch(ip -> lb.containsKey(ip) && differentMachines(la.get(ip), lb.get(ip)));
   }
 
-  private static Set<String> linkLocal(Segment s) {
-    Set<String> out = new LinkedHashSet<>();
-    s.routers().stream().filter(IpLocality::isLinkLocal).forEach(out::add);
-    s.clients().stream().map(Client::ip).filter(IpLocality::isLinkLocal).forEach(out::add);
+  /**
+   * Its IPv6 link-local addresses, each with the MACs seen at it there. One router serving several
+   * VLANs from one MAC often has one link-local address on all of them: one machine, not several.
+   */
+  private static Map<String, Set<String>> linkLocal(Segment s) {
+    Map<String, Set<String>> out = new LinkedHashMap<>();
+    for (String ip : s.routers()) {
+      if (!IpLocality.isIpv6LinkLocal(ip)) continue;
+      String mac = s.routerMacs().get(ip);
+      out.computeIfAbsent(ip, k -> new LinkedHashSet<>());
+      if (mac != null) out.get(ip).add(mac);
+    }
+    for (Client c : s.clients()) {
+      if (IpLocality.isIpv6LinkLocal(c.ip())) out.computeIfAbsent(c.ip(), k -> new LinkedHashSet<>()).add(c.mac());
+    }
     return out;
+  }
+
+  private static boolean severalMachines(List<Set<String>> macsPerSegment) {
+    for (int i = 0; i < macsPerSegment.size(); i++) {
+      for (int j = i + 1; j < macsPerSegment.size(); j++) {
+        if (differentMachines(macsPerSegment.get(i), macsPerSegment.get(j))) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Whether the MACs seen at one address on two links are different machines (unknown MACs are). */
+  private static boolean differentMachines(Set<String> a, Set<String> b) {
+    return a.isEmpty() || b.isEmpty() || java.util.Collections.disjoint(a, b);
   }
 
   /**
@@ -329,10 +398,8 @@ public final class NetworkSegments {
         .min(Comparator.comparing((String r) -> !r.contains("."))
             .thenComparingInt(NetworkSegments::prefix)
             .thenComparing(r -> r))
-        .orElse(LINK_LOCAL);
+        .orElse(IpLocality.IPV6_LINK_LOCAL_NETWORK);
   }
-
-  static final String LINK_LOCAL = "fe80::/64";
 
   // ── Ranges ───────────────────────────────────────────────────────────────────
 

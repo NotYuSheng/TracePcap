@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert } from '@components/common/Alert';
+import { IPV6_LINK_LOCAL_NETWORK } from '@/utils/ipClassification';
 import {
   networkSegmentService,
   type NetworkSegment,
@@ -52,12 +53,10 @@ export function NetworkSegmentsPanel({ fileId }: { fileId: string }) {
   );
 }
 
-/** Every link has fe80::/64: networks that only share it reuse link-local addresses (#1357). */
-const LINK_LOCAL = 'fe80::/64';
-
 function Overlap({ overlap, segments }: { overlap: NetworkSegmentOverlap; segments: NetworkSegment[] }) {
   const byVlan = segments.every(s => s.vlanId != null);
-  const linkLocal = overlap.cidr === LINK_LOCAL;
+  // Networks that share only this reuse link-local addresses (#1357).
+  const linkLocal = overlap.cidr === IPV6_LINK_LOCAL_NETWORK;
   return (
     <div className="card">
       <div className="card-body">

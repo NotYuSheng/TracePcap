@@ -24,7 +24,7 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | Concept | Backend | Frontend |
 |---|---|---|
 | Is this address inside the network | `LocalityRules` from `KnowledgeContext.locality()` / `ScanContext.locality()` / `LocalityPolicy` (custom ranges first). Never `IpLocality.isLocal` directly: only `common/net`, the policy and GeoIP may | `isPrivateIp` (custom ranges) / `isRfc1918` in `utils/ipClassification.ts` |
-| Is this a real host / unspecified / a filled-in address field / IPv6 link-local | `IpLocality.isHostAddress` / `isUnspecified` / `isAssigned` / `isLinkLocal` | `isHostAddress` / `isUnspecified` / `isLinkLocal` in `utils/ipClassification.ts` |
+| Is this a real host / unspecified / a filled-in address field / link-local | `IpLocality.isHostAddress` / `isUnspecified` / `isAssigned` / `isLinkLocal` (`isIpv6LinkLocal`) | `isHostAddress` / `isUnspecified` / `isLinkLocal` in `utils/ipClassification.ts` |
 | Bytes, lengths of time, counted nouns | `common/text/Humanize` (`bytes`, `span`, `plural`) | `utils/formatters` (`formatBytes`, `formatSpan`, `formatDuration`, `formatNumber`) |
 | A CIDR typed into settings | `common/net/Cidr.normalise` (bare IP → /32, host bits zeroed, literals only) | — (the backend validates) |
 | Is this address inside a CIDR (IPv4 and IPv6) | `common/net/CidrBlock.contains`; in SQL `ip_inet(col) <<= CAST(? AS inet)` | `ipInCidr` in `utils/ipClassification.ts` |

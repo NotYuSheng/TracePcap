@@ -98,6 +98,17 @@ public final class IpLocality {
     return CidrBlock.contains("fe80::/10", ip) || CidrBlock.contains("169.254.0.0/16", ip);
   }
 
+  /**
+   * The IPv6 link-local network every link has ({@code fe80::/64}): what two networks share when
+   * they reuse a link-local address (#1357).
+   */
+  public static final String IPV6_LINK_LOCAL_NETWORK = "fe80::/64";
+
+  /** IPv6 link-local only ({@code fe80::/10}), not IPv4's {@code 169.254.0.0/16}. */
+  public static boolean isIpv6LinkLocal(String ip) {
+    return CidrBlock.contains("fe80::/10", ip);
+  }
+
   /** Loopback: {@code 127.0.0.0/8} or {@code ::1}. Never a machine on the network. */
   public static boolean isLoopback(String ip) {
     return CidrBlock.contains("::1/128", ip) || CidrBlock.contains("127.0.0.0/8", ip);

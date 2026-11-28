@@ -118,4 +118,18 @@ class DhcpLeaseResolverServiceTest {
         .extracting(u -> u.hostname() + "@" + u.vlanId() + "x" + u.requests())
         .containsExactlyInAnyOrder("raspberrypi@10x3", "CAM-LOBBY@99x1");
   }
+
+  @Test
+  void aDhcpv6LeaseDoesNotAnswerAClientsDhcpv4Requests() {
+    Map<String, DhcpLeaseResolverService.Lease> leases = new LinkedHashMap<>();
+    Map<String, DhcpLeaseResolverService.Asking> asking = new LinkedHashMap<>();
+    java.util.Set<String> acked = new java.util.HashSet<>();
+    DhcpLeaseResolverService.parseRow(
+        "1730000000.0|1|0.0.0.0|0.0.0.0||cc:cc:cc:00:00:02|PRINTER".split("\\|", -1), leases, asking, acked);
+    leases.put("fd00::2|cc:cc:cc:00:00:02",
+        new DhcpLeaseResolverService.Lease("fd00::2", "cc:cc:cc:00:00:02", null,
+            java.time.LocalDateTime.now(), java.time.LocalDateTime.now()));
+    assertThat(DhcpLeaseResolverService.unanswered(asking, acked, leases))
+        .extracting(DhcpLeaseResolverService.Unanswered::mac).containsExactly("cc:cc:cc:00:00:02");
+  }
 }

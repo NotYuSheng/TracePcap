@@ -137,4 +137,16 @@ class DeviceMovesTest {
     assertThat(DeviceMoves.of(arp, List.of(), uses)).extracting(m -> m.fromIp() + ">" + m.toIp())
         .containsExactly("10.0.0.50>10.0.0.73");
   }
+
+  @Test
+  void aDualStackMachinesIpv6LeaseIsNotAMoveFromItsIpv4Address() {
+    // DHCPv4 at 0, DHCPv6 two minutes later: both held at once, in two families (#1357).
+    var moves = DeviceMoves.of(List.of(),
+        List.of(lease("10.0.10.100", "10:00:00:00:00:01", null, 0), lease("fd00:10::100", "10:00:00:00:00:01", "laptop-a", 2)));
+    assertThat(moves).isEmpty();
+    // Within one family a change still is.
+    var v6 = DeviceMoves.of(List.of(),
+        List.of(lease("fd00:10::100", "10:00:00:00:00:01", null, 0), lease("fd00:10::200", "10:00:00:00:00:01", null, 30)));
+    assertThat(v6).singleElement().satisfies(m -> assertThat(m.toIp()).isEqualTo("fd00:10::200"));
+  }
 }
