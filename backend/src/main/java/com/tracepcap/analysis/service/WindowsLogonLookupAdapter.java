@@ -24,12 +24,12 @@ public class WindowsLogonLookupAdapter implements WindowsLogonLookup {
   public AccountsAtTime accountsAtTime(UUID fileId, java.util.Collection<String> ips) {
     if (ips.isEmpty()) return AccountsAtTime.NONE;
     java.util.Map<String, List<com.tracepcap.analysis.entity.WindowsLogonEntity>> byIp =
-        repository.findByFileIdAndIpIn(fileId, ips).stream()
+        com.tracepcap.common.db.InBatches.of(ips, b -> repository.findByFileIdAndIpIn(fileId, b)).stream()
             .filter(e -> !"CUSTOM".equals(e.getFolderKind()) && e.getFirstSeen() != null)
             .collect(java.util.stream.Collectors.groupingBy(e -> e.getIp()));
     if (byIp.isEmpty()) return AccountsAtTime.NONE;
     java.util.Set<String> ldapIgnored =
-        hostRepository.findByFileIdAndIpIn(fileId, byIp.keySet()).stream()
+        com.tracepcap.common.db.InBatches.of(byIp.keySet(), b -> hostRepository.findByFileIdAndIpIn(fileId, b)).stream()
             .filter(h -> NO_LDAP_SIGN_IN.contains(h.getDeviceType()))
             .map(h -> h.getIp())
             .collect(java.util.stream.Collectors.toSet());

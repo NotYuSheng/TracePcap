@@ -623,13 +623,18 @@ public class AnalysisService {
         occupancyCounts.keySet(),
         severalNetworks);
     hostClassificationRepository.saveAll(hostClassifications);
+    // Written now and never read back as entities: let them go. Each carries three JSON maps, and
+    // the session holds a snapshot of every managed row until the analysis commits; a 200k-host
+    // scan held a gigabyte of them and ran the analysis out of heap.
+    entityManager.flush();
+    hostClassifications.forEach(entityManager::detach);
 
     try {
       Set<String> allIps =
           run.parseResult.getConversations().stream()
               .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
               .collect(Collectors.toSet());
-      geoIpService.lookupExternal(allIps);
+      geoIpService.warm(allIps);
     } catch (Exception e) {
       log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
     }

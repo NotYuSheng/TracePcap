@@ -21,7 +21,7 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
   @Override
   public List<String> orgsFor(Collection<String> ips) {
     if (ips == null || ips.isEmpty()) return List.of();
-    return repository.findAllByIpIn(ips).stream()
+    return repository.findByIps(ips).stream()
         .map(IpGeoInfoEntity::getOrg)
         .filter(o -> o != null && !o.isBlank())
         .distinct()
@@ -32,7 +32,7 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
   public Map<String, IpAttribution> attributionFor(Collection<String> ips) {
     if (ips == null || ips.isEmpty()) return Map.of();
     Map<String, IpAttribution> byIp = new LinkedHashMap<>();
-    for (IpGeoInfoEntity g : repository.findAllByIpIn(ips)) {
+    for (IpGeoInfoEntity g : repository.findByIps(ips)) {
       // First record wins on a duplicate IP — the cache is keyed by IP, so this is belt-and-braces,
       // but putIfAbsent keeps the choice deterministic rather than last-write-wins.
       byIp.putIfAbsent(
@@ -45,7 +45,7 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
   public Map<String, IpPlace> placesFor(Collection<String> ips) {
     if (ips == null || ips.isEmpty()) return Map.of();
     Map<String, IpPlace> byIp = new LinkedHashMap<>();
-    for (IpGeoInfoEntity g : repository.findAllByIpIn(ips)) {
+    for (IpGeoInfoEntity g : repository.findByIps(ips)) {
       byIp.putIfAbsent(
           g.getIp(),
           new IpPlace(

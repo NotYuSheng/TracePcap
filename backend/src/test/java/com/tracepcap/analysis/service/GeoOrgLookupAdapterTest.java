@@ -29,7 +29,7 @@ class GeoOrgLookupAdapterTest {
 
   @Test
   void dropsNullAndBlankOrgsAndDeduplicates() {
-    when(repository.findAllByIpIn(anyCollection()))
+    when(repository.findByIps(anyCollection()))
         .thenReturn(
             List.of(
                 geo("1.1.1.1", "Cloudflare, Inc."),
@@ -45,19 +45,19 @@ class GeoOrgLookupAdapterTest {
   @Test
   void emptyInputShortCircuitsWithoutQuerying() {
     assertThat(adapter.orgsFor(Set.of())).isEmpty();
-    verify(repository, never()).findAllByIpIn(anyCollection());
+    verify(repository, never()).findByIps(anyCollection());
   }
 
   @Test
   void nullInputIsEmptyNotAnError() {
     // computeProperties can reach here with nothing to resolve; the port promises a list, not a throw.
     assertThat(adapter.orgsFor(null)).isEmpty();
-    verify(repository, never()).findAllByIpIn(anyCollection());
+    verify(repository, never()).findByIps(anyCollection());
   }
 
   @Test
   void noGeoRecordsYieldsEmptyList() {
-    when(repository.findAllByIpIn(anyCollection())).thenReturn(List.of());
+    when(repository.findByIps(anyCollection())).thenReturn(List.of());
     assertThat(adapter.orgsFor(Set.of("10.0.0.1"))).isEmpty();
   }
 
@@ -68,7 +68,7 @@ class GeoOrgLookupAdapterTest {
    */
   @Test
   void attributionOmitsIpsWithNoGeoRecord() {
-    when(repository.findAllByIpIn(anyCollection()))
+    when(repository.findByIps(anyCollection()))
         .thenReturn(List.of(geoFull("1.1.1.1", "AS13335", "Cloudflare, Inc.", "US")));
 
     var attribution = adapter.attributionFor(Set.of("1.1.1.1", "203.0.113.9"));
@@ -86,7 +86,7 @@ class GeoOrgLookupAdapterTest {
   @Test
   void attributionKeepsPartialRecordsRatherThanDroppingThem() {
     // A cached IP with no org is still known to exist — dropping it would look like a lookup miss.
-    when(repository.findAllByIpIn(anyCollection()))
+    when(repository.findByIps(anyCollection()))
         .thenReturn(List.of(geoFull("203.0.113.1", null, null, null)));
 
     assertThat(adapter.attributionFor(Set.of("203.0.113.1")))
@@ -99,7 +99,7 @@ class GeoOrgLookupAdapterTest {
   void emptyAttributionInputShortCircuits() {
     assertThat(adapter.attributionFor(Set.of())).isEmpty();
     assertThat(adapter.attributionFor(null)).isEmpty();
-    verify(repository, never()).findAllByIpIn(anyCollection());
+    verify(repository, never()).findByIps(anyCollection());
   }
 
   private static IpGeoInfoEntity geoFull(String ip, String asn, String org, String cc) {
