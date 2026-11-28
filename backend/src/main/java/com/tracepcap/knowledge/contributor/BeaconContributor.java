@@ -1,5 +1,6 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.common.net.Endpoints;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.FlowIdentity;
 import com.tracepcap.analysis.spi.ConversationLookup.TlsFacts;
@@ -92,7 +93,7 @@ public class BeaconContributor implements KnowledgeContributor {
       board.addFinding(
           new Finding(
               SUSPECTED_BEACON,
-              hostIp + " → " + extIp + ":" + extPort + " — sustained low-throughput raw-TCP session ("
+              hostIp + " → " + Endpoints.of(extIp, extPort) + " — sustained low-throughput raw-TCP session ("
                   + packets + " pkts / " + durationSec + "s, ~" + avgBytes + " B/pkt), no TLS: a beacon shape",
               // MEDIUM: a shape-only suspicion. The classifier's confirmed finding is the HIGH one.
               Severity.MEDIUM,

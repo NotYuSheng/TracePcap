@@ -36,6 +36,13 @@ describe('link-local matches the backend', () => {
   })
 })
 
+describe('isRfc1918 and IPv4-mapped addresses (#1357)', () => {
+  it('reads ::ffff:a.b.c.d as a.b.c.d, as the backend does', () => {
+    expect(isRfc1918('::ffff:10.0.0.1')).toBe(true);
+    expect(isRfc1918('::ffff:8.8.8.8')).toBe(false);
+  });
+});
+
 describe('ipInCidr', () => {
   it('matches inside an IPv4 CIDR and rejects outside', () => {
     expect(ipInCidr('10.0.1.5', '10.0.0.0/16')).toBe(true);

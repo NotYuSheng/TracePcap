@@ -30,6 +30,7 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | Is this address inside a CIDR (IPv4 and IPv6) | `common/net/CidrBlock.contains`; in SQL `ip_inet(col) <<= CAST(? AS inet)` | `ipInCidr` in `utils/ipClassification.ts` |
 | Reading, writing, sorting an address | `Cidr.addressBytes` / `Cidr.formatAddress` (RFC 5952) | `parseIp` / `formatIp` / `networkOf` / `compareIps` in `utils/ipClassification.ts` |
 | Reading tshark fields: a packet's addresses (IPv4 and IPv6), booleans | `common/net/TsharkFields`: `command`/`withIpv6` + `fold`, never `ip.src` alone; `isTrue`, never `"1".equals` (tshark 4 writes `True`) | — |
+| An address with a port, for people (`[fd00::1]:443`) | `common/net/Endpoints.of` | `formatIpPort` in `utils/formatters` |
 | MAC addresses | `common/net/MacAddress` | — |
 | Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |
 | Severity colours | — | `utils/severityColors.ts` |

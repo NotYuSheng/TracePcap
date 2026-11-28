@@ -1,5 +1,6 @@
 package com.tracepcap.story.service;
 
+import com.tracepcap.common.net.Endpoints;
 import com.tracepcap.common.text.Humanize;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -806,8 +807,8 @@ public class StoryService {
       for (StoryAggregates.FailedTarget t : outcomes.getTopFailedTargets()) {
         prompt.append(
             String.format(
-                "- %s -> %s:%s — %d unanswered, %d refused\n",
-                t.getSrcIp(), t.getDstIp(), t.getDstPort() != null ? t.getDstPort() : "*",
+                "- %s -> %s — %d unanswered, %d refused\n",
+                t.getSrcIp(), Endpoints.of(t.getDstIp(), t.getDstPort() != null ? t.getDstPort() : "*"),
                 t.getNoAnswer(), t.getRejected()));
       }
     }
@@ -823,10 +824,9 @@ public class StoryService {
                 : (intervalSec / 60) + "m " + (intervalSec % 60) + "s";
         prompt.append(
             String.format(
-                "- %s -> %s:%s (%s%s) — %d flows, avg interval %s, jitter %.0f%%\n",
+                "- %s -> %s (%s%s) — %d flows, avg interval %s, jitter %.0f%%\n",
                 b.getSrcIp(),
-                b.getDstIp() != null ? b.getDstIp() : "?",
-                b.getDstPort() != null ? b.getDstPort() : "*",
+                Endpoints.of(b.getDstIp() != null ? b.getDstIp() : "?", b.getDstPort() != null ? b.getDstPort() : "*"),
                 b.getProtocol(),
                 app,
                 b.getFlowCount(),

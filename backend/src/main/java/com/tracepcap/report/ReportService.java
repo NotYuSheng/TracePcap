@@ -755,22 +755,16 @@ public class ReportService {
     return from + " → " + to;
   }
 
-  private static String ipSortKey(String ip) {
+  /** IPv4 by value, then IPv6 by value, then anything else as text (#1357). */
+  static String ipSortKey(String ip) {
     if (ip == null) return "";
-    String[] o = ip.split("\\.");
-    if (o.length != 4) return "~" + ip;
-    StringBuilder sb = new StringBuilder();
-    for (String s : o) sb.append(String.format("%03d", parseOr(s)));
+    byte[] b = com.tracepcap.common.net.Cidr.addressBytes(ip);
+    if (b == null) return "~" + ip;
+    StringBuilder sb = new StringBuilder(b.length == 4 ? "4" : "6");
+    for (byte x : b) sb.append(String.format("%02x", x & 0xFF));
     return sb.toString();
   }
 
-  private static int parseOr(String s) {
-    try {
-      return Integer.parseInt(s);
-    } catch (NumberFormatException e) {
-      return 0;
-    }
-  }
 
   private static String cap(String s) {
     String l = s.toLowerCase();

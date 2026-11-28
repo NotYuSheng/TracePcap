@@ -118,6 +118,20 @@ RULES.append({
     "exempt": set(),
 })
 
+RULES.append({
+    "name": "address and port joined by hand",
+    "why": "\"fd00::1:443\" reads as one IPv6 address: IPv6 needs brackets, [fd00::1]:443 (#1357)",
+    "owner": "backend common/net/Endpoints.of",
+    "pattern": re.compile(r"""\+\s*":"\s*\+\s*[\w.()]*[pP]ort\b|["']\]:["']"""),
+    "owners": {"backend/src/main/java/com/tracepcap/common/net/Endpoints.java"},
+    "exempt": {
+        # Keys, not text for people: compared for equality within one parse, never displayed.
+        "backend/src/main/java/com/tracepcap/analysis/service/TcpHandshake.java",
+        "backend/src/main/java/com/tracepcap/story/service/StoryAggregatesService.java",
+        "backend/src/main/java/com/tracepcap/analysis/service/SuricataService.java",  # flowKey
+    },
+})
+
 SCAN_DIRS = ["backend/src/main/java", "frontend/src"]
 SCAN_SUFFIXES = {".java", ".ts", ".tsx"}
 

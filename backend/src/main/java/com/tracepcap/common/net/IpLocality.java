@@ -80,7 +80,12 @@ public final class IpLocality {
     if (addr.isEmpty()) {
       return false;
     }
-    return addr.indexOf(':') >= 0 ? isLocalV6(addr) : isLocalV4(addr);
+    if (addr.indexOf(':') >= 0) {
+      // An IPv4-mapped address (::ffff:10.0.0.1) is its IPv4 address, as CidrBlock reads it (#1357).
+      byte[] b = Cidr.addressBytes(addr);
+      return b != null && b.length == 4 ? isLocalV4(Cidr.formatAddress(b)) : isLocalV6(addr);
+    }
+    return isLocalV4(addr);
   }
 
   /**
