@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.TsharkAddressFields;
 import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,6 +41,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class FailoverAddressResolverService {
 
+  /**
+   * The row layout read below. The router's own address comes from ip.src, or ipv6.src for an
+   * IPv6 group (folded, #1357); IPv6 virtual addresses have their own fields.
+   */
+  static final String[] FIELDS = {
+    "ip.src", "vrrp.ip_addr", "hsrp.virt_ip", "hsrp2.virt_ip", "vrrp.ipv6_addr", "hsrp2.virt_ip_v6"
+  };
+
   /** A virtual address: which protocol, and the routers seen advertising it (may be empty). */
   public record VirtualAddress(String ip, String protocol, Set<String> members) {}
 
@@ -65,6 +74,8 @@ public class FailoverAddressResolverService {
     Map<String, Set<String>> membersByIp = new LinkedHashMap<>();
     ProcessBuilder pb =
         new ProcessBuilder(
+            TsharkAddressFields.command(
+            FIELDS,
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
@@ -79,15 +90,7 @@ public class FailoverAddressResolverService {
             "-E",
             "occurrence=a",
             "-E",
-            "aggregator=,",
-            "-e",
-            "ip.src",
-            "-e",
-            "vrrp.ip_addr",
-            "-e",
-            "hsrp.virt_ip",
-            "-e",
-            "hsrp2.virt_ip");
+            "aggregator=,"));
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -118,12 +121,14 @@ public class FailoverAddressResolverService {
                     new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    String[] f = line.split("\\|", -1);
-                    if (f.length < 4) continue;
+                    String[] f = TsharkAddressFields.fold(line.split("\\|", -1), FIELDS);
+                    if (f.length < FIELDS.length) continue;
                     String src = f[0].split(",")[0].trim();
                     record(f[1], "VRRP", src, protocolByIp, membersByIp);
                     record(f[2], "HSRP", src, protocolByIp, membersByIp);
                     record(f[3], "HSRP", src, protocolByIp, membersByIp);
+                    record(f[4], "VRRP", src, protocolByIp, membersByIp); // VRRPv3 over IPv6
+                    record(f[5], "HSRP", src, protocolByIp, membersByIp); // HSRPv2 over IPv6
                   }
                 } catch (Exception ignored) {
                   // best-effort

@@ -1,5 +1,6 @@
 package com.tracepcap.hostlog.service;
 
+import com.tracepcap.common.net.TsharkAddressFields;
 import com.tracepcap.analysis.spi.HostServiceLogExtractor;
 import com.tracepcap.analysis.spi.HostServiceLogResult;
 import com.tracepcap.analysis.spi.ServiceLogRoles;
@@ -292,10 +293,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     cmd.add("fields");
     cmd.add("-E");
     cmd.add("separator=|");
-    for (String field : fields) {
-      cmd.add("-e");
-      cmd.add(field);
-    }
+    // IPv6 packets carry their addresses in ipv6.*: ask for both, and fold them back (#1357).
+    cmd.addAll(TsharkAddressFields.args(TsharkAddressFields.withIpv6(fields)));
     ProcessBuilder pb = new ProcessBuilder(cmd);
 
     Process process = null;
@@ -315,7 +314,9 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) rowConsumer.accept(line.split("\\|", -1));
+                    if (!line.isEmpty()) {
+                      rowConsumer.accept(TsharkAddressFields.fold(line.split("\\|", -1), fields));
+                    }
                   }
                 } catch (Exception ignored) {
                   // best-effort

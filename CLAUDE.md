@@ -29,13 +29,14 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | A CIDR typed into settings | `common/net/Cidr.normalise` (bare IP → /32, host bits zeroed, literals only) | — (the backend validates) |
 | Is this address inside a CIDR (IPv4 and IPv6) | `common/net/CidrBlock.contains`; in SQL `ip_inet(col) <<= CAST(? AS inet)` | `ipInCidr` in `utils/ipClassification.ts` |
 | Reading, writing, sorting an address | `Cidr.addressBytes` / `Cidr.formatAddress` (RFC 5952) | `parseIp` / `formatIp` / `networkOf` / `compareIps` in `utils/ipClassification.ts` |
+| A packet's addresses from tshark (IPv4 and IPv6) | `common/net/TsharkAddressFields` (`command`/`withIpv6` + `fold`): never `ip.src` alone | — |
 | MAC addresses | `common/net/MacAddress` | — |
 | Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |
 | Severity colours | — | `utils/severityColors.ts` |
 
 Three checks hold this in place; when you add a shared concept, add it to the table **and** to a check, or it erodes:
 
-- `scripts/check_shared_vocabulary.py`: a concept's literals (address ranges, the byte and duration unit ladders) appear only in its owner.
+- `scripts/check_shared_vocabulary.py`: a concept's literals (address ranges, the byte and duration unit ladders) appear only in its owner, and no tshark pass asks for `ip.src`/`ip.dst` without its IPv6 twin.
 - `scripts/check_duplicate_helpers.py`: a concept-named helper (`format*`, `plural`, `pct`, `is*Local*`, `bytes`, `duration`, `severity*`, …) is defined in one file per side. Today's duplicates are a baseline that **may only shrink**: fix one, delete its line.
 - `SharedConceptTest` (ArchUnit): callers go through the entry point, not around it.
 

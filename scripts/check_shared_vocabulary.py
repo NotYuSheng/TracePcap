@@ -145,13 +145,37 @@ def scan(root: Path) -> list[str]:
     return failures
 
 
+# A tshark pass that asks for an IPv4 address field and not its IPv6 twin drops every IPv6
+# packet silently: five extractors did (#1357). A file naming "ip.src" / "ip.dst" must name
+# "ipv6.src" / "ipv6.dst" too, or go through common/net/TsharkAddressFields, which adds them.
+IPV4_FIELD = re.compile(r"""["']ip\.(src|dst)["']""")
+
+
+def scan_ipv4_only_fields(root: Path) -> list[str]:
+    failures = []
+    base = root / "backend/src/main/java"
+    for path in sorted(base.rglob("*.java")) if base.exists() else []:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if "TsharkAddressFields" in text or path.name == "TsharkAddressFields.java":
+            continue
+        for m in sorted(set(IPV4_FIELD.findall(text))):
+            if f'"ipv6.{m}"' not in text:
+                rel = path.relative_to(root).as_posix()
+                failures.append(
+                    f"{rel}: asks tshark for ip.{m} but not ipv6.{m}\n"
+                    f"    use common/net/TsharkAddressFields (withIpv6/command + fold), or read both\n"
+                    f"    why this is gated: five extractors silently dropped every IPv6 packet (#1357)"
+                )
+    return failures
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     args = ap.parse_args()
     root = Path(args.root).resolve()
 
-    failures = scan(root)
+    failures = scan(root) + scan_ipv4_only_fields(root)
     if failures:
         print("Shared vocabulary defined outside its owning module:\n")
         for f in failures:

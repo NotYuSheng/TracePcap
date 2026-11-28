@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.TsharkAddressFields;
 import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
@@ -59,6 +60,11 @@ public class HostnameResolverService {
   /** One raw claim: {@code source} asserted that {@code ip} is named {@code hostname}. */
   public record Claim(String ip, String hostname, String source) {}
 
+  /** The row layout {@link #parseRow} reads; an IPv6 packet's source is folded into ip.src (#1357). */
+  static final String[] FIELDS = {
+    "_ws.col.Protocol", "ip.src", "dhcp.option.hostname", "dhcp.option.requested_ip_address", "dns.resp.name", "dns.a", "dns.aaaa", "dns.ptr.domain_name", "dns.qry.name", "nbns.name", "nbns.addr", "ntlmssp.auth.hostname"
+  };
+
   /**
    * Scans the capture and returns a map of IP → resolved hostname for every host whose name could
    * be derived from DHCP, mDNS, NBNS or reverse DNS.
@@ -75,6 +81,8 @@ public class HostnameResolverService {
     //   11 ntlmssp.auth.hostname
     ProcessBuilder pb =
         new ProcessBuilder(
+            TsharkAddressFields.command(
+                FIELDS,
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
@@ -86,31 +94,7 @@ public class HostnameResolverService {
             "-E",
             "separator=|",
             "-E",
-            "occurrence=f",
-            "-e",
-            "_ws.col.Protocol",
-            "-e",
-            "ip.src",
-            "-e",
-            "dhcp.option.hostname",
-            "-e",
-            "dhcp.option.requested_ip_address",
-            "-e",
-            "dns.resp.name",
-            "-e",
-            "dns.a",
-            "-e",
-            "dns.aaaa",
-            "-e",
-            "dns.ptr.domain_name",
-            "-e",
-            "dns.qry.name",
-            "-e",
-            "nbns.name",
-            "-e",
-            "nbns.addr",
-            "-e",
-            "ntlmssp.auth.hostname");
+            "occurrence=f"));
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -147,7 +131,7 @@ public class HostnameResolverService {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) parseRow(line.split("\\|", -1), result);
+                    if (!line.isEmpty()) parseRow(TsharkAddressFields.fold(line.split("\\|", -1), FIELDS), result);
                   }
                 } catch (Exception ignored) {
                   // best-effort
