@@ -17,6 +17,8 @@ class SuricataEveAddressTest {
         "{\"src_ip\":\"fd00:0000:0000:0000:0000:0000:0000:0010\",\"dest_ip\":\"10.0.0.1\",\"x\":\"x:y\"}");
     assertThat(SuricataService.eveAddress(eve, "src_ip")).isEqualTo("fd00::10");
     assertThat(SuricataService.eveAddress(eve, "dest_ip")).isEqualTo("10.0.0.1");
+    var mapped = new ObjectMapper().readTree("{\"src_ip\":\"0000:0000:0000:0000:0000:ffff:0a00:0001\"}");
+    assertThat(SuricataService.eveAddress(mapped, "src_ip")).isEqualTo("::ffff:10.0.0.1"); // as tshark writes it
     assertThat(SuricataService.eveAddress(eve, "x")).isEqualTo("x:y"); // not an address: unchanged
     assertThat(SuricataService.eveAddress(eve, "missing")).isNull();
   }

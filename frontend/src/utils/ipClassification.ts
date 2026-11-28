@@ -17,6 +17,7 @@ import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateR
  * server, and the same host was classified differently depending on which side answered.
  */
 export function isRfc1918(ip: string): boolean {
+  if (!ip) return false; // callers pass node data, which can lack an address
   // An IPv4-mapped address (::ffff:10.0.0.1) is its IPv4 address, as parseIp reads it (#1357).
   if (ip.includes(':')) {
     const b = parseIp(ip);

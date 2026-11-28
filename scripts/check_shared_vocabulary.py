@@ -122,8 +122,14 @@ RULES.append({
     "name": "address and port joined by hand",
     "why": "\"fd00::1:443\" reads as one IPv6 address: IPv6 needs brackets, [fd00::1]:443 (#1357)",
     "owner": "backend common/net/Endpoints.of",
-    "pattern": re.compile(r"""\+\s*":"\s*\+\s*[\w.()]*[pP]ort\b|["']\]:["']"""),
-    "owners": {"backend/src/main/java/com/tracepcap/common/net/Endpoints.java"},
+    # Java "+ \":\" + port", a TS template "${ip}:${port}", or a hand-written "]:" bracket.
+    "pattern": re.compile(
+        r"""\+\s*":"\s*\+\s*[\w.()]*[pP]ort\b|["'`]\]:|\$\{[^}]*\}:\$\{[^}]*[pP]ort[^}]*\}"""
+    ),
+    "owners": {
+        "backend/src/main/java/com/tracepcap/common/net/Endpoints.java",
+        "frontend/src/utils/formatters/index.ts",
+    },
     "exempt": {
         # Keys, not text for people: compared for equality within one parse, never displayed.
         "backend/src/main/java/com/tracepcap/analysis/service/TcpHandshake.java",

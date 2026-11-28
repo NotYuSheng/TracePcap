@@ -1,3 +1,4 @@
+import { formatIpPort } from '@/utils/formatters';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
@@ -93,8 +94,7 @@ export function flightsFor(moment: Moment, ends: Map<string, ConversationEnds>):
 
 /** One line for a packet: "TCP 10.0.0.5:51334 → 10.0.0.9:445 · 74 B · [SYN]". */
 export function describePacket(p: ReplayPacket): string {
-  const end = (ip: string, port?: number | null) => (port != null ? `${ip}:${port}` : ip);
-  const parts = [`${p.protocol} ${end(p.srcIp, p.srcPort)} → ${end(p.dstIp, p.dstPort)}`];
+  const parts = [`${p.protocol} ${formatIpPort(p.srcIp, p.srcPort)} → ${formatIpPort(p.dstIp, p.dstPort)}`];
   if (p.size != null) parts.push(`${p.size} B`);
   if (p.info) parts.push(p.info);
   return parts.join(' · ');

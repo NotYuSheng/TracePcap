@@ -693,7 +693,10 @@ public class SuricataService implements Extractor {
     String v = node.path(field).asText(null);
     if (v == null || v.indexOf(':') < 0) return v;
     byte[] b = com.tracepcap.common.net.Cidr.addressBytes(v);
-    return b == null ? v : com.tracepcap.common.net.Cidr.formatAddress(b);
+    if (b == null) return v;
+    // An IPv4-mapped address reads as 4 bytes; tshark writes it ::ffff:10.0.0.1, so keep the prefix.
+    String a = com.tracepcap.common.net.Cidr.formatAddress(b);
+    return b.length == 4 ? "::ffff:" + a : a;
   }
 
   private static String text(JsonNode node, String field, int max) {

@@ -82,7 +82,9 @@ public final class IpLocality {
     }
     if (addr.indexOf(':') >= 0) {
       // An IPv4-mapped address (::ffff:10.0.0.1) is its IPv4 address, as CidrBlock reads it (#1357).
-      byte[] b = Cidr.addressBytes(addr);
+      // Parsed only when it could be one (a dotted tail or a ::ffff: prefix): isLocal is hot.
+      boolean couldBeMapped = addr.indexOf('.') >= 0 || addr.regionMatches(true, 0, "::ffff:", 0, 7);
+      byte[] b = couldBeMapped ? Cidr.addressBytes(addr) : null;
       return b != null && b.length == 4 ? isLocalV4(Cidr.formatAddress(b)) : isLocalV6(addr);
     }
     return isLocalV4(addr);

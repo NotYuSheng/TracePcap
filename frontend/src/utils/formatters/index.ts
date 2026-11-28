@@ -137,7 +137,9 @@ export const formatProtocol = (protocol: string): string => {
  * @param port - Port number (optional)
  * @returns Formatted string (e.g., "192.168.1.1:80")
  */
-export const formatIpPort = (ip: string, port?: number): string => {
+export const formatIpPort = (ip: string, port?: number | null): string => {
+  // 0 is "no port" here: conversationService maps a missing port to 0 (ICMP, ARP). The backend's
+  // Endpoints.of gets null for that, so the two agree on what's shown.
   if (!port) return ip;
   return ip.includes(':') ? `[${ip}]:${port}` : `${ip}:${port}`;
 };
