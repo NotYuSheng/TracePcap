@@ -1,6 +1,6 @@
 package com.tracepcap.hostlog.service;
 
-import com.tracepcap.common.net.TsharkAddressFields;
+import com.tracepcap.common.net.TsharkFields;
 import com.tracepcap.analysis.spi.HostServiceLogExtractor;
 import com.tracepcap.analysis.spi.HostServiceLogResult;
 import com.tracepcap.analysis.spi.HostServiceSuspicion;
@@ -187,7 +187,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     // A resolver answering over IPv6 writes its address in ipv6.src (#1357).
     ProcessBuilder pb =
         new ProcessBuilder(
-            TsharkAddressFields.command(
+            TsharkFields.command(
                 FIELDS, "tshark", "-r", pcap.getAbsolutePath(), "-Y", "dns.flags.response==1",
                 "-T", "fields", "-E", "separator=|"));
     // Discard stderr natively (no drain thread needed); we only consume stdout.
@@ -209,7 +209,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
                   String line;
                   while ((line = reader.readLine()) != null) {
                     if (!line.isEmpty()) {
-                      String[] row = TsharkAddressFields.fold(line.split("\\|", -1), FIELDS);
+                      String[] row = TsharkFields.fold(line.split("\\|", -1), FIELDS);
                       parseRow(String.join("|", row), groups, serverStats);
                     }
                   }

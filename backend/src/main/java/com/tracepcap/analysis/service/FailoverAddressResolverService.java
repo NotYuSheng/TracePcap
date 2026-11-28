@@ -1,6 +1,6 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.common.net.TsharkAddressFields;
+import com.tracepcap.common.net.TsharkFields;
 import com.tracepcap.common.net.IpLocality;
 import java.io.BufferedReader;
 import java.io.File;
@@ -76,7 +76,7 @@ public class FailoverAddressResolverService {
     Map<String, Set<String>> membersByIp = new LinkedHashMap<>();
     ProcessBuilder pb =
         new ProcessBuilder(
-            TsharkAddressFields.command(
+            TsharkFields.command(
             FIELDS,
             "tshark",
             "-r",
@@ -123,7 +123,7 @@ public class FailoverAddressResolverService {
                     new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    String[] f = TsharkAddressFields.fold(line.split("\\|", -1), FIELDS);
+                    String[] f = TsharkFields.fold(line.split("\\|", -1), FIELDS);
                     if (f.length < FIELDS.length) continue;
                     String src = f[0].split(",")[0].trim();
                     record(f[1], "VRRP", src, protocolByIp, membersByIp);

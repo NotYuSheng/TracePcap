@@ -214,8 +214,7 @@ public class ServiceBannerExtractor implements HostServiceLogExtractor, ServiceB
   }
 
   private static boolean truthy(String raw) {
-    String v = first(raw);
-    return "1".equals(v) || "True".equalsIgnoreCase(v);
+    return com.tracepcap.common.net.TsharkFields.isTrue(raw);
   }
 
   private static void run(File pcap, Tally tally) {

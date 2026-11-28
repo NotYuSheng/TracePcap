@@ -1,6 +1,6 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.common.net.TsharkAddressFields;
+import com.tracepcap.common.net.TsharkFields;
 import com.tracepcap.common.net.IpLocality;
 import java.time.LocalDateTime;
 import java.io.BufferedReader;
@@ -216,7 +216,7 @@ public class WindowsIdentityResolverService {
     // person objects from infrastructure, not the presence of an attribute list.
     ProcessBuilder pb =
         new ProcessBuilder(
-            TsharkAddressFields.command(
+            TsharkFields.command(
                 FIELDS,
             "tshark",
             "-r",
@@ -269,7 +269,7 @@ public class WindowsIdentityResolverService {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) parseRow(TsharkAddressFields.fold(line.split("\\|", -1), FIELDS), result);
+                    if (!line.isEmpty()) parseRow(TsharkFields.fold(line.split("\\|", -1), FIELDS), result);
                   }
                 } catch (Exception ignored) {
                   // best-effort
@@ -324,7 +324,7 @@ public class WindowsIdentityResolverService {
   /** For tests: tshark output rows (fields as {@link #resolveLogons} requests them) to logins. */
   List<Logon> logonsFromRows(List<String> rows) {
     Map<LogonKey, LogonAgg> result = new java.util.LinkedHashMap<>();
-    for (String row : rows) parseRow(TsharkAddressFields.fold(row.split("\\|", -1), FIELDS), result);
+    for (String row : rows) parseRow(TsharkFields.fold(row.split("\\|", -1), FIELDS), result);
     return result.values().stream().map(LogonAgg::toLogon).toList();
   }
 
