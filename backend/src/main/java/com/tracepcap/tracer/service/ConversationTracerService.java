@@ -1,5 +1,6 @@
 package com.tracepcap.tracer.service;
 
+import com.tracepcap.common.net.Endpoints;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.PacketLookup;
@@ -146,9 +147,9 @@ public class ConversationTracerService {
   public Prepared prepareExplanations(UUID conversationId) {
     ConversationFacts conv = conversationLookup.conversationFactsById(conversationId)
         .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
-    String name = "%s:%s → %s:%s".formatted(
-        conv.flow().srcIp(), conv.flow().srcPort() != null ? conv.flow().srcPort() : "?",
-        conv.flow().dstIp(), conv.flow().dstPort() != null ? conv.flow().dstPort() : "?");
+    String name = "%s → %s".formatted(
+        Endpoints.of(conv.flow().srcIp(), conv.flow().srcPort() != null ? conv.flow().srcPort() : "?"),
+        Endpoints.of(conv.flow().dstIp(), conv.flow().dstPort() != null ? conv.flow().dstPort() : "?"));
 
     // Return from cache if available
     List<StepExplanation> cached = explanationCache.get(conversationId);
@@ -217,11 +218,9 @@ public class ConversationTracerService {
         Format your response as a numbered list with one entry per packet, using the format:
         STEP <n>: <explanation>
         Keep each explanation to 1-2 sentences. Use plain language suitable for a security analyst.
-        Conversation: %s:%s -> %s:%s (%s%s)""".formatted(
-        conv.flow().srcIp(),
-        conv.flow().srcPort() != null ? conv.flow().srcPort() : "?",
-        conv.flow().dstIp(),
-        conv.flow().dstPort() != null ? conv.flow().dstPort() : "?",
+        Conversation: %s -> %s (%s%s)""".formatted(
+        Endpoints.of(conv.flow().srcIp(), conv.flow().srcPort() != null ? conv.flow().srcPort() : "?"),
+        Endpoints.of(conv.flow().dstIp(), conv.flow().dstPort() != null ? conv.flow().dstPort() : "?"),
         conv.flow().protocol(),
         conv.findings().appName() != null ? " / " + conv.findings().appName() : "");
   }

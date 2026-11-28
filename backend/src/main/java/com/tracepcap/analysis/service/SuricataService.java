@@ -499,7 +499,7 @@ public class SuricataService implements Extractor {
       JsonNode root = objectMapper.readTree(line);
       String type = root.path("event_type").asText();
       if ("krb5".equals(type)) {
-        String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);
+        String srcIp = eveAddress(root, "src_ip"), dstIp = eveAddress(root, "dest_ip");
         if (srcIp == null || dstIp == null) return;
         String key = flowKey(srcIp, root.has("src_port") ? root.get("src_port").asInt() : null,
             dstIp, root.has("dest_port") ? root.get("dest_port").asInt() : null,
@@ -509,7 +509,7 @@ public class SuricataService implements Extractor {
       }
       if ("smb".equals(type) || "dcerpc".equals(type)
           || ("fileinfo".equals(type) && "smb".equals(root.path("app_proto").asText()))) {
-        String srcIp = root.path("src_ip").asText(null), dstIp = root.path("dest_ip").asText(null);
+        String srcIp = eveAddress(root, "src_ip"), dstIp = eveAddress(root, "dest_ip");
         if (srcIp == null || dstIp == null) return;
         String key = flowKey(srcIp, root.has("src_port") ? root.get("src_port").asInt() : null,
             dstIp, root.has("dest_port") ? root.get("dest_port").asInt() : null,
@@ -540,8 +540,8 @@ public class SuricataService implements Extractor {
       int severity = alert.path("severity").asInt(0);
       String formatted = formatAlert(signature, sid, severity);
 
-      String srcIp = root.path("src_ip").asText(null);
-      String dstIp = root.path("dest_ip").asText(null);
+      String srcIp = eveAddress(root, "src_ip");
+      String dstIp = eveAddress(root, "dest_ip");
       if (srcIp == null || dstIp == null) return;
       Integer srcPort = root.has("src_port") ? root.get("src_port").asInt() : null;
       Integer dstPort = root.has("dest_port") ? root.get("dest_port").asInt() : null;
@@ -592,8 +592,8 @@ public class SuricataService implements Extractor {
   private static void parseAnomaly(JsonNode root, Eve result) {
     JsonNode a = root.path("anomaly");
     String event = a.path("event").asText("").trim();
-    String srcIp = root.path("src_ip").asText(null);
-    String dstIp = root.path("dest_ip").asText(null);
+    String srcIp = eveAddress(root, "src_ip");
+    String dstIp = eveAddress(root, "dest_ip");
     // Decoder anomalies on a lone packet have no flow to hang on: only flow-level ones are kept.
     if (event.isEmpty() || srcIp == null || dstIp == null) return;
     if (result.anomalyCount().getAndIncrement() >= MAX_ANOMALIES) return; // a running count, as for alerts
@@ -650,8 +650,8 @@ public class SuricataService implements Extractor {
    */
   private void parseTls(JsonNode root, Map<String, TlsRecord> out) {
     JsonNode tls = root.path("tls");
-    String srcIp = root.path("src_ip").asText(null);
-    String dstIp = root.path("dest_ip").asText(null);
+    String srcIp = eveAddress(root, "src_ip");
+    String dstIp = eveAddress(root, "dest_ip");
     if (tls.isMissingNode() || srcIp == null || dstIp == null) return;
     Integer srcPort = root.has("src_port") ? root.get("src_port").asInt() : null;
     Integer dstPort = root.has("dest_port") ? root.get("dest_port").asInt() : null;
@@ -682,6 +682,21 @@ public class SuricataService implements Extractor {
         a.ja3() != null ? a.ja3() : b.ja3(),
         a.ja3s() != null ? a.ja3s() : b.ja3s(),
         a.cert() != null ? a.cert() : b.cert());
+  }
+
+  /**
+   * An eve address as tshark writes it (#1357). Suricata writes IPv6 in full ("fd00:0000:…:0010"),
+   * tshark compressed ("fd00::10"), so an IPv6 alert's flow key never matched its conversation and
+   * its addresses never matched a host. IPv4 and anything that isn't an address are unchanged.
+   */
+  static String eveAddress(JsonNode node, String field) {
+    String v = node.path(field).asText(null);
+    if (v == null || v.indexOf(':') < 0) return v;
+    byte[] b = com.tracepcap.common.net.Cidr.addressBytes(v);
+    if (b == null) return v;
+    // An IPv4-mapped address reads as 4 bytes; tshark writes it ::ffff:10.0.0.1, so keep the prefix.
+    String a = com.tracepcap.common.net.Cidr.formatAddress(b);
+    return b.length == 4 ? "::ffff:" + a : a;
   }
 
   private static String text(JsonNode node, String field, int max) {

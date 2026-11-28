@@ -1,5 +1,6 @@
 package com.tracepcap.story.chat.tools;
 
+import com.tracepcap.common.net.Endpoints;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.spi.ConversationLookup;
@@ -71,8 +72,8 @@ class ConversationsTool implements ChatTool {
   static Map<String, Object> row(ConversationFacts c) {
     var f = c.flow();
     Map<String, Object> m = new LinkedHashMap<>();
-    m.put("src", f.srcIp() + (f.srcPort() != null ? ":" + f.srcPort() : ""));
-    m.put("dst", f.dstIp() + (f.dstPort() != null ? ":" + f.dstPort() : ""));
+    m.put("src", Endpoints.of(f.srcIp(), f.srcPort()));
+    m.put("dst", Endpoints.of(f.dstIp(), f.dstPort()));
     m.put("protocol", f.protocol());
     if (c.findings() != null && c.findings().appName() != null) m.put("app", c.findings().appName());
     m.put("packets", f.packetCount());

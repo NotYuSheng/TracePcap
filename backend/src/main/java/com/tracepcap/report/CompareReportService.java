@@ -1,5 +1,6 @@
 package com.tracepcap.report;
 
+import com.tracepcap.common.net.Endpoints;
 import com.tracepcap.common.text.Humanize;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
@@ -457,6 +458,6 @@ public class CompareReportService {
 
   private static String endpoint(String ip, Integer port) {
     if (ip == null) return "—";
-    return port != null ? ip + ":" + port : ip;
+    return Endpoints.of(ip, port);
   }
 }

@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.net.Endpoints;
 import com.tracepcap.common.text.Humanize;
 import com.tracepcap.analysis.dto.SessionResponse;
 import com.tracepcap.analysis.entity.ConversationEntity;
@@ -948,11 +949,7 @@ public class SessionReconstructionService {
         int ipInt = java.nio.ByteBuffer.wrap(ipBytes).getInt() ^ STUN_MAGIC_COOKIE;
         java.nio.ByteBuffer.wrap(ipBytes).putInt(ipInt);
       }
-      try {
-        return java.net.InetAddress.getByAddress(ipBytes).getHostAddress() + ":" + port;
-      } catch (java.net.UnknownHostException e) {
-        return "(invalid IPv4):" + port;
-      }
+      return Endpoints.of(com.tracepcap.common.net.Cidr.formatAddress(ipBytes), port);
     } else if (family == 0x02) {
       // IPv6 — XOR key is magic cookie (4 bytes) + transaction ID (12 bytes)
       if (offset + 20 > data.length) return "(truncated)";
@@ -962,11 +959,7 @@ public class SessionReconstructionService {
         java.nio.ByteBuffer.wrap(xorKey).putInt(STUN_MAGIC_COOKIE).put(txId);
         for (int i = 0; i < 16; i++) ipBytes[i] ^= xorKey[i];
       }
-      try {
-        return "[" + java.net.InetAddress.getByAddress(ipBytes).getHostAddress() + "]:" + port;
-      } catch (java.net.UnknownHostException e) {
-        return "(invalid IPv6):" + port;
-      }
+      return Endpoints.of(com.tracepcap.common.net.Cidr.formatAddress(ipBytes), port);
     }
     return "(unknown family)";
   }

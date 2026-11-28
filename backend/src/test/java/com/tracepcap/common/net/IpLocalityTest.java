@@ -110,4 +110,12 @@ class IpLocalityTest {
     assertThat(IpLocality.isAssigned("  ")).isFalse();
     assertThat(IpLocality.isAssigned(null)).isFalse();
   }
+
+  @Test
+  void anIpv4MappedAddressIsItsIpv4Address() {
+    // #1357: CidrBlock and the frontend read ::ffff:a.b.c.d as a.b.c.d; locality agrees.
+    assertThat(IpLocality.isLocal("::ffff:10.0.0.1")).isTrue();
+    assertThat(IpLocality.isLocal("::ffff:8.8.8.8")).isFalse();
+    assertThat(IpLocality.isLocal("fd00::1")).isTrue();
+  }
 }
