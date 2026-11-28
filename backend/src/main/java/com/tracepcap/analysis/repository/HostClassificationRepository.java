@@ -12,6 +12,13 @@ public interface HostClassificationRepository
 
   List<HostClassificationEntity> findByFileId(UUID fileId);
 
+  /** The first page of a file's rows in id order: {@code InPages}. */
+  List<HostClassificationEntity> findByFileIdOrderByIdAsc(UUID fileId, org.springframework.data.domain.Limit limit);
+
+  /** The page after {@code after}: {@code InPages}. */
+  List<HostClassificationEntity> findByFileIdAndIdGreaterThanOrderByIdAsc(
+      UUID fileId, UUID after, org.springframework.data.domain.Limit limit);
+
   List<HostClassificationEntity> findByFileIdAndIpIn(UUID fileId, java.util.Collection<String> ips);
 
   // findFirst + OrderByIdAsc (LIMIT 1, deterministic): a file can hold >1 classification for the

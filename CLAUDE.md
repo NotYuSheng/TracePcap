@@ -34,6 +34,7 @@ Some concepts have **one definition and one way in**. Before writing a helper th
 | MAC addresses (same address, vendor prefix, multicast) | `common/net/MacAddress` | — |
 | A capture's networks (DHCP v4/v6, IPv6 router adverts) | `NetworkSegmentReader.of(fileId)`; outside analysis, `NetworkSegmentLookup` | `segmentRanges` / `segmentHolds` / `segmentAdmits` in `features/networkSegments/segmentRanges.ts` |
 | Looking rows up by a caller-sized list of keys (`IN`) | `common/db/InBatches.of(keys, repo::findAllByXIn)`: Postgres binds at most 65,535 parameters, and a scan capture has 200k addresses | — |
+| Every row of a file, mapped to facts | `common/db/InPages.of` over keyset pages (`findByFileIdOrderByIdAsc` / `…AndIdGreaterThan…`, indexed on `(file_id, id)`): never load a whole file's entities and then map them | — |
 | Well-known ports | `common/net/ServicePorts` | `utils/portUtils.ts` |
 | Severity colours | — | `utils/severityColors.ts` |
 

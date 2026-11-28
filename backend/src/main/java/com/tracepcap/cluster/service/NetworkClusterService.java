@@ -131,7 +131,8 @@ public class NetworkClusterService {
       geoByIp.putAll(geoOrgLookup.placesFor(allIps));
     }
     if ("deviceType".equals(groupBy)) {
-      hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.put(h.ip(), h));
+      // Two rows for one address: the first (lowest id) wins, as hostFactsByIp picks it.
+      hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.putIfAbsent(h.ip(), h));
     }
     // The analyst's network labels: their own grouping, and the organisation an address belongs
     // to before its ASN (labelling your own public range shows it as yours, not as the ISP's).
@@ -364,7 +365,7 @@ public class NetworkClusterService {
     Map<String, IpPlace> geoByIp = new HashMap<>();
     geoByIp.putAll(geoOrgLookup.placesFor(ips));
     Map<String, HostFacts> deviceByIp = new HashMap<>();
-    hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.put(h.ip(), h));
+    hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.putIfAbsent(h.ip(), h));
 
     // Sort and limit
     Comparator<Map.Entry<String, HostAcc>> comparator = switch (sortBy) {
@@ -424,7 +425,7 @@ public class NetworkClusterService {
     Map<String, List<DnsQueryLogEntity>> byServer =
         rows.stream().collect(Collectors.groupingBy(DnsQueryLogEntity::getServerIp));
     Map<String, HostFacts> hostByIp = new HashMap<>();
-    hostClassificationLookup.hostFacts(fileId).forEach(h -> hostByIp.put(h.ip(), h));
+    hostClassificationLookup.hostFacts(fileId).forEach(h -> hostByIp.putIfAbsent(h.ip(), h));
 
     return byServer.entrySet().stream()
         .map(

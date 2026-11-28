@@ -25,6 +25,13 @@ public interface ConversationRepository
 
   List<ConversationEntity> findByFileId(UUID fileId);
 
+  /** The first page of a file's rows in id order: {@code InPages}. */
+  List<ConversationEntity> findByFileIdOrderByIdAsc(UUID fileId, org.springframework.data.domain.Limit limit);
+
+  /** The page after {@code after}: {@code InPages}. */
+  List<ConversationEntity> findByFileIdAndIdGreaterThanOrderByIdAsc(
+      UUID fileId, UUID after, org.springframework.data.domain.Limit limit);
+
   long countByFileId(UUID fileId);
 
   /** All conversations in a file in which the given IP is either endpoint (initiator or peer). */
